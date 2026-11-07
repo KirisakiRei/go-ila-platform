@@ -1,16 +1,16 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/lib/auth-api'
-import { onUnauthorized, tokenStorage } from '@/lib/http'
+import { onUnauthorized, readCsrfToken } from '@/lib/http'
 import type { User } from '@/types/api'
 import { AuthContext, type AuthContextValue } from './auth-context'
-import { useEffect } from 'react'
 
 type SessionStatus = 'restoring' | 'authenticated' | 'anonymous'
 
 /**
- * AuthProvider memulihkan sesi dari token tersimpan, menyediakan aksi
- * masuk/keluar, dan memutus sesi seketika saat backend menolak token.
+ * AuthProvider memulihkan sesi dari cookie HttpOnly, menyediakan aksi
+ * masuk/keluar, dan memutus tampilan seketika saat backend menolak sesi.
+ * Tidak ada token yang disimpan di sisi klien.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -18,14 +18,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
 
   const signOut = useCallback(() => {
-    tokenStorage.clear()
+    // Cookie dihapus backend; kegagalan jaringan tidak boleh memblokir keluar.
+    void authApi.logout().catch(() => undefined)
     setUser(null)
     setStatus('anonymous')
     queryClient.clear()
   }, [queryClient])
 
-  const signIn = useCallback((token: string, nextUser: User) => {
-    tokenStorage.set(token)
+  const signIn = useCallback((nextUser: User) => {
     setUser(nextUser)
     setStatus('authenticated')
   }, [])
@@ -35,22 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     async function restore() {
-      if (!tokenStorage.get()) {
-        if (!cancelled) setStatus('anonymous')
-        return
-      }
-
       try {
         const currentUser = await authApi.me()
-        if (!cancelled) {
-          setUser(currentUser)
-          setStatus('authenticated')
+        if (cancelled) return
+
+        // Cookie CSRF bisa hilang (sesi browser dibersihkan sebagian),
+        // sedangkan permintaan tulis pertama akan ditolak tanpa itu.
+        if (!readCsrfToken()) {
+          await authApi.csrf().catch(() => undefined)
         }
+
+        setUser(currentUser)
+        setStatus('authenticated')
       } catch {
-        if (!cancelled) {
-          tokenStorage.clear()
-          setStatus('anonymous')
-        }
+        if (!cancelled) setStatus('anonymous')
       }
     }
 
@@ -60,11 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Token yang ditolak backend langsung dibuang agar UI tidak bertahan
-  // pada sesi yang sudah tidak sah.
+  // Sesi yang ditolak backend langsung dibuang agar UI tidak bertahan
+  // pada keadaan yang sudah tidak sah.
   useEffect(() => {
     onUnauthorized(() => {
-      tokenStorage.clear()
       setUser(null)
       setStatus('anonymous')
     })

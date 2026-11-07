@@ -4,7 +4,7 @@ import { authApi } from '@/lib/auth-api'
 import type { LoginPayload, RegisterPayload } from '@/types/api'
 import { useAuthContext } from '../auth-context'
 
-/** Mutation untuk masuk; mengisi sesi lalu mengalihkan ke dashboard. */
+/** Mutation untuk masuk; sesi disimpan backend, UI hanya menerima data akun. */
 export function useSignIn() {
   const { signIn } = useAuthContext()
   const navigate = useNavigate()
@@ -12,7 +12,7 @@ export function useSignIn() {
   return useMutation({
     mutationFn: (payload: LoginPayload) => authApi.login(payload),
     onSuccess: (result) => {
-      signIn(result.token, result.user)
+      signIn(result.user)
       navigate('/', { replace: true })
     },
   })

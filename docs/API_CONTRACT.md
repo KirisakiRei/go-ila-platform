@@ -47,13 +47,29 @@ Gagal:
 
 ### 1.2. Autentikasi
 
-Endpoint bertanda 🔒 memerlukan header:
+Endpoint bertanda 🔒 memerlukan **cookie sesi**. Tidak ada header
+`Authorization` — backend tidak menerimanya sama sekali.
+
+| Cookie | HttpOnly | Isi |
+|---|---|---|
+| `ila_session` | ✅ | JWT sesi, 12 jam |
+| `ila_csrf` | ❌ | token anti-CSRF |
+
+Server menetapkan keduanya saat login. Browser mengirimkannya otomatis bila
+permintaan memakai `credentials: 'same-origin'`.
+
+**Permintaan pengubah keadaan** (`POST`, `PUT`, `PATCH`, `DELETE`) wajib
+menyertakan header:
 
 ```
-Authorization: Bearer <token>
+X-CSRF-Token: <nilai cookie ila_csrf>
 ```
 
-Token dari `POST /auth/login`, berlaku 12 jam.
+Tanpa header itu atau bila nilainya berbeda → `403`.
+
+> Cookie memakai `SameSite=Strict`, `HttpOnly` (sesi saja), dan `Secure` di
+> produksi. Frontend **tidak boleh** menyimpan token di `localStorage`,
+> `sessionStorage`, atau variabel yang bisa dibaca ulang setelah reload.
 
 ---
 
@@ -75,18 +91,36 @@ Ketentuan: `name` 3–100, `email` valid, `password` 10–72.
 { "email": "budi@contoh.id", "password": "rahasia12345" }
 ```
 
-Balasan `200`:
+Balasan `200` beserta dua `Set-Cookie`:
 
 ```json
 {
-  "token": "eyJ...",
   "expires_at": "2026-11-08T02:00:00Z",
   "user": { }
 }
 ```
 
+> Token **tidak** ada di badan balasan. Satu-satunya tempatnya adalah cookie
+> `ila_session`.
+
 **Batas percobaan:** 5 gagal per 15 menit per `email + IP` → `429`.
 Setelah login berhasil, hitungan direset.
+
+### POST `/auth/logout` — publik
+
+Menghapus kedua cookie. Balasan `200` `{ "logged_out": true }`.
+Aman dipanggil tanpa sesi, sehingga frontend tidak perlu menunggu respons.
+
+### GET `/auth/csrf` — publik
+
+Menerbitkan ulang cookie CSRF dan mengembalikannya:
+
+```json
+{ "csrf_token": "QwfIQREK..." }
+```
+
+Dipanggil frontend setelah sesi dipulihkan, karena cookie CSRF bisa hilang
+saat browser dibersihkan sebagian. Token lama otomatis tidak berlaku.
 
 ### GET `/me` 🔒
 
@@ -474,6 +508,9 @@ Token dihapus setelah dipakai, apa pun hasilnya.
 | Menampilkan token/kredensial | Tidak pernah dikirim |
 | Memanggil `/internal/*` Runner | Hanya backend-api |
 | Memakai data user lain | Isolasi wajib |
+| Menyimpan token di `localStorage` / `sessionStorage` | Sesi hanya di cookie HttpOnly |
+| Memakai header `Authorization` | Backend menolaknya; sesi hanya lewat cookie |
+| Mengirim `POST`/`PATCH`/`DELETE` tanpa `X-CSRF-Token` | Ditolak `403` |
 | Menganggap `message` sebagai kode | Pakai `error` untuk logika |
 | Menampilkan ILA 3.0 aktif bila `available: false` | Selalu patuhi `available && allowed` |
 | Memanggil `POST /telegram/webhook` | Bukan untuk klien |

@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
 import { ApiError } from '@/lib/api-error'
-import { request, tokenStorage } from '@/lib/http'
+import { CSRF_HEADER, readCsrfToken, request } from '@/lib/http'
 
 function mockFetch(status: number, body: unknown) {
   const fn = vi.fn().mockResolvedValue({
@@ -12,13 +12,17 @@ function mockFetch(status: number, body: unknown) {
   return fn
 }
 
-describe('request', () => {
-  beforeEach(() => {
-    tokenStorage.clear()
-  })
+function setCookie(value: string) {
+  document.cookie = value
+}
 
+describe('request', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    // Bersihkan cookie antar-tes dengan mengosongkan nilai dan masa berlaku.
+    for (const name of ['ila_csrf', 'ila_session']) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+    }
   })
 
   it('mengembalikan data saat balasan sukses', async () => {
@@ -28,15 +32,35 @@ describe('request', () => {
     expect(result).toEqual({ id: '1' })
   })
 
-  it('menyertakan token bila tersedia', async () => {
-    tokenStorage.set('token-uji')
+  it('tidak pernah mengirim header Authorization', async () => {
     const fetchMock = mockFetch(200, { success: true, message: 'ok', data: null })
 
     await request('/ping')
 
-    const init = fetchMock.mock.calls[0]?.[1]
-    const headers = init?.headers as Headers
-    expect(headers.get('Authorization')).toBe('Bearer token-uji')
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers
+    expect(headers.get('Authorization')).toBeNull()
+    // Sesi dikirim lewat cookie yang tidak terjangkau JavaScript.
+    expect(fetchMock.mock.calls[0]?.[1]?.credentials).toBe('same-origin')
+  })
+
+  it('menyertakan header CSRF pada permintaan tulis', async () => {
+    setCookie('ila_csrf=abc123')
+    const fetchMock = mockFetch(200, { success: true, message: 'ok', data: null })
+
+    await request('/trial', { method: 'POST' })
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers
+    expect(headers.get(CSRF_HEADER)).toBe('abc123')
+  })
+
+  it('tidak menyertakan header CSRF pada permintaan baca', async () => {
+    setCookie('ila_csrf=abc123')
+    const fetchMock = mockFetch(200, { success: true, message: 'ok', data: null })
+
+    await request('/me')
+
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers
+    expect(headers.get(CSRF_HEADER)).toBeNull()
   })
 
   it('melempar ApiError saat balasan gagal', async () => {
@@ -56,5 +80,22 @@ describe('request', () => {
 
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).isNetworkProblem).toBe(true)
+  })
+})
+
+describe('readCsrfToken', () => {
+  afterEach(() => {
+    document.cookie = 'ila_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+  })
+
+  it('mengembalikan string kosong bila cookie tidak ada', () => {
+    expect(readCsrfToken()).toBe('')
+  })
+
+  it('membaca nilai cookie di antara cookie lain', () => {
+    document.cookie = 'lain=x'
+    document.cookie = 'ila_csrf=token-uji'
+
+    expect(readCsrfToken()).toBe('token-uji')
   })
 })

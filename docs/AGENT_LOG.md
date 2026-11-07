@@ -35,6 +35,57 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Sesi pindah ke cookie HttpOnly + proteksi CSRF
+
+**Pelaku:** Claude
+**Tipe:** SECURITY
+**Status:** SELESAI, terverifikasi terhadap server berjalan
+
+**Ringkasan:**
+
+Token sesi tidak lagi pernah disentuh JavaScript. Backend menaruhnya di
+cookie `ila_session` (`HttpOnly`, `Secure` di produksi, `SameSite=Strict`),
+dan permintaan tulis dijaga skema **double-submit CSRF**.
+
+| Berkas | Peran |
+|---|---|
+| `internal/session/session.go` | set/hapus cookie, rotasi token CSRF |
+| `internal/middleware/auth.go` | sesi hanya dari cookie; `RequireCSRF` |
+| `internal/handler/auth_handler.go` | `logout`, `csrf`, set cookie saat login |
+| `internal/config/config.go` | 4 kunci baru + tolak `COOKIE_SECURE=false` di produksi |
+
+**Endpoint baru:**
+
+```text
+POST /api/v1/auth/logout   hapus kedua cookie
+get  /api/v1/auth/csrf     terbitkan ulang cookie CSRF
+```
+
+**Hasil uji terhadap server berjalan:**
+
+| Skenario | Hasil |
+|---|---|
+| Login menetapkan cookie | `ila_session` HttpOnly, `ila_csrf` terbaca |
+| `GET /me` dengan cookie | 200 |
+| `POST /trial` tanpa header CSRF | **403** |
+| `POST /trial` dengan header benar | 201 |
+| Header CSRF salah | **403** |
+| Tanpa cookie sesi | 401 |
+| Token di `Authorization: Bearer` | **401** (jalur lama ditutup) |
+| Logout lalu `/me` | 401 |
+
+**Frontend:** `localStorage` dihapus seluruhnya (`grep` membuktikan nol
+kemunculan). `lib/http.ts` mengirim `X-CSRF-Token` dari cookie hanya pada
+metode tulis, dan `AuthProvider` memanggil `/auth/csrf` bila cookie itu hilang.
+Dua tes baru mengunci perilaku ini.
+
+**Verifikasi:** `gofmt` bersih, `go build`/`go vet` OK, **10 paket uji lulus**;
+frontend `tsc` bersih, ESLint 0 warning, Prettier rapi, **21 tes lulus**, build sukses.
+
+**Catatan untuk Hermes:** tidak ada perubahan pada kontrak engine.
+
+---
+
 ### 2026-11-08 — Frontend Console selesai mengikuti kontrak API
 
 **Pelaku:** Claude

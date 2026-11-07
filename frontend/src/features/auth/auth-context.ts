@@ -5,7 +5,8 @@ export type AuthContextValue = {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  signIn: (token: string, user: User) => void
+  /** Sesi sudah ada di cookie HttpOnly; klien hanya menyimpan data akun. */
+  signIn: (user: User) => void
   signOut: () => void
 }
 

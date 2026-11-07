@@ -13,6 +13,7 @@ import (
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/runnerclient"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
+	"github.com/KirisakiRei/go-ila-platform/backend/internal/session"
 	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
 )
 
@@ -86,7 +87,19 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	trialService := service.NewTrialService(userRepo, auditRepo)
 
 	// Handlers
-	authHandler := handler.NewAuthHandler(authService, middleware.NewLoginLimiter())
+	cookies := session.NewConfig(
+		cfg.SessionCookieName,
+		cfg.CSRFCookieName,
+		cfg.CookieSecure,
+		cfg.CookieDomain,
+	)
+
+	authHandler := handler.NewAuthHandler(
+		authService,
+		middleware.NewLoginLimiter(),
+		cookies,
+		cfg.JWTExpiry,
+	)
 	approveHandler := handler.NewApproveHandler(approveService)
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
 	accountHandler := handler.NewAccountHandler(accountService)
@@ -107,10 +120,16 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
+		// Logout hanya menghapus cookie; aman tanpa sesi.
+		auth.POST("/logout", authHandler.Logout)
+		auth.GET("/csrf", authHandler.CSRF)
 	}
 
 	me := r.Group("/api/v1")
-	me.Use(middleware.Auth(newTokenIssuer(cfg)))
+	me.Use(middleware.Auth(newTokenIssuer(cfg), cfg.SessionCookieName))
+	// Cookie HttpOnly menahan pencurian token lewat XSS, tetapi permintaan
+	// lintas situs tetap bisa ikut membawa cookie; CSRF menutup celah itu.
+	me.Use(middleware.RequireCSRF(cfg.CSRFCookieName))
 	{
 		me.GET("/me", authHandler.Profile)
 		// Konfirmasi entry: token dari deep-link Telegram, wajib sesi login.

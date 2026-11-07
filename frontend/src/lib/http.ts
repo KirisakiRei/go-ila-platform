@@ -3,23 +3,25 @@ import type { ApiResponse } from '@/types/api'
 
 const DEFAULT_TIMEOUT_MS = 15_000
 
-const AUTH_TOKEN_KEY = 'ila.token'
-
 /**
- * Token disimpan di localStorage agar sesi bertahan saat halaman dimuat ulang.
- * Untuk produksi jangka panjang, pertimbangkan pindah ke cookie HttpOnly
- * agar tidak terjangkau JavaScript.
+ * Sesi disimpan backend di cookie HttpOnly sehingga tidak dapat dibaca
+ * JavaScript. Karena itu setiap permintaan cukup mengirim `credentials`,
+ * dan permintaan pengubah keadaan menyertakan header CSRF dari cookie
+ * yang memang sengaja dapat dibaca.
  */
-export const tokenStorage = {
-  get(): string | null {
-    return localStorage.getItem(AUTH_TOKEN_KEY)
-  },
-  set(token: string): void {
-    localStorage.setItem(AUTH_TOKEN_KEY, token)
-  },
-  clear(): void {
-    localStorage.removeItem(AUTH_TOKEN_KEY)
-  },
+
+export const CSRF_COOKIE = 'ila_csrf'
+export const CSRF_HEADER = 'X-CSRF-Token'
+
+/** Membaca token CSRF dari cookie; kosong berarti sesi belum siap. */
+export function readCsrfToken(): string {
+  const match = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${CSRF_COOKIE}=`))
+
+  if (!match) return ''
+  return decodeURIComponent(match.slice(CSRF_COOKIE.length + 1))
 }
 
 type RequestOptions = {
@@ -30,15 +32,17 @@ type RequestOptions = {
   timeoutMs?: number
 }
 
-/** Dipanggil saat backend menolak token; memutus sesi di sisi UI. */
+/** Dipanggil saat backend menolak sesi; memutus tampilan di sisi UI. */
 let unauthorizedHandler: (() => void) | null = null
 
 export function onUnauthorized(handler: () => void): void {
   unauthorizedHandler = handler
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
 /**
- * request menangani satu panggilan API: header, timeout, parsing balasan
+ * request menangani satu panggilan API: header, CSRF, timeout, parsing balasan
  * seragam, dan penerjemahan kegagalan menjadi ApiError.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -57,9 +61,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers.set('Content-Type', 'application/json')
   }
 
-  const token = tokenStorage.get()
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
+  // Double-submit: header harus sama dengan cookie agar backend menerima.
+  if (!SAFE_METHODS.has(method)) {
+    const csrf = readCsrfToken()
+    if (csrf) headers.set(CSRF_HEADER, csrf)
   }
 
   try {
@@ -71,6 +76,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       credentials: 'same-origin',
     })
 
+    // Sesi habis hanya bermakna bila endpoint memang butuh sesi.
     if (response.status === 401) {
       unauthorizedHandler?.()
     }

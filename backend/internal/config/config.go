@@ -45,6 +45,14 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	LogLevel        string
 
+	// Sesi disimpan di cookie HttpOnly agar tidak terjangkau JavaScript.
+	SessionCookieName string
+	CSRFCookieName    string
+	// CookieSecure wajib true di produksi (HTTPS). Boleh false saat pengembangan lokal.
+	CookieSecure bool
+	// CookieDomain kosong berarti host-only cookie.
+	CookieDomain string
+
 	EngineGRPCAddr   string
 	EngineMTLSCert   string
 	EngineMTLSKey    string
@@ -103,6 +111,10 @@ func Load(service string) (*Config, error) {
 		AllowedOrigins:        envList("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		ShutdownTimeout:       envDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
 		LogLevel:              env("LOG_LEVEL", "info"),
+		SessionCookieName:     env("SESSION_COOKIE_NAME", "ila_session"),
+		CSRFCookieName:        env("CSRF_COOKIE_NAME", "ila_csrf"),
+		CookieSecure:          envBool("COOKIE_SECURE", false),
+		CookieDomain:          env("COOKIE_DOMAIN", ""),
 		EngineGRPCAddr:        env("ENGINE_GRPC_ADDR", ""),
 		EngineMTLSCert:        env("ENGINE_MTLS_CERT", ""),
 		EngineMTLSKey:         env("ENGINE_MTLS_KEY", ""),
@@ -153,6 +165,13 @@ func (c *Config) validate() error {
 	}
 	if c.MaxDailyTrades < 1 || c.MaxDailyTrades > 3 {
 		return fmt.Errorf("MAX_DAILY_TRADES harus 1 sampai 3 (sekarang %d)", c.MaxDailyTrades)
+	}
+	// Cookie tanpa Secure di produksi bisa terkirim lewat HTTP biasa.
+	if c.IsProduction() && !c.CookieSecure {
+		return fmt.Errorf("COOKIE_SECURE wajib true saat APP_ENV=production")
+	}
+	if c.SessionCookieName == c.CSRFCookieName {
+		return fmt.Errorf("SESSION_COOKIE_NAME dan CSRF_COOKIE_NAME tidak boleh sama")
 	}
 	return nil
 }

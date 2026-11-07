@@ -42,7 +42,6 @@ export type RegisterPayload = {
 }
 
 export type LoginResult = {
-  token: string
   expires_at: string
   user: User
 }

@@ -23,9 +23,10 @@ type UserResponse struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// LoginResponse membawa token sesi beserta data akun.
+// LoginResponse membawa data akun; token sesi dikirim lewat cookie HttpOnly
+// dan sengaja tidak pernah masuk badan balasan.
 type LoginResponse struct {
-	Token     string       `json:"token"`
+	Token     string       `json:"token,omitempty"`
 	ExpiresAt string       `json:"expires_at"`
 	User      UserResponse `json:"user"`
 }
