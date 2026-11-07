@@ -4,8 +4,10 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/features/auth/AuthProvider'
-import { SignalCard } from '@/features/signals/components/SignalCard'
+import { SignalRow } from '@/features/signals/components/SignalRow'
+import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { formatDateTime, formatNumber, formatR } from '@/lib/format'
+import { SIGNAL_LABEL, isFinal } from '@/features/signals/lib/status'
 import type { Signal } from '@/types/api'
 
 function renderWithProviders(ui: ReactNode) {
@@ -42,20 +44,47 @@ const signal: Signal = {
   delayed: false,
 }
 
-describe('SignalCard', () => {
-  it('menampilkan simbol, arah, dan status tertahan beserta alasannya', () => {
-    renderWithProviders(<SignalCard signal={signal} />)
+describe('SignalRow', () => {
+  it('menampilkan simbol, arah, dan label status', () => {
+    renderWithProviders(<SignalRow signal={signal} selected={false} onSelect={() => {}} />)
 
     expect(screen.getByText('XAUUSD')).toBeInTheDocument()
     expect(screen.getByText('BUY')).toBeInTheDocument()
     expect(screen.getByText('Tertahan')).toBeInTheDocument()
-    expect(screen.getByText(/Batas harian tercapai/)).toBeInTheDocument()
   })
 
-  it('menandai sinyal tier Free yang telat', () => {
-    renderWithProviders(<SignalCard signal={{ ...signal, delayed: true }} />)
+  it('menandai baris terpilih lewat aria-pressed', () => {
+    renderWithProviders(<SignalRow signal={signal} selected onSelect={() => {}} />)
 
-    expect(screen.getByText('Telat 15 menit')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('SignalDetail', () => {
+  it('menampilkan alasan penolakan dan langkah berikutnya', () => {
+    renderWithProviders(<SignalDetail signal={signal} />)
+
+    expect(screen.getByText(/Batas harian tercapai/)).toBeInTheDocument()
+    expect(screen.getByText(/Tunggu retest/)).toBeInTheDocument()
+  })
+
+  it('tidak menyediakan tombol eksekusi', () => {
+    renderWithProviders(<SignalDetail signal={signal} />)
+
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+})
+
+describe('status sinyal', () => {
+  it('mengenali status final', () => {
+    expect(isFinal('EXPIRED')).toBe(true)
+    expect(isFinal('CONSUMED')).toBe(true)
+    expect(isFinal('READY_TO_ENTRY')).toBe(false)
+  })
+
+  it('punya label untuk setiap status', () => {
+    expect(SIGNAL_LABEL.READY_TO_ENTRY).toBe('Siap entry')
+    expect(SIGNAL_LABEL.CONSUMED).toBe('Sudah dieksekusi')
   })
 })
 

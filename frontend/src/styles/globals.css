@@ -3,46 +3,51 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   Token desain shadcn/ui (dark-first)
-   ========================================================================== */
+   Token desain — monokrom (hitam-putih)
 
+   Tahap ini fokus pada struktur dan keterbacaan, bukan warna. Semua makna
+   disampaikan lewat bobot huruf, garis, dan ikon tekstual, bukan warna.
+   ========================================================================== */
 @layer base {
   :root {
-    --background: 220 27% 7%;
-    --foreground: 210 29% 93%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
 
-    --card: 215 21% 11%;
-    --card-foreground: 210 29% 93%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
 
-    --popover: 215 21% 11%;
-    --popover-foreground: 210 29% 93%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
 
-    --primary: 217 100% 65%;
+    /* Aksi utama memakai hitam pekat agar kontras tinggi. */
+    --primary: 0 0% 9%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 19% 16%;
-    --secondary-foreground: 210 29% 93%;
+    /* Permukaan sekunder: abu sangat terang untuk membedakan blok. */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 215 19% 16%;
-    --muted-foreground: 215 12% 58%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 217 100% 65%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 93%;
+    --accent-foreground: 0 0% 9%;
 
-    --destructive: 3 93% 63%;
+    /* Semantik tetap monokrom: dibedakan oleh bobot dan bentuk, bukan rona. */
+    --destructive: 0 0% 25%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 137 55% 49%;
+    --success: 0 0% 20%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 40 72% 48%;
-    --warning-foreground: 0 0% 8%;
+    --warning: 0 0% 35%;
+    --warning-foreground: 0 0% 100%;
 
-    --border: 215 19% 20%;
-    --input: 215 19% 20%;
-    --ring: 217 100% 65%;
+    --border: 0 0% 88%;
+    --input: 0 0% 84%;
+    --ring: 0 0% 9%;
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;
   }
 
   * {
@@ -58,6 +63,31 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Angka rata kolom agar tabel harga mudah dibandingkan. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Gulir tipis agar area yang bisa digeser terlihat jelas tanpa memakan ruang. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: hsl(var(--border));
+  }
+
+  /* Fokus selalu terlihat: navigasi keyboard harus jelas walau tanpa warna. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
   /* Hormati preferensi pengguna yang membatasi animasi */

@@ -1,29 +1,35 @@
 import type * as React from 'react'
 import { cn } from '@/lib/utils'
 
-/** Label status bersudut bulat dengan warna sesuai kelas semantik. */
+/**
+ * Label status monokrom.
+ *
+ * Status dibedakan oleh latar dan gaya garis, bukan warna, supaya tetap
+ * bermakna bagi pengguna dengan buta warna dan saat dicetak.
+ */
+type Tone = 'neutral' | 'solid' | 'outline' | 'muted'
+
+const TONES: Record<Tone, string> = {
+  neutral: 'border-border bg-transparent text-foreground',
+  solid: 'border-foreground bg-foreground text-background',
+  outline: 'border-foreground/40 bg-transparent text-foreground',
+  muted: 'border-border bg-secondary text-muted-foreground',
+}
+
 export function StatusPill({
   children,
-  tone = 'muted',
+  tone = 'neutral',
   className,
 }: {
   children: React.ReactNode
-  tone?: 'muted' | 'success' | 'warning' | 'danger' | 'info'
+  tone?: Tone
   className?: string
 }) {
-  const tones = {
-    muted: 'border-border text-muted-foreground',
-    success: 'border-success/35 bg-success/10 text-success',
-    warning: 'border-warning/35 bg-warning/10 text-warning',
-    danger: 'border-destructive/35 bg-destructive/10 text-destructive',
-    info: 'border-primary/35 bg-primary/10 text-primary',
-  } as const
-
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
-        tones[tone],
+        'inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+        TONES[tone],
         className,
       )}
     >

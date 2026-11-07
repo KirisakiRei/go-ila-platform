@@ -112,13 +112,6 @@ export function RegisterForm() {
       <Button type="submit" className="w-full" isLoading={signUp.isPending}>
         Daftar
       </Button>
-
-      <p className="text-center text-[13px] text-muted-foreground">
-        Sudah punya akun?{' '}
-        <Link to="/login" className="font-medium text-primary hover:underline">
-          Masuk
-        </Link>
-      </p>
     </form>
   )
 }

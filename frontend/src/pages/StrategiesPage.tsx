@@ -3,43 +3,41 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  Label,
+  PageHeader,
+  Section,
+  Select,
+  Skeleton,
+} from '@/components/ui'
+import {
+  useAccounts,
   useCreateSubscription,
   useDeleteSubscription,
-  useAccounts,
   useStrategies,
   useSubscriptions,
 } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Select,
-  Skeleton,
-} from '@/components/ui'
 import type { StrategyVersion } from '@/types/api'
 
-const schema = z.object({
+const skema = z.object({
   symbol: z
     .string()
     .min(3, 'Simbol minimal 3 karakter')
     .max(12, 'Simbol maksimal 12 karakter')
-    .transform((value) => value.toUpperCase().replace(/\//g, '')),
+    .transform((v) => v.toUpperCase().replace(/\//g, '')),
   strategy: z.enum(['ila-2.0', 'ila-3.0']),
-  broker_account_id: z.string(),
+  broker_account_id: z.string().min(1, 'Pilih akun broker'),
 })
 
-type FormValues = z.input<typeof schema>
+type NilaiForm = z.input<typeof skema>
 
-function SubscriptionForm() {
-  const [submitError, setSubmitError] = useState<string | null>(null)
+function FormLangganan() {
+  const [galat, setGalat] = useState<string | null>(null)
   const { data: accounts } = useAccounts()
   const { data: strategies } = useStrategies()
   const create = useCreateSubscription()
@@ -49,42 +47,42 @@ function SubscriptionForm() {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  } = useForm<NilaiForm>({
+    resolver: zodResolver(skema),
     defaultValues: { symbol: '', strategy: 'ila-2.0', broker_account_id: '' },
   })
 
-  // Strategi yang belum dirilis atau tier-nya tidak berhak tidak boleh dipilih.
-  const selectable = (strategies ?? []).filter((s) => s.available && s.allowed)
+  // Hanya strategi yang sudah dirilis dan boleh untuk tier ini yang muncul.
+  const tersedia = (strategies ?? []).filter((s) => s.available && s.allowed)
 
-  const onSubmit = handleSubmit(async (values) => {
-    setSubmitError(null)
+  const submit = handleSubmit(async (nilai) => {
+    setGalat(null)
     try {
       await create.mutateAsync({
-        symbol: values.symbol,
-        strategy: values.strategy as StrategyVersion,
-        broker_account_id: values.broker_account_id,
+        symbol: nilai.symbol,
+        strategy: nilai.strategy as StrategyVersion,
+        broker_account_id: nilai.broker_account_id,
       })
-      reset({ symbol: '', strategy: values.strategy, broker_account_id: values.broker_account_id })
-    } catch (error) {
-      setSubmitError(error instanceof ApiError ? error.message : 'Gagal berlangganan simbol.')
+      reset({ symbol: '', strategy: nilai.strategy, broker_account_id: nilai.broker_account_id })
+    } catch (err) {
+      setGalat(err instanceof ApiError ? err.message : 'Gagal berlangganan simbol.')
     }
   })
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-      <div className="grid gap-4 sm:grid-cols-3">
+    <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="symbol">Simbol</Label>
           <Input id="symbol" placeholder="XAUUSD" {...register('symbol')} />
-          {errors.symbol && <p className="text-[12px] text-destructive">{errors.symbol.message}</p>}
+          {errors.symbol && <p className="text-[11px] text-foreground">{errors.symbol.message}</p>}
         </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="strategy">Strategi</Label>
           <Select id="strategy" {...register('strategy')}>
-            {selectable.length === 0 && <option value="ila-2.0">ILA 2.0</option>}
-            {selectable.map((s) => (
+            {tersedia.length === 0 && <option value="ila-2.0">ILA 2.0</option>}
+            {tersedia.map((s) => (
               <option key={s.version} value={s.version}>
                 {s.name}
               </option>
@@ -102,12 +100,15 @@ function SubscriptionForm() {
               </option>
             ))}
           </Select>
+          {errors.broker_account_id && (
+            <p className="text-[11px] text-foreground">{errors.broker_account_id.message}</p>
+          )}
         </div>
       </div>
 
-      {submitError && <Alert>{submitError}</Alert>}
+      {galat && <Alert variant="destructive">{galat}</Alert>}
 
-      <Button type="submit" isLoading={isSubmitting} className="self-start">
+      <Button type="submit" size="sm" isLoading={isSubmitting} className="self-start">
         Berlangganan
       </Button>
     </form>
@@ -116,72 +117,72 @@ function SubscriptionForm() {
 
 export default function StrategiesPage() {
   const { data: strategies, isLoading: loadingStrategies } = useStrategies()
-  const { data: subscriptions, isLoading: loadingSubs } = useSubscriptions()
+  const { data: subs, isLoading: loadingSubs } = useSubscriptions()
   const remove = useDeleteSubscription()
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight">Strategi & Langganan</h1>
-        <p className="text-[13px] text-muted-foreground">
-          Pilih strategi dan pasangan yang ingin dipantau.
-        </p>
-      </header>
+    <>
+      <PageHeader
+        title="Strategi & Langganan"
+        description="Pilih strategi dan pasangan yang ingin dipantau."
+      />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {loadingStrategies && <Skeleton className="h-28 w-full" />}
-        {strategies?.map((strategy) => (
-          <Card key={strategy.version}>
-            <CardHeader>
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle>{strategy.name}</CardTitle>
-                <Badge
-                  variant={
-                    strategy.status === 'active'
-                      ? 'success'
-                      : strategy.status === 'beta'
-                        ? 'warning'
-                        : 'default'
-                  }
-                >
-                  {strategy.status === 'coming_soon'
-                    ? 'Segera hadir'
-                    : strategy.status === 'beta'
-                      ? 'Beta'
-                      : 'Aktif'}
-                </Badge>
-              </div>
-              <CardDescription>{strategy.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center gap-2 text-[12px] text-muted-foreground">
-              {strategy.selected && <Badge variant="primary">Sedang dipakai</Badge>}
-              {!strategy.allowed && <span>Khusus tier Plus</span>}
-              {strategy.allowed && !strategy.available && <span>Belum dirilis</span>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Section title="Strategi tersedia">
+        {loadingStrategies ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {strategies?.map((s) => (
+              <article key={s.version} className="flex flex-col gap-2 border border-border p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-[14px] font-semibold">{s.name}</h3>
+                  <Badge variant={s.status === 'active' ? 'solid' : 'muted'}>
+                    {s.status === 'coming_soon'
+                      ? 'Segera hadir'
+                      : s.status === 'beta'
+                        ? 'Beta'
+                        : 'Aktif'}
+                  </Badge>
+                </div>
+                <p className="text-[12px] leading-relaxed text-muted-foreground">{s.description}</p>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {s.selected && <Badge variant="outline">Sedang dipakai</Badge>}
+                  {!s.allowed && <Badge variant="muted">Khusus tier Plus</Badge>}
+                  {s.allowed && !s.available && <Badge variant="muted">Belum dirilis</Badge>}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </Section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Langganan pasangan</CardTitle>
-          <CardDescription>Maksimal 8 simbol aktif per akun.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <SubscriptionForm />
+      <Section
+        title="Langganan pasangan"
+        description="Maksimal 8 simbol aktif. Simbol yang sama tidak digandakan."
+      >
+        <div className="border border-border p-4">
+          <FormLangganan />
+        </div>
 
-          {loadingSubs && <Skeleton className="h-16 w-full" />}
+        {loadingSubs && <Skeleton className="h-16 w-full" />}
 
-          {subscriptions?.length === 0 && (
-            <p className="text-[13px] text-muted-foreground">Belum ada langganan simbol.</p>
-          )}
+        {subs?.length === 0 && (
+          <EmptyState
+            title="Belum ada langganan"
+            description="Tambahkan pasangan di atas untuk mulai menerima sinyal."
+          />
+        )}
 
-          <ul className="flex flex-col divide-y divide-border">
-            {subscriptions?.map((sub) => (
-              <li key={sub.id} className="flex items-center gap-3 py-2.5">
-                <span className="font-medium">{sub.symbol}</span>
-                <Badge variant="primary">{sub.strategy}</Badge>
-                {!sub.is_active && <Badge variant="warning">Nonaktif</Badge>}
+        {subs && subs.length > 0 && (
+          <ul className="divide-y divide-border border border-border">
+            {subs.map((sub) => (
+              <li
+                key={sub.id}
+                className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-[13px]"
+              >
+                <span className="w-24 font-semibold">{sub.symbol}</span>
+                <Badge variant="outline">{sub.strategy}</Badge>
+                {!sub.is_active && <Badge variant="muted">Nonaktif</Badge>}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -194,8 +195,8 @@ export default function StrategiesPage() {
               </li>
             ))}
           </ul>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+      </Section>
+    </>
   )
 }

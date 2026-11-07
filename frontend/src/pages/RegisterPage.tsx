@@ -1,15 +1,20 @@
+import { Link } from 'react-router-dom'
+import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { RegisterForm } from '@/features/auth/components/RegisterForm'
 
 export default function RegisterPage() {
   return (
-    <main className="flex min-h-full items-center justify-center px-4 py-12">
-      <section className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-sm">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="text-lg font-bold tracking-tight">ILA</span>
-          <span className="text-[13px] text-muted-foreground">Bot</span>
-        </div>
-        <RegisterForm />
-      </section>
-    </main>
+    <AuthLayout
+      footer={
+        <>
+          Sudah punya akun?{' '}
+          <Link to="/login" className="font-medium text-foreground underline underline-offset-4">
+            Masuk
+          </Link>
+        </>
+      }
+    >
+      <RegisterForm />
+    </AuthLayout>
   )
 }

@@ -1,118 +1,104 @@
 import { useState } from 'react'
+import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
 import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
-import { formatDateTime, formatDate } from '@/lib/format'
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Skeleton,
-} from '@/components/ui'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 function TrialSection() {
   const { data, isLoading, isError, error } = useTrial()
-  const start = useStartTrial()
-  const [actionError, setActionError] = useState<string | null>(null)
+  const mulai = useStartTrial()
+  const [galat, setGalat] = useState<string | null>(null)
 
-  const handleStart = async () => {
-    setActionError(null)
+  const onMulai = async () => {
+    setGalat(null)
     try {
-      await start.mutateAsync()
+      await mulai.mutateAsync()
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Gagal memulai uji coba.')
+      setGalat(err instanceof ApiError ? err.message : 'Gagal memulai uji coba.')
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Uji coba 7 hari</CardTitle>
-        <CardDescription>
-          Setara tier Plus, namun seluruh eksekusi berjalan sebagai simulasi.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <Section
+      title="Uji coba 7 hari"
+      description="Setara tier Plus, namun seluruh eksekusi berjalan sebagai simulasi."
+    >
+      <div className="flex flex-col gap-3 border border-border p-4">
         {isLoading && <Skeleton className="h-16 w-full" />}
-        {isError && <Alert>{(error as Error).message}</Alert>}
+        {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}
 
         {data && (
           <>
             {data.active ? (
-              <div className="flex flex-col gap-1 text-[13px]">
-                <p>
-                  Aktif · sisa <strong>{data.days_remaining} hari</strong>
+              <div className="flex flex-col gap-2 text-[13px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="solid">Aktif</Badge>
+                  <span>
+                    sisa <strong>{data.days_remaining} hari</strong>
+                  </span>
+                  <Badge variant="outline">Simulasi wajib</Badge>
+                </div>
+                <p className="text-[12px] text-muted-foreground">
+                  Mulai {formatDateTime(data.trial_started_at)} · berakhir{' '}
+                  {formatDate(data.trial_expires_at)}
                 </p>
-                <p className="text-muted-foreground">
-                  Berakhir {formatDate(data.trial_expires_at)} · mulai{' '}
-                  {formatDateTime(data.trial_started_at)}
-                </p>
-                <Badge variant="warning" className="self-start">
-                  Mode simulasi wajib
-                </Badge>
               </div>
             ) : data.used ? (
               <p className="text-[13px] text-muted-foreground">
                 Uji coba sudah pernah dipakai. Masa berlaku tidak dapat diulang.
               </p>
             ) : (
-              <p className="text-[13px] text-muted-foreground">
-                Anda belum memakai uji coba. Uji coba hanya bisa dipakai sekali per akun.
-              </p>
-            )}
-
-            {!data.used && (
-              <Button
-                className="self-start"
-                isLoading={start.isPending}
-                onClick={() => void handleStart()}
-              >
-                Mulai uji coba
-              </Button>
+              <div className="flex flex-col gap-2">
+                <p className="text-[13px] text-muted-foreground">
+                  Anda belum memakai uji coba. Uji coba hanya bisa dipakai sekali per akun.
+                </p>
+                <Button
+                  size="sm"
+                  className="self-start"
+                  isLoading={mulai.isPending}
+                  onClick={() => void onMulai()}
+                >
+                  Mulai uji coba
+                </Button>
+              </div>
             )}
           </>
         )}
 
-        {actionError && <Alert>{actionError}</Alert>}
-      </CardContent>
-    </Card>
+        {galat && <Alert variant="destructive">{galat}</Alert>}
+      </div>
+    </Section>
   )
 }
 
 function TelegramSection() {
   const link = useTelegramLink()
   const unlink = useTelegramUnlink()
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [galat, setGalat] = useState<string | null>(null)
 
-  const handleLink = async () => {
-    setActionError(null)
+  const onLink = async () => {
+    setGalat(null)
     try {
-      const result = await link.mutateAsync()
+      const hasil = await link.mutateAsync()
       // Dibuka di tab baru agar sesi dashboard tidak hilang.
-      window.open(result.url, '_blank', 'noopener,noreferrer')
+      window.open(hasil.url, '_blank', 'noopener,noreferrer')
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Gagal membuat tautan Telegram.')
+      setGalat(err instanceof ApiError ? err.message : 'Gagal membuat tautan Telegram.')
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Notifikasi Telegram</CardTitle>
-        <CardDescription>
-          Terima pemberitahuan sinyal lewat bot. Bot tidak pernah mengakses kredensial akun.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <Section
+      title="Notifikasi Telegram"
+      description="Bot hanya mengirim pemberitahuan. Bot tidak pernah mengakses kredensial akun Anda."
+    >
+      <div className="flex flex-col gap-3 border border-border p-4">
         <div className="flex flex-wrap gap-2">
-          <Button isLoading={link.isPending} onClick={() => void handleLink()}>
+          <Button size="sm" isLoading={link.isPending} onClick={() => void onLink()}>
             Hubungkan Telegram
           </Button>
           <Button
+            size="sm"
             variant="outline"
             isLoading={unlink.isPending}
             onClick={() => void unlink.mutateAsync()}
@@ -120,26 +106,24 @@ function TelegramSection() {
             Putuskan
           </Button>
         </div>
+
         <p className="text-[11px] text-muted-foreground">
           Tautan berlaku 5 menit dan hanya bisa dipakai sekali.
         </p>
-        {actionError && <Alert>{actionError}</Alert>}
-        {unlink.isSuccess && <Alert variant="info">Chat Telegram sudah diputus.</Alert>}
-      </CardContent>
-    </Card>
+
+        {galat && <Alert variant="destructive">{galat}</Alert>}
+        {unlink.isSuccess && <Alert variant="success">Chat Telegram sudah diputus.</Alert>}
+      </div>
+    </Section>
   )
 }
 
 export default function SettingsPage() {
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight">Pengaturan</h1>
-        <p className="text-[13px] text-muted-foreground">Uji coba dan saluran notifikasi.</p>
-      </header>
-
+    <>
+      <PageHeader title="Pengaturan" description="Uji coba dan saluran notifikasi." />
       <TrialSection />
       <TelegramSection />
-    </div>
+    </>
   )
 }

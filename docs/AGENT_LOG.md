@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `a3977e0`
+> **Commit terakhir saat log ini ditulis:** `d157941`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,59 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-08 — Frontend Console: tema monokrom + perbaikan tata letak
+
+**Pelaku:** Claude
+**Tipe:** UI/UX
+**Status:** SELESAI, empat gerbang kualitas hijau
+
+**Ringkasan:**
+
+Console dirombak ke **monokrom murni**. Status tidak lagi dibedakan warna,
+melainkan lewat bobot huruf, garis, dan bentuk ikon. Ini kerangka awal untuk
+menilai struktur dan alur; palet final menyusul.
+
+**Perubahan struktur:**
+
+| Sebelum | Sesudah |
+|---|---|
+| `Header.tsx` terpisah | `AppShell.tsx` memegang sidebar + topbar |
+| `SignalCard.tsx` (satu blok besar) | `SignalRow` + `SignalDetail` (split view) |
+| Kartu akun menempel di halaman | `AccountCard.tsx` di dalam `features/accounts` |
+| Form login/daftar tanpa bingkai | `AuthLayout.tsx` memusatkan formulir |
+| — | `PageHeader`, `Section`, `Stat`/`StatGrid`, `EmptyState` |
+
+**Bug yang ditemukan di layar dan diperbaiki:**
+
+| # | Masalah | Penyebab | Perbaikan |
+|---|---|---|---|
+| 1 | Tautan "Daftar" muncul dua kali di halaman masuk | Footer ditulis di `LoginForm` **dan** `AuthLayout` | Footer hanya di `AuthLayout`; `RegisterForm` sama |
+| 2 | Angka di tabel Posisi tidak sejajar per kolom | SL/TP digabung satu sel dengan pemisah `/`; header tanpa `text-right` | SL dan TP dipisah jadi dua kolom, semua sel angka `text-right tabular` |
+| 3 | "Tidak diketahui" tampil dua kali di Ringkasan | `hint` mengulang `value` | `Stat` tidak menampilkan `hint` bila sama dengan `value` |
+| 4 | Menu terpotong di layar ponsel | Label panjang + gulir tanpa isyarat | Label ringkas di bawah `lg`; utilitas `.scrollbar-thin` |
+| 5 | Kolom Saldo/Ekuitas/Margin berjarak lebar kosong | Grid tanpa batas lebar | `sm:max-w-xl` + jarak antar kolom lebih lebar |
+
+**Tema:** token CSS monokrom (`--primary` hitam pekat), `.tabular` untuk semua
+angka, `:focus-visible` selalu terlihat, dan `prefers-reduced-motion` dihormati.
+
+**Gerbang kualitas:**
+
+```text
+npm run typecheck   bersih
+npm run lint        0 peringatan
+npm test            25 tes lulus (4 berkas)
+npm run build       sukses
+```
+
+Tangkapan layar diverifikasi dengan Camoufox pada stack Docker hidup: delapan
+halaman, **nol error konsol**.
+
+**Catatan untuk Hermes:** tidak ada perubahan kontrak API. Frontend tetap hanya
+memakai `docs/API_CONTRACT.md`; sesi tetap cookie `ila_session` HttpOnly + CSRF,
+tanpa `localStorage`.
+
+---
 
 ### 2026-11-08 — Uji mode produksi nyata di Docker + panduan `.env`
 

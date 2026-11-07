@@ -2,17 +2,19 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
+/**
+ * Badge monokrom. Perbedaan makna disampaikan lewat latar dan bobot huruf,
+ * bukan warna, sehingga tetap terbaca pada layar apa pun.
+ */
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+  'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-4',
   {
     variants: {
       variant: {
-        default: 'border-border text-muted-foreground',
-        primary: 'border-primary/35 bg-primary/10 text-primary',
-        success: 'border-success/35 bg-success/10 text-success',
-        warning: 'border-warning/35 bg-warning/10 text-warning',
-        destructive: 'border-destructive/35 bg-destructive/10 text-destructive',
-        accent: 'border-[hsl(270_80%_78%)/35] bg-[hsl(270_80%_78%)/10] text-[hsl(270_80%_78%)]',
+        default: 'border-border bg-transparent text-muted-foreground',
+        solid: 'border-foreground bg-foreground text-background',
+        outline: 'border-foreground/25 bg-transparent text-foreground',
+        muted: 'border-border bg-secondary text-foreground',
       },
     },
     defaultVariants: {

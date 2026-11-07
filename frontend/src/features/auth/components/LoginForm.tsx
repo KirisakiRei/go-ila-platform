@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Input, Label } from '@/components/ui'
@@ -73,13 +72,6 @@ export function LoginForm() {
       <Button type="submit" className="w-full" isLoading={signIn.isPending}>
         Masuk
       </Button>
-
-      <p className="text-center text-[13px] text-muted-foreground">
-        Belum punya akun?{' '}
-        <Link to="/register" className="font-medium text-primary hover:underline">
-          Daftar
-        </Link>
-      </p>
     </form>
   )
 }

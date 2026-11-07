@@ -18,7 +18,7 @@ const schema = z.object({
 type FormValues = z.input<typeof schema>
 
 /** Form penambahan akun Match-Trader. Token hanya dikirim sekali, tidak pernah ditampilkan lagi. */
-export function AccountForm({ tier }: { tier: Tier }) {
+export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void }) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const createAccount = useCreateAccount()
 
@@ -51,6 +51,7 @@ export function AccountForm({ tier }: { tier: Tier }) {
         base_url: '',
       })
       reset()
+      onDone?.()
     } catch (error) {
       setSubmitError(error instanceof ApiError ? error.message : 'Gagal menyimpan akun.')
     }
