@@ -35,6 +35,49 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Uji mode produksi nyata di Docker + panduan `.env`
+
+**Pelaku:** Claude
+**Tipe:** VERIFICATION
+**Status:** SELESAI, seluruh stack berjalan dengan `APP_ENV=production`
+
+**Ringkasan:**
+
+Stack dijalankan dengan konfigurasi produksi sungguhan: `COOKIE_SECURE=true`,
+`APP_ENV=production`, dan seluruh rahasia hasil generate acak.
+
+**Hasil uji pada stack berjalan:**
+
+| Uji | Hasil |
+|---|---|
+| Frontend, API, `/health`, SPA fallback | 200 / 401 / ok / 200 |
+| Cookie sesi | `HttpOnly` + `Secure` + `SameSite=Strict` |
+| `POST /trial` tanpa CSRF | 403 |
+| `POST /trial` dengan CSRF | 201 |
+| Token di header `Authorization` | 401 (jalur lama ditutup) |
+| Token plaintext di `credential.ciphertext` | **0 baris** |
+| Ciphertext tersimpan | 158 B, kunci terbungkus 48 B, versi 1 |
+| Token di log seluruh container | tidak ada |
+| `MASTER_KEY`, `DB_PASSWORD`, `JWT_SECRET` di log | tidak ada |
+| Rahasia diterima Caddy dan frontend | **tidak ada** |
+| Restart backend + runner | sesi dan kredensial tetap utuh |
+
+**Uji master key salah (bukti kunci benar-benar dipakai):**
+
+Dengan `MASTER_KEY` diganti nilai acak lain, Runner gagal membuka kredensial
+dan `last_error` berisi `gagal mendekripsi data` — tanpa membocorkan detail.
+Setelah kunci asli dikembalikan, dekripsi berhasil dan error berubah menjadi
+`kredensial broker tidak sah: HTTP 401`, yaitu penolakan dari Match-Trader
+karena token ujinya palsu. Rantai **dekripsi → login broker** terbukti utuh.
+
+**Dokumen baru:** `deploy/ENV-SETUP.md` — cara membuat rahasia, verifikasi
+tidak bocor, penyimpanan master key, dan prosedur rotasi.
+
+`.env.example` dilengkapi `TELEGRAM_BOT_USERNAME` dan
+`TELEGRAM_WEBHOOK_SECRET` yang sebelumnya belum terdokumentasi.
+
+---
+
 ### 2026-11-08 — Audit kredensial: 3 kebocoran ditemukan dan ditutup
 
 **Pelaku:** Claude
