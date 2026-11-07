@@ -40,13 +40,13 @@ func (ApprovalToken) TableName() string {
 }
 
 // OnboardingToken menghubungkan chat Telegram dengan akun lewat /start <token>.
+// Token asli tidak pernah disimpan; hanya hash-nya.
 type OnboardingToken struct {
-	ID        string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	Base
 	TokenHash string     `gorm:"type:varchar(64);uniqueIndex;not null" json:"-"`
 	UserID    string     `gorm:"type:varchar(36);index;not null" json:"user_id"`
 	UsedAt    *time.Time `json:"used_at"`
 	ExpiresAt time.Time  `gorm:"index;not null" json:"expires_at"`
-	CreatedAt time.Time  `json:"created_at"`
 }
 
 // TableName menetapkan nama tabel.

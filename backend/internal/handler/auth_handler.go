@@ -13,11 +13,12 @@ import (
 // AuthHandler adalah pintu HTTP untuk pendaftaran, masuk, dan profil akun.
 type AuthHandler struct {
 	authService service.AuthService
+	limiter     LoginLimiter
 }
 
 // NewAuthHandler merangkai handler autentikasi.
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService service.AuthService, limiter LoginLimiter) *AuthHandler {
+	return &AuthHandler{authService: authService, limiter: limiter}
 }
 
 // Register menangani POST /api/v1/auth/register.
@@ -37,7 +38,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	httpx.Created(c, "Akun berhasil dibuat", result)
 }
 
-// Login menangani POST /api/v1/auth/login.
+// Login menangani POST /api/v1/auth/login dengan batas percobaan.
+//
+// Batas dihitung per email + IP: penyerang tidak bisa mengunci akun orang lain
+// hanya dengan menebak dari jaringannya sendiri (plans/12 par 4.1).
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -45,12 +49,24 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	key := c.ClientIP() + "|" + req.Email
+	if h.limiter != nil && h.limiter.Blocked(key) {
+		c.Error(apperror.ErrTooManyRequests)
+		return
+	}
+
 	result, err := h.authService.Login(c.Request.Context(), req)
 	if err != nil {
+		if h.limiter != nil {
+			h.limiter.Fail(key)
+		}
 		c.Error(err)
 		return
 	}
 
+	if h.limiter != nil {
+		h.limiter.Reset(key)
+	}
 	httpx.OK(c, "Berhasil masuk", result)
 }
 

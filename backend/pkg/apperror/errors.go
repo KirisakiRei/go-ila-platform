@@ -29,6 +29,9 @@ var ErrInternalServer = errors.New("internal server error")
 // ErrServiceUnavailable: dependensi eksternal tidak bisa dihubungi.
 var ErrServiceUnavailable = errors.New("service temporarily unavailable")
 
+// ErrTooManyRequests: terlalu banyak percobaan dalam jendela waktu.
+var ErrTooManyRequests = errors.New("too many requests")
+
 // MapHTTPStatus menerjemahkan domain error ke pasangan status HTTP dan kode error.
 func MapHTTPStatus(err error) (int, string) {
 	switch {
@@ -44,6 +47,8 @@ func MapHTTPStatus(err error) (int, string) {
 		return http.StatusForbidden, "FORBIDDEN"
 	case errors.Is(err, ErrBadRequest):
 		return http.StatusBadRequest, "BAD_REQUEST"
+	case errors.Is(err, ErrTooManyRequests):
+		return http.StatusTooManyRequests, "TOO_MANY_REQUESTS"
 	case errors.Is(err, ErrServiceUnavailable):
 		return http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE"
 	default:

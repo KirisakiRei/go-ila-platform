@@ -102,13 +102,17 @@ func (DailySummary) TableName() string {
 
 // EngineState mencatat status koneksi Runner ke engine, dipakai health check.
 type EngineState struct {
-	ID            string     `gorm:"primaryKey;type:varchar(40)" json:"id"`
-	Connected     bool       `gorm:"not null;default:false" json:"connected"`
-	EngineVersion string     `gorm:"type:varchar(40)" json:"engine_version"`
-	Strategy      string     `gorm:"type:varchar(20)" json:"strategy"`
-	LastError     string     `gorm:"type:varchar(255)" json:"last_error"`
-	LastSeenAt    *time.Time `json:"last_seen_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID            string `gorm:"primaryKey;type:varchar(40)" json:"id"`
+	Connected     bool   `gorm:"not null;default:false" json:"connected"`
+	EngineVersion string `gorm:"type:varchar(40)" json:"engine_version"`
+	Strategy      string `gorm:"type:varchar(20)" json:"strategy"`
+	// MarketState disalin dari Engine agar Console bisa menampilkan status pasar
+	// tanpa perlu bertanya langsung ke Engine (plans/06 C9).
+	MarketState string     `gorm:"type:varchar(24)" json:"market_state"`
+	MarkedAt    *time.Time `json:"marked_at"`
+	LastError   string     `gorm:"type:varchar(255)" json:"last_error"`
+	LastSeenAt  *time.Time `json:"last_seen_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // TableName menetapkan nama tabel.

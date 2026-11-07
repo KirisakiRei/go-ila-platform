@@ -103,3 +103,20 @@ func (s *Service) WithKeyring(keyring *cryptox.Keyring) *Service {
 	s.keyring = keyring
 	return s
 }
+
+// DropClient memutus sesi satu akun dan membuang tokennya dari memori.
+// Dipanggil saat user mencabut kredensial (plans/12 §3.4): sesi lama tidak
+// boleh tetap hidup setelah rahasianya dihapus dari database.
+func (s *Service) DropClient(accountID string) {
+	s.mu.Lock()
+	client, ok := s.clients[accountID]
+	delete(s.clients, accountID)
+	s.mu.Unlock()
+
+	if !ok {
+		return
+	}
+	if err := client.Close(); err != nil {
+		s.logger.Warn("gagal menutup sesi akun", "account_id", accountID, "error", err.Error())
+	}
+}

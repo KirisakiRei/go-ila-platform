@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `8c6df01`
+> **Commit terakhir saat log ini ditulis:** `a3977e0`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,64 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-08 — Backend Console selesai + kontrak API untuk frontend
+
+**Pelaku:** Claude
+**Tipe:** FEATURE + SECURITY + BUGFIX
+**Status:** SELESAI, terverifikasi end-to-end
+
+**Ringkasan:**
+
+Backend Console (bukan Runner) dilengkapi agar frontend punya kontrak yang
+stabil. Uji rantai penuh sudah dijalankan: register → trial → akun broker →
+langganan → approve sinyal → Runner membuka posisi Match-Trader.
+
+**1. Bug nyata yang ditemukan uji integrasi**
+
+Lima model tidak punya `Base`, sehingga `ID` tidak terisi dan INSERT gagal
+(`null value in column "id"`): `AuditLog`, `NotificationLog`, `SignalEvent`,
+`ExecutionRecord`, `OnboardingToken`. Diperbaiki di `internal/model/hooks.go`
+(`BeforeCreate` per model) dan dikunci `hooks_test.go`.
+
+**2. Keamanan**
+
+| Item | Implementasi |
+|---|---|
+| Hash password | bcrypt → **Argon2id** (time=3, memori 64 MB, paralel 4). Hash bcrypt lama tetap diterima + `NeedsRehash` |
+| Rate limit login | 5 gagal / 15 menit per `email+IP` → 429 `TOO_MANY_REQUESTS` |
+| Trial 7 hari | Sekali per akun, dicek dari fingerprint perangkat + IP saat daftar |
+| Trial = **dry-run wajib** | `runner/trial.go` `mustDryRun()` — tidak bisa dimatikan |
+| Revoke kredensial | Backend panggil Runner `POST /internal/account/revoke` |
+
+**3. Endpoint baru**
+
+```text
+GET    /api/v1/system/status     status engine, market, ringkasan harian (hari = WIB)
+GET    /api/v1/trial             sisa hari trial
+POST   /api/v1/trial             mulai trial
+POST   /api/v1/telegram/link     tautkan chat Telegram via /start <token>
+DELETE /api/v1/telegram/link     lepas tautan
+POST   /api/v1/telegram/webhook  webhook bot (bukan untuk frontend)
+```
+
+Telemetry Runner diperbarui tiap 60 detik (`runner/telemetry.go`) supaya
+`/system/status` tidak menampilkan data basi.
+
+**4. Kontrak API untuk frontend**
+
+Dokumen baru `docs/API_CONTRACT.md` — sumber tunggal untuk membangun UI.
+Semua respons memakai amplop `{"data": ...}` / `{"error": {"code","message"}}`.
+
+**File terdampak:** `docs/API_CONTRACT.md`, `internal/model/hooks.go`,
+`pkg/utils/hash.go`, `internal/middleware/ratelimit.go`,
+`internal/runner/{trial,telemetry,settings,rules,subscription,service,brokerpool}.go`,
+`internal/service/*_service.go`, `internal/dto/*`, `internal/handler/*`,
+`internal/router/router.go`, `cmd/runner/*`.
+
+**Verifikasi:** `gofmt` bersih, `go build`/`go vet` OK, **143 tes lulus**.
+
+---
 
 ### 2026-11-07 — Integrasi Runner selesai: adapter Match-Trader, akun broker, langganan
 

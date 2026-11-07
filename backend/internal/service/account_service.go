@@ -55,7 +55,14 @@ type accountService struct {
 	audit      AuditRepository
 	sealer     Sealer
 	strategies StrategyCatalog
+	revoker    CredentialRevoker
 	clock      func() time.Time
+}
+
+// CredentialRevoker meminta Runner memutus sesi broker setelah kredensial
+// dihapus, agar token lama tidak tetap hidup di memori (plans/12 par 3.4).
+type CredentialRevoker interface {
+	RevokeAccount(ctx context.Context, accountID string) error
 }
 
 // AccountServiceDeps mengumpulkan dependensi agar konstruktor tetap ringkas.
@@ -68,6 +75,7 @@ type AccountServiceDeps struct {
 	Audit         AuditRepository
 	Sealer        Sealer
 	Strategies    StrategyCatalog
+	Revoker       CredentialRevoker
 	Clock         func() time.Time
 }
 
@@ -92,6 +100,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		audit:      deps.Audit,
 		sealer:     deps.Sealer,
 		strategies: deps.Strategies,
+		revoker:    deps.Revoker,
 		clock:      clock,
 	}
 }
@@ -254,6 +263,14 @@ func (s *accountService) Delete(ctx context.Context, userID, accountID string) e
 
 	if err := s.creds.DeleteByAccount(ctx, accountID); err != nil {
 		return err
+	}
+
+	// Kredensial sudah hilang dari database; sesi di memori Runner juga harus
+	// berakhir. Kegagalan di sini tidak membatalkan pencabutan.
+	if s.revoker != nil {
+		revokeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		_ = s.revoker.RevokeAccount(revokeCtx, accountID)
 	}
 
 	account.IsActive = false

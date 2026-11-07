@@ -101,8 +101,51 @@ func NewService(store Store, brokers *broker.Registry, pub Publisher, logger *sl
 // SetMarketState mencatat status pasar terakhir dari engine.
 func (s *Service) SetMarketState(state enginev1.MarketState) {
 	s.mu.Lock()
+	changed := s.market != state
 	s.market = state
 	s.mu.Unlock()
+
+	// Perubahan status pasar jarang; hanya dicatat saat benar-benar berubah
+	// agar Console bisa menampilkannya tanpa bertanya ke Engine.
+	if changed {
+		s.persistMarketState(state)
+	}
+}
+
+// persistMarketState menyimpan status pasar pada setiap engine yang dikenal.
+func (s *Service) persistMarketState(state enginev1.MarketState) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	now := s.opts.Clock()
+	label := marketStateLabel(state)
+
+	for _, strategy := range []string{"ila-2.0", "ila-3.0"} {
+		record := &model.EngineState{
+			ID:          "engine:" + strategy,
+			Strategy:    strategy,
+			MarketState: label,
+			MarkedAt:    &now,
+			UpdatedAt:   now,
+		}
+		if err := s.store.UpsertEngineState(ctx, record); err != nil {
+			s.logger.Warn("gagal menyimpan status pasar", "error", err.Error())
+		}
+	}
+}
+
+// marketStateLabel mengubah enum engine menjadi label pendek untuk dashboard.
+func marketStateLabel(state enginev1.MarketState) string {
+	switch state {
+	case enginev1.MarketState_MARKET_OPEN:
+		return "OPEN"
+	case enginev1.MarketState_MARKET_CLOSED:
+		return "CLOSED"
+	case enginev1.MarketState_MARKET_ROLLOVER_BLACKOUT:
+		return "ROLLOVER"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 // SetEngineVersion mencatat build engine yang sedang terhubung.
@@ -316,7 +359,7 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 	}
 
 	// [3] Broker harus bisa dihubungi; dry-run tidak butuh koneksi.
-	if !account.IsDryRun && !s.opts.DryRunAll {
+	if !s.mustDryRun(&userSession{User: user}, account) {
 		client, err := s.client(ctx, account)
 		if err != nil {
 			return RejectAccountFrozen, nil
@@ -351,7 +394,7 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 	}
 
 	// [5] Slippage guard, kecuali simulasi.
-	if s.opts.SlippageGuard && !account.IsDryRun && !s.opts.DryRunAll {
+	if s.opts.SlippageGuard && !s.mustDryRun(&userSession{User: user}, account) {
 		if reason := s.checkSlippage(ctx, account, signal); reason != RejectNone {
 			return reason, nil
 		}
@@ -413,7 +456,7 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 		return s.reject(ctx, user.ID, signal.SignalID, RejectDuplicate)
 	}
 
-	dryRun := account.IsDryRun || s.opts.DryRunAll
+	dryRun := s.mustDryRun(&userSession{User: user}, account)
 	now := s.opts.Clock()
 
 	position := &model.Position{

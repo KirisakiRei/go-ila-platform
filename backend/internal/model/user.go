@@ -21,6 +21,13 @@ type User struct {
 	TrialStartedAt *time.Time `json:"trial_started_at"`
 	TrialExpiresAt *time.Time `json:"trial_expires_at"`
 
+	// Anti-abuse trial: disimpan sebagai hash, bukan plaintext (plans/14 §5.5.5).
+	DeviceFingerprintHash string `gorm:"type:varchar(64);index" json:"-"`
+	SignupIPHash          string `gorm:"type:varchar(64)" json:"-"`
+
+	// Flags menyimpan fitur tambahan per user, mis. akses uji strategi.
+	Flags string `gorm:"type:varchar(255)" json:"-"`
+
 	TelegramChatID   *string    `gorm:"type:varchar(64);index" json:"telegram_chat_id"`
 	TelegramLinkedAt *time.Time `json:"telegram_linked_at"`
 

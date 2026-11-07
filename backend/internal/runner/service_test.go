@@ -321,6 +321,12 @@ func (s *fakeStore) ListUsersBySymbol(_ context.Context, symbol string) ([]model
 
 func (s *fakeStore) UpsertEngineState(_ context.Context, _ *model.EngineState) error { return nil }
 
+func (s *fakeStore) ListEngines(_ context.Context) ([]model.EngineState, error) { return nil, nil }
+
+func (s *fakeStore) FindDailySummary(_ context.Context, userID, day string) (*model.DailySummary, error) {
+	return s.GetDailySummary(context.Background(), userID, day)
+}
+
 func (s *fakeStore) CreateApprovalToken(_ context.Context, _ *model.ApprovalToken) error { return nil }
 
 // Pastikan fake memenuhi kontrak.

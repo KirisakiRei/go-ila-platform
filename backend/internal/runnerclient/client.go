@@ -109,3 +109,14 @@ func (c *Client) post(ctx context.Context, path string, body, out any) error {
 	}
 	return nil
 }
+
+type revokeRequest struct {
+	AccountID string `json:"account_id"`
+}
+
+// RevokeAccount meminta Runner memutus sesi broker akun yang dicabut.
+// Kegagalan di sini tidak membatalkan pencabutan kredensial: sesi akan
+// berakhir sendiri saat Runner restart.
+func (c *Client) RevokeAccount(ctx context.Context, accountID string) error {
+	return c.post(ctx, "/internal/account/revoke", revokeRequest{AccountID: accountID}, nil)
+}

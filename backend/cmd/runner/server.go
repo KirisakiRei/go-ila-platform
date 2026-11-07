@@ -31,6 +31,7 @@ func newInternalServer(svc *runner.Service, secret string, logger *slog.Logger) 
 	mux.HandleFunc("/ready", handler.health)
 	mux.HandleFunc("/internal/approve", handler.authenticate(handler.approve))
 	mux.HandleFunc("/internal/skip", handler.authenticate(handler.skip))
+	mux.HandleFunc("/internal/account/revoke", handler.authenticate(handler.revokeAccount))
 
 	return &http.Server{
 		Addr:              ":" + envOr("RUNNER_HTTP_PORT", "8081"),
@@ -109,6 +110,22 @@ func (s *internalServer) skip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+type revokePayload struct {
+	AccountID string `json:"account_id"`
+}
+
+// revokeAccount memutus sesi broker setelah kredensialnya dihapus.
+func (s *internalServer) revokeAccount(w http.ResponseWriter, r *http.Request) {
+	var payload revokePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.AccountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload tidak sah"})
+		return
+	}
+
+	s.svc.DropClient(payload.AccountID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

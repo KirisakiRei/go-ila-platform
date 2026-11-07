@@ -64,6 +64,10 @@ type RunnerRepository interface {
 
 	// Status engine.
 	UpsertEngineState(ctx context.Context, state *model.EngineState) error
+	ListEngines(ctx context.Context) ([]model.EngineState, error)
+
+	// Kuota harian untuk dashboard.
+	FindDailySummary(ctx context.Context, userID, day string) (*model.DailySummary, error)
 
 	// Token konfirmasi entry (deep-link).
 	CreateApprovalToken(ctx context.Context, token *model.ApprovalToken) error
@@ -546,4 +550,29 @@ func boolToInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+// ListEngines mengembalikan status seluruh engine yang pernah terhubung.
+func (r *runnerRepository) ListEngines(ctx context.Context) ([]model.EngineState, error) {
+	var rows []model.EngineState
+	if err := r.db.WithContext(ctx).Order("strategy ASC").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("membaca status engine: %w", err)
+	}
+	return rows, nil
+}
+
+// FindDailySummary mengembalikan kuota hari ini, atau ringkasan kosong bila
+// belum ada perdagangan. Tidak ditemukannya baris bukan kegagalan.
+func (r *runnerRepository) FindDailySummary(ctx context.Context, userID, day string) (*model.DailySummary, error) {
+	var row model.DailySummary
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND day = ?", userID, day).
+		First(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &model.DailySummary{UserID: userID, Day: day}, nil
+		}
+		return nil, fmt.Errorf("membaca kuota harian: %w", err)
+	}
+	return &row, nil
 }

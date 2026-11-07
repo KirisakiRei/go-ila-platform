@@ -133,7 +133,14 @@ func main() {
 		runMonitor(ctx, svc, logger)
 	}()
 
-	// Koneksi engine: setiap strategi punya proses sendiri (plans/15 �1.1).
+	// Telemetry saldo akun: cukup sekali per menit (plans/05 par.9).
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runTelemetry(ctx, svc, logger)
+	}()
+
+	// Koneksi engine: setiap strategi punya proses sendiri (plans/15 par.1.1).
 	for _, target := range engineTargets(cfg) {
 		wg.Add(1)
 		go func(target engineTarget) {
@@ -173,6 +180,24 @@ func main() {
 	svc.CloseClients()
 
 	logger.Info("runner berhenti")
+}
+
+// runTelemetry memperbarui saldo akun broker secara berkala.
+// Jalan pertama langsung agar dashboard tidak kosong setelah restart.
+func runTelemetry(ctx context.Context, svc *runner.Service, logger *slog.Logger) {
+	svc.RefreshTelemetry(ctx)
+
+	ticker := time.NewTicker(runner.TelemetryInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			svc.RefreshTelemetry(ctx)
+		}
+	}
 }
 
 // runMonitor memeriksa posisi terbuka secara berkala.

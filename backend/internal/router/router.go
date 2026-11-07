@@ -41,6 +41,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	signalRepo := repository.NewSignalRepository(db)
 	positionRepo := repository.NewPositionRepository(db)
 	stateRepo := repository.NewBrokerAccountStateRepository(db)
+	onboardingRepo := repository.NewOnboardingTokenRepository(db)
 
 	// Klien Runner: backend-api meminta eksekusi, bukan mengeksekusi sendiri.
 	runnerAPI := runnerclient.New(cfg.RunnerBaseURL, cfg.InternalSecret)
@@ -70,19 +71,36 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		Audit:         auditRepo,
 		Sealer:        keyring,
 		Strategies:    runner.LoadSettings(),
+		Revoker:       runnerAPI,
 	})
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
+	systemService := service.NewSystemService(service.SystemServiceDeps{
+		Accounts:  accountRepo,
+		States:    stateRepo,
+		Engines:   runnerRepo,
+		Daily:     runnerRepo,
+		Positions: positionRepo,
+		MaxTrades: cfg.MaxDailyTrades,
+	})
+	telegramService := service.NewTelegramService(userRepo, onboardingRepo, auditRepo)
+	trialService := service.NewTrialService(userRepo, auditRepo)
 
 	// Handlers
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, middleware.NewLoginLimiter())
 	approveHandler := handler.NewApproveHandler(approveService)
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
 	accountHandler := handler.NewAccountHandler(accountService)
 	tradingHandler := handler.NewTradingHandler(tradingService)
+	systemHandler := handler.NewSystemHandler(systemService)
+	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret)
+	trialHandler := handler.NewTrialHandler(trialService)
 
 	// Health
 	r.GET("/health", healthHandler.Live)
 	r.GET("/ready", healthHandler.Ready)
+
+	// Webhook Telegram: diautentikasi rahasia header, bukan sesi user.
+	r.POST("/api/v1/telegram/webhook", telegramHandler.Webhook)
 
 	// API v1
 	auth := r.Group("/api/v1/auth")
@@ -111,6 +129,17 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		me.POST("/subscriptions", accountHandler.Subscribe)
 		me.DELETE("/subscriptions/:id", accountHandler.Unsubscribe)
 		me.GET("/strategies", accountHandler.Strategies)
+
+		// Penghubungan Telegram.
+		me.POST("/telegram/link", telegramHandler.CreateLink)
+		me.DELETE("/telegram/link", telegramHandler.Disconnect)
+
+		// Uji coba 7 hari: setara Plus namun hanya simulasi.
+		me.GET("/trial", trialHandler.Status)
+		me.POST("/trial", trialHandler.Start)
+
+		// Status pasar, engine, broker, dan kuota harian.
+		me.GET("/system/status", systemHandler.Status)
 
 		// Riwayat untuk dashboard.
 		me.GET("/signals", tradingHandler.Signals)
