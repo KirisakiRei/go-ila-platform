@@ -1,0 +1,169 @@
+# 🤝 AGENT_LOG — Kanal Komunikasi 2 Arah (Human ⇄ Hermes ⇄ Claude)
+
+> **Tujuan:** Media logging perubahan & pesan strategis antara **Human (owner)**,
+> **Hermes** (agent engine `go-trade`), dan **Claude** (agent platform
+> `go-ila-platform`) melalui repository Git.
+>
+> **Cara pakai:**
+> 1. Entri baru ditulis paling atas di bagian masing-masing.
+> 2. Setiap entri **WAJIB** punya: `Tanggal`, `Pelaku`, `Tipe`, `Ringkasan`,
+>    `File terdampak`, `Status`.
+> 3. Setelah menjalankan tugas, tulis balasan dengan `DIBACA` / `SELESAI` / `BLOKIR`.
+>
+> **Aturan Emas:**
+> - Log ini adalah **catatan, bukan instruksi otomatis**.
+> - Satu agent **tidak** mengubah isi bagian agent lain.
+
+---
+
+## 📍 PENANDA SINKRONISASI
+
+> **Commit terakhir saat log ini ditulis:** `8c6df01`
+> **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
+> **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
+
+### Perintah siap-tempel
+
+```text
+Pull lalu jalankan:
+  git pull origin main
+  git log -8 --oneline
+Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
+```
+
+---
+
+## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-07 — Integrasi Runner selesai: adapter Match-Trader, akun broker, langganan
+
+**Pelaku:** Claude
+**Tipe:** FEATURE + INTEGRATION
+
+**Ringkasan:**
+
+Runner kini bisa terhubung penuh: menerima sinyal, memutuskan, dan
+mengeksekusi ke Match-Trader. Backend sudah punya endpoint untuk mengelola
+akun broker dan langganan simbol. Engine ILA 3.0 disiapkan sebagai proses
+terpisah.
+
+**1. Adapter Match-Trader (`internal/broker/matchtrader/`)**
+
+Diverifikasi terhadap akun demo nyata (HTTP 200):
+
+| Cek | Hasil |
+|---|---|
+| Login token | balance 10610.33, equity 11100.27 |
+| Spec simbol | XAUUSD `valuePerLot=100`, US100 `20`, EURUSD `100000` |
+| Harga live | bid/ask terbaca per simbol |
+| Posisi terbuka | 1 posisi terbaca lengkap dengan SL/TP |
+| Posisi tertutup | 12 terbaca, alasan TP/SL terpetakan |
+
+Perbaikan penting dibanding `go-trade/pkg/broker/matchtrader_broker.go`:
+- **Harga isi diambil dari broker**, bukan dari permintaan
+  (`ExecutedPrice: req.OpenPrice` adalah bug yang membuat slippage tak terdeteksi).
+- **Nilai per lot dari `multiplier`/`contractSize` broker**, bukan tebakan.
+  Diverifikasi dengan PnL asli: US100 20×60.44×0.40 = 483.52 ✓
+- Digit SL/TP dari `pricePrecision`, step lot dari `volumeStep`.
+- Base URL per akun (bukan hardcode satu domain).
+- Token kosong/salah → `ErrInvalidCredentials`, sesi tidak pernah dianggap hidup.
+
+**2. Endpoint backend-api baru**
+
+```
+GET    /api/v1/accounts
+POST   /api/v1/accounts
+PATCH  /api/v1/accounts/:id
+DELETE /api/v1/accounts/:id
+GET    /api/v1/subscriptions
+POST   /api/v1/subscriptions
+DELETE /api/v1/subscriptions/:id
+GET    /api/v1/strategies
+GET    /api/v1/signals
+GET    /api/v1/positions
+```
+
+Penegakan di backend:
+- Free = 0 akun, Basic = 1, Plus = 2.
+- Mode `auto` hanya Plus.
+- Risiko per trade dijepit 0,10%–1,00%.
+- Maksimal 8 simbol dipantau per user.
+- ILA 3.0 wajib Plus **dan** sudah dirilis.
+
+**3. Kredensial**
+
+Backend hanya **menulis** blob terenkripsi (`cryptox.Seal`), Runner yang
+**membaca** (`Open`). Associated data = `broker_account_id`, sehingga blob
+tidak bisa dipindah antar akun. Dua tes mengunci ini:
+`TestKredensialTerenkripsi` dan `TestKredensialTerikatAkun`.
+
+**4. Engine ILA 3.0 sebagai proses terpisah**
+
+Runner sekarang membuka satu koneksi per strategi:
+
+```go
+engineTargets(cfg) -> [{ila-2.0, addr}, {ila-3.0, addr}]
+```
+
+- `ENGINE3_GRPC_ADDR` kosong atau `ILA3_AVAILABILITY=off` → engine ILA 3.0
+  **tidak dijalankan sama sekali**.
+- `SubscriberID` per strategi (`runner-ila-2.0`, `runner-ila-3.0`) agar dua
+  engine tidak saling mengira pelanggan yang sama.
+- `ComputeRequirements` tidak meminta ILA 3.0 selama belum dirilis.
+
+**5. Tier Free delay 15 menit**
+
+Sudah ditegakkan di `TradingService.Signals`:
+- Sebelum 15 menit → sinyal tidak tampil.
+- TTL habis sebelum 15 menit → tidak tampil sama sekali.
+- Setelah delay → tampil dengan penanda `delayed: true`.
+
+**File terdampak:**
+
+```
+backend/internal/broker/matchtrader/{client,transport,types}.go
+backend/internal/broker/matchtrader/{client,live}_test.go
+backend/cmd/runner/main.go
+backend/internal/config/config.go
+backend/internal/dto/{account,trading}_dto.go
+backend/internal/handler/{account,trading}_handler.go
+backend/internal/repository/{interfaces,broker,query}_repository.go
+backend/internal/router/router.go
+backend/internal/runner/{settings,rules,subscription,service}.go
+backend/internal/service/{account,trading}_service.go
+backend/internal/service/{account,trading}_service_test.go
+backend/internal/service/credentials.go
+.env.example
+```
+
+**Status:** SELESAI — `go build`, `go vet`, `gofmt`, `go test` semua hijau.
+
+---
+
+## ⬇️ DARI HUMAN KE HERMES
+
+> Bagian ini hanya diisi oleh Human. Hermes membaca, tidak mengubah.
+
+### 2026-11-07 — Kontrak Runner ↔ Engine (untuk Hermes)
+
+**Ringkasan:** Engine tidak perlu berubah kontrak. Yang perlu diketahui Hermes:
+
+| Aspek | Ketentuan |
+|---|---|
+| `strategy_version` | `ila-2.0` atau `ila-3.0`; wajib terisi benar |
+| `subscriber_id` | `runner-ila-2.0` dan `runner-ila-3.0` (satu per engine) |
+| `Subscribe.symbols` | Hanya simbol yang dibutuhkan; tanpa `user_id` |
+| `expires_at` | Wajib; Runner menolak sinyal lewat TTL |
+| `signal_id` | Unik dan stabil; dipakai sebagai kunci idempoten |
+| `SignalUpdate` | `CANCELLED`/`EXPIRED`/`SUPERSEDED` hanya membatalkan sinyal, **bukan** posisi |
+| `WantStatusUpdates` | Runner kini mengirim `true` |
+
+**Status:** DIBACA
+
+---
+
+## ⬆️ DARI HERMES KE HUMAN
+
+> Bagian ini hanya diisi oleh Hermes.
+
+_(belum ada entri)_

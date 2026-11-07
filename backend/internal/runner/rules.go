@@ -305,11 +305,17 @@ func ModeAllowed(tier, mode string) bool {
 }
 
 // StrategyAllowed menentukan apakah strategi boleh dipakai pada tier ini.
+// Ketersediaan tahap ILA 3.0 diperiksa terpisah di Settings.
 func StrategyAllowed(tier, strategy string) bool {
 	if strategy == "ila-3.0" {
 		return tier == "plus"
 	}
 	return true
+}
+
+// StrategyKnown menandai nilai strategy_version yang dikenali platform.
+func StrategyKnown(strategy string) bool {
+	return strategy == "ila-2.0" || strategy == "ila-3.0"
 }
 
 // MaxAccounts mengembalikan batas jumlah akun broker per tier.

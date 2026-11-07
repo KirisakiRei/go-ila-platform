@@ -37,7 +37,20 @@ type BrokerAccountRepository interface {
 type SubscriptionRepository interface {
 	Create(ctx context.Context, sub *model.Subscription) error
 	ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error)
+	ListByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	Deactivate(ctx context.Context, id, userID string) error
+}
+
+// CredentialRepository menyimpan blob kredensial terenkripsi.
+type CredentialRepository interface {
+	Upsert(ctx context.Context, credential *model.Credential) error
+	FindByAccount(ctx context.Context, accountID string) (*model.Credential, error)
+	DeleteByAccount(ctx context.Context, accountID string) error
+}
+
+// BrokerAccountStateLister membaca telemetry akun yang ditulis Runner.
+type BrokerAccountStateLister interface {
+	ListByUser(ctx context.Context, userID string) ([]model.BrokerAccountState, error)
 }
 
 // PositionRepository adalah kebutuhan service atas posisi terbuka user.

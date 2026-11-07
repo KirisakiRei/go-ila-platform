@@ -368,6 +368,12 @@ func discardLogger() *slog.Logger {
 }
 
 func newService(store *fakeStore, pub *fakePublisher) *runner.Service {
+	// ILA 3.0 dianggap sudah umum agar perilaku tier bisa diuji.
+	return newServiceWithSettings(store, pub, ila3General())
+}
+
+// newServiceWithSettings memungkinkan tes memilih tahap ketersediaan strategi.
+func newServiceWithSettings(store *fakeStore, pub *fakePublisher, settings *runner.Settings) *runner.Service {
 	registry := broker.NewRegistry()
 	registry.Register("paper", func(accountID, brokerType string) (broker.Client, error) {
 		return broker.NewPaperClient(accountID, brokerType), nil
@@ -378,7 +384,13 @@ func newService(store *fakeStore, pub *fakePublisher) *runner.Service {
 		SlippageGuard:   true,
 		AutoExecute:     true,
 		MarketOpenCheck: false,
+		Settings:        settings,
 	})
+}
+
+// ila3General menyalakan ILA 3.0 sampai tahap umum untuk pengujian.
+func ila3General() *runner.Settings {
+	return runner.NewSettings(runner.ILA3General)
 }
 
 func readySignal(symbol string, ttl time.Duration) *enginev1.Signal {

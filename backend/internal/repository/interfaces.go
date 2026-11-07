@@ -42,7 +42,14 @@ type CredentialRepository interface {
 type SubscriptionRepository interface {
 	Create(ctx context.Context, sub *model.Subscription) error
 	ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error)
+	ListByUser(ctx context.Context, userID string) ([]model.Subscription, error)
+	FindActive(ctx context.Context, userID, symbol, strategy string) (*model.Subscription, error)
 	Deactivate(ctx context.Context, id, userID string) error
+}
+
+// BrokerAccountStateRepository menyimpan telemetry akun yang ditulis Runner.
+type BrokerAccountStateRepository interface {
+	ListByUser(ctx context.Context, userID string) ([]model.BrokerAccountState, error)
 }
 
 // SignalRepository menyimpan sinyal yang diterima dari engine.
@@ -50,12 +57,14 @@ type SignalRepository interface {
 	Upsert(ctx context.Context, signal *model.Signal) error
 	FindBySignalID(ctx context.Context, signalID string) (*model.Signal, error)
 	UpdateStatus(ctx context.Context, signalID, status, reason string) error
+	ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error)
 }
 
 // PositionRepository mengelola posisi nyata di broker.
 type PositionRepository interface {
 	Create(ctx context.Context, pos *model.Position) error
 	FindOpenByUser(ctx context.Context, userID string) ([]model.Position, error)
+	ListByUser(ctx context.Context, userID string, limit int) ([]model.Position, error)
 	FindByTicket(ctx context.Context, ticket string) (*model.Position, error)
 	Close(ctx context.Context, id string, exitPrice, pnl, outcomeR float64, status string) error
 }

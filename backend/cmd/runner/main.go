@@ -133,15 +133,16 @@ func main() {
 		runMonitor(ctx, svc, logger)
 	}()
 
-	// Koneksi engine.
-	if cfg.EngineGRPCAddr != "" {
+	// Koneksi engine: setiap strategi punya proses sendiri (plans/15 �1.1).
+	for _, target := range engineTargets(cfg) {
 		wg.Add(1)
-		go func() {
+		go func(target engineTarget) {
 			defer wg.Done()
-			runEngineLoop(ctx, cfg, svc, store, registry, logger)
-		}()
-	} else {
-		logger.Warn("ENGINE_GRPC_ADDR kosong; runner berjalan tanpa sinyal engine")
+			runEngineLoop(ctx, target, svc, store, logger)
+		}(target)
+	}
+	if len(engineTargets(cfg)) == 0 {
+		logger.Warn("tidak ada alamat engine; runner berjalan tanpa sinyal")
 	}
 
 	// Server internal: hanya backend-api yang memanggilnya.
@@ -189,31 +190,72 @@ func runMonitor(ctx context.Context, svc *runner.Service, logger *slog.Logger) {
 	}
 }
 
-// runEngineLoop menjaga koneksi ke engine tetap hidup.
+// engineTarget adalah satu proses engine yang harus dijangkau Runner.
+type engineTarget struct {
+	Strategy           string
+	Addr               string
+	CertFile           string
+	KeyFile            string
+	CAFile             string
+	ServerNameOverride string
+}
+
+// engineTargets menyusun daftar engine yang aktif.
+// ILA 3.0 hanya ikut bila tahapnya mengizinkan engine berjalan.
+func engineTargets(cfg *config.Config) []engineTarget {
+	out := make([]engineTarget, 0, 2)
+
+	if cfg.EngineGRPCAddr != "" {
+		out = append(out, engineTarget{
+			Strategy:           cfg.EngineStrategy,
+			Addr:               cfg.EngineGRPCAddr,
+			CertFile:           cfg.EngineMTLSCert,
+			KeyFile:            cfg.EngineMTLSKey,
+			CAFile:             cfg.EngineMTLSCA,
+			ServerNameOverride: cfg.EngineServerName,
+		})
+	}
+
+	ila3 := runner.NewSettings(cfg.ILA3Availability)
+	if cfg.Engine3GRPCAddr != "" && ila3.ILA3Running() {
+		out = append(out, engineTarget{
+			Strategy:           "ila-3.0",
+			Addr:               cfg.Engine3GRPCAddr,
+			CertFile:           cfg.Engine3MTLSCert,
+			KeyFile:            cfg.Engine3MTLSKey,
+			CAFile:             cfg.Engine3MTLSCA,
+			ServerNameOverride: cfg.Engine3ServerName,
+		})
+	}
+
+	return out
+}
+
+// runEngineLoop menjaga koneksi ke satu engine tetap hidup.
 //
 // Pola reconnect mengikuti plans/05 §8: setelah terhubung, minta snapshot,
 // lalu berlangganan ulang untuk semua simbol kebutuhan. Sinyal lama yang
 // terlewat TIDAK dieksekusi karena pemeriksaan TTL berjalan di jalur sinyal.
 func runEngineLoop(
 	ctx context.Context,
-	cfg *config.Config,
+	target engineTarget,
 	svc *runner.Service,
 	store repository.RunnerRepository,
-	registry *broker.Registry,
 	logger *slog.Logger,
 ) {
 	backoff := minBackoff
-	stateID := engineStateID(cfg.EngineStrategy)
+	stateID := engineStateID(target.Strategy)
 
 	for ctx.Err() == nil {
-		err := streamOnce(ctx, cfg, svc, store, logger)
-		recordEngineState(ctx, store, stateID, cfg.EngineStrategy, err, logger)
+		err := streamOnce(ctx, target, svc, store, logger)
+		recordEngineState(ctx, store, stateID, target.Strategy, err, logger)
 
 		if ctx.Err() != nil {
 			return
 		}
 
 		logger.Warn("koneksi engine terputus, mencoba ulang",
+			"strategy", target.Strategy,
 			"backoff", backoff.String(), "error", errorText(err))
 
 		select {
@@ -232,19 +274,19 @@ func runEngineLoop(
 // streamOnce membuka satu sesi ke engine sampai terputus.
 func streamOnce(
 	ctx context.Context,
-	cfg *config.Config,
+	target engineTarget,
 	svc *runner.Service,
 	store repository.RunnerRepository,
 	logger *slog.Logger,
 ) error {
 	conn, err := engineclient.NewConnection(engineclient.Config{
-		Addr:               cfg.EngineGRPCAddr,
-		Strategy:           cfg.EngineStrategy,
-		SubscriberID:       cfg.RunnerSubscriber,
-		CertFile:           cfg.EngineMTLSCert,
-		KeyFile:            cfg.EngineMTLSKey,
-		CAFile:             cfg.EngineMTLSCA,
-		ServerNameOverride: cfg.EngineServerName,
+		Addr:               target.Addr,
+		Strategy:           target.Strategy,
+		SubscriberID:       subscriberFor(target.Strategy),
+		CertFile:           target.CertFile,
+		KeyFile:            target.KeyFile,
+		CAFile:             target.CAFile,
+		ServerNameOverride: target.ServerNameOverride,
 		ConnectTimeout:     10 * time.Second,
 	})
 	if err != nil {
@@ -252,17 +294,20 @@ func streamOnce(
 	}
 	defer func() { _ = conn.Close() }()
 
+	subscriberID := subscriberFor(target.Strategy)
+
 	return engineclient.Run(ctx, conn,
 		&enginev1.SubscribeRequest{
-			SubscriberId:      cfg.RunnerSubscriber,
-			Symbols:           subscribedSymbols(ctx, cfg, svc),
-			WantStatusUpdates: false,
+			SubscriberId:      subscriberID,
+			Symbols:           subscribedSymbols(ctx, target, svc),
+			WantStatusUpdates: true,
 		},
 		engineclient.Events{
 			OnConnected: func(client enginev1.EngineServiceClient) {
-				logger.Info("terhubung ke engine", "addr", cfg.EngineGRPCAddr)
-				applySnapshot(ctx, client, svc, cfg, logger)
-				svc.SetAckSender(ackSender(client, cfg.RunnerSubscriber))
+				logger.Info("terhubung ke engine",
+					"strategy", target.Strategy, "addr", target.Addr)
+				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
+				svc.SetAckSender(ackSender(client, subscriberID))
 			},
 			OnSignal: func(signal *enginev1.Signal) {
 				svc.SetEngineVersion(signal.GetEngineVersion())
@@ -273,25 +318,34 @@ func streamOnce(
 			},
 			OnMarketState: func(state *enginev1.MarketStateEvent) {
 				svc.SetMarketState(state.GetState())
-				logger.Info("status pasar", "state", state.GetState().String(), "detail", state.GetDetail())
+				logger.Info("status pasar",
+					"strategy", target.Strategy,
+					"state", state.GetState().String(), "detail", state.GetDetail())
 			},
 			OnHeartbeat: func(hb *enginev1.Heartbeat) {
 				svc.SetEngineVersion(hb.GetEngineVersion())
 			},
 			OnDisconnected: func(err error) {
-				logger.Warn("stream engine berakhir", "error", errorText(err))
+				logger.Warn("stream engine berakhir",
+					"strategy", target.Strategy, "error", errorText(err))
 			},
 		},
 	)
 }
 
 // applySnapshot memulihkan sinyal yang masih berlaku setelah reconnect (D19).
-func applySnapshot(ctx context.Context, client enginev1.EngineServiceClient, svc *runner.Service, cfg *config.Config, logger *slog.Logger) {
+func applySnapshot(
+	ctx context.Context,
+	client enginev1.EngineServiceClient,
+	svc *runner.Service,
+	subscriberID, strategy string,
+	logger *slog.Logger,
+) {
 	snapCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	snapshot, err := client.Snapshot(snapCtx, &enginev1.SnapshotRequest{
-		SubscriberId: cfg.RunnerSubscriber,
+		SubscriberId: subscriberID,
 	})
 	if err != nil {
 		logger.Warn("snapshot engine gagal", "error", err.Error())
@@ -303,7 +357,8 @@ func applySnapshot(ctx context.Context, client enginev1.EngineServiceClient, svc
 		svc.SetMarketState(state.GetState())
 	}
 
-	logger.Info("snapshot diterima", "signals", len(snapshot.GetSignals()))
+	logger.Info("snapshot diterima",
+		"strategy", strategy, "signals", len(snapshot.GetSignals()))
 
 	// Sinyal dari snapshot melewati jalur yang sama dengan sinyal live:
 	// TTL tetap diperiksa, sehingga sinyal kedaluwarsa tidak dieksekusi.
@@ -334,14 +389,20 @@ func ackSender(client enginev1.EngineServiceClient, subscriberID string) runner.
 }
 
 // subscribedSymbols menghitung simbol yang perlu dipantau saat koneksi dibuka.
-func subscribedSymbols(ctx context.Context, cfg *config.Config, svc *runner.Service) []string {
+func subscribedSymbols(ctx context.Context, target engineTarget, svc *runner.Service) []string {
 	reqs, err := svc.ComputeRequirements(ctx, []runner.StrategyLocation{
-		{Strategy: cfg.EngineStrategy, Addr: cfg.EngineGRPCAddr},
+		{Strategy: target.Strategy, Addr: target.Addr},
 	})
 	if err != nil {
 		return nil
 	}
-	return reqs[cfg.EngineStrategy]
+	return reqs[target.Strategy]
+}
+
+// subscriberFor membentuk identitas langganan per strategi, agar dua engine
+// tidak saling mengira sebagai pelanggan yang sama.
+func subscriberFor(strategy string) string {
+	return "runner-" + strategy
 }
 
 // recordEngineState mencatat status koneksi agar dashboard bisa menampilkan

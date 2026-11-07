@@ -51,13 +51,22 @@ type Config struct {
 	EngineMTLSCA     string
 	EngineServerName string
 	EngineStrategy   string
-	RunnerSubscriber string
-	DailyTimezone    string
-	MaxDailyTrades   int
-	MaxDailyLosses   int
-	StopAfterWin     bool
-	AutoExecute      bool
-	DryRunAll        bool
+
+	// ILA 3.0 berjalan sebagai proses terpisah dengan kontrak gRPC yang sama.
+	// Alamat kosong berarti engine itu tidak dijalankan (plans/15 §1.1).
+	Engine3GRPCAddr   string
+	Engine3MTLSCert   string
+	Engine3MTLSKey    string
+	Engine3MTLSCA     string
+	Engine3ServerName string
+	ILA3Availability  string
+	RunnerSubscriber  string
+	DailyTimezone     string
+	MaxDailyTrades    int
+	MaxDailyLosses    int
+	StopAfterWin      bool
+	AutoExecute       bool
+	DryRunAll         bool
 
 	// MasterKey membungkus kunci per user; wajib untuk kredensial broker.
 	MasterKey        string
@@ -76,39 +85,45 @@ type Config struct {
 // Proses tidak boleh mulai dengan konfigurasi setengah jadi.
 func Load(service string) (*Config, error) {
 	cfg := &Config{
-		AppEnv:           env("APP_ENV", "development"),
-		ServiceName:      service,
-		HTTPPort:         env("HTTP_PORT", "8080"),
-		PublicURL:        env("PUBLIC_BASE_URL", "http://localhost:3000"),
-		DBDSN:            env("DB_DSN", ""),
-		DBMaxIdleConns:   envInt("DB_MAX_IDLE_CONNS", 5),
-		DBMaxOpenConns:   envInt("DB_MAX_OPEN_CONNS", 20),
-		DBConnMaxLife:    envDuration("DB_CONN_MAX_LIFETIME", time.Hour),
-		DBAutoMigrate:    envBool("DB_AUTO_MIGRATE", false),
-		JWTSecret:        env("JWT_SECRET", ""),
-		JWTExpiry:        envDuration("JWT_EXPIRY", 12*time.Hour),
-		AllowedOrigins:   envList("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
-		ShutdownTimeout:  envDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
-		LogLevel:         env("LOG_LEVEL", "info"),
-		EngineGRPCAddr:   env("ENGINE_GRPC_ADDR", ""),
-		EngineMTLSCert:   env("ENGINE_MTLS_CERT", ""),
-		EngineMTLSKey:    env("ENGINE_MTLS_KEY", ""),
-		EngineMTLSCA:     env("ENGINE_MTLS_CA", ""),
-		EngineServerName: env("ENGINE_SERVER_NAME", ""),
-		EngineStrategy:   env("ENGINE_STRATEGY", "ila-2.0"),
-		RunnerSubscriber: env("RUNNER_SUBSCRIBER_ID", "runner-1"),
-		DailyTimezone:    env("DAILY_TZ", "Asia/Jakarta"),
-		MaxDailyTrades:   envInt("MAX_DAILY_TRADES", 2),
-		MaxDailyLosses:   envInt("MAX_DAILY_LOSSES", 2),
-		StopAfterWin:     envBool("STOP_AFTER_WIN", true),
-		AutoExecute:      envBool("AUTO_EXECUTE", false),
-		DryRunAll:        envBool("DRY_RUN_ALL", false),
-		MasterKey:        env("MASTER_KEY", ""),
-		MasterKeyVersion: envInt("MASTER_KEY_VERSION", 1),
-		InternalSecret:   env("INTERNAL_SECRET", ""),
-		RunnerBaseURL:    env("RUNNER_BASE_URL", "http://runner:8081"),
-		TelegramBotToken: env("TELEGRAM_BOT_TOKEN", ""),
-		TelegramTimeout:  envDuration("TELEGRAM_TIMEOUT", 10*time.Second),
+		AppEnv:            env("APP_ENV", "development"),
+		ServiceName:       service,
+		HTTPPort:          env("HTTP_PORT", "8080"),
+		PublicURL:         env("PUBLIC_BASE_URL", "http://localhost:3000"),
+		DBDSN:             env("DB_DSN", ""),
+		DBMaxIdleConns:    envInt("DB_MAX_IDLE_CONNS", 5),
+		DBMaxOpenConns:    envInt("DB_MAX_OPEN_CONNS", 20),
+		DBConnMaxLife:     envDuration("DB_CONN_MAX_LIFETIME", time.Hour),
+		DBAutoMigrate:     envBool("DB_AUTO_MIGRATE", false),
+		JWTSecret:         env("JWT_SECRET", ""),
+		JWTExpiry:         envDuration("JWT_EXPIRY", 12*time.Hour),
+		AllowedOrigins:    envList("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
+		ShutdownTimeout:   envDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
+		LogLevel:          env("LOG_LEVEL", "info"),
+		EngineGRPCAddr:    env("ENGINE_GRPC_ADDR", ""),
+		EngineMTLSCert:    env("ENGINE_MTLS_CERT", ""),
+		EngineMTLSKey:     env("ENGINE_MTLS_KEY", ""),
+		EngineMTLSCA:      env("ENGINE_MTLS_CA", ""),
+		EngineServerName:  env("ENGINE_SERVER_NAME", ""),
+		EngineStrategy:    env("ENGINE_STRATEGY", "ila-2.0"),
+		Engine3GRPCAddr:   env("ENGINE3_GRPC_ADDR", ""),
+		Engine3MTLSCert:   env("ENGINE3_MTLS_CERT", ""),
+		Engine3MTLSKey:    env("ENGINE3_MTLS_KEY", ""),
+		Engine3MTLSCA:     env("ENGINE3_MTLS_CA", ""),
+		Engine3ServerName: env("ENGINE3_SERVER_NAME", ""),
+		ILA3Availability:  env("ILA3_AVAILABILITY", "off"),
+		RunnerSubscriber:  env("RUNNER_SUBSCRIBER_ID", "runner-1"),
+		DailyTimezone:     env("DAILY_TZ", "Asia/Jakarta"),
+		MaxDailyTrades:    envInt("MAX_DAILY_TRADES", 2),
+		MaxDailyLosses:    envInt("MAX_DAILY_LOSSES", 2),
+		StopAfterWin:      envBool("STOP_AFTER_WIN", true),
+		AutoExecute:       envBool("AUTO_EXECUTE", false),
+		DryRunAll:         envBool("DRY_RUN_ALL", false),
+		MasterKey:         env("MASTER_KEY", ""),
+		MasterKeyVersion:  envInt("MASTER_KEY_VERSION", 1),
+		InternalSecret:    env("INTERNAL_SECRET", ""),
+		RunnerBaseURL:     env("RUNNER_BASE_URL", "http://runner:8081"),
+		TelegramBotToken:  env("TELEGRAM_BOT_TOKEN", ""),
+		TelegramTimeout:   envDuration("TELEGRAM_TIMEOUT", 10*time.Second),
 	}
 
 	if err := cfg.validate(); err != nil {

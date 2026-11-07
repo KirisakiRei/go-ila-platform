@@ -10,8 +10,10 @@ import (
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/handler"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/middleware"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
+	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/runnerclient"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
+	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
 )
 
 // NewBackendAPI merangkai seluruh endpoint backend-api.
@@ -33,6 +35,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	auditRepo := repository.NewAuditRepository(db)
 	runnerRepo := repository.NewRunnerRepository(db)
 	approvalRepo := repository.NewApprovalTokenRepository(db)
+	accountRepo := repository.NewBrokerAccountRepository(db)
+	credentialRepo := repository.NewCredentialRepository(db)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	signalRepo := repository.NewSignalRepository(db)
+	positionRepo := repository.NewPositionRepository(db)
+	stateRepo := repository.NewBrokerAccountStateRepository(db)
 
 	// Klien Runner: backend-api meminta eksekusi, bukan mengeksekusi sendiri.
 	runnerAPI := runnerclient.New(cfg.RunnerBaseURL, cfg.InternalSecret)
@@ -47,10 +55,30 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		runnerAPI,
 	)
 
+	// Kredensial broker dienkripsi sebelum menyentuh database.
+	keyring, err := cryptox.NewKeyring(cfg.MasterKeyVersion, cfg.MasterKey, nil)
+	if err != nil {
+		logger.Error("master key tidak sah; endpoint akun dinonaktifkan", "error", err.Error())
+	}
+
+	accountService := service.NewAccountService(service.AccountServiceDeps{
+		Users:         userRepo,
+		Accounts:      accountRepo,
+		Credentials:   credentialRepo,
+		Subscriptions: subscriptionRepo,
+		States:        stateRepo,
+		Audit:         auditRepo,
+		Sealer:        keyring,
+		Strategies:    runner.LoadSettings(),
+	})
+	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
 	approveHandler := handler.NewApproveHandler(approveService)
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
+	accountHandler := handler.NewAccountHandler(accountService)
+	tradingHandler := handler.NewTradingHandler(tradingService)
 
 	// Health
 	r.GET("/health", healthHandler.Live)
@@ -71,6 +99,22 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		me.GET("/approve/:token", approveHandler.Preview)
 		me.POST("/approve/:token/confirm", approveHandler.Confirm)
 		me.POST("/approve/:token/decline", approveHandler.Decline)
+
+		// Akun broker: kredensial masuk terenkripsi, tidak pernah keluar lagi.
+		me.GET("/accounts", accountHandler.List)
+		me.POST("/accounts", accountHandler.Create)
+		me.PATCH("/accounts/:id", accountHandler.Update)
+		me.DELETE("/accounts/:id", accountHandler.Delete)
+
+		// Langganan simbol dan pilihan strategi.
+		me.GET("/subscriptions", accountHandler.ListSubscriptions)
+		me.POST("/subscriptions", accountHandler.Subscribe)
+		me.DELETE("/subscriptions/:id", accountHandler.Unsubscribe)
+		me.GET("/strategies", accountHandler.Strategies)
+
+		// Riwayat untuk dashboard.
+		me.GET("/signals", tradingHandler.Signals)
+		me.GET("/positions", tradingHandler.Positions)
 	}
 
 	return r

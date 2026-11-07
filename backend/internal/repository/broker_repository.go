@@ -158,6 +158,35 @@ func (r *subscriptionRepository) ListActiveByUser(ctx context.Context, userID st
 	return subs, nil
 }
 
+// ListByUser mengembalikan seluruh langganan termasuk yang nonaktif,
+// agar user melihat apa yang pernah dipilihnya.
+func (r *subscriptionRepository) ListByUser(ctx context.Context, userID string) ([]model.Subscription, error) {
+	var subs []model.Subscription
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("symbol ASC, strategy ASC").
+		Find(&subs).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca subscription user: %w", err)
+	}
+	return subs, nil
+}
+
+// FindActive mencari langganan aktif untuk satu pasangan (symbol, strategy).
+func (r *subscriptionRepository) FindActive(ctx context.Context, userID, symbol, strategy string) (*model.Subscription, error) {
+	var sub model.Subscription
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND symbol = ? AND strategy = ? AND is_active = ?", userID, symbol, strategy, true).
+		First(&sub).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, fmt.Errorf("membaca subscription: %w", err)
+	}
+	return &sub, nil
+}
+
 // Deactivate hanya mengubah baris milik user sendiri.
 func (r *subscriptionRepository) Deactivate(ctx context.Context, id, userID string) error {
 	res := r.db.WithContext(ctx).Model(&model.Subscription{}).

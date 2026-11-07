@@ -49,6 +49,10 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 		if !StrategyAllowed(tier, sub.Strategy) {
 			continue
 		}
+		// Strategi yang belum dirilis tidak boleh membuat engine dijalankan.
+		if sub.Strategy == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
+			continue
+		}
 
 		if byStrategy[sub.Strategy] == nil {
 			byStrategy[sub.Strategy] = make(map[string]bool)

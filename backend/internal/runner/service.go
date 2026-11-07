@@ -54,6 +54,8 @@ type Options struct {
 	Clock func() time.Time
 	// PriceTTL membatasi umur cache harga untuk pemeriksaan slippage.
 	PriceTTL time.Duration
+	// Settings menyimpan ketersediaan strategi; bila nil dipakai default.
+	Settings *Settings
 }
 
 // Service adalah inti Runner. Aman dipakai dari beberapa goroutine.
@@ -79,6 +81,9 @@ func NewService(store Store, brokers *broker.Registry, pub Publisher, logger *sl
 	}
 	if opts.PriceTTL <= 0 {
 		opts.PriceTTL = 30 * time.Second
+	}
+	if opts.Settings == nil {
+		opts.Settings = LoadSettings()
 	}
 	opts.Policy = opts.Policy.Clamp()
 
@@ -205,6 +210,10 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 
 	// [2] User berhak atas strategi ini?
 	if !StrategyAllowed(tier, signal.StrategyVersion) {
+		return s.reject(ctx, user.ID, signal.SignalID, RejectStrategyTier)
+	}
+	// Strategi yang belum dirilis tidak boleh menghasilkan posisi.
+	if signal.StrategyVersion == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
 		return s.reject(ctx, user.ID, signal.SignalID, RejectStrategyTier)
 	}
 
