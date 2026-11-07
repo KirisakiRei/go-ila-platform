@@ -12,6 +12,8 @@ import SettingsPage from '@/pages/SettingsPage'
 import SignalsPage from '@/pages/SignalsPage'
 import StrategiesPage from '@/pages/StrategiesPage'
 import AccountsPage from '@/pages/AccountsPage'
+import BillingPage from '@/pages/BillingPage'
+import CheckoutPage from '@/pages/CheckoutPage'
 import AdminAuditPage from '@/pages/admin/AdminAuditPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
@@ -139,6 +141,27 @@ export function AppRoutes() {
           <RequireAuth>
             <ShellPage>
               <SettingsPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/langganan"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <BillingPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/langganan/bayar"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <CheckoutPage />
             </ShellPage>
           </RequireAuth>
         }

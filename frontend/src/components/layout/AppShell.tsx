@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { BarChart3, Bot, LayoutDashboard, Radio, Settings, Wallet } from 'lucide-react'
+import { BarChart3, Bot, CreditCard, LayoutDashboard, Radio, Settings, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
 import { useSignOut } from '@/features/auth/hooks/use-auth'
@@ -15,6 +15,8 @@ const TITLES: Record<string, string> = {
   '/posisi': 'Posisi',
   '/akun': 'Akun Broker',
   '/strategi': 'Strategi',
+  '/langganan': 'Langganan',
+  '/langganan/bayar': 'Pembayaran',
   '/pengaturan': 'Pengaturan',
 }
 
@@ -24,6 +26,7 @@ const NAV = [
   { to: '/posisi', label: 'Posisi', short: 'Posisi', icon: BarChart3, end: false },
   { to: '/akun', label: 'Akun Broker', short: 'Akun', icon: Wallet, end: false },
   { to: '/strategi', label: 'Strategi', short: 'Strategi', icon: Bot, end: false },
+  { to: '/langganan', label: 'Langganan', short: 'Langganan', icon: CreditCard, end: false },
   { to: '/pengaturan', label: 'Pengaturan', short: 'Setelan', icon: Settings, end: false },
 ]
 
