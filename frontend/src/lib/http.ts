@@ -25,6 +25,7 @@ export const tokenStorage = {
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  query?: Record<string, string | number | boolean | undefined>
   signal?: AbortSignal
   timeoutMs?: number
 }
@@ -41,7 +42,7 @@ export function onUnauthorized(handler: () => void): void {
  * seragam, dan penerjemahan kegagalan menjadi ApiError.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options
+  const { method = 'GET', body, query, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -62,7 +63,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   try {
-    const response = await fetch(`/api/v1${path}`, {
+    const response = await fetch(buildUrl(path, query), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -103,10 +104,22 @@ async function parseJson<T>(response: Response): Promise<ApiResponse<T>> {
   try {
     return (await response.json()) as ApiResponse<T>
   } catch {
-    throw new ApiError(
-      'Balasan server tidak dapat dibaca.',
-      response.status,
-      'INVALID_RESPONSE',
-    )
+    throw new ApiError('Balasan server tidak dapat dibaca.', response.status, 'INVALID_RESPONSE')
   }
+}
+
+/** buildUrl menyusun URL lengkap; parameter kosong dilewati. */
+function buildUrl(
+  path: string,
+  query?: Record<string, string | number | boolean | undefined>,
+): string {
+  if (!query) return `/api/v1${path}`
+
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  }
+
+  const search = params.toString()
+  return search ? `/api/v1${path}?${search}` : `/api/v1${path}`
 }

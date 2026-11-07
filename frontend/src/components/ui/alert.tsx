@@ -23,8 +23,7 @@ const ICONS = {
 } as const
 
 export interface AlertProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof alertVariants> {}
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof alertVariants> {}
 
 function Alert({ className, variant = 'destructive', children, ...props }: AlertProps) {
   const Icon = ICONS[variant ?? 'destructive']

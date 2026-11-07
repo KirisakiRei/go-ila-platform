@@ -10,10 +10,7 @@ export const loginSchema = z.object({
 })
 
 export const registerSchema = z.object({
-  name: z
-    .string()
-    .min(3, 'Nama minimal 3 karakter')
-    .max(100, 'Nama maksimal 100 karakter'),
+  name: z.string().min(3, 'Nama minimal 3 karakter').max(100, 'Nama maksimal 100 karakter'),
   email: z.string().min(1, 'Email wajib diisi').email('Format email tidak sah'),
   password: z
     .string()

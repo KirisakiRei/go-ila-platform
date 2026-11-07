@@ -2,9 +2,15 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
+import ApprovePage from '@/pages/ApprovePage'
 import DashboardPage from '@/pages/DashboardPage'
 import LoginPage from '@/pages/LoginPage'
+import PositionsPage from '@/pages/PositionsPage'
 import RegisterPage from '@/pages/RegisterPage'
+import SettingsPage from '@/pages/SettingsPage'
+import SignalsPage from '@/pages/SignalsPage'
+import StrategiesPage from '@/pages/StrategiesPage'
+import AccountsPage from '@/pages/AccountsPage'
 import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 
@@ -24,8 +30,15 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+/** Halaman dalam kerangka aplikasi; user dijamin tersedia oleh RequireAuth. */
+function ShellPage({ children }: { children: ReactNode }) {
+  const { user } = useAuthContext()
+  if (!user) return null
+  return <AppShell user={user}>{children}</AppShell>
+}
+
 export function AppRoutes() {
-  const { user, isLoading } = useAuthContext()
+  const { isLoading } = useAuthContext()
 
   if (isLoading) {
     return <FullPageLoading label="Memuat sesi…" />
@@ -49,18 +62,80 @@ export function AppRoutes() {
           </RedirectIfAuthenticated>
         }
       />
+
       <Route
         path="/"
         element={
           <RequireAuth>
-            {user ? (
-              <AppShell user={user}>
-                <DashboardPage user={user} />
-              </AppShell>
-            ) : null}
+            <ShellPage>
+              <DashboardPage />
+            </ShellPage>
           </RequireAuth>
         }
       />
+      <Route
+        path="/sinyal"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <SignalsPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/posisi"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <PositionsPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/akun"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <AccountsPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/strategi"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <StrategiesPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/pengaturan"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <SettingsPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+
+      {/* Deep-link dari bot Telegram wajib login; tanpa sesi diarahkan ke login. */}
+      <Route
+        path="/approve/:token"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <ApprovePage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )

@@ -35,6 +35,47 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Frontend Console selesai mengikuti kontrak API
+
+**Pelaku:** Claude
+**Tipe:** FEATURE
+**Status:** SELESAI, typecheck/lint/tes/build bersih
+
+**Ringkasan:**
+
+Seluruh halaman yang dijanjikan `docs/API_CONTRACT.md` sudah dibangun.
+Frontend tetap **tanpa logika trading** — hanya menampilkan dan memanggil API.
+
+| Halaman | Endpoint |
+|---|---|
+| Ringkasan | `/system/status`, `/positions` |
+| Sinyal | `/signals` |
+| Posisi | `/positions` |
+| Akun Broker | `/accounts` (CRUD) |
+| Strategi & Langganan | `/strategies`, `/subscriptions` |
+| Pengaturan | `/trial`, `/telegram/link` |
+| Konfirmasi Entry | `/approve/:token` |
+
+**Aturan kontrak yang dipegang frontend:**
+
+- Tidak ada tombol tutup posisi.
+- Sinyal `REJECTED` menampilkan `reject_reason`, tombol mati.
+- Strategi hanya bisa dipilih bila `available && allowed`.
+- Token akun dikirim sekali, tidak pernah ditampilkan kembali.
+- Sinyal tier Free diberi label “Telat 15 menit”.
+
+**Struktur:** tipe di `types/api.ts`, panggilan API di `lib/api.ts`,
+query React Query dipusatkan di `lib/queries.ts`, komponen per fitur
+di `features/*`, halaman di `pages/*`.
+
+**Verifikasi:** `tsc --noEmit` bersih, ESLint 0 warning, Prettier rapi,
+**17 tes lulus**, `vite build` sukses.
+
+**Catatan untuk Hermes:** tidak ada perubahan kontrak engine. Runner tetap
+mengirim `subscriber_id` `runner-ila-2.0` / `runner-ila-3.0`.
+
+---
+
 ### 2026-11-08 — Backend Console selesai + kontrak API untuk frontend
 
 **Pelaku:** Claude
