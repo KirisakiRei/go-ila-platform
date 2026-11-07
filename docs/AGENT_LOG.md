@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `d157941`
+> **Commit terakhir saat log ini ditulis:** `78a3066`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,113 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-08 — Fase B selesai: RBAC (role, permission, pintu admin)
+
+**Pelaku:** Claude
+**Tipe:** Penyelesaian Fase B
+**Status:** SELESAI — `go build`, `go vet`, `gofmt -l` kosong, seluruh tes lulus
+
+#### Ringkasan
+
+Kewenangan admin kini dibatasi **per izin**, bukan sekadar "siapa yang admin".
+Ada 32 permission di katalog tetap, 4 role bawaan, dan setiap route admin
+**wajib** menyebut izin yang menjaganya.
+
+#### Berkas baru
+
+| Berkas | Isi |
+|---|---|
+| `model/rbac.go` | Tabel `role`, `permission`, `role_permission` |
+| `authz/catalog.go` | Katalog 32 permission + 4 role bawaan; `Known()`, `SuperadminOnly()` |
+| `authz/service.go` | Pemuat permission dengan cache 30 detik; `Invalidate`/`InvalidateAll` |
+| `authz/authz_test.go` | Tes cache, katalog, isi role bawaan |
+| `repository/role_repository.go` | CRUD role, permission per role/user, hitung pemakai |
+| `repository/role_migration.go` | Pindahkan akun `support` lama; isi `role_id` akun admin |
+| `repository/authz_loader.go` | Menyambung repository ke pemuat permission middleware |
+| `middleware/permission.go` | `AdminScope`, `RequirePermission`, penjaga startup route admin |
+| `service/role_service.go` | Lima larangan pengamanan + pencatatan audit per permission |
+| `service/admin_auth_service.go` | Login pintu admin (scope terpisah, sesi terpisah) |
+| `handler/admin_role_handler.go` | `GET/POST/PATCH/DELETE /admin/roles`, `/admin/permissions`, `PATCH /admin/users/:id/role` |
+| `handler/admin_auth_handler.go` | `POST /admin/auth/login`, `/logout`, `GET /admin/auth/csrf`, `/auth/me` |
+| `dto/role_dto.go`, `dto/admin_auth_dto.go` | Kontrak request/response RBAC |
+
+#### Berkas yang diubah
+
+| Berkas | Perubahan |
+|---|---|
+| `model/user.go` | Kolom `role_id` (nullable) — penunjuk role RBAC |
+| `middleware/permission.go` | `AdminScope` kini **memeriksa DB**: status akun, `session_version`, dan role kasar `admin` |
+| `config/config.go` | `ADMIN_COOKIE_NAME` (bawaan `ila_admin_session`), `ADMIN_JWT_EXPIRY` (bawaan `2h`); ditolak bila sama dengan cookie sesi user |
+| `router/router.go` | Grup admin + pemeriksaan startup: route admin tanpa izin **menggagalkan start** |
+| `router/deps.go` | `newAdminTokenIssuer` (umur sesi admin lebih pendek) |
+| `session/session.go` | `WithSessionName` agar cookie admin terpisah dari cookie user |
+| `cmd/migrate/main.go` | Migrasi tabel RBAC + selaraskan katalog + seed role + migrasi data lama |
+| `.env.example` | `ADMIN_COOKIE_NAME`, `ADMIN_JWT_EXPIRY` |
+
+#### Lima larangan pengamanan (plans/04 §4.1)
+
+| # | Larangan | Diterapkan di |
+|---|---|---|
+| 1 | Mengubah role sendiri | `AssignRole` — `actorID == userID` ditolak |
+| 2 | Menyentuh role `superadmin` / role bawaan | `guardSystemRole` pada ubah & hapus |
+| 3 | Mencabut role admin aktif terakhir | `CountActiveAdmins` sebelum mencabut |
+| 4 | Memberi izin yang tidak dimiliki sendiri | `ensureCanGrant` pada buat/ubah/tugaskan |
+| 5 | Menghapus role yang masih dipakai | `CountUsersWithRole` sebelum hapus |
+
+Ditambah: role superadmin hanya bisa diberikan oleh superadmin.
+
+#### Celah yang ditemukan saat mengerjakan Fase B
+
+> **Pintu admin sebelumnya hanya memverifikasi tanda tangan token.** Di versi
+> awal, `AdminScope` tidak membaca database, sehingga admin yang di-ban atau
+> yang sesinya dicabut tetap bisa masuk sampai token kedaluwarsa (2 jam). Kini
+> setiap permintaan admin mencocokkan status akun dan `session_version` ke DB.
+
+> **Menurunkan role akun tidak memutus sesinya.** `AssignRole` kini menaikkan
+> `session_version` dan membuang cache akun target, sehingga token lamanya
+> langsung tidak berlaku.
+
+#### Tes yang mengunci perilaku
+
+| Berkas | Yang dikunci |
+|---|---|
+| `authz/authz_test.go` | Cache 30 detik, `Invalidate`, katalog tanpa duplikat, admin tanpa kewenangan terkunci |
+| `service/role_service_test.go` | Kelima larangan, role kosong ditolak, permission asing ditolak, audit per permission |
+| `service/admin_auth_service_test.go` | Pelanggan tidak bisa masuk pintu admin; admin tanpa role RBAC ditolak; password salah 401 |
+| `middleware/permission_test.go` | 401 vs 403, pesan 403 tidak menyebut nama permission, admin ter-ban ditolak |
+| `router/router_test.go` | Semua route admin terdeklarasi; pendeteksi deklarasi hilang; RBAC terpasang |
+
+#### Perilaku penolakan (plans/04 §5.3)
+
+| Keadaan | HTTP |
+|---|---|
+| Tanpa sesi admin | 401 |
+| Token ber-scope user di pintu admin | 403 |
+| Admin tanpa permission yang diminta | 403 — pesan tidak menyebut izin mana |
+| Admin di-ban / sesi dicabut | 401 atau 403 |
+
+#### Belum dikerjakan (jujur, bukan klaim)
+
+| Hal | Keterangan |
+|---|---|
+| **2FA admin** | Belum dirancang. Login admin saat ini password saja. Flag `RequireTwoFA` sudah ada dan akan **menolak** login bila diaktifkan sebelum alurnya siap |
+| **Ubah `user.role` kasar** | Belum ada endpoint. `role_id` hanya bisa ditugaskan ke akun yang `role`-nya sudah `admin` |
+| **Seksi auth di frontend** | Belum ada halaman `/admin/*`; menunggu Fase D |
+| **Pemulihan cache lintas proses** | Cache permission disimpan di memori proses; aman karena hanya ada satu backend-api |
+| **Uji endpoint dengan DB nyata** | Tes router memakai koneksi tiruan; verifikasi menyeluruh butuh database sungguhan |
+
+#### Untuk Hermes (`go-trade`)
+
+Tidak ada perubahan kontrak engine. Yang perlu diketahui:
+
+| Hal | Dampak |
+|---|---|
+| `user.status` tetap satu-satunya penentu boleh-tidaknya eksekusi | Tidak berubah |
+| `role_id` **tidak** memengaruhi jalur trading | Runner tidak membaca RBAC |
+| Ban user → `session_version` naik → token user mati | Tetap seperti Fase A |
+
+---
 
 ### 2026-11-08 — Fase A selesai: daftar sesi, idle warning, PnL jujur
 

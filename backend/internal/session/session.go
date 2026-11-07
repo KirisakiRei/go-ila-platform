@@ -36,6 +36,13 @@ func NewConfig(sessionName, csrfName string, secure bool, domain string) Config 
 	}
 }
 
+// WithSessionName mengembalikan salinan dengan nama cookie sesi lain,
+// dipakai pintu admin agar sesinya terpisah dari sesi user.
+func (c Config) WithSessionName(name string) Config {
+	c.SessionName = name
+	return c
+}
+
 // SetSession menulis cookie sesi. HttpOnly membuatnya tidak terbaca JavaScript.
 func (c Config) SetSession(ctx *gin.Context, token string, expiresAt time.Time) {
 	http.SetCookie(ctx.Writer, &http.Cookie{

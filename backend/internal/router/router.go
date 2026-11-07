@@ -1,11 +1,15 @@
 package router
 
 import (
+	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"ila/backend/internal/authstate"
+	"ila/backend/internal/authz"
 	"ila/backend/internal/config"
 	"ila/backend/internal/handler"
 	"ila/backend/internal/middleware"
@@ -16,6 +20,9 @@ import (
 	"ila/backend/internal/session"
 	"ila/backend/pkg/cryptox"
 )
+
+// adminPrefix adalah awalan tunggal seluruh endpoint administrasi.
+const adminPrefix = "/api/v1/admin"
 
 // NewBackendAPI merangkai seluruh endpoint backend-api.
 // Wiring sengaja dikumpulkan di satu tempat agar alur dependensi terlihat utuh.
@@ -43,9 +50,13 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	positionRepo := repository.NewPositionRepository(db)
 	stateRepo := repository.NewBrokerAccountStateRepository(db)
 	onboardingRepo := repository.NewOnboardingTokenRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
 
 	// Klien Runner: backend-api meminta eksekusi, bukan mengeksekusi sendiri.
 	runnerAPI := runnerclient.New(cfg.RunnerBaseURL, cfg.InternalSecret)
+
+	// Kewenangan dibaca dari DB dengan cache pendek (plans/04 §4.3).
+	permCache := authz.NewService(repository.NewAuthzLoader(roleRepo))
 
 	// Services
 	sessionRepo := repository.NewSessionRepository(db)
@@ -91,6 +102,16 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	telegramService := service.NewTelegramService(userRepo, onboardingRepo, auditRepo)
 	trialService := service.NewTrialService(userRepo, auditRepo)
 
+	roleService := service.NewRoleService(roleRepo, userRepo, auditRepo, permCache)
+	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
+		Users:    userRepo,
+		Audit:    auditRepo,
+		Roles:    roleRepo,
+		Perms:    permCache,
+		Issuer:   newAdminTokenIssuer(cfg),
+		Sessions: service.NewSessionRecorder(sessionRepo),
+	})
+
 	// Handlers
 	cookies := session.NewConfig(
 		cfg.SessionCookieName,
@@ -98,6 +119,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		cfg.CookieSecure,
 		cfg.CookieDomain,
 	)
+	adminCookies := cookies.WithSessionName(cfg.AdminCookieName)
 
 	sessionHandler := handler.NewSessionHandler(sessionService, middleware.CurrentSessionID)
 	authHandler := handler.NewAuthHandler(
@@ -113,6 +135,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	systemHandler := handler.NewSystemHandler(systemService)
 	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret)
 	trialHandler := handler.NewTrialHandler(trialService)
+	adminAuthHandler := handler.NewAdminAuthHandler(
+		adminAuthService,
+		middleware.NewLoginLimiter(),
+		adminCookies,
+		cfg.CSRFCookieName,
+		cfg.AdminJWTExpiry,
+	)
+	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
 
 	// Health
 	r.GET("/health", healthHandler.Live)
@@ -180,5 +210,69 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		me.GET("/positions", tradingHandler.Positions)
 	}
 
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler)
+
+	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
+	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
+	if missing := middleware.UndeclaredAdminRoutes(r.Routes()); len(missing) > 0 {
+		panic(fmt.Sprintf("route admin tanpa permission: %v", missing))
+	}
+
 	return r
+}
+
+// registerAdmin memasang pintu admin: login, sesi, lalu route ber-permission.
+//
+// Setiap route admin mendeklarasikan izinnya tepat di barisnya sehingga tidak
+// ada endpoint admin tanpa kewenangan karena lupa (plans/04 §5.2).
+func registerAdmin(
+	r *gin.Engine,
+	cfg *config.Config,
+	logger *slog.Logger,
+	reader authstate.Reader,
+	permCache *authz.Service,
+	authHandler *handler.AdminAuthHandler,
+	roleHandler *handler.AdminRoleHandler,
+) {
+	issuer := newAdminTokenIssuer(cfg)
+
+	// Autentikasi: tidak membawa sesi admin yang sudah ada. Batas per IP
+	// menahan tebakan password dari satu sumber.
+	login := r.Group(adminPrefix + "/auth")
+	login.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
+	{
+		login.POST("/login", authHandler.Login)
+		login.POST("/logout", authHandler.Logout)
+		login.GET("/csrf", authHandler.CSRF)
+	}
+
+	admin := r.Group(adminPrefix)
+	admin.Use(middleware.AdminScope(issuer, cfg.AdminCookieName, reader))
+	admin.Use(middleware.RateLimitByUser(middleware.NewRateLimiter(0, 0)))
+	admin.Use(middleware.RequireCSRF(cfg.CSRFCookieName))
+
+	// Profil sesi sendiri: cukup lolos pintu admin, tanpa permission.
+	// Ditandai "-" karena hanya butuh sesi admin, bukan permission tertentu.
+	middleware.RegisterAdminRoute(http.MethodGet, adminPrefix+"/auth/me", "-")
+	admin.GET("/auth/me", authHandler.Profile)
+
+	// guard mencatat izin sebuah route lalu mengembalikan penjaganya. Path
+	// lengkap dibentuk dari awalan grup agar deklarasi tidak bisa meleset.
+	guard := func(method, path, permission string) gin.HandlerFunc {
+		middleware.RegisterAdminRoute(method, adminPrefix+path, permission)
+		return middleware.RequirePermission(permCache, permission)
+	}
+
+	// Tata kelola: lihat role dan katalog permission.
+	admin.GET("/roles", guard(http.MethodGet, "/roles", authz.RoleView))
+	admin.GET("/roles/:id", guard(http.MethodGet, "/roles/:id", authz.RoleView))
+	admin.GET("/permissions", guard(http.MethodGet, "/permissions", authz.RoleView))
+
+	// Tata kelola: ubah role dan penugasannya.
+	admin.POST("/roles", guard(http.MethodPost, "/roles", authz.RoleEdit))
+	admin.PATCH("/roles/:id", guard(http.MethodPatch, "/roles/:id", authz.RoleEdit))
+	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleEdit))
+	admin.PATCH("/users/:id/role", guard(http.MethodPatch, "/users/:id/role", authz.RoleEdit))
+
+	logger.Info("pintu admin siap", "base", "/api/v1/admin")
 }

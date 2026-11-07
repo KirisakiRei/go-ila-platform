@@ -7,8 +7,10 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"ila/backend/internal/authz"
 	"ila/backend/internal/config"
 	"ila/backend/internal/model"
+	"ila/backend/internal/repository"
 )
 
 // main menjalankan migrasi tabel dari struct model.
@@ -51,6 +53,9 @@ func main() {
 		&model.DailySummary{},
 		&model.EngineState{},
 		&model.Session{},
+		&model.Role{},
+		&model.Permission{},
+		&model.RolePermission{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
@@ -58,5 +63,29 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("migrasi selesai", "tables", len(models))
+	// Katalog permission dan role bawaan diselaraskan setiap migrasi agar
+	// permission baru di kode ikut masuk tanpa langkah manual (plans/04 §3).
+	roles := repository.NewRoleRepository(db)
+	if err := roles.SyncCatalog(ctx, authz.Catalog); err != nil {
+		logger.Error("katalog permission gagal diselaraskan", "error", err.Error())
+		os.Exit(1)
+	}
+	if err := roles.SeedDefaultRoles(ctx, authz.DefaultRoles()); err != nil {
+		logger.Error("role bawaan gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
+	// Akun support lama dan akun admin tanpa role RBAC dipindahkan ke model baru.
+	moved, err := roles.MigrateLegacySupport(ctx)
+	if err != nil {
+		logger.Error("migrasi akun support gagal", "error", err.Error())
+		os.Exit(1)
+	}
+	filled, err := roles.SyncAdminRoleID(ctx, authz.RoleSuperadmin)
+	if err != nil {
+		logger.Error("migrasi role admin gagal", "error", err.Error())
+		os.Exit(1)
+	}
+
+	logger.Info("migrasi selesai", "tables", len(models), "support_dipindah", moved, "admin_dilengkapi", filled)
 }

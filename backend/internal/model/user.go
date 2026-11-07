@@ -10,7 +10,9 @@ type User struct {
 	Email        string `gorm:"type:varchar(150);uniqueIndex;not null" json:"email"`
 	PasswordHash string `gorm:"type:varchar(255);not null" json:"-"`
 	Role         string `gorm:"type:varchar(20);not null;default:user" json:"role"`
-	Tier         string `gorm:"type:varchar(20);not null;default:free" json:"tier"`
+	// RoleID menunjuk role RBAC. Kosong berarti akun tanpa kewenangan admin.
+	RoleID *string `gorm:"type:varchar(36);index" json:"role_id,omitempty"`
+	Tier   string  `gorm:"type:varchar(20);not null;default:free" json:"tier"`
 
 	TierStartedAt *time.Time `json:"tier_started_at"`
 	TierExpiresAt *time.Time `json:"tier_expires_at"`
