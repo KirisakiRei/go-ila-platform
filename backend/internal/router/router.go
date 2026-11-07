@@ -142,6 +142,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		userRepo,
 	)
 	auditAdminService := service.NewAdminAuditService(repository.NewAuditReader(db), adminAudit)
+
+	pricingRepo := repository.NewPricingRepository(db)
+	pricingService := service.NewPricingService(pricingRepo)
+	adminBillingService := service.NewAdminBillingService(pricingRepo, adminAudit)
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
 		Users:      userRepo,
 		Audit:      auditRepo,
@@ -186,6 +190,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
+	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
+	pricingHandler := handler.NewPricingHandler(pricingService)
 	legalHandler := handler.NewLegalHandler(legalService)
 
 	// Alamat surel dipakai sebagai label di aplikasi authenticator.
@@ -219,6 +225,13 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	{
 		publicLegal.GET("", legalHandler.List)
 		publicLegal.GET("/:slug", legalHandler.BySlug)
+	}
+
+	// Daftar paket publik: dibaca halaman harga sebelum masuk.
+	publicBilling := r.Group("/api/v1/billing")
+	publicBilling.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
+	{
+		publicBilling.GET("/plans", pricingHandler.Plans)
 	}
 
 	// API v1
@@ -295,7 +308,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -322,6 +335,7 @@ func registerAdmin(
 	legalHandler *handler.LegalHandler,
 	userHandler *handler.AdminUserHandler,
 	auditHandler *handler.AdminAuditHandler,
+	billingHandler *handler.AdminBillingHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -392,6 +406,7 @@ func registerAdmin(
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.
 	userHandler.Register(admin.Group(""), guard)
 	auditHandler.Register(admin.Group(""), guard)
+	billingHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")
 }

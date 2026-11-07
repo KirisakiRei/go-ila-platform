@@ -63,6 +63,15 @@ func main() {
 		&model.TwoFactorChallenge{},
 		&model.LegalDocument{},
 		&model.LegalAcceptance{},
+		&model.UserAdminNote{},
+		&model.Plan{},
+		&model.PlanFeature{},
+		&model.PriceOverride{},
+		&model.PricingGuard{},
+		&model.Coupon{},
+		&model.CouponRedemption{},
+		&model.CreditBalance{},
+		&model.CreditTransaction{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
@@ -79,6 +88,13 @@ func main() {
 	}
 	if err := roles.SeedDefaultRoles(ctx, authz.DefaultRoles()); err != nil {
 		logger.Error("role bawaan gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
+	// Paket, fitur, dan batas bawah harga diisi sekali; nilai yang sudah
+	// disesuaikan admin tidak ditimpa (plans/12 §9.2).
+	if err := repository.SeedPlans(ctx, db); err != nil {
+		logger.Error("paket bawaan gagal disiapkan", "error", err.Error())
 		os.Exit(1)
 	}
 

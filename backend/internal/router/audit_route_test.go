@@ -36,14 +36,21 @@ var harapanAksiAudit = map[string]audit.Action{
 	"POST /api/v1/admin/2fa/disable":        audit.TwoFADisable,
 	"POST /api/v1/admin/2fa/recovery-codes": audit.TwoFARecovery,
 
+	"POST /api/v1/admin/users/:id/credit": audit.CreditAdjust,
+
 	// Konten dan RBAC sudah mencatat sendiri lewat recordAudit di service-nya.
-	"POST /api/v1/admin/legal":             audit.LegalPublish,
-	"PATCH /api/v1/admin/legal/:id":        audit.LegalPublish,
-	"POST /api/v1/admin/legal/:id/publish": audit.LegalPublish,
-	"POST /api/v1/admin/roles":             audit.RoleCreate,
-	"PATCH /api/v1/admin/roles/:id":        audit.RolePermChange,
-	"DELETE /api/v1/admin/roles/:id":       audit.RoleDelete,
-	"PATCH /api/v1/admin/users/:id/role":   audit.UserRoleAssign,
+	"POST /api/v1/admin/legal":               audit.LegalPublish,
+	"PATCH /api/v1/admin/legal/:id":          audit.LegalPublish,
+	"POST /api/v1/admin/legal/:id/publish":   audit.LegalPublish,
+	"POST /api/v1/admin/roles":               audit.RoleCreate,
+	"PATCH /api/v1/admin/roles/:id":          audit.RolePermChange,
+	"DELETE /api/v1/admin/roles/:id":         audit.RoleDelete,
+	"PATCH /api/v1/admin/plans/:code":        audit.PlanPriceChange,
+	"PUT /api/v1/admin/plans/:code/guard":    audit.PricingGuardChange,
+	"POST /api/v1/admin/coupons":             audit.CouponCreate,
+	"PATCH /api/v1/admin/coupons/:id":        audit.CouponUpdate,
+	"POST /api/v1/admin/coupons/:id/disable": audit.CouponDisable,
+	"PATCH /api/v1/admin/users/:id/role":     audit.UserRoleAssign,
 }
 
 // Setiap route mutasi admin harus punya kode aksi audit yang terdaftar.

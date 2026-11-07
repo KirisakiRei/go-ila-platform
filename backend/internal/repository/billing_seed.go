@@ -1,0 +1,114 @@
+package repository
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
+	"ila/backend/internal/model"
+)
+
+// SeedPlans mengisi paket bawaan bila belum ada. Nilainya sengaja dapat
+// diubah admin lewat panel, jadi seed ini hanya titik awal.
+func SeedPlans(ctx context.Context, db *gorm.DB) error {
+	now := time.Now().UTC()
+
+	plans := []model.Plan{
+		{
+			Code: model.TierFree, Name: "Free", PriceIDR: 0, Interval: "monthly",
+			IsActive: true, SortOrder: 0,
+			Description: "Melihat sinyal dengan penundaan, tanpa eksekusi otomatis.",
+			UpdatedAt:   now,
+		},
+		{
+			Code: model.TierBasic, Name: "Basic", PriceIDR: 666000, Interval: "monthly",
+			IsActive: true, SortOrder: 1,
+			Description: "Seluruh sinyal tanpa penundaan, eksekusi manual.",
+			UpdatedAt:   now,
+		},
+		{
+			Code: model.TierPlus, Name: "Plus", PriceIDR: 999000, Interval: "monthly",
+			IsActive: true, SortOrder: 2,
+			Description: "Eksekusi otomatis, risiko dapat diatur, hingga 2 akun broker.",
+			UpdatedAt:   now,
+		},
+	}
+
+	features := map[string]map[string]string{
+		model.TierFree: {
+			model.FeatureAccountLimit: "1",
+			model.FeatureMaxSymbols:   "1",
+			model.FeatureAutoExecute:  "false",
+			// Free menerima sinyal telat 15 menit.
+			model.FeatureSignalDelay: "15",
+			model.FeatureStrategies:  "ila-2.0",
+			model.FeatureILA3Status:  "coming_soon",
+			model.FeatureReasonAI:    "false",
+		},
+		model.TierBasic: {
+			model.FeatureAccountLimit: "1",
+			model.FeatureMaxSymbols:   "8",
+			model.FeatureAutoExecute:  "false",
+			model.FeatureSignalDelay:  "0",
+			model.FeatureStrategies:   "ila-2.0",
+			model.FeatureILA3Status:   "coming_soon",
+			model.FeatureReasonAI:     "false",
+		},
+		model.TierPlus: {
+			model.FeatureAccountLimit: "2",
+			model.FeatureMaxSymbols:   "8",
+			model.FeatureAutoExecute:  "true",
+			model.FeatureSignalDelay:  "0",
+			model.FeatureStrategies:   "ila-2.0",
+			// ILA 3.0 masih penelitian: tampil di daftar tapi belum bisa dipilih.
+			model.FeatureILA3Status: "coming_soon",
+			model.FeatureReasonAI:   "true",
+		},
+	}
+
+	guards := map[string]int64{
+		model.TierFree:  0,
+		model.TierBasic: 333000,
+		model.TierPlus:  499000,
+	}
+
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, plan := range plans {
+			// DoNothing: harga yang sudah disesuaikan admin tidak ditimpa seed.
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&plan).Error; err != nil {
+				return fmt.Errorf("mengisi paket %s: %w", plan.Code, err)
+			}
+		}
+
+		for code, values := range features {
+			for key, value := range values {
+				row := &model.PlanFeature{PlanCode: code, FeatureKey: key, Value: value}
+				if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(row).Error; err != nil {
+					return fmt.Errorf("mengisi fitur %s.%s: %w", code, key, err)
+				}
+			}
+		}
+
+		for code, min := range guards {
+			guard := &model.PricingGuard{PlanCode: code, MinPriceIDR: min, UpdatedBy: "seed", UpdatedAt: now}
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(guard).Error; err != nil {
+				return fmt.Errorf("mengisi batas bawah %s: %w", code, err)
+			}
+		}
+		return nil
+	})
+}
+
+// TierFeature membaca satu fitur paket dari database dengan nilai cadangan.
+// Dipakai Runner dan backend agar batas tier tidak lagi tertulis di kode.
+func TierFeature(ctx context.Context, db *gorm.DB, tier, key, fallback string) string {
+	var row model.PlanFeature
+	err := db.WithContext(ctx).Where("plan_code = ? AND feature_key = ?", tier, key).Limit(1).Find(&row).Error
+	if err != nil || row.Value == "" {
+		return fallback
+	}
+	return row.Value
+}
