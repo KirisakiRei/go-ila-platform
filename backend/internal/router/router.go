@@ -58,7 +58,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	)
 
 	// Kredensial broker dienkripsi sebelum menyentuh database.
-	keyring, err := cryptox.NewKeyring(cfg.MasterKeyVersion, cfg.MasterKey, nil)
+	keyring, err := cryptox.NewKeyring(cfg.MasterKeyVersion, cfg.MasterKey, cfg.LegacyMasterKeys())
 	if err != nil {
 		logger.Error("master key tidak sah; endpoint akun dinonaktifkan", "error", err.Error())
 	}

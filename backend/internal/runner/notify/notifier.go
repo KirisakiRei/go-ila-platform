@@ -12,6 +12,7 @@ import (
 
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/telegram"
+	"github.com/KirisakiRei/go-ila-platform/backend/pkg/redact"
 )
 
 // UserLookup menyediakan tujuan notifikasi per user.
@@ -128,10 +129,13 @@ func (n *Notifier) deliver(j job) {
 	}
 
 	if err := n.tg.Send(ctx, *user.TelegramChatID, message.Text); err != nil {
+		// Teks error disaring dahulu: kegagalan jaringan bisa memuat URL yang
+		// berisi token bot, dan nilainya ikut tercatat di log serta database.
+		safeError := redact.Error(err)
 		n.logger.Warn("gagal mengirim notifikasi",
-			"user_id", j.userID, "message_key", j.messageKey, "error", err.Error())
+			"user_id", j.userID, "message_key", j.messageKey, "error", safeError)
 		if n.claims != nil {
-			_ = n.claims.MarkMessageFailed(ctx, j.messageKey, err.Error())
+			_ = n.claims.MarkMessageFailed(ctx, j.messageKey, safeError)
 		}
 		return
 	}

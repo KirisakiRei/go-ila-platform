@@ -8,11 +8,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -101,7 +103,7 @@ func (c *Client) Send(ctx context.Context, chatID, text string) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("mengirim pesan telegram: %w", err)
+		return fmt.Errorf("mengirim pesan telegram: %w", sanitizeTransportError(err, c.cfg.BotToken))
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
@@ -161,4 +163,31 @@ func trimSlash(raw string) string {
 		raw = raw[:len(raw)-1]
 	}
 	return raw
+}
+
+// sanitizeTransportError membuang token bot dari pesan kegagalan jaringan.
+//
+// Token Telegram berada di path URL, dan error dari http.Do memuat URL
+// lengkap. Tanpa penyaringan ini token ikut tercatat di log maupun di kolom
+// last_error yang ditampilkan ke dasbor user.
+func sanitizeTransportError(err error, token string) error {
+	if err == nil {
+		return nil
+	}
+
+	message := err.Error()
+	if token != "" {
+		message = strings.ReplaceAll(message, token, "<token-disembunyikan>")
+	}
+
+	// URLRequest dipertahankan bila ada, tetapi isinya sudah dibersihkan.
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		cleaned := *urlErr
+		cleaned.URL = strings.ReplaceAll(urlErr.URL, token, "<token-disembunyikan>")
+		cleaned.Err = errors.New(strings.ReplaceAll(urlErr.Err.Error(), token, "<token-disembunyikan>"))
+		return &cleaned
+	}
+
+	return errors.New(message)
 }

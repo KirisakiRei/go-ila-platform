@@ -35,6 +35,59 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Audit kredensial: 3 kebocoran ditemukan dan ditutup
+
+**Pelaku:** Claude
+**Tipe:** SECURITY
+**Status:** SELESAI, diverifikasi pada server berjalan
+
+**Ringkasan:**
+
+Enkripsi kredensial sudah benar sejak awal (AES-256-GCM amplop, kunci per
+akun). Audit menemukan **tiga jalur kebocoran** di sekitarnya, semuanya
+diperbaiki. Analisis lengkap ada di `docs/SECURITY.md`.
+
+**1. Token bot Telegram bocor lewat pesan error (tinggi)**
+
+Token ada di path URL `api.telegram.org/bot<TOKEN>/sendMessage`. Saat
+`http.Do` gagal, Go menyertakan URL lengkap, dan error itu tercatat di log
+**serta** `notification_log.last_error`. Diperbaiki dengan
+`sanitizeTransportError`.
+
+**2. Token deep-link approve tercatat di log akses (sedang)**
+
+`/api/v1/approve/<token>` dicatat apa adanya. Diperbaiki dengan `safePath`
+yang menyamarkan segmen token tetapi mempertahankan `/confirm` dan `/decline`.
+
+**3. Tidak ada lapisan kedua untuk rahasia di last_error (sedang)**
+
+Paket baru `pkg/redact` menyaring token Telegram, JWT, header Bearer, dan
+parameter `token=`/`password=`/`api_key=` sebelum teks disimpan.
+
+**Tambahan: rotasi kunci.**
+
+`MASTER_KEYS_LEGACY` memungkinkan penggantian `MASTER_KEY` tanpa kehilangan
+data. Sebelumnya kunci lama selalu `nil`, sehingga rotasi berarti blob lama
+mustahil dibuka.
+
+**Verifikasi nyata terhadap database:**
+
+| Uji | Hasil |
+|---|---|
+| Token plaintext di kolom ciphertext | 0 baris |
+| `GET /accounts` memuat token | tidak ada |
+| Token di seluruh file log | tidak ada |
+| Ciphertext tersimpan | 161 byte, `key_version=1` |
+
+**Verifikasi:** `gofmt` bersih, `build`/`vet` OK, **12 paket uji lulus**
+(termasuk 15 tes baru untuk redaksi, path, dan kunci lama).
+
+**Catatan untuk Hermes:** engine tidak diubah. Token di engine dibaca dari
+environment dan sudah dipastikan tidak menyimpan ke database maupun mencetak
+ke log.
+
+---
+
 ### 2026-11-08 — Deploy Docker siap: satu domain lewat Caddy
 
 **Pelaku:** Claude

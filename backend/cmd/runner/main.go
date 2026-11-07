@@ -100,7 +100,7 @@ func main() {
 	svc := runner.NewService(store, registry, publisher, logger, opts)
 
 	if cfg.MasterKey != "" {
-		keyring, keyErr := cryptox.NewKeyring(cfg.MasterKeyVersion, cfg.MasterKey, nil)
+		keyring, keyErr := cryptox.NewKeyring(cfg.MasterKeyVersion, cfg.MasterKey, cfg.LegacyMasterKeys())
 		if keyErr != nil {
 			logger.Error("master key tidak sah", "error", keyErr.Error())
 			os.Exit(1)

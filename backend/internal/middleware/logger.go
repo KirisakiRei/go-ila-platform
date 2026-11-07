@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +30,7 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 
 		attrs := []any{
 			"method", c.Request.Method,
-			"path", c.Request.URL.Path,
+			"path", safePath(c.Request.URL.Path),
 			"status", c.Writer.Status(),
 			"latency_ms", time.Since(start).Milliseconds(),
 			"request_id", c.GetString("request_id"),
@@ -47,4 +48,34 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 			logger.Info("permintaan selesai", attrs...)
 		}
 	}
+}
+
+// safePath menyamarkan token pada path sebelum dicatat.
+//
+// Token deep-link konfirmasi entry berada di path (/api/v1/approve/<token>).
+// Tanpa penyamaran, siapa pun yang bisa membaca log dapat memakai tautan itu.
+func safePath(path string) string {
+	const penanda = "approve/"
+
+	idx := strings.Index(path, penanda)
+	if idx < 0 {
+		return path
+	}
+
+	prefix := path[:idx+len(penanda)]
+	rest := path[idx+len(penanda):]
+
+	// Sisa token boleh memuat sub-path seperti /confirm; hanya segmen pertama
+	// yang merupakan token dan harus disamarkan.
+	segment := rest
+	suffix := ""
+	if slash := strings.Index(rest, "/"); slash >= 0 {
+		segment = rest[:slash]
+		suffix = rest[slash:]
+	}
+	if segment == "" {
+		return path
+	}
+
+	return prefix + "<disembunyikan>" + suffix
 }

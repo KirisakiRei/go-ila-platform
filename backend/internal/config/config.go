@@ -79,6 +79,9 @@ type Config struct {
 	// MasterKey membungkus kunci per user; wajib untuk kredensial broker.
 	MasterKey        string
 	MasterKeyVersion int
+	// MasterKeysLegacy menjaga data lama tetap terbaca setelah rotasi.
+	// Format: "1:<base64>,2:<base64>" — hanya kunci lama, bukan kunci aktif.
+	MasterKeysLegacy string
 
 	// InternalSecret melindungi endpoint internal Runner dari pemanggil liar.
 	InternalSecret string
@@ -136,6 +139,7 @@ func Load(service string) (*Config, error) {
 		DryRunAll:             envBool("DRY_RUN_ALL", false),
 		MasterKey:             env("MASTER_KEY", ""),
 		MasterKeyVersion:      envInt("MASTER_KEY_VERSION", 1),
+		MasterKeysLegacy:      env("MASTER_KEYS_LEGACY", ""),
 		InternalSecret:        env("INTERNAL_SECRET", ""),
 		RunnerBaseURL:         env("RUNNER_BASE_URL", "http://runner:8081"),
 		TelegramBotToken:      env("TELEGRAM_BOT_TOKEN", ""),
@@ -174,6 +178,34 @@ func (c *Config) validate() error {
 		return fmt.Errorf("SESSION_COOKIE_NAME dan CSRF_COOKIE_NAME tidak boleh sama")
 	}
 	return nil
+}
+
+// LegacyMasterKeys memecah MASTER_KEYS_LEGACY menjadi pasangan versi dan kunci.
+// Nilai rusak dilewati agar satu entri salah tidak mematikan seluruh proses.
+func (c *Config) LegacyMasterKeys() map[int]string {
+	if strings.TrimSpace(c.MasterKeysLegacy) == "" {
+		return nil
+	}
+
+	keys := make(map[int]string)
+	for _, part := range strings.Split(c.MasterKeysLegacy, ",") {
+		version, key, ok := strings.Cut(strings.TrimSpace(part), ":")
+		if !ok {
+			continue
+		}
+		parsed, err := strconv.Atoi(strings.TrimSpace(version))
+		if err != nil {
+			continue
+		}
+		if trimmed := strings.TrimSpace(key); trimmed != "" {
+			keys[parsed] = trimmed
+		}
+	}
+
+	if len(keys) == 0 {
+		return nil
+	}
+	return keys
 }
 
 // IsProduction menandai konfigurasi produksi.

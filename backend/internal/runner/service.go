@@ -840,17 +840,3 @@ func (s *Service) markBrokerDown(ctx context.Context, account *model.BrokerAccou
 func (s *Service) loadUser(ctx context.Context, userID string) (*model.User, error) {
 	return s.store.FindUserByID(ctx, userID)
 }
-
-func truncate(text string, limit int) string {
-	if len(text) <= limit {
-		return text
-	}
-	return text[:limit]
-}
-
-func errText(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
