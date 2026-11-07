@@ -35,6 +35,59 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Deploy Docker siap: satu domain lewat Caddy
+
+**Pelaku:** Claude
+**Tipe:** DEPLOYMENT
+**Status:** SELESAI, seluruh stack diuji nyata termasuk deploy dingin
+
+**Ringkasan:**
+
+Enam container di VPS 2. **Hanya Caddy** yang membuka port ke internet;
+backend, runner, frontend, dan postgres tidak terjangkau dari luar.
+
+```text
+https://ila.id/api/*  → backend-api:8080
+https://ila.id/*      → frontend:3000 (nginx)
+```
+
+Satu origin disengaja: cookie sesi memakai `SameSite=Strict`, jadi deep-link
+konfirmasi dari Telegram tetap membawa sesi.
+
+**Masalah yang ditemukan saat pengujian dan diperbaiki:**
+
+| Masalah | Akibat | Perbaikan |
+|---|---|---|
+| Tidak ada langkah migrasi | backend mati di DB kosong | service `migrate` + `depends_on: service_completed_successfully` |
+| `DB_PASSWORD` ada di dua tempat | password bisa berbeda, login DB gagal | `DB_DSN` disusun dari `DB_USER/DB_PASSWORD/DB_NAME` |
+| Caddy mewarisi seluruh `.env` | kredensial DB masuk container yang tidak butuh | hanya 2 variabel yang dikirim |
+| Blok `email` dengan nilai kosong | Caddy gagal start berulang | blok global dihapus |
+| Port backend terbit ke `127.0.0.1:8080` | backend bisa dijangkau tanpa Caddy | `expose` saja, tanpa `ports` |
+| `add_header` setelah `return` di nginx | header tidak terpasang | pakai `default_type` |
+
+**Hasil uji nyata lewat Caddy (HTTPS):**
+
+| Uji | Hasil |
+|---|---|
+| Frontend `/` | 200 HTML |
+| SPA fallback `/sinyal` | 200 HTML (bukan 404) |
+| `/api/v1/me` tanpa sesi | 401 |
+| Login → cookie | `HttpOnly` + `SameSite=Strict` utuh |
+| `POST /trial` tanpa CSRF | 403 |
+| `POST /trial` dengan CSRF | 201 |
+| `GET /auth/csrf` | 200 |
+| Logout | 200 |
+| Deploy dingin `down -v` lalu `up` | semua sehat, migrasi otomatis |
+| Restart backend/runner/caddy | pulih sendiri |
+
+**Berkas terdampak:** `deploy/{Caddyfile,docker-compose.yml,Dockerfile.backend,nginx.conf,README.md}`,
+`Makefile`, `.env.example`.
+
+**Catatan untuk Hermes:** engine tidak tersentuh. Runner tetap memakai
+`subscriber_id` `runner-ila-2.0` / `runner-ila-3.0` dan meminta pembaruan status.
+
+---
+
 ### 2026-11-08 — Sesi pindah ke cookie HttpOnly + proteksi CSRF
 
 **Pelaku:** Claude

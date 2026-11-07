@@ -6,17 +6,40 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "2"
 
+x-backend-build: &backend-build
+  context: ..
+  dockerfile: deploy/Dockerfile.backend
+
 services:
+  # migrasi berjalan sekali sebelum backend dan runner mulai, sehingga
+  # keduanya tidak pernah menyentuh database yang tabelnya belum ada.
+  migrate:
+    build: *backend-build
+    entrypoint: ["/app/migrate"]
+    env_file: ../.env
+    environment:
+      DB_AUTO_MIGRATE: "false"
+      DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
+    restart: "no"
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend-api:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.backend
+    build: *backend-build
     restart: unless-stopped
     env_file: ../.env
     environment:
       SERVICE_ROLE: backend-api
       HTTP_PORT: "8080"
       RUNNER_BASE_URL: http://runner:8081
+      # Dua proses berbagi satu Postgres ber-max_connections=40.
+      DB_MAX_OPEN_CONNS: "15"
+      DB_MAX_IDLE_CONNS: "4"
+      # DSN disusun dari DB_USER/DB_PASSWORD/DB_NAME agar password hanya
+      # hidup di satu tempat dan tidak pernah berbeda antar layanan.
+      DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
     mem_limit: 128m
     cpus: "0.8"
     pids_limit: 200
@@ -24,9 +47,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks: [platform]
-    ports:
-      - "127.0.0.1:8080:8080"
+    # Hanya Caddy yang berbicara dengan backend-api.
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/ready"]
       interval: 30s
@@ -35,15 +61,16 @@ services:
       start_period: 10s
 
   runner:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.backend
+    build: *backend-build
     entrypoint: ["/app/runner"]
     restart: unless-stopped
     env_file: ../.env
     environment:
       SERVICE_ROLE: runner
       RUNNER_HTTP_PORT: "8081"
+      DB_MAX_OPEN_CONNS: "15"
+      DB_MAX_IDLE_CONNS: "4"
+      DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
     mem_limit: 128m
     cpus: "0.8"
     pids_limit: 200
@@ -51,6 +78,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - ./certs:/certs:ro
     networks: [platform]
@@ -74,13 +103,43 @@ services:
     cpus: "0.5"
     logging: *default-logging
     networks: [platform]
-    ports:
-      - "127.0.0.1:3000:3000"
+    expose:
+      - "3000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 3s
       retries: 3
+
+  # Satu-satunya pintu masuk dari internet. TLS ditangani otomatis.
+  # Semua path /api/* diteruskan ke backend-api sehingga frontend dan API
+  # berada di origin yang sama: cookie SameSite=Strict tetap sah, dan
+  # deep-link konfirmasi dari Telegram tidak kehilangan sesi.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # Hanya dua variabel ini yang dibutuhkan. Kredensial database sengaja
+    # tidak diwariskan agar tidak ada rahasia di container yang tidak butuh.
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      # Cadangan bila email akun ACME kosong: Caddy menolak nilai kosong.
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    mem_limit: 64m
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [platform]
+    depends_on:
+      backend-api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
@@ -116,3 +175,5 @@ networks:
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

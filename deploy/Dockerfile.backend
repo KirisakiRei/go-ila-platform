@@ -12,7 +12,7 @@ RUN go mod download
 
 COPY backend/ ./
 
-# Dua binary dari satu modul: backend-api (HTTP) dan runner (eksekusi).
+# Dua binary dari satu modul: backend-api (HTTP), runner (eksekusi), migrate.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/backend-api ./cmd/backend-api \
  && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runner ./cmd/runner \
  && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate

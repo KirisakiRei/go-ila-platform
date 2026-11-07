@@ -2,7 +2,7 @@
 
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
-COMPOSE := docker compose -f deploy/docker-compose.yml
+COMPOSE := docker compose --env-file .env -f deploy/docker-compose.yml
 
 .PHONY: help
 help:
@@ -64,6 +64,27 @@ check-frontend: ## Type-check frontend tanpa emit
 .PHONY: up
 up: ## Nyalakan semua container
 	$(COMPOSE) up -d --build
+
+.PHONY: up-cold
+up-cold: ## Nyalakan ulang dari nol termasuk volume database
+	$(COMPOSE) down -v
+	$(COMPOSE) up -d --build
+
+.PHONY: config-check
+config-check: ## Validasi konfigurasi compose tanpa menyalakan container
+	$(COMPOSE) config --quiet
+
+.PHONY: caddy-check
+caddy-check: ## Validasi sintaks Caddyfile memakai image resmi
+	docker run --rm -e SITE_ADDRESS=localhost \
+	  -v "$$(pwd)/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+	  caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+.PHONY: nginx-check
+nginx-check: ## Validasi sintaks nginx.conf memakai image resmi
+	docker run --rm \
+	  -v "$$(pwd)/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+	  nginx:1.27-alpine nginx -t
 
 .PHONY: down
 down: ## Hentikan semua container

@@ -1,0 +1,53 @@
+# Satu-satunya pintu masuk publik untuk ILA Platform.
+#
+# Frontend dan API berada di origin yang sama. Cookie sesi memakai
+# SameSite=Strict, jadi keduanya WAJIB satu domain: kalau dipisah,
+# deep-link konfirmasi dari Telegram akan kehilangan sesi.
+#
+# Urutan `handle` penting: Caddy memakai blok pertama yang cocok, sehingga
+# path paling spesifik harus ditulis lebih dulu.
+#
+# Catatan: email ACME sengaja TIDAK ditulis di sini. Blok global `email`
+# menolak nilai kosong dan membuat Caddy gagal start. Setel lewat variabel
+# environment CADDY_AGENT_EMAIL di produksi bila ingin akun ACME tertentu.
+
+{$SITE_ADDRESS:localhost} {
+	# Kompresi untuk aset teks.
+	encode zstd gzip
+
+	# --- API -----------------------------------------------------------------
+	# Prefix sudah sama dengan yang dipakai backend (/api/v1), jadi tidak ada
+	# penulisan ulang path.
+	handle /api/* {
+		reverse_proxy backend-api:8080
+	}
+
+	handle /health {
+		reverse_proxy backend-api:8080
+	}
+
+	handle /ready {
+		reverse_proxy backend-api:8080
+	}
+
+	# --- Frontend ------------------------------------------------------------
+	# SPA: semua path lain disajikan Nginx, yang punya fallback ke index.html.
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	# Header keamanan tingkat situs.
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		# Versi server tidak perlu dibocorkan.
+		-Server
+	}
+
+	# Ukuran badan permintaan dibatasi agar tidak ada unggahan tak terduga.
+	request_body {
+		max_size 1MB
+	}
+}
