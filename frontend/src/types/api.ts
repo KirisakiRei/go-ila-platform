@@ -17,6 +17,13 @@ export type PaginationMeta = {
   per_page: number
   total: number
   total_pages: number
+  has_more?: boolean
+  sort?: string
+  order?: string
+  /** Penanda total hanya perkiraan pada tabel besar; tampilkan dengan "~". */
+  approx_total?: boolean
+  /** Kursor halaman berikutnya pada daftar panjang. */
+  next_cursor?: string
 }
 
 /**

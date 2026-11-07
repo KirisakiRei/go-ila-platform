@@ -1,0 +1,107 @@
+import { request, requestList } from './http'
+import type { TimePair } from '@/types/api'
+import type { PublicPlan } from '@/types/admin'
+import type {
+  AdminAccountItem,
+  AdminLegalItem,
+  AdminNoteItem,
+  AdminPositionItem,
+  AdminUserDetail,
+  AdminUserListItem,
+  AuditCatalogEntry,
+  AuditEntry,
+  CouponItem,
+  CouponReport,
+  CreditSummary,
+  CustomerReport,
+  OperationReport,
+  RevenueReport,
+  UserActionPayload,
+} from '@/types/admin'
+
+/** Envelope daftar: data dan meta dikirim terpisah oleh backend. */
+
+
+/** Lampiran sesi admin memakai cookie sendiri, jadi path berbeda dari sesi user. */
+const ADMIN = '/admin'
+
+export const adminAuthApi = {
+  me: () => request<{ id: string; email: string; name: string; role: string }>(`${ADMIN}/auth/me`),
+}
+
+export const adminUserApi = {
+  list: (query: Record<string, string | number | boolean | undefined>) =>
+    requestList<AdminUserListItem>(`${ADMIN}/users`, { query }),
+  detail: (id: string) => request<AdminUserDetail>(`${ADMIN}/users/${id}`),
+  accounts: (id: string) => request<AdminAccountItem[]>(`${ADMIN}/users/${id}/accounts`),
+  positions: (id: string) => request<AdminPositionItem[]>(`${ADMIN}/users/${id}/positions`),
+  legal: (id: string) => request<AdminLegalItem[]>(`${ADMIN}/users/${id}/legal`),
+  notes: (id: string) => request<AdminNoteItem[]>(`${ADMIN}/users/${id}/notes`),
+  addNote: (id: string, body: string) =>
+    request<void>(`${ADMIN}/users/${id}/notes`, { method: 'POST', body: { body } }),
+
+  suspend: (id: string, payload: UserActionPayload) =>
+    request<void>(`${ADMIN}/users/${id}/suspend`, { method: 'POST', body: payload }),
+  unsuspend: (id: string) =>
+    request<void>(`${ADMIN}/users/${id}/unsuspend`, { method: 'POST', body: {} }),
+  ban: (id: string, payload: UserActionPayload) =>
+    request<void>(`${ADMIN}/users/${id}/ban`, { method: 'POST', body: payload }),
+  unban: (id: string) => request<void>(`${ADMIN}/users/${id}/unban`, { method: 'POST', body: {} }),
+  remove: (id: string, payload: UserActionPayload) =>
+    request<void>(`${ADMIN}/users/${id}/delete`, { method: 'POST', body: payload }),
+  changeTier: (id: string, payload: { tier: string; reason: string; days?: number }) =>
+    request<void>(`${ADMIN}/users/${id}/tier`, { method: 'PATCH', body: payload }),
+
+  freezeAccount: (accountID: string, reason: string) =>
+    request<void>(`${ADMIN}/accounts/${accountID}/freeze`, { method: 'POST', body: { reason } }),
+  unfreezeAccount: (accountID: string) =>
+    request<void>(`${ADMIN}/accounts/${accountID}/unfreeze`, { method: 'POST', body: {} }),
+
+  credit: (id: string) => request<CreditSummary>(`${ADMIN}/users/${id}/credit`),
+  adjustCredit: (id: string, payload: { amount_idr: number; reason: string }) =>
+    request<CreditSummary>(`${ADMIN}/users/${id}/credit`, { method: 'POST', body: payload }),
+}
+
+export const adminAuditApi = {
+  list: (query: Record<string, string | number | boolean | undefined>) =>
+    requestList<AuditEntry>(`${ADMIN}/audit`, { query }),
+  detail: (id: string) => request<AuditEntry>(`${ADMIN}/audit/${id}`),
+  catalog: () => request<AuditCatalogEntry[]>(`${ADMIN}/audit-catalog`),
+}
+
+export const adminPlanApi = {
+  list: () => request<PublicPlan[]>(`${ADMIN}/plans`),
+  update: (code: string, payload: Record<string, unknown>) =>
+    request<void>(`${ADMIN}/plans/${code}`, { method: 'PATCH', body: payload }),
+  setGuard: (code: string, payload: { min_price_idr: number; reason: string }) =>
+    request<void>(`${ADMIN}/plans/${code}/guard`, { method: 'PUT', body: payload }),
+}
+
+export const adminCouponApi = {
+  list: (query?: Record<string, string | undefined>) =>
+    request<CouponItem[]>(`${ADMIN}/coupons`, { query }),
+  create: (payload: Record<string, unknown>) =>
+    request<CouponItem>(`${ADMIN}/coupons`, { method: 'POST', body: payload }),
+  update: (id: string, payload: Record<string, unknown>) =>
+    request<void>(`${ADMIN}/coupons/${id}`, { method: 'PATCH', body: payload }),
+  disable: (id: string, reason: string) =>
+    request<void>(`${ADMIN}/coupons/${id}/disable`, { method: 'POST', body: { reason } }),
+}
+
+export const adminReportApi = {
+  revenue: (from?: string, to?: string) =>
+    request<RevenueReport>(`${ADMIN}/reports/revenue`, { query: { from, to } }),
+  customers: (from?: string, to?: string) =>
+    request<CustomerReport>(`${ADMIN}/reports/customers`, { query: { from, to } }),
+  coupons: (from?: string, to?: string) =>
+    request<CouponReport>(`${ADMIN}/reports/coupons`, { query: { from, to } }),
+  operations: (from?: string, to?: string) =>
+    request<OperationReport>(`${ADMIN}/reports/operations`, { query: { from, to } }),
+}
+
+/** Paket publik untuk halaman harga; tanpa sesi. */
+export const publicPlanApi = {
+  list: () => request<PublicPlan[]>('/billing/plans'),
+}
+
+export type { TimePair }

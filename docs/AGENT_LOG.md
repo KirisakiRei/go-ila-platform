@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `5b59ff6`
+> **Commit terakhir saat log ini ditulis:** `2349adc`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,105 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-12 — Fase D–H selesai: manajemen pelanggan, audit, harga, billing, laporan
+
+**Pelaku:** Claude
+**Tipe:** `SELESAI`
+**Status:** Backend + panel admin frontend terpasang.
+
+**Ringkasan pekerjaan**
+
+| Fase | Yang dikerjakan |
+|---|---|
+| D | Daftar/detail pelanggan, akun broker, riwayat posisi, legal, catatan internal, suspend/ban/hapus/tier, bekukan akun |
+| E | Jejak audit berkursor dengan rentang wajib, katalog aksi, penyaring rahasia, pemindai rute |
+| F | Paket & fitur sebagai data, urutan harga subtotal→kupon→kredit→pagar, kupon, buku besar kredit |
+| G | Checkout, webhook khusus bertanda tangan, idempoten, masa tenggang 3 hari |
+| H | Laporan pendapatan, pelanggan, kupon, operasional |
+
+**Keputusan yang perlu diketahui**
+
+1. **Hanya webhook yang menaikkan tier.** Halaman `?status=success` tidak.
+   Status gateway tak dikenal dan kurang bayar **tidak** pernah dianggap lunas.
+2. **Batas tier dibaca dari `plan_feature`, bukan kode.** Free: 1 simbol, telat
+   15 menit, tanpa auto-eksekusi. Basic: 8 simbol, tanpa auto-eksekusi.
+   Plus: 8 simbol, auto-eksekusi, 2 akun.
+3. **ILA 3.0 = `coming_soon`** di semua paket dan belum bisa dipilih.
+4. **Harga mock:** Basic Rp 666.000, Plus Rp 999.000. Premium tidak ada.
+5. **Pagar harga:** Basic minimal Rp 333.000, Plus Rp 499.000. Total di bawah
+   pagar ditolak sebelum invoice terbit.
+6. **Baca sensitif tercatat:** membuka riwayat posisi pelanggan menulis
+   `user.view.sensitive` setiap kali, tanpa terkecuali.
+7. **Kredensial tidak punya endpoint.** Tidak ada route yang mengembalikan
+   token broker, bahkan untuk superadmin.
+
+**Batas pandang yang dijaga**
+
+| Tidak bisa dilakukan admin | Alasan |
+|---|---|
+| Melihat token broker | Nilai itu tidak pernah keluar dari server |
+| Mengubah kata sandi pelanggan | Bukan wewenang staf |
+| Menutup posisi berjalan | Kita percaya pada eksekusi kita |
+| Mengubah tier akun sendiri | Memberi diri akses berbayar |
+| Menghapus jejak audit | Append-only |
+
+**Berkas baru utama**
+
+- `backend/internal/pagination/` — daftar, kursor, rentang WIB→UTC
+- `backend/internal/audit/` — katalog aksi + penyaring rahasia
+- `backend/internal/timezone/` — rumah tunggal WIB/NY
+- `backend/internal/export/` — CSV ber-BOM dua kolom waktu
+- `backend/internal/payment/` — antarmuka gateway + adapter Pakasir
+- `backend/internal/service/admin_user_service.go`, `admin_audit_service.go`,
+  `admin_billing_service.go`, `pricing_service.go`, `billing_service.go`,
+  `admin_report_service.go`
+- `backend/internal/repository/admin_*.go`, `pricing_repository.go`,
+  `billing_repository.go`, `billing_seed.go`, `report_repository.go`
+- `frontend/src/pages/admin/*` — pengguna, detail, audit, paket, kupon, laporan
+- `frontend/src/lib/admin-api.ts`, `frontend/src/types/admin.ts`
+
+**Perubahan pada kode lama**
+
+- `internal/runner/schedule.go` dan `rules.go`: `NY`/`WIB` kini mengambil dari
+  `internal/timezone` agar paket lain bisa memakainya tanpa import cycle.
+  **Perilaku trading tidak berubah.**
+- `middleware.ContextRequestID`: nomor permintaan disalin ke baris audit.
+- `authz.Catalog`: tambah `user.export`.
+
+**Catatan untuk Hermes**
+
+- Engine **tidak perlu berubah** untuk Fase D–H. Jalur `signal`, `position`,
+  `user_signal`, `execution_record`, `credential` tidak disentuh.
+- Satu hal yang **masih menunggu** di sisi engine: `ExecutedPrice: req.OpenPrice`
+  di `go-trade`. Itu dicatat sebagai temuan, bukan dikerjakan di repo ini.
+- Bila engine nanti membaca batas tier, sumbernya sekarang `plan_feature`
+  (tabel), bukan konstanta di kode.
+
+**Uji yang dijalankan**
+
+```
+gofmt -l .            → kosong
+go vet ./...          → bersih
+go test ./...         → 19 paket lulus, 0 gagal
+npx tsc --noEmit      → bersih
+npx eslint src        → 0 peringatan
+npx vitest run        → 34 tes lulus
+```
+
+**Yang BELUM dikerjakan (jujur)**
+
+| Hal | Status |
+|---|---|
+| Halaman 2FA (QR, recovery codes) di frontend | Endpoint siap, halaman belum |
+| Halaman `/legal/*` di frontend | Belum |
+| Halaman `/billing` dan `/billing/selesai` untuk pelanggan | Endpoint siap, halaman belum |
+| Runner menolak eksekusi saat `legal_blocked` | Belum ditegakkan |
+| Kode kredit (tukar voucher saldo) | Belum, mengembalikan 404 |
+| Webhook Pakasir diuji ke server asli | Baru diuji ke server tiruan |
+| Landing page, CMS, help center | Belum |
+
+---
 
 ### 2026-11-08 — 2FA opsional (user & admin) + Fase C selesai: legal berversi
 

@@ -1,5 +1,5 @@
 import { ApiError } from './api-error'
-import type { ApiResponse } from '@/types/api'
+import type { ApiResponse, PaginationMeta } from '@/types/api'
 
 const DEFAULT_TIMEOUT_MS = 15_000
 
@@ -50,6 +50,27 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  * seragam, dan penerjemahan kegagalan menjadi ApiError.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const payload = await requestEnvelope<T>(path, options)
+  return payload.data as T
+}
+
+/**
+ * requestList mengembalikan data beserta metadata paginasi. Daftar yang
+ * panjang butuh `total` dan `has_more` untuk tombol halaman berikutnya.
+ */
+export async function requestList<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ data: T[]; meta?: PaginationMeta }> {
+  const payload = await requestEnvelope<T[]>(path, options)
+  return { data: payload.data ?? [], meta: payload.meta }
+}
+
+/** requestEnvelope adalah inti semua panggilan: header, CSRF, timeout, parsing. */
+async function requestEnvelope<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<ApiResponse<T>> {
   const { method = 'GET', body, query, signal, timeoutMs = DEFAULT_TIMEOUT_MS } = options
 
   const controller = new AbortController()
@@ -97,7 +118,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       )
     }
 
-    return payload.data as T
+    return payload
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
