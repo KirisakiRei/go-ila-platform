@@ -17,6 +17,7 @@ import (
 
 	enginev1 "github.com/KirisakiRei/go-ila-platform/backend/gen/engine/v1"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
+	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker/matchtrader"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/engineclient"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
@@ -77,6 +78,10 @@ func main() {
 	// Simulasi tersedia untuk semua akun dry-run dan seluruh tier.
 	registry.Register("paper", func(accountID, brokerType string) (broker.Client, error) {
 		return broker.NewPaperClient(accountID, brokerType), nil
+	})
+	// Eksekusi nyata lewat access token akun, tanpa menyimpan password.
+	registry.Register("matchtrader", func(accountID, _ string) (broker.Client, error) {
+		return matchtrader.New(accountID), nil
 	})
 
 	// --- Runner ---------------------------------------------------------------
