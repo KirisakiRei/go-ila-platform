@@ -72,6 +72,10 @@ func main() {
 		&model.CouponRedemption{},
 		&model.CreditBalance{},
 		&model.CreditTransaction{},
+		&model.SubscriptionRecord{},
+		&model.Invoice{},
+		&model.Payment{},
+		&model.Refund{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

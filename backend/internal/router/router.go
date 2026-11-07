@@ -13,6 +13,7 @@ import (
 	"ila/backend/internal/config"
 	"ila/backend/internal/handler"
 	"ila/backend/internal/middleware"
+	"ila/backend/internal/payment"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
 	"ila/backend/internal/runnerclient"
@@ -192,6 +193,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
 	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
+
+	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
+	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
+	billingRepo := repository.NewBillingRepository(db)
+	billingService := service.NewBillingService(billingRepo, pricingService, billingRepo, gateway, adminAudit)
+	billingHandler := handler.NewBillingHandler(billingService)
 	legalHandler := handler.NewLegalHandler(legalService)
 
 	// Alamat surel dipakai sebagai label di aplikasi authenticator.
@@ -225,6 +232,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	{
 		publicLegal.GET("", legalHandler.List)
 		publicLegal.GET("/:slug", legalHandler.BySlug)
+	}
+
+	// Webhook pembayaran: diautentikasi tanda tangan gateway, bukan sesi.
+	// Batas per IP hanya menahan banjir permintaan, bukan pengganti tanda tangan.
+	webhook := r.Group("/api/v1/webhook")
+	webhook.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
+	{
+		webhook.POST("/payment", billingHandler.Webhook)
 	}
 
 	// Daftar paket publik: dibaca halaman harga sebelum masuk.
@@ -285,6 +300,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Uji coba 7 hari: setara Plus namun hanya simulasi.
 		me.GET("/trial", trialHandler.Status)
 		me.POST("/trial", trialHandler.Start)
+
+		// Billing: checkout dan riwayat tagihan pengguna.
+		billingHandler.RegisterUser(me)
 
 		// Status pasar, engine, broker, dan kuota harian.
 		me.GET("/system/status", systemHandler.Status)

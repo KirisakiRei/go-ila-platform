@@ -90,6 +90,13 @@ type Config struct {
 	// Format: "1:<base64>,2:<base64>" — hanya kunci lama, bukan kunci aktif.
 	MasterKeysLegacy string
 
+	// Gateway pembayaran. Kunci tidak pernah dikirim ke klien; hanya dipakai
+	// server untuk membuat tagihan dan memeriksa tanda tangan webhook.
+	PakasirBaseURL    string
+	PakasirSlug       string
+	PakasirAPIKey     string
+	PakasirWebhookKey string
+
 	// InternalSecret melindungi endpoint internal Runner dari pemanggil liar.
 	InternalSecret string
 	// RunnerBaseURL adalah alamat HTTP internal Runner.
@@ -150,6 +157,10 @@ func Load(service string) (*Config, error) {
 		MasterKey:             env("MASTER_KEY", ""),
 		MasterKeyVersion:      envInt("MASTER_KEY_VERSION", 1),
 		MasterKeysLegacy:      env("MASTER_KEYS_LEGACY", ""),
+		PakasirBaseURL:        env("PAKASIR_BASE_URL", "https://pakasir.com"),
+		PakasirSlug:           env("PAKASIR_SLUG", ""),
+		PakasirAPIKey:         env("PAKASIR_API_KEY", ""),
+		PakasirWebhookKey:     env("PAKASIR_WEBHOOK_KEY", ""),
 		InternalSecret:        env("INTERNAL_SECRET", ""),
 		RunnerBaseURL:         env("RUNNER_BASE_URL", "http://runner:8081"),
 		TelegramBotToken:      env("TELEGRAM_BOT_TOKEN", ""),

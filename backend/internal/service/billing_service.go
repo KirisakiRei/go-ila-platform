@@ -1,0 +1,307 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"ila/backend/internal/audit"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/internal/payment"
+	"ila/backend/internal/repository"
+	"ila/backend/pkg/apperror"
+)
+
+// BillingService mengurus checkout, webhook, dan masa tenggang.
+//
+// Aturan yang tidak boleh dilanggar: halaman sukses TIDAK menaikkan tier.
+// Hanya webhook bertanda tangan sah yang boleh mengubah langganan.
+type BillingService interface {
+	Checkout(ctx context.Context, userID string, req dto.CheckoutRequest) (*dto.CheckoutResult, error)
+	HandleWebhook(ctx context.Context, header map[string]string, body []byte) error
+	Invoices(ctx context.Context, userID string) ([]dto.InvoiceItem, error)
+	Subscription(ctx context.Context, userID string) (*dto.SubscriptionItem, error)
+	RunGraceSweep(ctx context.Context) (int, error)
+}
+
+// BillingStore adalah data yang dibutuhkan billing.
+type BillingStore interface {
+	FindPlan(ctx context.Context, code string) (*model.Plan, error)
+	CreditBalance(ctx context.Context, userID string) (int64, error)
+	ApplyCredit(ctx context.Context, input *repository.ApplyCreditInput) (int64, error)
+	NextInvoiceNumber(ctx context.Context, at time.Time) (string, error)
+	CreateInvoice(ctx context.Context, invoice *model.Invoice) error
+	FindInvoiceByNumber(ctx context.Context, number string) (*model.Invoice, error)
+	FindInvoiceByID(ctx context.Context, id string) (*model.Invoice, error)
+	UpdateInvoice(ctx context.Context, invoice *model.Invoice) error
+	ListInvoices(ctx context.Context, userID string, limit int) ([]model.Invoice, error)
+	SavePayment(ctx context.Context, payment *model.Payment) (bool, error)
+	SaveRedemption(ctx context.Context, redemption *model.CouponRedemption) error
+	ActiveSubscription(ctx context.Context, userID string) (*model.SubscriptionRecord, error)
+	UpsertSubscription(ctx context.Context, sub *model.SubscriptionRecord) error
+	ExtendTier(ctx context.Context, userID, planCode string, start, end time.Time) error
+	DowngradeExpired(ctx context.Context, at time.Time) ([]string, error)
+	StartGrace(ctx context.Context, at time.Time) ([]string, error)
+	AddRefund(ctx context.Context, refund *model.Refund) error
+}
+
+type billingService struct {
+	store   BillingStore
+	pricing PricingService
+	coupons couponLookup
+	gateway payment.Gateway
+	audit   AdminAudit
+	now     func() time.Time
+}
+
+// couponLookup membaca id kupon berdasarkan kode untuk dicatat pemakaiannya.
+type couponLookup interface {
+	FindCouponByCode(ctx context.Context, code string) (*model.Coupon, error)
+}
+
+// NewBillingService merangkai billing.
+func NewBillingService(store BillingStore, pricing PricingService, coupons couponLookup, gateway payment.Gateway, recorder AdminAudit) BillingService {
+	return &billingService{
+		store: store, pricing: pricing, coupons: coupons, gateway: gateway, audit: recorder,
+		now: func() time.Time { return time.Now().UTC() },
+	}
+}
+
+// Checkout membuat invoice dan meminta URL pembayaran.
+func (s *billingService) Checkout(ctx context.Context, userID string, req dto.CheckoutRequest) (*dto.CheckoutResult, error) {
+	quote, err := s.pricing.Quote(ctx, userID, req.PlanCode, req.CouponCode, req.UseCredit)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	periodStart := now
+	periodEnd := now.AddDate(0, 1, 0)
+	expiresAt := now.Add(24 * time.Hour)
+
+	number, err := s.store.NextInvoiceNumber(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+
+	invoice := &model.Invoice{
+		Number: number, UserID: userID, PlanCode: quote.PlanCode,
+		AmountIDR: quote.Subtotal, DiscountIDR: quote.Discount, CreditIDR: quote.CreditUsed,
+		TotalIDR: quote.Total, Status: model.InvoicePending, CouponCode: quote.CouponCode,
+		PeriodStart: periodStart, PeriodEnd: periodEnd, ExpiresAt: expiresAt,
+		Gateway: s.gateway.Name(), CreatedAt: now, UpdatedAt: now,
+	}
+
+	// Tagihan gratis (total 0) langsung lunas tanpa gateway.
+	paymentURL := ""
+	if quote.Total == 0 {
+		invoice.Status = model.InvoicePaid
+		invoice.PaidAt = &now
+	} else {
+		txn, err := s.gateway.CreateTransaction(ctx, number, quote.Total)
+		if err != nil {
+			return nil, errors.Join(apperror.ErrServiceUnavailable, errors.New("gateway pembayaran sedang tidak tersedia"))
+		}
+		invoice.GatewayRef = txn.Reference
+		invoice.ExpiresAt = txn.ExpiresAt
+		paymentURL = txn.PaymentURL
+	}
+
+	if err := s.store.CreateInvoice(ctx, invoice); err != nil {
+		return nil, err
+	}
+
+	// Kupon dicatat saat invoice terbit dengan nilai yang sudah dibekukan.
+	if quote.CouponCode != "" {
+		coupon, err := s.coupons.FindCouponByCode(ctx, quote.CouponCode)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.store.SaveRedemption(ctx, &model.CouponRedemption{
+			CouponID: coupon.ID, UserID: userID, InvoiceID: invoice.ID,
+			DiscountIDR: quote.Discount, RedeemedAt: now,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	if quote.CreditUsed > 0 {
+		invoiceID := invoice.ID
+		if _, err := s.store.ApplyCredit(ctx, &repository.ApplyCreditInput{
+			UserID: userID, DeltaIDR: -quote.CreditUsed, Kind: model.CreditKindUsed,
+			InvoiceID: &invoiceID, Reason: "pemakaian kredit pada invoice " + number,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	if quote.Total == 0 {
+		if err := s.activate(ctx, invoice, now); err != nil {
+			return nil, err
+		}
+	}
+
+	return &dto.CheckoutResult{
+		InvoiceNumber: number,
+		TotalIDR:      quote.Total,
+		PaymentURL:    paymentURL,
+		ExpiresAt:     dto.NewTimePair(invoice.ExpiresAt),
+		Status:        invoice.Status,
+	}, nil
+}
+
+// HandleWebhook memproses webhook dengan tujuh langkah berurutan (plans/08 §5.1).
+func (s *billingService) HandleWebhook(ctx context.Context, header map[string]string, body []byte) error {
+	// 1. Verifikasi tanda tangan lebih dulu: tidak ada pemrosesan sebelum sah.
+	if err := s.gateway.VerifyWebhook(header, body); err != nil {
+		if errors.Is(err, payment.ErrDisabled) {
+			return errors.Join(apperror.ErrServiceUnavailable, errors.New("gateway belum dikonfigurasi"))
+		}
+		return errors.Join(apperror.ErrUnauthorized, errors.New("tanda tangan webhook tidak sah"))
+	}
+
+	// 2. Urai isi webhook.
+	event, err := s.gateway.ParseWebhook(body)
+	if err != nil {
+		return errors.Join(apperror.ErrBadRequest, err)
+	}
+
+	// 3. Temukan invoice.
+	invoice, err := s.store.FindInvoiceByNumber(ctx, event.InvoiceNumber)
+	if err != nil {
+		return err
+	}
+
+	// 4. Catat pembayaran. Duplikat tidak menambah periode dua kali.
+	isNew, err := s.store.SavePayment(ctx, &model.Payment{
+		InvoiceID: invoice.ID, Gateway: s.gateway.Name(),
+		GatewayTxnID: event.TransactionID, AmountIDR: event.AmountIDR,
+		Status: event.Status, SignatureValid: true,
+		RawPayload: truncateRaw(body), ReceivedAt: s.now(),
+	})
+	if err != nil {
+		return err
+	}
+	if !isNew {
+		// Webhook yang sama sudah diproses: selesai tanpa efek.
+		return nil
+	}
+
+	// 5. Status yang tidak dikenal tidak pernah dianggap lunas.
+	if event.Status != payment.StatusPaid {
+		return nil
+	}
+
+	// 6. Nominal harus cukup; kurang bayar tidak menaikkan tier.
+	if event.AmountIDR < invoice.TotalIDR {
+		return nil
+	}
+
+	// 7. Tandai lunas dan aktifkan langganan dalam satu alur.
+	return s.activate(ctx, invoice, s.now())
+}
+
+// activate menandai invoice lunas dan memperpanjang langganan.
+func (s *billingService) activate(ctx context.Context, invoice *model.Invoice, now time.Time) error {
+	if invoice.Status == model.InvoicePaid {
+		return nil
+	}
+
+	// Perpanjangan menyambung periode berjalan, bukan menimpanya.
+	start := now
+	if sub, err := s.store.ActiveSubscription(ctx, invoice.UserID); err == nil && sub != nil && sub.CurrentPeriodEnd.After(now) {
+		start = sub.CurrentPeriodEnd
+	}
+	end := start.AddDate(0, 1, 0)
+
+	invoice.Status = model.InvoicePaid
+	invoice.PaidAt = &now
+	invoice.PeriodStart = start
+	invoice.PeriodEnd = end
+	invoice.UpdatedAt = now
+	if err := s.store.UpdateInvoice(ctx, invoice); err != nil {
+		return err
+	}
+
+	if err := s.store.ExtendTier(ctx, invoice.UserID, invoice.PlanCode, start, end); err != nil {
+		return err
+	}
+	if err := s.store.UpsertSubscription(ctx, &model.SubscriptionRecord{
+		UserID: invoice.UserID, PlanCode: invoice.PlanCode, Status: model.SubStatusActive,
+		CurrentPeriodStart: start, CurrentPeriodEnd: end,
+		CreatedAt: now, UpdatedAt: now,
+	}); err != nil {
+		return err
+	}
+
+	return s.audit.Record(ctx, AuditEntry{
+		ActorType: "system", Action: audit.InvoicePaid,
+		TargetType: "invoice", TargetID: invoice.ID,
+		After: map[string]any{
+			"number": invoice.Number, "total_idr": invoice.TotalIDR,
+			"plan": invoice.PlanCode, "user_id": invoice.UserID,
+		},
+	})
+}
+
+// Invoices menampilkan tagihan milik pengguna.
+func (s *billingService) Invoices(ctx context.Context, userID string) ([]dto.InvoiceItem, error) {
+	rows, err := s.store.ListInvoices(ctx, userID, 50)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]dto.InvoiceItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, toInvoiceItem(row))
+	}
+	return items, nil
+}
+
+// Subscription menampilkan langganan aktif pengguna.
+func (s *billingService) Subscription(ctx context.Context, userID string) (*dto.SubscriptionItem, error) {
+	sub, err := s.store.ActiveSubscription(ctx, userID)
+	if err != nil || sub == nil {
+		return nil, nil
+	}
+	return &dto.SubscriptionItem{
+		PlanCode:    sub.PlanCode,
+		Status:      sub.Status,
+		PeriodStart: dto.NewTimePair(sub.CurrentPeriodStart),
+		PeriodEnd:   dto.NewTimePair(sub.CurrentPeriodEnd),
+		CancelAtEnd: sub.CancelAtPeriodEnd,
+	}, nil
+}
+
+// RunGraceSweep menjalankan pekerjaan harian masa tenggang.
+// Posisi berjalan TIDAK disentuh: yang berubah hanya akses entry baru.
+func (s *billingService) RunGraceSweep(ctx context.Context) (int, error) {
+	now := s.now()
+	started, err := s.store.StartGrace(ctx, now)
+	if err != nil {
+		return 0, err
+	}
+	downgraded, err := s.store.DowngradeExpired(ctx, now)
+	if err != nil {
+		return 0, err
+	}
+	return len(started) + len(downgraded), nil
+}
+
+func toInvoiceItem(row model.Invoice) dto.InvoiceItem {
+	return dto.InvoiceItem{
+		ID: row.ID, Number: row.Number, PlanCode: row.PlanCode,
+		AmountIDR: row.AmountIDR, DiscountIDR: row.DiscountIDR, CreditIDR: row.CreditIDR,
+		TotalIDR: row.TotalIDR, Status: row.Status, CouponCode: row.CouponCode,
+		CreatedAt: dto.NewTimePair(row.CreatedAt), PaidAt: dto.NewTimePairPtr(row.PaidAt),
+		ExpiresAt: dto.NewTimePair(row.ExpiresAt),
+	}
+}
+
+func truncateRaw(body []byte) string {
+	const max = 4000
+	if len(body) <= max {
+		return string(body)
+	}
+	return string(body[:max])
+}
