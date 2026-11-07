@@ -2,6 +2,34 @@ package model
 
 import "time"
 
+// Status sinyal mengikuti state machine di plans/07 dan disimpan apa adanya
+// di kolom signal.status.
+const (
+	SignalStatusWaitHTFSweep       = "WAIT_HTF_SWEEP"
+	SignalStatusWaitHTFCandleClose = "WAIT_HTF_CANDLE_CLOSE"
+	SignalStatusWaitLTFCISD        = "WAIT_LTF_CISD"
+	SignalStatusReadyToEntry       = "READY_TO_ENTRY"
+	SignalStatusInvalidated        = "INVALIDATED"
+	SignalStatusAcked              = "ACKED"
+	SignalStatusConsumed           = "CONSUMED"
+	SignalStatusExpired            = "EXPIRED"
+	SignalStatusCancelled          = "CANCELLED"
+	SignalStatusSuperseded         = "SUPERSEDED"
+	SignalStatusRejected           = "REJECTED"
+	SignalStatusSkipped            = "SKIPPED"
+)
+
+// IsTerminalSignal menandai status sinyal yang tidak bisa dieksekusi lagi.
+func IsTerminalSignal(status string) bool {
+	switch status {
+	case SignalStatusConsumed, SignalStatusExpired, SignalStatusCancelled,
+		SignalStatusSuperseded, SignalStatusRejected, SignalStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Signal adalah sinyal yang diterima dari engine.
 // Sinyal bisa dibatalkan, ditolak, atau kedaluwarsa; ini bukan posisi.
 type Signal struct {
@@ -28,6 +56,16 @@ type Signal struct {
 func (Signal) TableName() string {
 	return "signal"
 }
+
+// Status posisi. Posisi hanya berpindah dari OPEN ke salah satu status tutup;
+// tidak ada transisi lain, dan engine tidak pernah bisa membatalkannya.
+const (
+	PositionStatusOpen         = "OPEN"
+	PositionStatusClosedTP     = "CLOSED_TP"
+	PositionStatusClosedSL     = "CLOSED_SL"
+	PositionStatusClosedManual = "CLOSED_MANUAL"
+	PositionStatusUntracked    = "UNTRACKED"
+)
 
 // Position adalah order nyata yang hidup di server broker.
 // Posisi tidak pernah batal; hanya OPEN lalu CLOSED dengan alasan.

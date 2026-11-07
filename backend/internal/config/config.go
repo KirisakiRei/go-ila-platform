@@ -49,10 +49,25 @@ type Config struct {
 	EngineMTLSCert   string
 	EngineMTLSKey    string
 	EngineMTLSCA     string
-	RunnerSubscribe  string
+	EngineServerName string
+	EngineStrategy   string
+	RunnerSubscriber string
 	DailyTimezone    string
 	MaxDailyTrades   int
+	MaxDailyLosses   int
 	StopAfterWin     bool
+	AutoExecute      bool
+	DryRunAll        bool
+
+	// MasterKey membungkus kunci per user; wajib untuk kredensial broker.
+	MasterKey        string
+	MasterKeyVersion int
+
+	// InternalSecret melindungi endpoint internal Runner dari pemanggil liar.
+	InternalSecret string
+	// RunnerBaseURL adalah alamat HTTP internal Runner.
+	RunnerBaseURL string
+
 	TelegramBotToken string
 	TelegramTimeout  time.Duration
 }
@@ -79,10 +94,19 @@ func Load(service string) (*Config, error) {
 		EngineMTLSCert:   env("ENGINE_MTLS_CERT", ""),
 		EngineMTLSKey:    env("ENGINE_MTLS_KEY", ""),
 		EngineMTLSCA:     env("ENGINE_MTLS_CA", ""),
-		RunnerSubscribe:  env("RUNNER_SUBSCRIBE_SYMBOLS", ""),
+		EngineServerName: env("ENGINE_SERVER_NAME", ""),
+		EngineStrategy:   env("ENGINE_STRATEGY", "ila-2.0"),
+		RunnerSubscriber: env("RUNNER_SUBSCRIBER_ID", "runner-1"),
 		DailyTimezone:    env("DAILY_TZ", "Asia/Jakarta"),
 		MaxDailyTrades:   envInt("MAX_DAILY_TRADES", 2),
+		MaxDailyLosses:   envInt("MAX_DAILY_LOSSES", 2),
 		StopAfterWin:     envBool("STOP_AFTER_WIN", true),
+		AutoExecute:      envBool("AUTO_EXECUTE", false),
+		DryRunAll:        envBool("DRY_RUN_ALL", false),
+		MasterKey:        env("MASTER_KEY", ""),
+		MasterKeyVersion: envInt("MASTER_KEY_VERSION", 1),
+		InternalSecret:   env("INTERNAL_SECRET", ""),
+		RunnerBaseURL:    env("RUNNER_BASE_URL", "http://runner:8081"),
 		TelegramBotToken: env("TELEGRAM_BOT_TOKEN", ""),
 		TelegramTimeout:  envDuration("TELEGRAM_TIMEOUT", 10*time.Second),
 	}

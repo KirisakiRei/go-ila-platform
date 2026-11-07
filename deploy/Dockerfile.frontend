@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /src
 
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
 RUN npm run build

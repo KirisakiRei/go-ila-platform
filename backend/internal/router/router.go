@@ -10,6 +10,7 @@ import (
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/handler"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/middleware"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
+	"github.com/KirisakiRei/go-ila-platform/backend/internal/runnerclient"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
 )
 
@@ -30,12 +31,25 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
 	auditRepo := repository.NewAuditRepository(db)
+	runnerRepo := repository.NewRunnerRepository(db)
+	approvalRepo := repository.NewApprovalTokenRepository(db)
+
+	// Klien Runner: backend-api meminta eksekusi, bukan mengeksekusi sendiri.
+	runnerAPI := runnerclient.New(cfg.RunnerBaseURL, cfg.InternalSecret)
 
 	// Services
 	authService := service.NewAuthService(userRepo, auditRepo, newTokenIssuer(cfg))
+	approveService := service.NewApproveService(
+		approvalRepo,
+		runnerRepo,
+		runnerRepo,
+		auditRepo,
+		runnerAPI,
+	)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
+	approveHandler := handler.NewApproveHandler(approveService)
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
 
 	// Health
@@ -53,6 +67,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	me.Use(middleware.Auth(newTokenIssuer(cfg)))
 	{
 		me.GET("/me", authHandler.Profile)
+		// Konfirmasi entry: token dari deep-link Telegram, wajib sesi login.
+		me.GET("/approve/:token", approveHandler.Preview)
+		me.POST("/approve/:token/confirm", approveHandler.Confirm)
+		me.POST("/approve/:token/decline", approveHandler.Decline)
 	}
 
 	return r

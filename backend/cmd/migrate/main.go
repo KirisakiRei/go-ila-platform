@@ -44,6 +44,12 @@ func main() {
 		&model.ApprovalToken{},
 		&model.OnboardingToken{},
 		&model.NotificationLog{},
+		&model.UserSignal{},
+		&model.SignalEvent{},
+		&model.ExecutionRecord{},
+		&model.BrokerAccountState{},
+		&model.DailySummary{},
+		&model.EngineState{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
