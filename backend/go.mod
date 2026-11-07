@@ -1,4 +1,4 @@
-module github.com/KirisakiRei/go-ila-platform/backend
+module ila/backend
 
 go 1.24.1
 
@@ -42,6 +42,6 @@ require (
 	google.golang.org/grpc v1.67.1 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/postgres v1.5.11 // indirect
-	gorm.io/gorm v1.25.12 // indirect
+	gorm.io/driver/postgres v1.5.11
+	gorm.io/gorm v1.25.12
 )

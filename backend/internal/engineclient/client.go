@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
-	enginev1 "github.com/KirisakiRei/go-ila-platform/backend/gen/engine/v1"
+	enginev1 "ila/backend/gen/engine/v1"
 )
 
 // Config menampung pengaturan koneksi ke satu engine.

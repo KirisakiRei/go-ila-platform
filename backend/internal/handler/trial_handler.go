@@ -3,9 +3,9 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/middleware"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/httpx"
+	"ila/backend/internal/middleware"
+	"ila/backend/internal/service"
+	"ila/backend/pkg/httpx"
 )
 
 // TrialHandler melayani aktivasi dan status uji coba.

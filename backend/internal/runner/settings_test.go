@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
+	"ila/backend/internal/model"
+	"ila/backend/internal/runner"
 )
 
 // ILA 3.0 yang belum dirilis tidak boleh membuat engine dijalankan.

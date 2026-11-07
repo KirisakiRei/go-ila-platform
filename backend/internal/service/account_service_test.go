@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/cryptox"
 )
 
 // --- Tiruan penyimpanan -----------------------------------------------------

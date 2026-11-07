@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/internal/runner"
 )
 
 // Sesi pasar mengikuti NY/UTC; hanya hari akuntansi yang memakai WIB.
@@ -83,10 +83,11 @@ func (s *systemService) Status(ctx context.Context, userID string) (*dto.SystemS
 	}
 
 	status := &dto.SystemStatus{
-		ServerTime:    now,
-		DailyTimezone: "Asia/Jakarta",
-		Market:        dto.MarketStatus{State: "UNKNOWN", Label: "Tidak diketahui"},
-		Engines:       make([]dto.EngineStatus, 0, len(engines)),
+		ServerTime:     now,
+		ServerTimePair: dto.NewTimePair(now),
+		DailyTimezone:  "Asia/Jakarta",
+		Market:         dto.MarketStatus{State: "UNKNOWN", Label: "Tidak diketahui"},
+		Engines:        make([]dto.EngineStatus, 0, len(engines)),
 	}
 
 	for _, engine := range engines {
@@ -159,6 +160,8 @@ func (s *systemService) brokerStatus(ctx context.Context, userID string) (dto.Br
 // dailyStatus menyusun kuota hari ini dalam WIB.
 func (s *systemService) dailyStatus(ctx context.Context, userID string, now time.Time) (dto.DailyResponse, error) {
 	day := now.In(wib).Format("2006-01-02")
+	// Tengah malam hari akuntansi, disajikan dalam WIB dan NY.
+	dayStart := runner.DayStart(now)
 
 	summary, err := s.daily.FindDailySummary(ctx, userID, day)
 	if err != nil {
@@ -172,6 +175,7 @@ func (s *systemService) dailyStatus(ctx context.Context, userID string, now time
 
 	out := dto.DailyResponse{
 		Day:         day,
+		DayPair:     dto.NewTimePair(dayStart),
 		MaxTrades:   s.maxTrades,
 		OpenCount:   len(open),
 		TotalTrades: summary.TotalTrades,

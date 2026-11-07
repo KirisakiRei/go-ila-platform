@@ -5,12 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/middleware"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/session"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/httpx"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/middleware"
+	"ila/backend/internal/service"
+	"ila/backend/internal/session"
+	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/httpx"
 )
 
 // AuthHandler adalah pintu HTTP untuk pendaftaran, masuk, dan profil akun.
@@ -128,6 +128,35 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 	}
 
 	httpx.OK(c, "Profil akun", result)
+}
+
+// ChangePassword menangani POST /api/v1/me/password.
+// Semua sesi dicabut, jadi cookie perangkat ini ikut dibersihkan.
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+
+	if err := h.authService.ChangePassword(c.Request.Context(), middleware.CurrentUserID(c), req); err != nil {
+		c.Error(err)
+		return
+	}
+
+	h.cookies.Clear(c)
+	httpx.OK(c, "Password diperbarui. Silakan masuk lagi.", gin.H{"re_login_required": true})
+}
+
+// LogoutAll menangani POST /api/v1/me/logout-all.
+func (h *AuthHandler) LogoutAll(c *gin.Context) {
+	if err := h.authService.LogoutAll(c.Request.Context(), middleware.CurrentUserID(c)); err != nil {
+		c.Error(err)
+		return
+	}
+
+	h.cookies.Clear(c)
+	httpx.OK(c, "Berhasil keluar dari semua perangkat", gin.H{"logged_out": true})
 }
 
 func (h *AuthHandler) issueCookies(c *gin.Context, token string, expiresAt time.Time) error {

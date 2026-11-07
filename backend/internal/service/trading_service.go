@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
 )
 
 // FreeTierDelay adalah jeda tampil sinyal untuk tier Free (plans/14 §3.1).
@@ -169,7 +169,10 @@ func (s *tradingService) Positions(ctx context.Context, userID string, limit int
 			Status:          pos.Status,
 			IsDryRun:        pos.IsDryRun,
 			OpenedAt:        pos.OpenedAt,
+			OpenedAtPair:    dto.NewTimePair(pos.OpenedAt),
 			ClosedAt:        pos.ClosedAt,
+			ClosedAtPair:    dto.NewTimePairPtr(pos.ClosedAt),
+			PnLKnown:        pnlKnown(&pos),
 		})
 	}
 	return out, nil
@@ -185,4 +188,14 @@ func signalRetention(tier string) time.Duration {
 	default:
 		return 7 * 24 * time.Hour
 	}
+}
+
+// pnlKnown menandai apakah hasil posisi benar-benar terbaca dari broker.
+// Posisi yang sudah ditutup tanpa exit price berarti broker tidak melaporkan
+// hasilnya; angka 0 pada kondisi itu bukan keuntungan maupun kerugian.
+func pnlKnown(pos *model.Position) bool {
+	if pos.Status == model.PositionStatusOpen {
+		return false
+	}
+	return pos.ExitPrice != 0 || pos.ProfitLoss != 0
 }

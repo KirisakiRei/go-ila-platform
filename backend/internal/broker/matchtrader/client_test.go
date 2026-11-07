@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
+	"ila/backend/internal/broker"
 )
 
 func TestMapSymbol(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/telegram"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/redact"
+	"ila/backend/internal/model"
+	"ila/backend/internal/telegram"
+	"ila/backend/pkg/redact"
 )
 
 // UserLookup menyediakan tujuan notifikasi per user.

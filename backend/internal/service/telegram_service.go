@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
 )
 
 // OnboardingTokenTTL adalah masa berlaku token /start Telegram (plans/13 §3.2).

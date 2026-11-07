@@ -5,8 +5,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	enginev1 "github.com/KirisakiRei/go-ila-platform/backend/gen/engine/v1"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	enginev1 "ila/backend/gen/engine/v1"
+	"ila/backend/internal/model"
 )
 
 // ConvertSignal menerjemahkan payload engine menjadi entitas penyimpanan.

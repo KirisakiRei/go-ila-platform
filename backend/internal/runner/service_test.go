@@ -10,12 +10,12 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	enginev1 "github.com/KirisakiRei/go-ila-platform/backend/gen/engine/v1"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	enginev1 "ila/backend/gen/engine/v1"
+	"ila/backend/internal/broker"
+	"ila/backend/internal/model"
+	"ila/backend/internal/repository"
+	"ila/backend/internal/runner"
+	"ila/backend/pkg/apperror"
 )
 
 // ---------------------------------------------------------------------------
@@ -346,6 +346,12 @@ type recordedSignal struct {
 type fakePublisher struct {
 	mu      sync.Mutex
 	signals []recordedSignal
+	closed  []recordedClose
+}
+
+type recordedClose struct {
+	positionID string
+	daily      *runner.DailyOutcome
 }
 
 func (p *fakePublisher) PublishSignal(_ context.Context, userID, signalID, status, reason string) {
@@ -355,6 +361,15 @@ func (p *fakePublisher) PublishSignal(_ context.Context, userID, signalID, statu
 }
 
 func (p *fakePublisher) PublishTelemetry(_ context.Context, _ string) {}
+
+func (p *fakePublisher) PublishPositionClosed(_ context.Context, pos *model.Position, daily *runner.DailyOutcome) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if pos == nil {
+		return
+	}
+	p.closed = append(p.closed, recordedClose{positionID: pos.ID, daily: daily})
+}
 
 func (p *fakePublisher) last() (recordedSignal, bool) {
 	p.mu.Lock()

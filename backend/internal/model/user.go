@@ -34,6 +34,14 @@ type User struct {
 	NotifyEnabled bool       `gorm:"not null;default:true" json:"notify_enabled"`
 	LastLoginAt   *time.Time `json:"last_login_at"`
 	Status        string     `gorm:"type:varchar(20);not null;default:active" json:"status"`
+
+	// SessionVersion dinaikkan saat sesi harus dicabut seketika: ganti password,
+	// ban, ubah role, atau 2FA berubah. Token yang membawa nilai lama ditolak.
+	SessionVersion int `gorm:"not null;default:1" json:"-"`
+
+	// IdleWarning menentukan apakah modal peringatan "masih di sini?" muncul.
+	// Batas diam di server tidak ikut berubah (plans/23 §5).
+	IdleWarning bool `gorm:"not null;default:true" json:"idle_warning"`
 }
 
 // TableName menetapkan nama tabel tanpa bentuk jamak.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/model"
 )
 
 // TelemetryInterval adalah jeda pembaruan saldo akun broker (plans/05 §9).

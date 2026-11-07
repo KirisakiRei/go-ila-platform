@@ -177,6 +177,21 @@ func (c *Config) validate() error {
 	if c.SessionCookieName == c.CSRFCookieName {
 		return fmt.Errorf("SESSION_COOKIE_NAME dan CSRF_COOKIE_NAME tidak boleh sama")
 	}
+	// Default localhost di produksi membuat frontend sendiri ditolak CORS
+	// tanpa pesan jelas; lebih baik gagal saat start (plans/21 D3).
+	if c.IsProduction() {
+		if len(c.AllowedOrigins) == 0 {
+			return fmt.Errorf("ALLOWED_ORIGINS wajib diisi saat APP_ENV=production")
+		}
+		for _, origin := range c.AllowedOrigins {
+			if origin == "*" {
+				return fmt.Errorf("ALLOWED_ORIGINS tidak boleh \"*\": cookie sesi butuh asal eksplisit")
+			}
+			if strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1") {
+				return fmt.Errorf("ALLOWED_ORIGINS memuat alamat lokal (%s) saat produksi", origin)
+			}
+		}
+	}
 	return nil
 }
 

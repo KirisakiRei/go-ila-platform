@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/authstate"
+	"ila/backend/internal/model"
 )
 
 // Interface di paket ini adalah tipe kembalian konstruktor.
@@ -20,6 +21,13 @@ type UserRepository interface {
 	UpdateLastLogin(ctx context.Context, id string, at time.Time) error
 	Update(ctx context.Context, user *model.User) error
 	CountByTier(ctx context.Context, tier string) (int64, error)
+
+	// FindSessionUser membaca kolom minimal untuk validasi sesi tiap request.
+	FindSessionUser(ctx context.Context, id string) (*authstate.User, error)
+	// RevokeSessions menaikkan session_version: seluruh token lama ditolak.
+	RevokeSessions(ctx context.Context, id string) error
+	// UpdatePassword mengganti hash dan menaikkan session_version sekaligus.
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
 }
 
 // BrokerAccountRepository adalah kontrak penyimpanan akun broker.

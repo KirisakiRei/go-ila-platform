@@ -3,9 +3,9 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/middleware"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/httpx"
+	"ila/backend/internal/middleware"
+	"ila/backend/internal/service"
+	"ila/backend/pkg/httpx"
 )
 
 // SystemHandler menyajikan status pasar, engine, broker, dan kuota harian.

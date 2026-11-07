@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
+	"ila/backend/internal/model"
+	"ila/backend/internal/runner"
 )
 
 // Trial tidak boleh mengeksekusi order nyata, walau akunnya bukan dry-run.

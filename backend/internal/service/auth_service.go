@@ -2,14 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/utils"
+	"ila/backend/internal/config"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/utils"
 )
 
 // AuthService menangani pendaftaran dan masuk akun.
@@ -17,6 +18,10 @@ type AuthService interface {
 	Register(ctx context.Context, req dto.RegisterRequest) (*dto.UserResponse, error)
 	Login(ctx context.Context, req dto.LoginRequest) (*dto.LoginResponse, error)
 	Profile(ctx context.Context, userID string) (*dto.UserResponse, error)
+	// ChangePassword mencabut semua sesi lain setelah password berganti.
+	ChangePassword(ctx context.Context, userID string, req dto.ChangePasswordRequest) error
+	// LogoutAll menaikkan session_version sehingga semua token lama ditolak.
+	LogoutAll(ctx context.Context, userID string) error
 }
 
 type authService struct {
@@ -94,7 +99,12 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Log
 		return nil, apperror.ErrUnauthorized
 	}
 
-	token, expiresAt, err := s.tokenIssuer.Issue(user.ID, user.Role)
+	token, expiresAt, err := s.tokenIssuer.IssueWithClaims(utils.Claims{
+		UserID:  user.ID,
+		Role:    user.Role,
+		Scope:   utils.ScopeUser,
+		Session: user.SessionVersion,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -143,4 +153,47 @@ func toUserResponse(user *model.User) *dto.UserResponse {
 		Tier:      user.Tier,
 		CreatedAt: user.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+// ChangePassword memverifikasi password lama, menyimpan hash baru, lalu
+// mencabut semua sesi. Sesi perangkat ini ikut berakhir sehingga pengguna
+// diminta masuk ulang dengan password baru.
+func (s *authService) ChangePassword(ctx context.Context, userID string, req dto.ChangePasswordRequest) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		if err == apperror.ErrNotFound {
+			return apperror.ErrUnauthorized
+		}
+		return err
+	}
+
+	if !utils.ComparePassword(user.PasswordHash, req.CurrentPassword) {
+		s.recordAudit(ctx, userID, "auth.password_failed", "user", userID)
+		return apperror.ErrUnauthorized
+	}
+
+	if req.CurrentPassword == req.NewPassword {
+		return errors.Join(apperror.ErrBadRequest, errors.New("password baru harus berbeda dari password lama"))
+	}
+
+	hash, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	if err := s.userRepo.UpdatePassword(ctx, userID, hash); err != nil {
+		return err
+	}
+
+	s.recordAudit(ctx, userID, "auth.password_change", "user", userID)
+	return nil
+}
+
+// LogoutAll menaikkan session_version sehingga semua token lama ditolak.
+func (s *authService) LogoutAll(ctx context.Context, userID string) error {
+	if err := s.userRepo.RevokeSessions(ctx, userID); err != nil {
+		return err
+	}
+	s.recordAudit(ctx, userID, "auth.logout_all", "user", userID)
+	return nil
 }

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/pkg/apperror"
 )
 
 // Response adalah bentuk tunggal semua balasan API.

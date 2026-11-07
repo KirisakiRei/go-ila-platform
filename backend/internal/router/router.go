@@ -6,15 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/handler"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/middleware"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runnerclient"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/session"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
+	"ila/backend/internal/config"
+	"ila/backend/internal/handler"
+	"ila/backend/internal/middleware"
+	"ila/backend/internal/repository"
+	"ila/backend/internal/runner"
+	"ila/backend/internal/runnerclient"
+	"ila/backend/internal/service"
+	"ila/backend/internal/session"
+	"ila/backend/pkg/cryptox"
 )
 
 // NewBackendAPI merangkai seluruh endpoint backend-api.
@@ -126,12 +126,17 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	}
 
 	me := r.Group("/api/v1")
-	me.Use(middleware.Auth(newTokenIssuer(cfg), cfg.SessionCookieName))
+	me.Use(middleware.Auth(newTokenIssuer(cfg), cfg.SessionCookieName, userRepo))
+	// Batas per akun mencegah satu klien yang rusak menghabiskan memori.
+	me.Use(middleware.RateLimitByUser(middleware.NewRateLimiter(0, 0)))
 	// Cookie HttpOnly menahan pencurian token lewat XSS, tetapi permintaan
 	// lintas situs tetap bisa ikut membawa cookie; CSRF menutup celah itu.
 	me.Use(middleware.RequireCSRF(cfg.CSRFCookieName))
 	{
 		me.GET("/me", authHandler.Profile)
+		// Ganti password & cabut seluruh sesi (plans/23 §6).
+		me.POST("/me/password", authHandler.ChangePassword)
+		me.POST("/me/logout-all", authHandler.LogoutAll)
 		// Konfirmasi entry: token dari deep-link Telegram, wajib sesi login.
 		me.GET("/approve/:token", approveHandler.Preview)
 		me.POST("/approve/:token/confirm", approveHandler.Confirm)

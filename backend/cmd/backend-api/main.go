@@ -12,9 +12,9 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/router"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
+	"ila/backend/internal/config"
+	"ila/backend/internal/router"
+	"ila/backend/internal/runner"
 )
 
 func main() {

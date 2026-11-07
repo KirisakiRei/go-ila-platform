@@ -3,7 +3,7 @@ package runner
 import (
 	"strings"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/redact"
+	"ila/backend/pkg/redact"
 )
 
 // RedactSecrets adalah pintu pendek ke pkg/redact untuk paket runner.

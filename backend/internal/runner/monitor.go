@@ -5,13 +5,44 @@ import (
 	"math"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/broker"
+	"ila/backend/internal/model"
 )
 
 // MonitorInterval adalah jeda pemeriksaan posisi yang masih hidup.
 // Cukup rapat untuk PnL yang terasa real-time, cukup longgar untuk VPS 1 GB.
 const MonitorInterval = 20 * time.Second
+
+// ApplyClose mencatat penutupan posisi beserta notifikasi ke user.
+// Diekspor agar perilaku ini bisa diuji tanpa broker sungguhan.
+func (s *Service) ApplyClose(ctx context.Context, pos *model.Position, closeStatus string, exitPrice, profit float64) {
+	s.applyClose(ctx, pos, broker.ClosedPosition{
+		Ticket:    pos.TicketNumber,
+		Reason:    closeReasonFromStatus(closeStatus),
+		ExitPrice: exitPrice,
+		Profit:    profit,
+		ClosedAt:  s.opts.Clock().Unix(),
+	})
+}
+
+// SetClock mengganti sumber waktu, dipakai saat pengujian.
+func (s *Service) SetClock(clock func() time.Time) {
+	if clock != nil {
+		s.opts.Clock = clock
+	}
+}
+
+// closeReasonFromStatus menerjemahkan status akhir posisi ke alasan broker.
+func closeReasonFromStatus(status string) broker.CloseReason {
+	switch status {
+	case model.PositionStatusClosedTP:
+		return broker.CloseReasonTP
+	case model.PositionStatusClosedSL:
+		return broker.CloseReasonSL
+	default:
+		return broker.CloseReasonManual
+	}
+}
 
 // MonitorPositions memeriksa posisi yang masih OPEN lalu menutup yang sudah
 // tidak ada di broker.
@@ -117,11 +148,24 @@ func (s *Service) applyClose(ctx context.Context, pos *model.Position, closed br
 		s.logger.Error("gagal mencatat hasil harian", "error", err.Error())
 	}
 
+	daily := &DailyOutcome{
+		TotalTrades: 0,
+		MaxTrades:   s.opts.Policy.MaxTrades,
+	}
+
 	// 1 win = stop trading hari ini.
 	if won && s.opts.Policy.StopAfterWin {
 		if err := s.store.LockDaily(ctx, pos.UserID, day, string(RejectDailyWin)); err != nil {
 			s.logger.Error("gagal mengunci hari user", "error", err.Error())
+		} else {
+			daily.Locked = true
+			daily.LockReason = string(RejectDailyWin)
 		}
+	}
+
+	// Sisa kuota dibaca setelah pencatatan agar pesan yang dikirim akurat.
+	if summary, err := s.store.GetDailySummary(ctx, pos.UserID, day); err == nil && summary != nil {
+		daily.TotalTrades = summary.TotalTrades
 	}
 
 	s.logger.Info("posisi ditutup",
@@ -132,6 +176,10 @@ func (s *Service) applyClose(ctx context.Context, pos *model.Position, closed br
 		"outcome_r", pos.OutcomeR)
 
 	s.pub.PublishTelemetry(ctx, pos.BrokerAccountID)
+
+	// Notifikasi tutup posisi wajib dikirim: tanpa ini user tidak tahu hasil
+	// trading-nya dan harus membuka dashboard sendiri (plans/19 C1).
+	s.pub.PublishPositionClosed(ctx, pos, daily)
 }
 
 // Reconcile menyelaraskan database dengan broker saat Runner mulai.

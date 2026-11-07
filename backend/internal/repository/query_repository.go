@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/model"
 )
 
 // Pembacaan daftar untuk dashboard. Semua kueri dibatasi userID agar tidak ada

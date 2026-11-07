@@ -15,17 +15,17 @@ import (
 	"github.com/joho/godotenv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	enginev1 "github.com/KirisakiRei/go-ila-platform/backend/gen/engine/v1"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker/matchtrader"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/engineclient"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner/notify"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/telegram"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
+	enginev1 "ila/backend/gen/engine/v1"
+	"ila/backend/internal/broker"
+	"ila/backend/internal/broker/matchtrader"
+	"ila/backend/internal/config"
+	"ila/backend/internal/engineclient"
+	"ila/backend/internal/model"
+	"ila/backend/internal/repository"
+	"ila/backend/internal/runner"
+	"ila/backend/internal/runner/notify"
+	"ila/backend/internal/telegram"
+	"ila/backend/pkg/cryptox"
 )
 
 // batas percobaan koneksi ulang ke engine.

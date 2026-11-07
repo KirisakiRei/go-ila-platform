@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner/notify"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/telegram"
+	"ila/backend/internal/model"
+	"ila/backend/internal/repository"
+	"ila/backend/internal/runner"
+	"ila/backend/internal/runner/notify"
+	"ila/backend/internal/telegram"
 )
 
 // runnerPublisher menerjemahkan perubahan status Runner menjadi notifikasi.
@@ -73,6 +75,63 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 // dari tabel status akun untuk dashboard.
 func (p *runnerPublisher) PublishTelemetry(_ context.Context, accountID string) {
 	p.logger.Debug("telemetry akun diperbarui", "account_id", accountID)
+}
+
+// PublishPositionClosed memberi tahu user bahwa posisinya sudah ditutup,
+// beserta hasil dan sisa kuota hari ini.
+func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.Position, daily *runner.DailyOutcome) {
+	if pos == nil {
+		return
+	}
+
+	messageKey := "pos:closed:" + pos.ID
+
+	dailyNote := p.dailyNote(daily)
+
+	p.notifier.Enqueue(pos.UserID, messageKey, func(chatID string) telegram.Message {
+		_ = chatID
+		return telegram.FormatClosedMessage(
+			pos.Symbol,
+			positionResultLabel(pos.Status),
+			pos.OpenPrice,
+			pos.ExitPrice,
+			pos.ProfitLoss,
+			pos.OutcomeR,
+			dailyNote,
+		)
+	})
+}
+
+// positionResultLabel menerjemahkan status teknis menjadi bahasa user.
+func positionResultLabel(status string) string {
+	switch status {
+	case model.PositionStatusClosedTP:
+		return "Target tercapai"
+	case model.PositionStatusClosedSL:
+		return "Stop loss"
+	case model.PositionStatusClosedManual:
+		return "Ditutup manual"
+	default:
+		return "Selesai"
+	}
+}
+
+// dailyNote menyusun catatan kuota agar user tahu apakah masih bisa trade.
+func (p *runnerPublisher) dailyNote(daily *runner.DailyOutcome) string {
+	if daily == nil {
+		return ""
+	}
+	if daily.Locked {
+		return "Trading dihentikan untuk hari ini. Lanjut besok."
+	}
+	remaining := daily.MaxTrades - daily.TotalTrades
+	if remaining < 0 {
+		remaining = 0
+	}
+	if remaining == 0 {
+		return "Kuota trading hari ini sudah terpakai."
+	}
+	return fmt.Sprintf("Sisa kuota hari ini: %d trade.", remaining)
 }
 
 // approveLink membuat token sekali pakai lalu menyusun deep-link.

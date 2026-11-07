@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/redact"
+	"ila/backend/pkg/redact"
 )
 
 // TestKasusNyataDariKodeProduksi memakai bentuk pesan error yang benar-benar

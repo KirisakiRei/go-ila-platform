@@ -7,8 +7,8 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/config"
+	"ila/backend/internal/model"
 )
 
 // main menjalankan migrasi tabel dari struct model.

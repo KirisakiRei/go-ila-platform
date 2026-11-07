@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
 )
 
 type signalRepository struct {

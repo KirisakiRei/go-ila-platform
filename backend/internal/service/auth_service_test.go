@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/utils"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/utils"
 )
 
 type fakeUserRepo struct {
@@ -60,6 +60,25 @@ func (f *fakeUserRepo) CountByTier(_ context.Context, _ string) (int64, error) {
 	return 0, nil
 }
 
+func (f *fakeUserRepo) RevokeSessions(_ context.Context, id string) error {
+	for _, u := range f.users {
+		if u.ID == id {
+			u.SessionVersion++
+		}
+	}
+	return nil
+}
+
+func (f *fakeUserRepo) UpdatePassword(_ context.Context, id, hash string) error {
+	for _, u := range f.users {
+		if u.ID == id {
+			u.PasswordHash = hash
+			u.SessionVersion++
+		}
+	}
+	return nil
+}
+
 type fakeAuditRepo struct {
 	events []string
 }
@@ -73,6 +92,10 @@ type fakeTokenIssuer struct{}
 
 func (fakeTokenIssuer) Issue(userID, role string) (string, time.Time, error) {
 	return "token-" + userID, time.Now().Add(time.Hour), nil
+}
+
+func (fakeTokenIssuer) IssueWithClaims(c utils.Claims) (string, time.Time, error) {
+	return "token-" + c.UserID, time.Now().Add(time.Hour), nil
 }
 
 func (fakeTokenIssuer) Verify(_ string) (utils.TokenClaims, error) {

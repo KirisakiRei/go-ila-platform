@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/model"
 )
 
 // Alasan penolakan eksekusi. Nilainya dipakai di telemetry dan kolom
@@ -28,6 +28,7 @@ const (
 	RejectStrategyTier  RejectReason = "Strategi ini belum tersedia untuk tier Anda."
 	RejectAccountFrozen RejectReason = "Akun broker sedang dibekukan."
 	RejectSuspended     RejectReason = "Akun sedang ditangguhkan karena pembayaran. Entry baru diblokir."
+	RejectAccountBanned RejectReason = "Akun diblokir. Hubungi dukungan untuk keterangan lebih lanjut."
 	RejectMarketClosed  RejectReason = "Pasar sedang tutup."
 	RejectDuplicate     RejectReason = "Sinyal ini sudah pernah dieksekusi untuk akun ini."
 	RejectBadSignal     RejectReason = "Data sinyal tidak lengkap atau tidak sah."

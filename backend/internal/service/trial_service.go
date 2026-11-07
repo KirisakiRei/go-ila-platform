@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
 )
 
 // TrialDuration adalah masa uji coba (plans/14 par 5.5.1).

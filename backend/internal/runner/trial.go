@@ -3,7 +3,7 @@ package runner
 import (
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/model"
 )
 
 // userSession membungkus user agar aturan trial punya satu tempat.

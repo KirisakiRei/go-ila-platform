@@ -42,7 +42,12 @@ type PositionResponse struct {
 	Status          string     `json:"status"`
 	IsDryRun        bool       `json:"is_dry_run"`
 	OpenedAt        time.Time  `json:"opened_at"`
+	OpenedAtPair    TimePair   `json:"opened_at_pair"`
 	ClosedAt        *time.Time `json:"closed_at,omitempty"`
+	ClosedAtPair    *TimePair  `json:"closed_at_pair,omitempty"`
+	// PnLKnown=false berarti hasil belum terbaca dari broker. Antarmuka wajib
+	// menampilkan "—", bukan US$0,00 yang menyesatkan (plans/19 C9).
+	PnLKnown bool `json:"pnl_known"`
 }
 
 // DailySummaryResponse menampilkan sisa kuota dan alasan lock hari ini.

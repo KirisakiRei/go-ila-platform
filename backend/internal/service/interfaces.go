@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"ila/backend/internal/model"
 )
 
 // UserRepository adalah kebutuhan service atas penyimpanan akun.
@@ -17,6 +17,10 @@ type UserRepository interface {
 	FindByTelegramChatID(ctx context.Context, chatID string) (*model.User, error)
 	UpdateLastLogin(ctx context.Context, id string, at time.Time) error
 	Update(ctx context.Context, user *model.User) error
+	// RevokeSessions mencabut seluruh sesi aktif akun ini.
+	RevokeSessions(ctx context.Context, id string) error
+	// UpdatePassword mengganti hash dan mencabut sesi dalam satu operasi.
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
 }
 
 // AuditRepository adalah kebutuhan service atas pencatatan audit.

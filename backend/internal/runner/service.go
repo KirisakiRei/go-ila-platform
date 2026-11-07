@@ -15,13 +15,14 @@ import (
 	"sync"
 	"time"
 
-	enginev1 "github.com/KirisakiRei/go-ila-platform/backend/gen/engine/v1"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/repository"
-	ingest "github.com/KirisakiRei/go-ila-platform/backend/internal/runner/ingest"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
+	enginev1 "ila/backend/gen/engine/v1"
+	"ila/backend/internal/authstate"
+	"ila/backend/internal/broker"
+	"ila/backend/internal/model"
+	"ila/backend/internal/repository"
+	ingest "ila/backend/internal/runner/ingest"
+	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/cryptox"
 )
 
 // Publisher menerbitkan perubahan status ke Console.
@@ -29,6 +30,17 @@ import (
 type Publisher interface {
 	PublishSignal(ctx context.Context, userID, signalID, status, reason string)
 	PublishTelemetry(ctx context.Context, accountID string)
+	// PublishPositionClosed memberi tahu user bahwa posisinya sudah ditutup.
+	// Tanpa ini user tidak pernah tahu hasil trading (plans/19 C1).
+	PublishPositionClosed(ctx context.Context, pos *model.Position, daily *DailyOutcome)
+}
+
+// DailyOutcome menjelaskan sisa kuota setelah sebuah posisi ditutup.
+type DailyOutcome struct {
+	TotalTrades int
+	MaxTrades   int
+	Locked      bool
+	LockReason  string
 }
 
 // Store adalah kebutuhan penyimpanan Runner.
@@ -348,6 +360,12 @@ func (s *Service) executableAccounts(ctx context.Context, user *model.User, tier
 
 // evaluate menjalankan pemeriksaan 3-5 (plans/14 §5.2) pada satu akun.
 func (s *Service) evaluate(ctx context.Context, user *model.User, account *model.BrokerAccount, signal *model.Signal, tier string, now time.Time) (RejectReason, error) {
+	// Ban berlaku seketika: akun ter-ban tidak boleh dieksekusi sama sekali,
+	// walau sesinya masih hidup di perangkat user (plans/19 C3).
+	if user.Status == authstate.StatusBanned {
+		return RejectAccountBanned, nil
+	}
+
 	// Penurunan tier tidak menyentuh posisi hidup, tetapi mematikan mode auto.
 	if !ModeAllowed(tier, account.Mode) {
 		return RejectEntitlement, nil

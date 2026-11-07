@@ -8,8 +8,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/internal/authstate"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
 )
 
 type userRepository struct {
@@ -81,4 +82,59 @@ func (r *userRepository) CountByTier(ctx context.Context, tier string) (int64, e
 		return 0, fmt.Errorf("menghitung user per tier: %w", err)
 	}
 	return total, nil
+}
+
+// FindSessionUser membaca kolom yang dibutuhkan middleware sesi saja.
+// Query ringan agar pemeriksaan tiap request tetap murah.
+func (r *userRepository) FindSessionUser(ctx context.Context, id string) (*authstate.User, error) {
+	var row struct {
+		ID             string
+		Role           string
+		Status         string
+		SessionVersion int
+	}
+	err := r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Select("id, role, status, session_version").
+		Where("id = ?", id).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, fmt.Errorf("membaca sesi user: %w", err)
+	}
+	return &authstate.User{
+		ID:             row.ID,
+		Role:           row.Role,
+		Status:         row.Status,
+		SessionVersion: row.SessionVersion,
+	}, nil
+}
+
+// RevokeSessions menaikkan session_version sehingga seluruh token lama ditolak.
+// Dipakai saat ganti password, ban, atau perubahan role.
+func (r *userRepository) RevokeSessions(ctx context.Context, id string) error {
+	err := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ?", id).
+		UpdateColumn("session_version", gorm.Expr("session_version + 1")).Error
+	if err != nil {
+		return fmt.Errorf("mencabut sesi: %w", err)
+	}
+	return nil
+}
+
+// UpdatePassword menyimpan hash baru sekaligus menaikkan session_version
+// dalam satu pernyataan agar tidak ada celah antara keduanya.
+func (r *userRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	err := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ?", id).
+		Updates(map[string]any{
+			"password_hash":   passwordHash,
+			"session_version": gorm.Expr("session_version + 1"),
+		}).Error
+	if err != nil {
+		return fmt.Errorf("memperbarui password: %w", err)
+	}
+	return nil
 }

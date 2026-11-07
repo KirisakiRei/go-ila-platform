@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
+	"ila/backend/internal/runner"
 )
 
 // internalServer menerima permintaan dari backend-api.

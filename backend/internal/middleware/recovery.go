@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/httpx"
+	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/httpx"
 )
 
 // Recovery menangkap panic agar proses tetap hidup dan balasan tetap seragam.

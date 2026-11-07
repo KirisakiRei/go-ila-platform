@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
+	"ila/backend/internal/broker"
 )
 
 // encodeCredentials menyiapkan blob yang akan dienkripsi.

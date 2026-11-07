@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
+	"ila/backend/internal/broker"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/cryptox"
 )
 
 // IdempotencyKey membentuk kunci unik eksekusi.

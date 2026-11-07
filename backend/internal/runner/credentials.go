@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
+	"ila/backend/internal/broker"
 )
 
 // ErrMalformedCredential menandai blob kredensial yang tidak bisa dibaca.

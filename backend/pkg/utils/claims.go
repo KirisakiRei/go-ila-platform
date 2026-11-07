@@ -8,5 +8,7 @@ import "time"
 type TokenClaims struct {
 	UserID    string
 	Role      string
+	Scope     string
+	Session   int
 	ExpiresAt time.Time
 }

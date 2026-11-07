@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
+	"ila/backend/internal/broker"
 )
 
 // transport membungkus satu base URL dengan bearer token akun.

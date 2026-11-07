@@ -5,12 +5,14 @@ import "time"
 // SystemStatus adalah keadaan platform yang ditampilkan di header dashboard
 // (plans/06 C9). Semua nilainya berasal dari laporan Runner, bukan tebakan.
 type SystemStatus struct {
-	Market        MarketStatus   `json:"market"`
-	Engines       []EngineStatus `json:"engines"`
-	Brokers       BrokerStatus   `json:"brokers"`
-	Daily         DailyResponse  `json:"daily"`
-	ServerTime    time.Time      `json:"server_time"`
-	DailyTimezone string         `json:"daily_timezone"`
+	Market     MarketStatus   `json:"market"`
+	Engines    []EngineStatus `json:"engines"`
+	Brokers    BrokerStatus   `json:"brokers"`
+	Daily      DailyResponse  `json:"daily"`
+	ServerTime time.Time      `json:"server_time"`
+	// ServerTimePair menyajikan waktu server dalam WIB dan NY sekaligus.
+	ServerTimePair TimePair `json:"server_time_pair"`
+	DailyTimezone  string   `json:"daily_timezone"`
 }
 
 // MarketStatus adalah status sesi pasar menurut Engine.
@@ -38,7 +40,9 @@ type BrokerStatus struct {
 
 // DailyResponse adalah ringkasan kuota hari ini dalam zona WIB.
 type DailyResponse struct {
-	Day         string     `json:"day"`
+	Day string `json:"day"`
+	// DayPair adalah tengah malam hari akuntansi dalam WIB dan NY.
+	DayPair     TimePair   `json:"day_pair"`
 	WinCount    int        `json:"win_count"`
 	LossCount   int        `json:"loss_count"`
 	TotalTrades int        `json:"total_trades"`

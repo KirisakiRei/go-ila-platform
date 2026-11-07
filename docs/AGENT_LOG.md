@@ -35,6 +35,72 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Modul dipendekkan jadi `ila/backend` + Fase A fondasi
+
+**Pelaku:** Claude
+**Tipe:** Refactor penamaan + perbaikan fondasi
+**Status:** SELESAI — `go build`, `go vet`, `gofmt`, seluruh tes lulus
+
+#### 1. Nama modul dipendekkan
+
+| Sebelum | Sesudah |
+|---|---|
+| `module github.com/KirisakiRei/go-ila-platform/backend` | `module ila/backend` |
+| `"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"` | `"ila/backend/internal/dto"` |
+
+66 berkas Go + `go.mod`, murni penggantian nama import. **Tidak ada logika
+berubah.** Hermes: bila ada kode yang mengimpor paket ini dari luar, sesuaikan
+path-nya.
+
+Sekaligus penanda `// indirect` pada `gorm.io/gorm` dan
+`gorm.io/driver/postgres` dihapus karena keduanya dipakai langsung.
+
+#### 2. Celah fondasi yang ditutup
+
+| # | Celah | Perbaikan |
+|---|---|---|
+| **C1** 🔴 | Notifikasi tutup posisi tidak pernah dikirim | `Publisher.PublishPositionClosed` ditambahkan; `applyClose` memanggilnya. Pesan memuat hasil + sisa kuota |
+| **C3** 🔴 | Runner tidak cek `user.status` di jalur eksekusi | `evaluate` menolak `RejectAccountBanned` sebelum entitlement |
+| **C9** | PnL tak terbaca tampil `US$0,00` | Respons posisi punya `pnl_known`; `false` berarti tampilkan "—" |
+| **C11** | Akun beku tetap simulasi | Sudah benar (`executableAccounts` menyaring `IsFrozen`); dikunci dengan tes |
+
+#### 3. Fondasi sesi
+
+| Berkas | Perubahan |
+|---|---|
+| `model/user.go` | Kolom `SessionVersion`, `IdleWarning` |
+| `pkg/utils/jwt.go` | Klaim `scope` + `sv`; `IssueWithClaims` |
+| `internal/authstate/` | **Paket baru**: bentuk ringkas akun untuk validasi sesi, menghindari import cycle |
+| `middleware/auth.go` | Cocokkan `sv` dengan DB, tolak akun ter-ban, tolak token berscope admin di pintu user |
+| `service/auth_service.go` | `ChangePassword` (verifikasi password lama + cabut semua sesi), `LogoutAll` |
+| `repository/user_repository.go` | `RevokeSessions`, `UpdatePassword` (naik `session_version` dalam satu pernyataan) |
+| Router | `POST /api/v1/me/password`, `POST /api/v1/me/logout-all` |
+
+#### 4. Keamanan & waktu
+
+| # | Perbaikan |
+|---|---|
+| **D3** | `APP_ENV=production` menolak start bila `ALLOWED_ORIGINS` kosong, `*`, atau memuat localhost |
+| **D4** | `middleware.RateLimiter` — batas 120/menit per akun, terpasang di grup `/api/v1` |
+| **E3** | `runner/schedule.go` — deteksi pasar buka di akhir pekan / tutup di luar jadwal + status usang |
+| **E5** | `dto.TimePair` (`utc`, `wib`, `ny`) pada `server_time_pair`, `day_pair`, `opened_at_pair`, `closed_at_pair` |
+| **D5** | `PaginationQuery` lengkap: `per_page` maks 200, `q`, `cursor`, `sort`, `order`, `from`, `to`, `has_more`, `approx_total` |
+
+#### 5. Tes baru
+
+`ban_test.go`, `close_notify_test.go`, `schedule_test.go`, `auth_test.go`,
+`ratelimit_general_test.go`, `cors_guard_test.go`, `time_dto_test.go`,
+`pagination_dto_test.go`, `TestSetDailyTimezone`.
+
+#### Yang perlu Hermes perhatikan
+
+- Jam trading **tetap** New York; hari akuntansi WIB.
+- Kontrak gRPC **tidak berubah**.
+- `Publisher` punya method baru — bila ada implementasi lain, tambahkan
+  `PublishPositionClosed`.
+
+---
+
 ### 2026-11-08 — Zona waktu harian kini bisa dikonfigurasi (`DAILY_TZ`)
 
 **Pelaku:** Claude

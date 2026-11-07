@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
 )
 
 type fakeSignalLister struct {

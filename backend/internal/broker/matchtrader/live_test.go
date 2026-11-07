@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
+	"ila/backend/internal/broker"
 )
 
 // TestLiveAccount menguji koneksi nyata; jalankan dengan -tags live dan MT_TOKEN.

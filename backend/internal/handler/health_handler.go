@@ -3,7 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/httpx"
+	"ila/backend/pkg/httpx"
 )
 
 // HealthHandler menyediakan penanda hidup dan kesiapan proses.

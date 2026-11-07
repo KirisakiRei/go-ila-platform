@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/broker"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/cryptox"
+	"ila/backend/internal/broker"
+	"ila/backend/internal/dto"
+	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/cryptox"
 )
 
 // Batas risiko per trade yang berlaku untuk semua tier (plans/14 §6).

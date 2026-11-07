@@ -8,6 +8,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Scope memisahkan pintu sesi user dan admin. Token yang membawa scope salah
+// ditolak oleh penjaga masing-masing (plans/03 §2).
+const (
+	ScopeUser  = "user"
+	ScopeAdmin = "admin"
+)
+
 // JWTIssuer menerbitkan dan memverifikasi token sesi berbasis HS256.
 type JWTIssuer struct {
 	secret []byte
@@ -19,20 +26,37 @@ func NewJWTIssuer(secret string, ttl time.Duration) *JWTIssuer {
 	return &JWTIssuer{secret: []byte(secret), ttl: ttl}
 }
 
+// Claims berisi identitas yang perlu ditanam di token.
+type Claims struct {
+	UserID  string
+	Role    string
+	Scope   string
+	Session int
+}
+
 type claimsPayload struct {
-	Role string `json:"role"`
+	Role    string `json:"role"`
+	Scope   string `json:"scope,omitempty"`
+	Session int    `json:"sv,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // Issue membuat token untuk satu akun.
 func (j *JWTIssuer) Issue(userID, role string) (string, time.Time, error) {
+	return j.IssueWithClaims(Claims{UserID: userID, Role: role, Scope: ScopeUser})
+}
+
+// IssueWithClaims membuat token dengan scope dan session version eksplisit.
+func (j *JWTIssuer) IssueWithClaims(c Claims) (string, time.Time, error) {
 	now := time.Now().UTC()
 	expiresAt := now.Add(j.ttl)
 
 	claims := claimsPayload{
-		Role: role,
+		Role:    c.Role,
+		Scope:   c.Scope,
+		Session: c.Session,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
+			Subject:   c.UserID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			Issuer:    "ila-platform",
@@ -61,9 +85,17 @@ func (j *JWTIssuer) Verify(raw string) (TokenClaims, error) {
 		return TokenClaims{}, fmt.Errorf("token tidak sah: %w", err)
 	}
 
+	scope := claims.Scope
+	if scope == "" {
+		// Token lama sebelum scope diperkenalkan tetap dianggap sesi user.
+		scope = ScopeUser
+	}
+
 	return TokenClaims{
 		UserID:    claims.Subject,
 		Role:      claims.Role,
+		Scope:     scope,
+		Session:   claims.Session,
 		ExpiresAt: claims.ExpiresAt.Time,
 	}, nil
 }

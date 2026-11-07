@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
-	"github.com/KirisakiRei/go-ila-platform/backend/internal/service"
-	"github.com/KirisakiRei/go-ila-platform/backend/pkg/apperror"
+	"ila/backend/internal/model"
+	"ila/backend/internal/service"
+	"ila/backend/pkg/apperror"
 )
 
 // ---------------------------------------------------------------------------
