@@ -147,6 +147,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	pricingRepo := repository.NewPricingRepository(db)
 	pricingService := service.NewPricingService(pricingRepo)
 	adminBillingService := service.NewAdminBillingService(pricingRepo, adminAudit)
+	adminReportService := service.NewAdminReportService(repository.NewReportRepository(db))
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
 		Users:      userRepo,
 		Audit:      auditRepo,
@@ -192,6 +193,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
 	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
+	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
 
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
@@ -326,7 +328,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -354,6 +356,7 @@ func registerAdmin(
 	userHandler *handler.AdminUserHandler,
 	auditHandler *handler.AdminAuditHandler,
 	billingHandler *handler.AdminBillingHandler,
+	reportHandler *handler.AdminReportHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -425,6 +428,7 @@ func registerAdmin(
 	userHandler.Register(admin.Group(""), guard)
 	auditHandler.Register(admin.Group(""), guard)
 	billingHandler.Register(admin.Group(""), guard)
+	reportHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")
 }
