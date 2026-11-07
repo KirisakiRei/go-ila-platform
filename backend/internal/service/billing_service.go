@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"ila/backend/internal/audit"
@@ -23,6 +24,7 @@ type BillingService interface {
 	Invoices(ctx context.Context, userID string) ([]dto.InvoiceItem, error)
 	Subscription(ctx context.Context, userID string) (*dto.SubscriptionItem, error)
 	RunGraceSweep(ctx context.Context) (int, error)
+	RedeemCredit(ctx context.Context, userID string, code string) (*dto.CreditSummary, error)
 }
 
 // BillingStore adalah data yang dibutuhkan billing.
@@ -46,8 +48,14 @@ type BillingStore interface {
 	AddRefund(ctx context.Context, refund *model.Refund) error
 }
 
+// creditRedeemer menukar kode kredit menjadi saldo.
+type creditRedeemer interface {
+	Redeem(ctx context.Context, userID, code string, now time.Time) (int64, error)
+}
+
 type billingService struct {
 	store   BillingStore
+	codes   creditRedeemer
 	pricing PricingService
 	coupons couponLookup
 	gateway payment.Gateway
@@ -61,9 +69,9 @@ type couponLookup interface {
 }
 
 // NewBillingService merangkai billing.
-func NewBillingService(store BillingStore, pricing PricingService, coupons couponLookup, gateway payment.Gateway, recorder AdminAudit) BillingService {
+func NewBillingService(store BillingStore, pricing PricingService, coupons couponLookup, gateway payment.Gateway, recorder AdminAudit, codes creditRedeemer) BillingService {
 	return &billingService{
-		store: store, pricing: pricing, coupons: coupons, gateway: gateway, audit: recorder,
+		store: store, pricing: pricing, coupons: coupons, gateway: gateway, audit: recorder, codes: codes,
 		now: func() time.Time { return time.Now().UTC() },
 	}
 }
@@ -243,6 +251,27 @@ func (s *billingService) activate(ctx context.Context, invoice *model.Invoice, n
 			"plan": invoice.PlanCode, "user_id": invoice.UserID,
 		},
 	})
+}
+
+// RedeemCredit menukar kode kredit. Penukaran ganda ditolak repository, bukan
+// hanya diperiksa di sini, agar dua permintaan bersamaan tidak lolos.
+func (s *billingService) RedeemCredit(ctx context.Context, userID string, code string) (*dto.CreditSummary, error) {
+	normalized := strings.ToUpper(strings.TrimSpace(code))
+	if normalized == "" {
+		return nil, validation("kode kredit wajib diisi")
+	}
+	if s.codes == nil {
+		return nil, errors.Join(apperror.ErrServiceUnavailable, errors.New("kode kredit belum tersedia"))
+	}
+	if _, err := s.codes.Redeem(ctx, userID, normalized, s.now()); err != nil {
+		return nil, err
+	}
+
+	balance, err := s.store.CreditBalance(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.CreditSummary{UserID: userID, Balance: balance}, nil
 }
 
 // Invoices menampilkan tagihan milik pengguna.

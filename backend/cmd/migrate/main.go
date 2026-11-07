@@ -72,6 +72,8 @@ func main() {
 		&model.CouponRedemption{},
 		&model.CreditBalance{},
 		&model.CreditTransaction{},
+		&model.CreditCode{},
+		&model.CreditRedemption{},
 		&model.SubscriptionRecord{},
 		&model.Invoice{},
 		&model.Payment{},

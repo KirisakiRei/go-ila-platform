@@ -145,6 +145,41 @@ const (
 	CreditKindRefund = "refund"
 )
 
+// CreditCode adalah voucher saldo yang bisa ditukar pengguna.
+// Nilainya dipakai sekali per kode per pengguna (plans/14 §5).
+type CreditCode struct {
+	Base
+	Code           string    `gorm:"type:varchar(40);uniqueIndex;not null" json:"code"`
+	AmountIDR      int64     `gorm:"not null" json:"amount_idr"`
+	MaxRedemptions int       `gorm:"not null;default:1" json:"max_redemptions"`
+	MaxPerUser     int       `gorm:"not null;default:1" json:"max_per_user"`
+	StartsAt       time.Time `json:"starts_at"`
+	EndsAt         time.Time `json:"ends_at"`
+	IsActive       bool      `gorm:"not null;default:true" json:"is_active"`
+	CreatedBy      string    `gorm:"type:varchar(36);not null" json:"created_by"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// TableName menetapkan nama tabel.
+func (CreditCode) TableName() string {
+	return "credit_code"
+}
+
+// CreditRedemption mencatat penukaran kode kredit oleh satu pengguna.
+// Unik (code_id, user_id) mencegah kode yang sama dipakai dua kali.
+type CreditRedemption struct {
+	ID         string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	CodeID     string    `gorm:"type:varchar(36);uniqueIndex:uq_credit_redeem;not null" json:"code_id"`
+	UserID     string    `gorm:"type:varchar(36);uniqueIndex:uq_credit_redeem;not null" json:"user_id"`
+	AmountIDR  int64     `gorm:"not null" json:"amount_idr"`
+	RedeemedAt time.Time `json:"redeemed_at"`
+}
+
+// TableName menetapkan nama tabel.
+func (CreditRedemption) TableName() string {
+	return "credit_redemption"
+}
+
 // CreditTransaction adalah buku besar kredit. Setiap perubahan saldo wajib
 // punya baris di sini dalam transaksi DB yang sama (plans/12 §5.7).
 type CreditTransaction struct {

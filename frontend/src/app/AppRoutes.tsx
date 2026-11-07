@@ -14,6 +14,7 @@ import StrategiesPage from '@/pages/StrategiesPage'
 import AccountsPage from '@/pages/AccountsPage'
 import BillingPage from '@/pages/BillingPage'
 import CheckoutPage from '@/pages/CheckoutPage'
+import LegalPage from '@/pages/LegalPage'
 import AdminAuditPage from '@/pages/admin/AdminAuditPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
@@ -250,6 +251,10 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
+
+      {/* Dokumen legal boleh dibaca tanpa masuk. */}
+      <Route path="/legal" element={<LegalPage />} />
+      <Route path="/legal/:slug" element={<LegalPage />} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

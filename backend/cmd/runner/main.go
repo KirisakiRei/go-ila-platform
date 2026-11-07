@@ -96,6 +96,8 @@ func main() {
 		DryRunAll:       cfg.DryRunAll,
 		AutoExecute:     cfg.AutoExecute,
 		MarketOpenCheck: true,
+		// Entry baru ditahan bila dokumen wajib belum disetujui.
+		LegalGate: repository.NewLegalGate(db),
 	}
 
 	svc := runner.NewService(store, registry, publisher, logger, opts)

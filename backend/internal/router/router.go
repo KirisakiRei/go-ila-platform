@@ -199,7 +199,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
 	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
 	billingRepo := repository.NewBillingRepository(db)
-	billingService := service.NewBillingService(billingRepo, pricingService, billingRepo, gateway, adminAudit)
+	billingService := service.NewBillingService(billingRepo, pricingService, billingRepo, gateway, adminAudit, repository.NewCreditCodeRepository(db))
 	billingHandler := handler.NewBillingHandler(billingService)
 	legalHandler := handler.NewLegalHandler(legalService)
 

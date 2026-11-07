@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -10,7 +9,6 @@ import (
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
-	"ila/backend/pkg/apperror"
 )
 
 // AdminBillingService mengelola paket, kupon, dan kredit dari panel admin.
@@ -25,7 +23,6 @@ type AdminBillingService interface {
 	DisableCoupon(ctx context.Context, actor AdminActor, id, reason string) error
 	CreditSummary(ctx context.Context, actor AdminActor, userID string) (*dto.CreditSummary, error)
 	AdjustCredit(ctx context.Context, actor AdminActor, userID string, req dto.CreditRequest) (*dto.CreditSummary, error)
-	RedeemCredit(ctx context.Context, userID string, code string) (*dto.CreditSummary, error)
 }
 
 // billingStore adalah kebutuhan kelola uang di sisi admin.
@@ -57,7 +54,10 @@ type adminBillingService struct {
 
 // NewAdminBillingService merangkai kelola uang.
 func NewAdminBillingService(store billingStore, recorder AdminAudit) AdminBillingService {
-	return &adminBillingService{store: store, audit: recorder, now: func() time.Time { return time.Now().UTC() }}
+	return &adminBillingService{
+		store: store, audit: recorder,
+		now: func() time.Time { return time.Now().UTC() },
+	}
 }
 
 func (s *adminBillingService) Plans(ctx context.Context) ([]dto.PublicPlan, error) {
@@ -262,11 +262,6 @@ func (s *adminBillingService) AdjustCredit(ctx context.Context, actor AdminActor
 		return nil, err
 	}
 	return s.CreditSummary(ctx, actor, userID)
-}
-
-// RedeemCredit menukar kode kredit yang dibuat admin.
-func (s *adminBillingService) RedeemCredit(ctx context.Context, userID string, code string) (*dto.CreditSummary, error) {
-	return nil, errors.Join(apperror.ErrNotFound, errors.New("kode kredit belum tersedia"))
 }
 
 // buildCoupon memvalidasi masukan kupon dan menyusun modelnya.

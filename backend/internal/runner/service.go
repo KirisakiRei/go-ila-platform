@@ -68,6 +68,9 @@ type Options struct {
 	PriceTTL time.Duration
 	// Settings menyimpan ketersediaan strategi; bila nil dipakai default.
 	Settings *Settings
+	// LegalGate menandai dokumen wajib yang belum disetujui. Bila nil,
+	// pemeriksaan dilewati agar Runner tetap berjalan tanpa penanda.
+	LegalGate func(ctx context.Context, userID string) bool
 }
 
 // Service adalah inti Runner. Aman dipakai dari beberapa goroutine.
@@ -364,6 +367,12 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 	// walau sesinya masih hidup di perangkat user (plans/19 C3).
 	if user.Status == authstate.StatusBanned {
 		return RejectAccountBanned, nil
+	}
+
+	// Dokumen wajib harus disetujui sebelum eksekusi. Posisi yang sudah
+	// berjalan tidak disentuh: yang diblokir hanya entry baru (plans/09).
+	if s.opts.LegalGate != nil && s.opts.LegalGate(ctx, user.ID) {
+		return RejectLegalPending, nil
 	}
 
 	// Penurunan tier tidak menyentuh posisi hidup, tetapi mematikan mode auto.

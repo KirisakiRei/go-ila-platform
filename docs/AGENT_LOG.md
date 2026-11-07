@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `2349adc`
+> **Commit terakhir saat log ini ditulis:** `9aeae72`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -120,17 +120,24 @@ npx eslint src        → 0 peringatan
 npx vitest run        → 34 tes lulus
 ```
 
+**Kemudian ditutup dalam rangkaian yang sama**
+
+| Hal | Status |
+|---|---|
+| Halaman `/legal` dan `/legal/:slug` | Selesai, bisa dibaca tanpa masuk |
+| Halaman `/langganan` dan `/langganan/bayar` | Selesai |
+| Runner menolak entry saat dokumen wajib belum disetujui | Selesai (`RejectLegalPending`) |
+| Tukar kode kredit | Selesai, penukaran ganda ditolak indeks unik |
+| Pesan akun beku | Diperbaiki, kini menyebut langkah berikutnya |
+
 **Yang BELUM dikerjakan (jujur)**
 
 | Hal | Status |
 |---|---|
 | Halaman 2FA (QR, recovery codes) di frontend | Endpoint siap, halaman belum |
-| Halaman `/legal/*` di frontend | Belum |
-| Halaman `/billing` dan `/billing/selesai` untuk pelanggan | Endpoint siap, halaman belum |
-| Runner menolak eksekusi saat `legal_blocked` | Belum ditegakkan |
-| Kode kredit (tukar voucher saldo) | Belum, mengembalikan 404 |
 | Webhook Pakasir diuji ke server asli | Baru diuji ke server tiruan |
-| Landing page, CMS, help center | Belum |
+| Landing page, CMS panel, help center | Belum |
+| Persetujuan legal di UI setelah login | Endpoint siap, halaman belum |
 
 ---
 

@@ -25,6 +25,7 @@ func (h *BillingHandler) RegisterUser(g *gin.RouterGroup) {
 	g.POST("/billing/checkout", h.Checkout)
 	g.GET("/billing/invoices", h.Invoices)
 	g.GET("/billing/subscription", h.Subscription)
+	g.POST("/billing/credit/redeem", h.RedeemCredit)
 }
 
 // Checkout menangani POST /api/v1/billing/checkout.
@@ -60,6 +61,21 @@ func (h *BillingHandler) Subscription(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Langganan aktif", item)
+}
+
+// RedeemCredit menangani POST /api/v1/billing/credit/redeem.
+func (h *BillingHandler) RedeemCredit(c *gin.Context) {
+	var req dto.RedeemCreditRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	result, err := h.billing.RedeemCredit(c.Request.Context(), middleware.CurrentUserID(c), req.Code)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Saldo kredit diperbarui", result)
 }
 
 // Webhook menangani POST /api/v1/webhook/payment.

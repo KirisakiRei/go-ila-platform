@@ -130,7 +130,7 @@ func (fakeCouponLookup) FindCouponByCode(ctx context.Context, code string) (*mod
 
 func newTestBilling(store *fakeBillingStore, gw payment.Gateway) BillingService {
 	pricing := NewPricingService(newFakePricingStore())
-	return NewBillingService(store, pricing, fakeCouponLookup{}, gw, &fakeAdminAudit{})
+	return NewBillingService(store, pricing, fakeCouponLookup{}, gw, &fakeAdminAudit{}, nil)
 }
 
 func paidWebhook(t *testing.T, gw *payment.Pakasir, orderID string, amount int64, status string) (map[string]string, []byte) {
