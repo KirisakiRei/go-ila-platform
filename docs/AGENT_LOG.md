@@ -35,6 +35,71 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Fase A selesai: daftar sesi, idle warning, PnL jujur
+
+**Pelaku:** Claude
+**Tipe:** Penyelesaian Fase A
+**Status:** SELESAI — backend `go vet` + tes lulus, frontend `tsc`/`eslint`/34 tes lulus
+
+#### A6 — Daftar sesi aktif & cabut per perangkat
+
+| Berkas | Perubahan |
+|---|---|
+| `model/session.go` | **Tabel baru**: `session` (user, scope, token_id hash, user_agent, last_seen, expires, revoked) |
+| `repository/session_repository.go` | Create/FindByTokenID/ListByUser/Touch/Revoke/RevokeAll + `NewTokenID` |
+| `service/session_service.go` | Daftar & cabut; label perangkat dikenali dari user agent |
+| `handler/session_handler.go` | `GET /me/sessions`, `DELETE /me/sessions/:id` |
+| `pkg/utils/jwt.go` | Klaim `sid`; `TTL()` |
+| `cmd/migrate/main.go` | `model.Session` masuk daftar migrasi |
+
+**Celah yang ditemukan & ditutup saat mengerjakan A6:**
+
+> Mencabut satu perangkat **tidak** mengeluarkannya, karena verifikasi per
+> permintaan memakai `session_version` di tabel `user`. Sekarang pencabutan
+> satu sesi **ikut menaikkan `session_version`**, sehingga token perangkat itu
+> benar-benar ditolak. Perangkat ini otomatis masuk ulang.
+
+Dua tes mengunci perilaku ini: `TestCabutSesiMenaikkanVersiSesi` dan
+`TestCabutSesiAsingTidakMenaikkanVersi`.
+
+#### A14/A15 — Sesi di frontend
+
+| Berkas | Perubahan |
+|---|---|
+| `lib/http.ts` | **401 memicu logout, 403 TIDAK.** Pesan khusus untuk 403/423/429 |
+| `features/auth/hooks/use-idle-timer.ts` | Timer diam; polling tidak dihitung aktivitas; `BroadcastChannel` antar-tab |
+| `features/auth/components/IdleWarningDialog.tsx` | Modal hitung mundur 60 detik, dua tombol, fokus ke "masih di sini" |
+| `features/auth/AuthProvider.tsx` | Integrasi timer (25 menit → peringatan, 30 menit → keluar) |
+| `features/auth/components/SessionSection.tsx` | Daftar perangkat + tombol cabut |
+| `features/auth/components/LoginForm.tsx` | Menjelaskan alasan keluar (diam / sesi berakhir) |
+
+**Batas yang tidak bisa dilonggarkan pengguna:** `idle_warning` hanya
+mematikan **modal**. Batas diam di server tetap berlaku.
+
+#### A10 — PnL jujur (C9)
+
+| Berkas | Perubahan |
+|---|---|
+| `runner/monitor.go` | `pnlKnown` dihitung dari exit price/profit; hasil tak diketahui **tidak** dicatat sebagai kalah |
+| `dto/trading_dto.go` | `pnl_known`, `opened_at_pair`, `closed_at_pair` |
+| `pages/DashboardPage.tsx`, `pages/PositionsPage.tsx` | Tampilkan `—`, bukan `US$0,00` |
+
+**Penting untuk aturan trading:** hasil yang tidak dilaporkan broker **tidak
+menghabiskan kuota**. Mencatatnya sebagai kalah akan menghentikan trading
+user tanpa trade yang benar-benar rugi.
+
+#### Tes baru
+
+`session_service_test.go` (5), `auth_test.go` (6), `idle-timer.test.ts` (5),
+`http-status.test.ts` (4), `close_notify_test.go` (+2).
+
+#### Catatan penutup Fase A
+
+Seluruh item A1–A19 sudah dikerjakan. Yang **belum** dan memang di luar Fase A:
+`signal_delay_minutes` (C2 → Fase F) dan `total_trades` per tier (C6 → Fase F).
+
+---
+
 ### 2026-11-08 — Modul dipendekkan jadi `ila/backend` + Fase A fondasi
 
 **Pelaku:** Claude

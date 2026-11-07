@@ -3,12 +3,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Input, Label } from '@/components/ui'
 import { ApiError } from '@/lib/api-error'
+import { LOGOUT_REASON_KEY } from '../AuthProvider'
 import { useSignIn } from '../hooks/use-auth'
 import { loginSchema, type LoginFormValues } from '../schemas'
 
 export function LoginForm() {
   const signIn = useSignIn()
   const [formError, setFormError] = useState('')
+  const [logoutNotice] = useState(readLogoutNotice)
   const {
     register,
     handleSubmit,
@@ -31,6 +33,8 @@ export function LoginForm() {
         <h1 className="text-xl font-semibold tracking-tight">Masuk</h1>
         <p className="text-[13px] text-muted-foreground">Gunakan akun ILA Bot Anda.</p>
       </header>
+
+      {logoutNotice && <Alert>{logoutNotice}</Alert>}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">Email</Label>
@@ -85,4 +89,24 @@ function describeError(error: unknown): string {
     return error.message
   }
   return 'Terjadi kesalahan tak terduga.'
+}
+
+/**
+ * readLogoutNotice menjelaskan kenapa pengguna harus masuk lagi. Alasan yang
+ * berbeda mencegah kebingungan "kok tiba-tiba keluar?" (plans/23 §6).
+ */
+function readLogoutNotice(): string {
+  const reason = sessionStorage.getItem(LOGOUT_REASON_KEY)
+  if (!reason) return ''
+
+  sessionStorage.removeItem(LOGOUT_REASON_KEY)
+
+  switch (reason) {
+    case 'idle':
+      return 'Anda keluar karena tidak ada aktivitas. Silakan masuk lagi.'
+    case 'expired':
+      return 'Sesi Anda berakhir. Silakan masuk lagi.'
+    default:
+      return 'Anda telah keluar. Silakan masuk lagi.'
+  }
 }

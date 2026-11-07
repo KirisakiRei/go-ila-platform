@@ -53,6 +53,7 @@ func Auth(issuer service.TokenIssuer, cookieName string, reader authstate.Reader
 
 		c.Set(ContextUserID, claims.UserID)
 		c.Set(ContextRole, claims.Role)
+		c.Set(ContextSessionID, claims.SessionID)
 		c.Next()
 	}
 }
@@ -123,6 +124,11 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 // CurrentUserID membaca ID akun yang sudah diverifikasi dari context.
 func CurrentUserID(c *gin.Context) string {
 	return c.GetString(ContextUserID)
+}
+
+// CurrentSessionID membaca ID sesi perangkat ini dari context.
+func CurrentSessionID(c *gin.Context) string {
+	return c.GetString(ContextSessionID)
 }
 
 // SessionAccount mengembalikan akun hasil validasi middleware, bila ada.

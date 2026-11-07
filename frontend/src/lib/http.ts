@@ -32,7 +32,11 @@ type RequestOptions = {
   timeoutMs?: number
 }
 
-/** Dipanggil saat backend menolak sesi; memutus tampilan di sisi UI. */
+/**
+ * Dipanggil HANYA saat sesi tidak sah (401). 403 tidak boleh masuk sini:
+ * mencampur keduanya membuat admin biasa ter-logout hanya karena membuka
+ * menu yang bukan haknya (plans/23 §6).
+ */
 let unauthorizedHandler: (() => void) | null = null
 
 export function onUnauthorized(handler: () => void): void {
@@ -76,16 +80,17 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       credentials: 'same-origin',
     })
 
-    // Sesi habis hanya bermakna bila endpoint memang butuh sesi.
-    if (response.status === 401) {
-      unauthorizedHandler?.()
-    }
-
     const payload = await parseJson<T>(response)
 
     if (!response.ok || !payload.success) {
+      // Sesi habis hanya bermakna bila endpoint memang butuh sesi.
+      // 403 berarti sesi sah tetapi tidak berwenang: pengguna tetap masuk.
+      if (response.status === 401) {
+        unauthorizedHandler?.()
+      }
+
       throw new ApiError(
-        payload.message || 'Permintaan gagal diproses.',
+        messageForStatus(response.status, payload.message),
         response.status,
         payload.error,
         payload.details,
@@ -103,6 +108,23 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError('Tidak dapat menghubungi server. Periksa koneksi Anda.', 0, 'NETWORK')
   } finally {
     clearTimeout(timer)
+  }
+}
+
+/**
+ * messageForStatus memberi pesan yang bisa ditindaklanjuti. Pesan mentah
+ * backend dipakai bila ada; status khusus punya penjelasan sendiri.
+ */
+function messageForStatus(status: number, fallback?: string): string {
+  switch (status) {
+    case 403:
+      return 'Anda tidak punya hak akses untuk tindakan ini.'
+    case 423:
+      return 'Sistem sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.'
+    case 429:
+      return 'Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.'
+    default:
+      return fallback || 'Permintaan gagal diproses.'
   }
 }
 

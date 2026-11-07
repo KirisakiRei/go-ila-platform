@@ -48,7 +48,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	runnerAPI := runnerclient.New(cfg.RunnerBaseURL, cfg.InternalSecret)
 
 	// Services
-	authService := service.NewAuthService(userRepo, auditRepo, newTokenIssuer(cfg))
+	sessionRepo := repository.NewSessionRepository(db)
+	authService := service.WithSessionRecorder(
+		service.NewAuthService(userRepo, auditRepo, newTokenIssuer(cfg)),
+		service.NewSessionRecorder(sessionRepo),
+	)
+	sessionService := service.NewSessionService(sessionRepo, userRepo, auditRepo)
 	approveService := service.NewApproveService(
 		approvalRepo,
 		runnerRepo,
@@ -94,6 +99,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		cfg.CookieDomain,
 	)
 
+	sessionHandler := handler.NewSessionHandler(sessionService, middleware.CurrentSessionID)
 	authHandler := handler.NewAuthHandler(
 		authService,
 		middleware.NewLoginLimiter(),
@@ -137,6 +143,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Ganti password & cabut seluruh sesi (plans/23 §6).
 		me.POST("/me/password", authHandler.ChangePassword)
 		me.POST("/me/logout-all", authHandler.LogoutAll)
+
+		// Perangkat yang sedang masuk & pencabutan per sesi.
+		me.GET("/me/sessions", sessionHandler.List)
+		me.DELETE("/me/sessions/:id", sessionHandler.Revoke)
 		// Konfirmasi entry: token dari deep-link Telegram, wajib sesi login.
 		me.GET("/approve/:token", approveHandler.Preview)
 		me.POST("/approve/:token/confirm", approveHandler.Confirm)

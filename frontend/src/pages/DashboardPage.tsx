@@ -85,8 +85,17 @@ function RecentPositions() {
             </span>
           )}
           <span className="ml-auto tabular font-medium">
-            {formatMoney(position.profit_loss)}{' '}
-            <span className="text-muted-foreground">({formatR(position.outcome_r)})</span>
+            {position.pnl_known ? (
+              <>
+                {formatMoney(position.profit_loss)}{' '}
+                <span className="text-muted-foreground">({formatR(position.outcome_r)})</span>
+              </>
+            ) : (
+              // Hasil belum dilaporkan broker: 0 akan terbaca sebagai "impas".
+              <span className="text-muted-foreground" title="Hasil belum dilaporkan broker">
+                —
+              </span>
+            )}
           </span>
         </li>
       ))}

@@ -22,12 +22,15 @@ type ChangePasswordRequest struct {
 
 // UserResponse adalah representasi akun yang aman dikirim ke klien.
 type UserResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	Role      string `json:"role"`
-	Tier      string `json:"tier"`
-	CreatedAt string `json:"created_at"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
+	Tier  string `json:"tier"`
+	// IdleWarning memutuskan apakah modal "masih di sini?" ditampilkan.
+	// Batas diam di server tidak terpengaruh nilai ini (plans/23 §5).
+	IdleWarning bool   `json:"idle_warning"`
+	CreatedAt   string `json:"created_at"`
 }
 
 // LoginResponse membawa data akun; token sesi dikirim lewat cookie HttpOnly
@@ -36,4 +39,21 @@ type LoginResponse struct {
 	Token     string       `json:"token,omitempty"`
 	ExpiresAt string       `json:"expires_at"`
 	User      UserResponse `json:"user"`
+	// SessionID menunjuk baris sesi yang baru dibuat.
+	SessionID string `json:"session_id,omitempty"`
+}
+
+// SessionResponse adalah satu perangkat yang sedang masuk.
+type SessionResponse struct {
+	ID          string   `json:"id"`
+	DeviceLabel string   `json:"device_label"`
+	UserAgent   string   `json:"user_agent"`
+	LastSeenAt  string   `json:"last_seen_at"`
+	LastSeen    TimePair `json:"last_seen_pair"`
+	CreatedAt   string   `json:"created_at"`
+	Created     TimePair `json:"created_pair"`
+	ExpiresAt   string   `json:"expires_at"`
+	Expires     TimePair `json:"expires_pair"`
+	// Current menandai sesi yang sedang dipakai perangkat ini.
+	Current bool `json:"current"`
 }

@@ -10,5 +10,6 @@ type TokenClaims struct {
 	Role      string
 	Scope     string
 	Session   int
+	SessionID string
 	ExpiresAt time.Time
 }

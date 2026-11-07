@@ -19,12 +19,24 @@ export type PaginationMeta = {
   total_pages: number
 }
 
+/**
+ * TimePair menyajikan satu waktu dalam dua zona. Server yang menghitung,
+ * bukan browser, supaya hasilnya sama di perangkat mana pun (plans/22).
+ */
+export type TimePair = {
+  utc: string
+  wib: string
+  ny: string
+}
+
 export type User = {
   id: string
   name: string
   email: string
   role: Role
   tier: Tier
+  /** Memutuskan apakah modal "masih di sini?" ditampilkan. */
+  idle_warning: boolean
   email_verified_at: string | null
   created_at: string
   updated_at: string
@@ -166,7 +178,29 @@ export type Position = {
   status: PositionStatus
   is_dry_run: boolean
   opened_at: string
+  opened_at_pair: TimePair
   closed_at: string | null
+  closed_at_pair: TimePair | null
+  /**
+   * false berarti hasil belum terbaca dari broker. Jangan tampilkan 0 —
+   * gunakan garis "(—)" agar tidak menyesatkan (plans/19 C9).
+   */
+  pnl_known: boolean
+}
+
+/** Satu perangkat yang sedang masuk ke akun ini. */
+export type Session = {
+  id: string
+  device_label: string
+  user_agent: string
+  last_seen_at: string
+  last_seen_pair: TimePair
+  created_at: string
+  created_pair: TimePair
+  expires_at: string
+  expires_pair: TimePair
+  /** true untuk perangkat yang sedang dipakai. */
+  current: boolean
 }
 
 export type MarketState = 'OPEN' | 'CLOSED' | 'ROLLOVER' | 'UNKNOWN'

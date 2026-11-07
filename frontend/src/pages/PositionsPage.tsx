@@ -92,10 +92,18 @@ export default function PositionsPage() {
                   {formatNumber(position.take_profit, 5)}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-right font-medium">
-                  <span className="tabular">{formatMoney(position.profit_loss)}</span>
-                  <span className="ml-1 tabular text-muted-foreground">
-                    ({formatR(position.outcome_r)})
-                  </span>
+                  {position.pnl_known ? (
+                    <>
+                      <span className="tabular">{formatMoney(position.profit_loss)}</span>
+                      <span className="ml-1 tabular text-muted-foreground">
+                        ({formatR(position.outcome_r)})
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground" title="Hasil belum dilaporkan broker">
+                      —
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <StatusPill tone={TONE[position.status]}>{LABEL[position.status]}</StatusPill>

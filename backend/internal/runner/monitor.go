@@ -115,7 +115,8 @@ func (s *Service) syncPosition(ctx context.Context, pos *model.Position) {
 	}
 
 	// Tidak ada di posisi hidup maupun riwayat: catat sebagai ditutup manual
-	// tanpa angka, agar tidak terlihat seperti posisi yang masih berjalan.
+	// tanpa angka. Hasilnya tidak diketahui, jadi tidak boleh dihitung sebagai
+	// menang maupun kalah (plans/19 C9).
 	s.applyClose(ctx, pos, broker.ClosedPosition{
 		Ticket: pos.TicketNumber,
 		Reason: broker.CloseReasonOther,
@@ -131,7 +132,11 @@ func (s *Service) applyClose(ctx context.Context, pos *model.Position, closed br
 	pos.Status = mapCloseReason(closed.Reason)
 	pos.ClosedAt = &now
 
-	if risk := pos.LotSize * absDistance(pos.OpenPrice, pos.StopLoss); risk > 0 {
+	// Broker yang tidak melaporkan exit price berarti hasil tidak diketahui.
+	// Tanpa tanda ini, PnL 0 akan terbaca sebagai "impas" di dashboard.
+	pnlKnown := closed.ExitPrice != 0 || closed.Profit != 0
+
+	if risk := pos.LotSize * absDistance(pos.OpenPrice, pos.StopLoss); risk > 0 && pnlKnown {
 		pos.OutcomeR = roundTo(pos.ProfitLoss/risk, 2)
 	}
 
@@ -144,8 +149,16 @@ func (s *Service) applyClose(ctx context.Context, pos *model.Position, closed br
 	won := pos.ProfitLoss > 0
 	day := DayKey(now)
 
-	if err := s.store.RecordDailyOutcome(ctx, pos.UserID, day, won); err != nil {
-		s.logger.Error("gagal mencatat hasil harian", "error", err.Error())
+	// Hasil yang tidak diketahui tidak dicatat sebagai kalah: mencatatnya
+	// akan menghabiskan kuota user tanpa trade yang benar-benar kalah
+	// (plans/01 O15).
+	if pnlKnown {
+		if err := s.store.RecordDailyOutcome(ctx, pos.UserID, day, won); err != nil {
+			s.logger.Error("gagal mencatat hasil harian", "error", err.Error())
+		}
+	} else {
+		s.logger.Warn("hasil posisi tidak diketahui broker; tidak dihitung ke kuota",
+			"position_id", pos.ID, "ticket", pos.TicketNumber)
 	}
 
 	daily := &DailyOutcome{

@@ -6,6 +6,7 @@ import type {
   CreateAccountPayload,
   CreateSubscriptionPayload,
   Position,
+  Session,
   Signal,
   Strategy,
   Subscription,
@@ -48,6 +49,21 @@ export const systemApi = {
 export const trialApi = {
   get: () => request<Trial>('/trial'),
   start: () => request<Trial>('/trial', { method: 'POST' }),
+}
+
+/** Perangkat yang sedang masuk dan pencabutannya. */
+export const sessionApi = {
+  list: () => request<Session[]>('/me/sessions'),
+  revoke: (id: string) => request<{ revoked: boolean }>(`/me/sessions/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }),
+}
+
+/** Keamanan akun: ganti password dan cabut semua sesi. */
+export const securityApi = {
+  changePassword: (payload: { current_password: string; new_password: string }) =>
+    request<{ re_login_required: boolean }>('/me/password', { method: 'POST', body: payload }),
+  logoutAll: () => request<{ logged_out: boolean }>('/me/logout-all', { method: 'POST' }),
 }
 
 export const telegramApi = {

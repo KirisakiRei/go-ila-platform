@@ -102,6 +102,10 @@ func (fakeTokenIssuer) Verify(_ string) (utils.TokenClaims, error) {
 	return utils.TokenClaims{}, nil
 }
 
+func (fakeTokenIssuer) TTL() time.Duration {
+	return time.Hour
+}
+
 func newTestAuth() (AuthService, *fakeUserRepo, *fakeAuditRepo) {
 	repo := newFakeUserRepo()
 	audit := &fakeAuditRepo{}

@@ -225,6 +225,8 @@ func (s *fakeStore) RecordDailyOutcome(_ context.Context, userID, day string, wo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	summary := s.dailyOrCreate(userID, day)
+	// Total trade dinaikkan saat eksekusi, bukan saat tutup; samakan dengan
+	// perilaku repository sungguhan agar tes tidak memberi rasa aman palsu.
 	if won {
 		summary.WinCount++
 	} else {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
+import { SessionSection } from '@/features/auth/components/SessionSection'
 import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
 import { formatDate, formatDateTime } from '@/lib/format'
@@ -121,9 +122,21 @@ function TelegramSection() {
 export default function SettingsPage() {
   return (
     <>
-      <PageHeader title="Pengaturan" description="Uji coba dan saluran notifikasi." />
+      <PageHeader
+        title="Pengaturan"
+        description="Uji coba, saluran notifikasi, dan keamanan akun."
+      />
       <TrialSection />
       <TelegramSection />
+
+      <Section
+        title="Keamanan"
+        description="Perangkat yang masuk ke akun Anda. Batas diam diberlakukan di server."
+      >
+        <div className="border border-border p-4">
+          <SessionSection />
+        </div>
+      </Section>
     </>
   )
 }

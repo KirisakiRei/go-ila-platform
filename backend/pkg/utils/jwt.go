@@ -32,12 +32,16 @@ type Claims struct {
 	Role    string
 	Scope   string
 	Session int
+	// SessionID menunjuk baris tabel session; kosong untuk token lama.
+	SessionID string
 }
 
 type claimsPayload struct {
 	Role    string `json:"role"`
 	Scope   string `json:"scope,omitempty"`
 	Session int    `json:"sv,omitempty"`
+	// Sid adalah ID sesi (bukan token), dipakai untuk mencabut per perangkat.
+	Sid string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -55,6 +59,7 @@ func (j *JWTIssuer) IssueWithClaims(c Claims) (string, time.Time, error) {
 		Role:    c.Role,
 		Scope:   c.Scope,
 		Session: c.Session,
+		Sid:     c.SessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   c.UserID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -96,6 +101,12 @@ func (j *JWTIssuer) Verify(raw string) (TokenClaims, error) {
 		Role:      claims.Role,
 		Scope:     scope,
 		Session:   claims.Session,
+		SessionID: claims.Sid,
 		ExpiresAt: claims.ExpiresAt.Time,
 	}, nil
+}
+
+// TTL mengembalikan masa hidup token yang diterbitkan issuer ini.
+func (j *JWTIssuer) TTL() time.Duration {
+	return j.ttl
 }

@@ -50,6 +50,7 @@ func main() {
 		&model.BrokerAccountState{},
 		&model.DailySummary{},
 		&model.EngineState{},
+		&model.Session{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

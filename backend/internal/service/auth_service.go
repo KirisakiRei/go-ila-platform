@@ -24,10 +24,17 @@ type AuthService interface {
 	LogoutAll(ctx context.Context, userID string) error
 }
 
+// SessionRecorder mencatat sesi baru agar user bisa melihat daftarnya.
+// Opsional: bila nil, login tetap berjalan seperti sebelumnya.
+type SessionRecorder interface {
+	Record(ctx context.Context, userID, tokenID, scope, userAgent, ipHash string, expiresAt time.Time) (string, error)
+}
+
 type authService struct {
 	userRepo    UserRepository
 	auditRepo   AuditRepository
 	tokenIssuer TokenIssuer
+	sessions    SessionRecorder
 	now         func() time.Time
 }
 
@@ -39,6 +46,20 @@ func NewAuthService(userRepo UserRepository, auditRepo AuditRepository, tokenIss
 		tokenIssuer: tokenIssuer,
 		now:         func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// WithSessionRecorder menambahkan pencatatan sesi ke layanan autentikasi.
+func WithSessionRecorder(s AuthService, recorder SessionRecorder) AuthService {
+	if svc, ok := s.(*authService); ok {
+		svc.sessions = recorder
+	}
+	return s
+}
+
+// LoginContext membawa informasi perangkat untuk pencatatan sesi.
+type LoginContext struct {
+	UserAgent string
+	IPHash    string
 }
 
 func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*dto.UserResponse, error) {
@@ -79,7 +100,13 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 	return toUserResponse(user), nil
 }
 
+// Login dengan pencatatan perangkat kosong; dipakai pemanggil lama.
 func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.LoginResponse, error) {
+	return s.LoginWithDevice(ctx, req, LoginContext{})
+}
+
+// LoginWithDevice mencatat sesi perangkat baru agar bisa dilihat dan dicabut.
+func (s *authService) LoginWithDevice(ctx context.Context, req dto.LoginRequest, device LoginContext) (*dto.LoginResponse, error) {
 	user, err := s.userRepo.FindByEmail(ctx, normalizeEmail(req.Email))
 	if err != nil {
 		if err == apperror.ErrNotFound {
@@ -99,11 +126,26 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Log
 		return nil, apperror.ErrUnauthorized
 	}
 
+	expiresAt := s.now().Add(s.tokenIssuer.TTL())
+
+	// Sesi dicatat lebih dulu agar token bisa membawa ID-nya. Bila pencatatan
+	// gagal, login tetap jalan: pelacakan perangkat bukan syarat masuk.
+	sessionID := ""
+	if s.sessions != nil {
+		id, err := s.sessions.Record(ctx, user.ID, "", utils.ScopeUser, device.UserAgent, device.IPHash, expiresAt)
+		if err != nil {
+			s.recordAudit(ctx, user.ID, "auth.session_record_failed", "user", user.ID)
+		} else {
+			sessionID = id
+		}
+	}
+
 	token, expiresAt, err := s.tokenIssuer.IssueWithClaims(utils.Claims{
-		UserID:  user.ID,
-		Role:    user.Role,
-		Scope:   utils.ScopeUser,
-		Session: user.SessionVersion,
+		UserID:    user.ID,
+		Role:      user.Role,
+		Scope:     utils.ScopeUser,
+		Session:   user.SessionVersion,
+		SessionID: sessionID,
 	})
 	if err != nil {
 		return nil, err
@@ -117,6 +159,7 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Log
 
 	return &dto.LoginResponse{
 		Token:     token,
+		SessionID: sessionID,
 		ExpiresAt: expiresAt.Format(time.RFC3339),
 		User:      *toUserResponse(user),
 	}, nil
@@ -146,12 +189,13 @@ func normalizeEmail(email string) string {
 
 func toUserResponse(user *model.User) *dto.UserResponse {
 	return &dto.UserResponse{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Role:      user.Role,
-		Tier:      user.Tier,
-		CreatedAt: user.CreatedAt.Format(time.RFC3339),
+		ID:          user.ID,
+		Name:        user.Name,
+		Email:       user.Email,
+		Role:        user.Role,
+		Tier:        user.Tier,
+		IdleWarning: user.IdleWarning,
+		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
 	}
 }
 

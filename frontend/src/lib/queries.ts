@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accountApi,
+  securityApi,
+  sessionApi,
   strategyApi,
   subscriptionApi,
   systemApi,
@@ -23,6 +25,7 @@ export const queryKeys = {
   positions: (limit: number) => ['positions', limit] as const,
   systemStatus: ['system', 'status'] as const,
   trial: ['trial'] as const,
+  sessions: ['me', 'sessions'] as const,
 }
 
 export function useAccounts() {
@@ -127,6 +130,26 @@ export function useStartTrial() {
       void qc.invalidateQueries({ queryKey: queryKeys.strategies })
     },
   })
+}
+
+export function useSessions() {
+  return useQuery({ queryKey: queryKeys.sessions, queryFn: sessionApi.list })
+}
+
+export function useRevokeSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: sessionApi.revoke,
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.sessions }),
+  })
+}
+
+export function useChangePassword() {
+  return useMutation({ mutationFn: securityApi.changePassword })
+}
+
+export function useLogoutAll() {
+  return useMutation({ mutationFn: securityApi.logoutAll })
 }
 
 export function useTelegramLink() {

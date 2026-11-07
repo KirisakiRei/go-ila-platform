@@ -12,4 +12,6 @@ type TokenIssuer interface {
 	Issue(userID, role string) (token string, expiresAt time.Time, err error)
 	IssueWithClaims(c utils.Claims) (token string, expiresAt time.Time, err error)
 	Verify(token string) (claims utils.TokenClaims, err error)
+	// TTL mengembalikan masa hidup token yang diterbitkan.
+	TTL() time.Duration
 }
