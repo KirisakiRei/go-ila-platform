@@ -124,8 +124,23 @@ func EvaluateDaily(d DailyStatus, p DailyPolicy) RejectReason {
 }
 
 // WIB adalah zona waktu basis aturan harian.
-// Penentuan sesi pasar tetap memakai UTC; hanya hari akuntansi yang WIB.
+// Penentuan sesi pasar tetap memakai UTC/NY; hanya hari akuntansi yang WIB.
+// Nilainya dapat diganti lewat DAILY_TZ (lihat SetDailyTimezone).
 var WIB = time.FixedZone("WIB", 7*60*60)
+
+// SetDailyTimezone mengganti zona hari akuntansi dari konfigurasi.
+// Nama zona tak dikenal diabaikan agar Runner tetap memakai WIB.
+func SetDailyTimezone(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		return
+	}
+	WIB = loc
+}
 
 // DayKey mengubah waktu menjadi kunci hari WIB berformat YYYY-MM-DD.
 func DayKey(t time.Time) string {

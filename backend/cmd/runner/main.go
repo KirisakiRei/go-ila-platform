@@ -85,6 +85,7 @@ func main() {
 	})
 
 	// --- Runner ---------------------------------------------------------------
+	runner.SetDailyTimezone(cfg.DailyTimezone)
 	opts := runner.Options{
 		Policy: runner.DailyPolicy{
 			MaxTrades:    cfg.MaxDailyTrades,

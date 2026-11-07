@@ -6,11 +6,12 @@ import (
 
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/dto"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/model"
+	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
 )
 
-// WIB adalah zona waktu basis aturan harian (plans/05 §3.1).
-// Sesi pasar tetap mengikuti UTC/NY; hanya hari akuntansi yang WIB.
-var wib = time.FixedZone("WIB", 7*60*60)
+// Sesi pasar mengikuti NY/UTC; hanya hari akuntansi yang memakai WIB.
+// Zona diambil dari runner agar dua bagian sistem tidak berbeda.
+var wib = runner.WIB
 
 // Batas kuota harian yang ditampilkan bila tidak ada konfigurasi lain.
 const defaultMaxDailyTrades = 2

@@ -319,3 +319,27 @@ func TestIdempotencyKey(t *testing.T) {
 		t.Fatal("akun berbeda harus menghasilkan kunci berbeda")
 	}
 }
+
+func TestSetDailyTimezone(t *testing.T) {
+	original := WIB
+	t.Cleanup(func() { WIB = original })
+
+	// 18:00 UTC = 01:00 WIB tanggal 6, tetapi 18:00 UTC sendiri di UTC.
+	utc := time.Date(2026, 11, 5, 18, 0, 0, 0, time.UTC)
+
+	SetDailyTimezone("UTC")
+	if got := DayKey(utc); got != "2026-11-05" {
+		t.Fatalf("DayKey(UTC) = %q, ingin 2026-11-05", got)
+	}
+
+	SetDailyTimezone("Asia/Jakarta")
+	if got := DayKey(utc); got != "2026-11-06" {
+		t.Fatalf("DayKey(Asia/Jakarta) = %q, ingin 2026-11-06", got)
+	}
+
+	// Nama tidak dikenal tidak boleh mengubah zona yang sedang berlaku.
+	SetDailyTimezone("Zona/TidakAda")
+	if got := DayKey(utc); got != "2026-11-06" {
+		t.Fatalf("DayKey setelah nama tak dikenal = %q, ingin tetap 2026-11-06", got)
+	}
+}

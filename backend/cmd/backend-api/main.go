@@ -14,6 +14,7 @@ import (
 
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/config"
 	"github.com/KirisakiRei/go-ila-platform/backend/internal/router"
+	"github.com/KirisakiRei/go-ila-platform/backend/internal/runner"
 )
 
 func main() {
@@ -27,6 +28,9 @@ func main() {
 		logger.Error("konfigurasi tidak sah", "error", err.Error())
 		os.Exit(1)
 	}
+
+	// Zona hari akuntansi harus sama dengan yang dipakai Runner.
+	runner.SetDailyTimezone(cfg.DailyTimezone)
 
 	ctx := context.Background()
 

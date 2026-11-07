@@ -35,6 +35,41 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Zona waktu harian kini bisa dikonfigurasi (`DAILY_TZ`)
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug
+**Status:** SELESAI — `go build`, `go vet`, seluruh tes lulus
+
+**Bug yang diperbaiki:**
+`DAILY_TZ` sudah dibaca `config.Load()` tetapi `runner/rules.go` memakai
+konstanta keras `time.FixedZone("WIB", 7*60*60)`. Akibatnya mengubah env
+`DAILY_TZ` **tidak berefek apa pun** — ada dua sumber kebenaran untuk zona
+hari akuntansi.
+
+**Perbaikan:**
+
+| Berkas | Perubahan |
+|---|---|
+| `internal/runner/rules.go` | `WIB` jadi variabel + `SetDailyTimezone(name)`; nama tak dikenal diabaikan |
+| `cmd/runner/main.go` | Panggil `runner.SetDailyTimezone(cfg.DailyTimezone)` sebelum service dibuat |
+| `cmd/backend-api/main.go` | Panggil hal yang sama agar backend-api dan Runner satu zona |
+| `internal/service/system_service.go` | `wib` tidak lagi didefinisikan ulang; memakai `runner.WIB` |
+| `internal/runner/rules_test.go` | Tes `TestSetDailyTimezone` mengunci perilaku |
+
+**Yang TIDAK berubah:**
+- `DayKey/DayStart/DayEnd` tetap berbasis WIB
+- Sesi pasar tetap `America/New_York` di engine
+- Jalur trading, kuota, dan rekonsiliasi tidak disentuh
+- Bawaan tetap `Asia/Jakarta` bila env kosong
+
+**Dampak ke engine:** **tidak ada.** Kontrak gRPC tidak berubah.
+
+**Yang perlu Hermes tahu:** jam trading tetap New York. Yang berubah hanya
+bahwa zona *hari akuntansi* kini mengikuti `DAILY_TZ` alih-alih konstanta.
+
+---
+
 ### 2026-11-08 — Frontend Console: tema monokrom + perbaikan tata letak
 
 **Pelaku:** Claude
