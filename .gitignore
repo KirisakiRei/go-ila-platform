@@ -38,3 +38,7 @@ plans/
 # Coverage
 coverage.out
 coverage.html
+
+# Skrip bantu sementara
+*.py.tmp
+tmp_patch*.py
