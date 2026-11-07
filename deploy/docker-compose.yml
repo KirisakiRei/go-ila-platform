@@ -1,0 +1,107 @@
+name: ila-platform
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "2"
+
+services:
+  backend-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      SERVICE_ROLE: backend-api
+      HTTP_PORT: "8080"
+    mem_limit: 128m
+    cpus: "0.8"
+    pids_limit: 200
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [platform]
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/ready"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  runner:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    entrypoint: ["/app/runner"]
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      SERVICE_ROLE: runner
+    mem_limit: 128m
+    cpus: "0.8"
+    pids_limit: 200
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./certs:/certs:ro
+    networks: [platform]
+    # Runner tidak pernah menerima koneksi dari luar.
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    restart: unless-stopped
+    mem_limit: 96m
+    cpus: "0.5"
+    logging: *default-logging
+    networks: [platform]
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    mem_limit: 192m
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ila}
+      POSTGRES_USER: ${DB_USER:-ila}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD wajib diisi}
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=64MB"
+      - "-c"
+      - "work_mem=2MB"
+      - "-c"
+      - "max_connections=40"
+      - "-c"
+      - "effective_cache_size=128MB"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [platform]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ila} -d ${DB_NAME:-ila}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  platform:
+    driver: bridge
+
+volumes:
+  pgdata:

@@ -1,0 +1,40 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Sertifikat & kunci
+*.pem
+*.key
+*.crt
+certs/
+
+# Binary
+bin/
+*.exe
+*.test
+*.out
+*.log
+
+# Build frontend
+node_modules/
+dist/
+.vite/
+
+# Database lokal
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Rancangan internal
+plans/
+
+# Coverage
+coverage.out
+coverage.html
