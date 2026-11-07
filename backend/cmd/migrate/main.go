@@ -4,11 +4,13 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 
 	"ila/backend/internal/authz"
 	"ila/backend/internal/config"
+	"ila/backend/internal/legal"
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 )
@@ -56,6 +58,11 @@ func main() {
 		&model.Role{},
 		&model.Permission{},
 		&model.RolePermission{},
+		&model.TwoFactor{},
+		&model.RecoveryCode{},
+		&model.TwoFactorChallenge{},
+		&model.LegalDocument{},
+		&model.LegalAcceptance{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
@@ -87,5 +94,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("migrasi selesai", "tables", len(models), "support_dipindah", moved, "admin_dilengkapi", filled)
+	// Dokumen legal versi 1 diterbitkan hanya bila slug itu belum punya versi
+	// sama sekali, sehingga perubahan isi oleh admin tidak tertimpa.
+	seeded, err := repository.NewLegalRepository(db).SeedInitialDrafts(ctx, legal.Drafts(), time.Now().UTC())
+	if err != nil {
+		logger.Error("dokumen legal awal gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
+	logger.Info("migrasi selesai",
+		"tables", len(models),
+		"support_dipindah", moved,
+		"admin_dilengkapi", filled,
+		"dokumen_legal_diterbitkan", seeded,
+	)
 }

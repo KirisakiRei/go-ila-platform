@@ -37,8 +37,15 @@ type systemService struct {
 	engines   EngineStateReader
 	daily     DailySummaryReader
 	positions PositionLister
+	// legal melaporkan persetujuan dokumen yang belum lengkap.
+	legal     LegalStatusReader
 	maxTrades int
 	clock     func() time.Time
+}
+
+// LegalStatusReader membaca status persetujuan legal sebuah akun.
+type LegalStatusReader interface {
+	Pending(ctx context.Context, userID string) ([]dto.LegalPendingItem, error)
 }
 
 // SystemServiceDeps mengumpulkan dependensi service status sistem.
@@ -48,6 +55,7 @@ type SystemServiceDeps struct {
 	Engines   EngineStateReader
 	Daily     DailySummaryReader
 	Positions PositionLister
+	Legal     LegalStatusReader
 	MaxTrades int
 	Clock     func() time.Time
 }
@@ -120,6 +128,15 @@ func (s *systemService) Status(ctx context.Context, userID string) (*dto.SystemS
 		return nil, err
 	}
 	status.Daily = daily
+
+	// Dokumen wajib yang belum disetujui menahan eksekusi dan pembayaran.
+	if s.legal != nil {
+		pending, err := s.legal.Pending(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		status.LegalBlocked = len(pending) > 0
+	}
 
 	return status, nil
 }

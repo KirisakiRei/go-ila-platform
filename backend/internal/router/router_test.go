@@ -44,6 +44,16 @@ func TestRouteRbacTerpasang(t *testing.T) {
 		"PATCH /api/v1/admin/users/:id/role": false,
 		"GET /api/v1/admin/auth/me":          false,
 		"POST /api/v1/admin/auth/login":      false,
+		// Fase C: dokumen legal & 2FA.
+		"GET /api/v1/admin/legal":               false,
+		"POST /api/v1/admin/legal":              false,
+		"PATCH /api/v1/admin/legal/:id":         false,
+		"POST /api/v1/admin/legal/:id/publish":  false,
+		"GET /api/v1/admin/2fa":                 false,
+		"POST /api/v1/admin/2fa/setup":          false,
+		"POST /api/v1/admin/2fa/activate":       false,
+		"POST /api/v1/admin/2fa/disable":        false,
+		"POST /api/v1/admin/2fa/recovery-codes": false,
 	}
 
 	for _, info := range r.Routes() {
@@ -131,5 +141,75 @@ func TestPemeriksaMenangkapDeklarasiHilang(t *testing.T) {
 	NewBackendAPI(cfg, testDB(t), testLogger())
 	if missing := middleware.UndeclaredAdminRoutes(r.Routes()); len(missing) > 0 {
 		t.Fatalf("deklarasi tidak pulih: %v", missing)
+	}
+}
+
+// Dokumen legal harus dapat dibaca tanpa masuk: calon pengguna perlu
+// membacanya sebelum memutuskan mendaftar.
+func TestLegalPublikTerbukaTanpaSesi(t *testing.T) {
+	cfg := testConfig(t)
+	r := NewBackendAPI(cfg, testDB(t), testLogger())
+
+	// Tanpa database sungguhan permintaannya gagal di lapisan data, tetapi
+	// yang diuji di sini adalah penjaganya: BUKAN 401.
+	for _, path := range []string{"/api/v1/legal", "/api/v1/legal/tos"} {
+		w := performRequest(r, http.MethodGet, path)
+		if w.Code == http.StatusUnauthorized {
+			t.Errorf("%s = 401; dokumen publik seharusnya tidak menuntut sesi", path)
+		}
+	}
+}
+
+// Endpoint 2FA dan persetujuan legal user wajib bersesi.
+func TestLegalDanDuaFaktorButuhSesi(t *testing.T) {
+	cfg := testConfig(t)
+	r := NewBackendAPI(cfg, testDB(t), testLogger())
+
+	for _, path := range []string{"/api/v1/me/legal", "/api/v1/2fa"} {
+		w := performRequest(r, http.MethodGet, path)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("%s = %d; ingin 401", path, w.Code)
+		}
+	}
+}
+
+// Tanpa kunci master, 2FA sengaja tidak tersedia: menyimpan secret tanpa
+// enkripsi lebih buruk daripada tidak ada 2FA sama sekali.
+func TestDuaFaktorNonaktifTanpaMasterKey(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.MasterKey = ""
+	r := NewBackendAPI(cfg, testDB(t), testLogger())
+
+	for _, path := range []string{"/api/v1/2fa", "/api/v1/admin/2fa"} {
+		w := performRequest(r, http.MethodGet, path)
+		if w.Code == http.StatusUnauthorized {
+			t.Errorf("%s = 401; route seharusnya tidak terpasang tanpa MASTER_KEY", path)
+		}
+	}
+}
+
+// Dengan kunci master sah, route 2FA terpasang dan tetap menuntut sesi.
+func TestDuaFaktorAktifDenganMasterKey(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.MasterKey = sealerTestKey()
+	r := NewBackendAPI(cfg, testDB(t), testLogger())
+
+	for _, path := range []string{"/api/v1/2fa", "/api/v1/admin/2fa"} {
+		w := performRequest(r, http.MethodGet, path)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("%s = %d; ingin 401", path, w.Code)
+		}
+	}
+}
+
+// Registrasi tanpa centang persetujuan harus ditolak sebelum menyentuh data.
+func TestRegistrasiTanpaCentangDitolakHTTP(t *testing.T) {
+	cfg := testConfig(t)
+	r := NewBackendAPI(cfg, testDB(t), testLogger())
+
+	body := `{"name":"Uji Coba","email":"uji@contoh.id","password":"rahasia-panjang-123"}`
+	w := performJSONRequest(r, http.MethodPost, "/api/v1/auth/register", body)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d; ingin 400 (body: %s)", w.Code, w.Body.String())
 	}
 }

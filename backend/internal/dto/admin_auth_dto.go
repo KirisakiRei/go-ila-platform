@@ -19,6 +19,10 @@ type AdminRoleSummary struct {
 // AdminLoginResponse membawa identitas, role, dan kewenangan sesi admin.
 // Token tidak ikut dikirim: satu-satunya tempatnya adalah cookie HttpOnly.
 type AdminLoginResponse struct {
+	// Step bernilai "complete" (sesi terbit) atau "two_factor_required".
+	Step        string        `json:"step,omitempty"`
+	ChallengeID string        `json:"challenge_id,omitempty"`
+	ExpiresIn   int           `json:"expires_in_seconds,omitempty"`
 	Token       string        `json:"token,omitempty"`
 	SessionID   string        `json:"session_id,omitempty"`
 	ExpiresAt   string        `json:"expires_at"`

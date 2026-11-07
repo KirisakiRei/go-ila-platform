@@ -51,6 +51,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	stateRepo := repository.NewBrokerAccountStateRepository(db)
 	onboardingRepo := repository.NewOnboardingTokenRepository(db)
 	roleRepo := repository.NewRoleRepository(db)
+	legalRepo := repository.NewLegalRepository(db)
+	twoFactorRepo := repository.NewTwoFactorRepository(db)
 
 	// Klien Runner: backend-api meminta eksekusi, bukan mengeksekusi sendiri.
 	runnerAPI := runnerclient.New(cfg.RunnerBaseURL, cfg.InternalSecret)
@@ -60,9 +62,29 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	// Services
 	sessionRepo := repository.NewSessionRepository(db)
-	authService := service.WithSessionRecorder(
-		service.NewAuthService(userRepo, auditRepo, newTokenIssuer(cfg)),
-		service.NewSessionRecorder(sessionRepo),
+	// Kunci untuk secret 2FA; sama dengan master key kredensial broker.
+	sealer, sealerErr := cryptox.NewSealer(cfg.MasterKeyVersion, cfg.MasterKey)
+	if sealerErr != nil {
+		logger.Error("master key tidak sah; endpoint 2FA dinonaktifkan", "error", sealerErr.Error())
+	}
+
+	// Legal & 2FA dipakai lintas layanan, jadi dirangkai lebih dulu.
+	legalService := service.NewLegalService(legalRepo, auditRepo)
+	var twoFactorSvc service.TwoFactorService
+	if sealer != nil {
+		twoFactorSvc = service.NewTwoFactorService(twoFactorRepo, sealer)
+	}
+
+	authService := service.WithTwoFactor(
+		service.WithLegal(
+			service.WithSessionRecorder(
+				service.NewAuthService(userRepo, auditRepo, newTokenIssuer(cfg)),
+				service.NewSessionRecorder(sessionRepo),
+			),
+			legalService,
+		),
+		twoFactorSvc,
+		twoFactorRepo,
 	)
 	sessionService := service.NewSessionService(sessionRepo, userRepo, auditRepo)
 	approveService := service.NewApproveService(
@@ -89,6 +111,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		Sealer:        keyring,
 		Strategies:    runner.LoadSettings(),
 		Revoker:       runnerAPI,
+		Legal:         legalService,
 	})
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
 	systemService := service.NewSystemService(service.SystemServiceDeps{
@@ -97,6 +120,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		Engines:   runnerRepo,
 		Daily:     runnerRepo,
 		Positions: positionRepo,
+		Legal:     legalService,
 		MaxTrades: cfg.MaxDailyTrades,
 	})
 	telegramService := service.NewTelegramService(userRepo, onboardingRepo, auditRepo)
@@ -104,12 +128,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	roleService := service.NewRoleService(roleRepo, userRepo, auditRepo, permCache)
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
-		Users:    userRepo,
-		Audit:    auditRepo,
-		Roles:    roleRepo,
-		Perms:    permCache,
-		Issuer:   newAdminTokenIssuer(cfg),
-		Sessions: service.NewSessionRecorder(sessionRepo),
+		Users:      userRepo,
+		Audit:      auditRepo,
+		Roles:      roleRepo,
+		Perms:      permCache,
+		Issuer:     newAdminTokenIssuer(cfg),
+		Sessions:   service.NewSessionRecorder(sessionRepo),
+		TwoFactor:  twoFactorSvc,
+		Challenges: twoFactorRepo,
 	})
 
 	// Handlers
@@ -119,7 +145,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		cfg.CookieSecure,
 		cfg.CookieDomain,
 	)
-	adminCookies := cookies.WithSessionName(cfg.AdminCookieName)
+	adminCookies := cookies.WithSessionName(cfg.AdminCookieName).WithCSRFName(cfg.AdminCSRFCookieName)
 
 	sessionHandler := handler.NewSessionHandler(sessionService, middleware.CurrentSessionID)
 	authHandler := handler.NewAuthHandler(
@@ -139,10 +165,28 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		adminAuthService,
 		middleware.NewLoginLimiter(),
 		adminCookies,
-		cfg.CSRFCookieName,
+		cfg.AdminCSRFCookieName,
 		cfg.AdminJWTExpiry,
 	)
 	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
+	legalHandler := handler.NewLegalHandler(legalService)
+
+	// Alamat surel dipakai sebagai label di aplikasi authenticator.
+	accountLabel := func(c *gin.Context, userID string) string {
+		user, err := userRepo.FindByID(c.Request.Context(), userID)
+		if err != nil {
+			return ""
+		}
+		return user.Email
+	}
+	// Tanpa kunci master, 2FA dinonaktifkan: lebih baik tidak tersedia
+	// daripada menyimpan secret tanpa enkripsi.
+	var twoFactorHandler *handler.TwoFactorHandler
+	if twoFactorSvc != nil {
+		twoFactorHandler = handler.NewTwoFactorHandler(twoFactorSvc, accountLabel)
+	} else {
+		logger.Warn("2FA nonaktif: MASTER_KEY tidak sah atau kosong")
+	}
 
 	// Health
 	r.GET("/health", healthHandler.Live)
@@ -151,11 +195,21 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// Webhook Telegram: diautentikasi rahasia header, bukan sesi user.
 	r.POST("/api/v1/telegram/webhook", telegramHandler.Webhook)
 
+	// Dokumen legal publik: boleh dibaca tanpa masuk, karena calon pengguna
+	// perlu membacanya sebelum memutuskan mendaftar.
+	publicLegal := r.Group("/api/v1/legal")
+	publicLegal.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
+	{
+		publicLegal.GET("", legalHandler.List)
+		publicLegal.GET("/:slug", legalHandler.BySlug)
+	}
+
 	// API v1
 	auth := r.Group("/api/v1/auth")
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
+		auth.POST("/verify-2fa", authHandler.VerifyTwoFactor)
 		// Logout hanya menghapus cookie; aman tanpa sesi.
 		auth.POST("/logout", authHandler.Logout)
 		auth.GET("/csrf", authHandler.CSRF)
@@ -208,9 +262,23 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Riwayat untuk dashboard.
 		me.GET("/signals", tradingHandler.Signals)
 		me.GET("/positions", tradingHandler.Positions)
+
+		// Persetujuan dokumen legal. `blocked` pada balasan berarti eksekusi
+		// dan pembayaran ditahan sampai dokumen wajib disetujui.
+		me.GET("/me/legal", legalHandler.Me)
+		me.POST("/me/legal/:slug/accept", legalHandler.Accept)
+
+		// 2FA opsional untuk user: melindungi akun bila kata sandi bocor.
+		if twoFactorHandler != nil {
+			me.GET("/2fa", twoFactorHandler.Status)
+			me.POST("/2fa/setup", twoFactorHandler.Setup)
+			me.POST("/2fa/activate", twoFactorHandler.Activate)
+			me.POST("/2fa/disable", twoFactorHandler.Disable)
+			me.POST("/2fa/recovery-codes", twoFactorHandler.Regenerate)
+		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -233,6 +301,8 @@ func registerAdmin(
 	permCache *authz.Service,
 	authHandler *handler.AdminAuthHandler,
 	roleHandler *handler.AdminRoleHandler,
+	twoFactorHandler *handler.TwoFactorHandler,
+	legalHandler *handler.LegalHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -242,6 +312,7 @@ func registerAdmin(
 	login.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
 	{
 		login.POST("/login", authHandler.Login)
+		login.POST("/verify-2fa", authHandler.VerifyTwoFactor)
 		login.POST("/logout", authHandler.Logout)
 		login.GET("/csrf", authHandler.CSRF)
 	}
@@ -249,7 +320,7 @@ func registerAdmin(
 	admin := r.Group(adminPrefix)
 	admin.Use(middleware.AdminScope(issuer, cfg.AdminCookieName, reader))
 	admin.Use(middleware.RateLimitByUser(middleware.NewRateLimiter(0, 0)))
-	admin.Use(middleware.RequireCSRF(cfg.CSRFCookieName))
+	admin.Use(middleware.RequireCSRF(cfg.AdminCSRFCookieName))
 
 	// Profil sesi sendiri: cukup lolos pintu admin, tanpa permission.
 	// Ditandai "-" karena hanya butuh sesi admin, bukan permission tertentu.
@@ -267,6 +338,30 @@ func registerAdmin(
 	admin.GET("/roles", guard(http.MethodGet, "/roles", authz.RoleView))
 	admin.GET("/roles/:id", guard(http.MethodGet, "/roles/:id", authz.RoleView))
 	admin.GET("/permissions", guard(http.MethodGet, "/permissions", authz.RoleView))
+
+	// 2FA admin: opsional sebagai tambahan proteksi di atas kata sandi.
+	// Cukup sesi admin — mengatur faktor milik sendiri bukan kewenangan orang
+	// lain, jadi tidak butuh permission.
+	if twoFactorHandler != nil {
+		middleware.RegisterAdminRoute(http.MethodGet, adminPrefix+"/2fa", "-")
+		middleware.RegisterAdminRoute(http.MethodPost, adminPrefix+"/2fa/setup", "-")
+		middleware.RegisterAdminRoute(http.MethodPost, adminPrefix+"/2fa/activate", "-")
+		middleware.RegisterAdminRoute(http.MethodPost, adminPrefix+"/2fa/disable", "-")
+		middleware.RegisterAdminRoute(http.MethodPost, adminPrefix+"/2fa/recovery-codes", "-")
+
+		admin.GET("/2fa", twoFactorHandler.Status)
+		admin.POST("/2fa/setup", twoFactorHandler.Setup)
+		admin.POST("/2fa/activate", twoFactorHandler.Activate)
+		admin.POST("/2fa/disable", twoFactorHandler.Disable)
+		admin.POST("/2fa/recovery-codes", twoFactorHandler.Regenerate)
+	}
+
+	// Konten: dokumen legal berversi. Dokumen terbit tidak pernah diubah;
+	// perubahan berarti versi baru (plans/09 §2.1).
+	admin.GET("/legal", guard(http.MethodGet, "/legal", authz.CMSView))
+	admin.POST("/legal", guard(http.MethodPost, "/legal", authz.CMSEdit))
+	admin.PATCH("/legal/:id", guard(http.MethodPatch, "/legal/:id", authz.CMSEdit))
+	admin.POST("/legal/:id/publish", guard(http.MethodPost, "/legal/:id/publish", authz.CMSPublish))
 
 	// Tata kelola: ubah role dan penugasannya.
 	admin.POST("/roles", guard(http.MethodPost, "/roles", authz.RoleEdit))

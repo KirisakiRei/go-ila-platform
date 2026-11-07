@@ -98,6 +98,37 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	httpx.OK(c, "Berhasil masuk", result)
 }
 
+// VerifyTwoFactor menangani POST /api/v1/auth/verify-2fa.
+// Cookie sesi baru ditulis setelah kode terbukti sah.
+func (h *AuthHandler) VerifyTwoFactor(c *gin.Context) {
+	var req dto.VerifyTwoFactorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+
+	result, err := h.authService.VerifyTwoFactor(c.Request.Context(), req, service.LoginContext{
+		UserAgent: c.Request.UserAgent(),
+	})
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	expiresAt, err := time.Parse(time.RFC3339, result.ExpiresAt)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	if err := h.issueCookies(c, result.Token, expiresAt); err != nil {
+		c.Error(err)
+		return
+	}
+
+	result.Token = ""
+	httpx.OK(c, "Berhasil masuk", result)
+}
+
 // Logout menangani POST /api/v1/auth/logout dengan menghapus kedua cookie.
 func (h *AuthHandler) Logout(c *gin.Context) {
 	h.cookies.Clear(c)

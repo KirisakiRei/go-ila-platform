@@ -3,11 +3,13 @@ package router
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,7 +46,7 @@ func testConfig(t *testing.T) *config.Config {
 		EngineStrategy:    "ila-2.0",
 		RunnerBaseURL:     "http://127.0.0.1:8081",
 		// Master key lemah: endpoint akun dinonaktifkan, tetapi route tetap terpasang.
-		MasterKey:        "",
+		MasterKey:        sealerTestKey(),
 		MasterKeyVersion: 1,
 		InternalSecret:   "rahasia-internal-uji",
 		MaxDailyLosses:   2,
@@ -93,6 +95,20 @@ func performRequest(r http.Handler, method, path string) *httptest.ResponseRecor
 func performRequestWithCookie(r http.Handler, method, path, name, value string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, nil)
 	req.AddCookie(&http.Cookie{Name: name, Value: value})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+// sealerTestKey adalah kunci uji 32 byte dalam base64.
+func sealerTestKey() string {
+	return base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+}
+
+// performJSONRequest mengirim permintaan berbadan JSON.
+func performJSONRequest(r http.Handler, method, path, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w

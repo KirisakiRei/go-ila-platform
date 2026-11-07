@@ -86,6 +86,38 @@ func (h *AdminAuthHandler) Login(c *gin.Context) {
 	httpx.OK(c, "Berhasil masuk", result)
 }
 
+// VerifyTwoFactor menangani POST /api/v1/admin/auth/verify-2fa.
+// Sesi baru terbit hanya setelah kode terbukti sah.
+func (h *AdminAuthHandler) VerifyTwoFactor(c *gin.Context) {
+	var req dto.VerifyTwoFactorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+
+	result, err := h.auth.VerifyTwoFactor(c.Request.Context(), req, service.LoginContext{
+		UserAgent: c.Request.UserAgent(),
+	})
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	expiresAt, err := time.Parse(time.RFC3339, result.ExpiresAt)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	h.cookies.SetSession(c, result.Token, expiresAt)
+	if _, err := h.cookies.RotateCSRF(c, expiresAt); err != nil {
+		c.Error(err)
+		return
+	}
+
+	result.Token = ""
+	httpx.OK(c, "Berhasil masuk", result)
+}
+
 // Logout menangani POST /api/v1/admin/auth/logout.
 func (h *AdminAuthHandler) Logout(c *gin.Context) {
 	h.cookies.Clear(c)

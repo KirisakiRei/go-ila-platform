@@ -17,6 +17,8 @@ import (
 // sesi user, dengan scope sendiri (plans/03 §2).
 type AdminAuthService interface {
 	Login(ctx context.Context, req dto.LoginRequest, device LoginContext) (*dto.AdminLoginResponse, error)
+	// VerifyTwoFactor menuntaskan login setelah kode 2FA diperiksa.
+	VerifyTwoFactor(ctx context.Context, req dto.VerifyTwoFactorRequest, device LoginContext) (*dto.AdminLoginResponse, error)
 	Profile(ctx context.Context, userID string) (*dto.AdminProfileResponse, error)
 }
 
@@ -27,14 +29,15 @@ type AdminPermissionReader interface {
 }
 
 type adminAuthService struct {
-	users    UserRepository
-	audit    AuditRepository
-	roles    RoleStore
-	perms    AdminPermissionReader
-	issuer   TokenIssuer
-	sessions SessionRecorder
-	twofaOn  bool
-	now      func() time.Time
+	users      UserRepository
+	audit      AuditRepository
+	roles      RoleStore
+	perms      AdminPermissionReader
+	issuer     TokenIssuer
+	sessions   SessionRecorder
+	gate       TwoFactorGate
+	challenges *challengeService
+	now        func() time.Time
 }
 
 // AdminAuthDeps mengumpulkan dependensi layanan autentikasi admin.
@@ -45,22 +48,37 @@ type AdminAuthDeps struct {
 	Perms    AdminPermissionReader
 	Issuer   TokenIssuer
 	Sessions SessionRecorder
-	// RequireTwoFA menandai apakah 2FA wajib. Bila true dan akun belum
-	// mengaktifkan 2FA, login ditolak dengan instruksi aktivasi.
-	RequireTwoFA bool
+	// TwoFactor membuat 2FA opsional sebagai tambahan proteksi. Bila nil,
+	// pintu admin bebas 2FA seperti sebelumnya.
+	TwoFactor TwoFactorGate
+	// Challenges menyimpan keadaan antara kata sandi dan kode 2FA.
+	Challenges ChallengeRepository
 }
 
 // NewAdminAuthService merangkai layanan autentikasi admin.
 func NewAdminAuthService(deps AdminAuthDeps) AdminAuthService {
+	var gate TwoFactorGate
+	var challenges *challengeService
+	if deps.TwoFactor != nil && deps.Challenges != nil {
+		gate = deps.TwoFactor
+		challenges = newChallengeService(deps.Challenges, gate)
+	}
+
+	now := func() time.Time { return time.Now().UTC() }
+	if challenges != nil {
+		challenges.setClock(now)
+	}
+
 	return &adminAuthService{
-		users:    deps.Users,
-		audit:    deps.Audit,
-		roles:    deps.Roles,
-		perms:    deps.Perms,
-		issuer:   deps.Issuer,
-		sessions: deps.Sessions,
-		twofaOn:  deps.RequireTwoFA,
-		now:      func() time.Time { return time.Now().UTC() },
+		users:      deps.Users,
+		audit:      deps.Audit,
+		roles:      deps.Roles,
+		perms:      deps.Perms,
+		issuer:     deps.Issuer,
+		sessions:   deps.Sessions,
+		gate:       gate,
+		challenges: challenges,
+		now:        now,
 	}
 }
 
@@ -92,12 +110,65 @@ func (s *adminAuthService) Login(ctx context.Context, req dto.LoginRequest, devi
 		return nil, apperror.ErrUnauthorized
 	}
 
-	// 2FA belum dirancang pada fase RBAC; penanda ini memaksa penolakan
-	// sampai alur 2FA tersedia agar tidak ada pintu tanpa faktor kedua.
-	if s.twofaOn {
-		return nil, errors.Join(apperror.ErrServiceUnavailable, errors.New("2FA admin belum aktif pada versi ini"))
+	// 2FA opsional: bila akun mengaktifkannya, sesi belum terbit sampai kode
+	// diverifikasi. Klien hanya menerima challenge ID yang tidak berguna
+	// untuk mengakses data (plans/05 §4.1).
+	pending, err := requireTwoFactor(ctx, s.gate, s.challenges, user.ID, PurposeAdmin)
+	if err != nil {
+		return nil, err
+	}
+	if pending.Step == StepTwoFactor {
+		detail := newTwoFactorRequired(pending)
+		return &dto.AdminLoginResponse{
+			Step:        detail.Step,
+			ChallengeID: detail.ChallengeID,
+			ExpiresAt:   detail.ExpiresAt,
+			ExpiresIn:   detail.ExpiresIn,
+			User: dto.AdminIdentity{
+				ID:    user.ID,
+				Name:  user.Name,
+				Email: user.Email,
+				Role:  user.Role,
+			},
+		}, nil
 	}
 
+	return s.issueSession(ctx, user, device)
+}
+
+// VerifyTwoFactor menuntaskan login admin: kode diperiksa, lalu sesi terbit.
+func (s *adminAuthService) VerifyTwoFactor(ctx context.Context, req dto.VerifyTwoFactorRequest, device LoginContext) (*dto.AdminLoginResponse, error) {
+	if s.challenges == nil {
+		return nil, apperror.ErrUnauthorized
+	}
+
+	// Pemilik tantangan dibaca dulu: pemeriksaan kode butuh identitas akun.
+	owner, err := s.challenges.Owner(ctx, req.ChallengeID, PurposeAdmin)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.challenges.Redeem(ctx, req.ChallengeID, owner, PurposeAdmin, req.Code); err != nil {
+		if errors.Is(err, apperror.ErrBadRequest) {
+			s.recordAudit(ctx, owner, "admin.login_failed")
+		}
+		return nil, err
+	}
+
+	user, err := s.users.FindByID(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	// Keadaan akun bisa berubah selama tantangan berjalan.
+	if user.Role != string(config.RoleAdmin) || user.Status != "active" || user.RoleID == nil {
+		return nil, apperror.ErrForbidden
+	}
+
+	return s.issueSession(ctx, user, device)
+}
+
+// issueSession menerbitkan token admin beserta identitas dan kewenangannya.
+func (s *adminAuthService) issueSession(ctx context.Context, user *model.User, device LoginContext) (*dto.AdminLoginResponse, error) {
 	expiresAt := s.now().Add(s.issuer.TTL())
 
 	sessionID := ""
@@ -137,6 +208,7 @@ func (s *adminAuthService) Login(ctx context.Context, req dto.LoginRequest, devi
 	}
 
 	return &dto.AdminLoginResponse{
+		Step:      string(StepComplete),
 		Token:     token,
 		SessionID: sessionID,
 		ExpiresAt: expiresAt.Format(time.RFC3339),

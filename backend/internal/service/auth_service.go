@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"ila/backend/internal/authstate"
 	"ila/backend/internal/config"
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
@@ -22,6 +23,8 @@ type AuthService interface {
 	ChangePassword(ctx context.Context, userID string, req dto.ChangePasswordRequest) error
 	// LogoutAll menaikkan session_version sehingga semua token lama ditolak.
 	LogoutAll(ctx context.Context, userID string) error
+	// VerifyTwoFactor menuntaskan masuk setelah kode 2FA diperiksa.
+	VerifyTwoFactor(ctx context.Context, req dto.VerifyTwoFactorRequest, device LoginContext) (*dto.LoginResponse, error)
 }
 
 // SessionRecorder mencatat sesi baru agar user bisa melihat daftarnya.
@@ -35,7 +38,12 @@ type authService struct {
 	auditRepo   AuditRepository
 	tokenIssuer TokenIssuer
 	sessions    SessionRecorder
-	now         func() time.Time
+	// legal memvalidasi centang Syarat & Ketentuan dan mencatat persetujuan.
+	legal LegalSignupRecorder
+	// gate & challenges membuat 2FA opsional untuk user.
+	gate       TwoFactorGate
+	challenges *challengeService
+	now        func() time.Time
 }
 
 // NewAuthService merangkai layanan akun.
@@ -46,6 +54,31 @@ func NewAuthService(userRepo UserRepository, auditRepo AuditRepository, tokenIss
 		tokenIssuer: tokenIssuer,
 		now:         func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// LegalSignupRecorder memvalidasi dan mencatat persetujuan saat mendaftar.
+type LegalSignupRecorder interface {
+	RequireSignup(req dto.RegisterRequest) error
+	AcceptSignup(ctx context.Context, userID string, meta AcceptanceMeta) error
+}
+
+// WithTwoFactor menambahkan 2FA opsional ke pintu masuk user.
+func WithTwoFactor(s AuthService, gate TwoFactorGate, challenges ChallengeRepository) AuthService {
+	if svc, ok := s.(*authService); ok && gate != nil && challenges != nil {
+		svc.gate = gate
+		svc.challenges = newChallengeService(challenges, gate)
+		// Jam disamakan agar masa berlaku tantangan dihitung konsisten.
+		svc.challenges.setClock(svc.now)
+	}
+	return s
+}
+
+// WithLegal menghubungkan layanan legal ke alur pendaftaran.
+func WithLegal(s AuthService, recorder LegalSignupRecorder) AuthService {
+	if svc, ok := s.(*authService); ok {
+		svc.legal = recorder
+	}
+	return s
 }
 
 // WithSessionRecorder menambahkan pencatatan sesi ke layanan autentikasi.
@@ -63,6 +96,14 @@ type LoginContext struct {
 }
 
 func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*dto.UserResponse, error) {
+	// Persetujuan legal diperiksa sebelum menyentuh database: mendaftar tanpa
+	// centang bukan kesalahan yang bisa diperbaiki setelah akun dibuat.
+	if s.legal != nil {
+		if err := s.legal.RequireSignup(req); err != nil {
+			return nil, err
+		}
+	}
+
 	email := normalizeEmail(req.Email)
 
 	_, err := s.userRepo.FindByEmail(ctx, email)
@@ -97,6 +138,14 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 
 	s.recordAudit(ctx, user.ID, "auth.register", "user", user.ID)
 
+	// Persetujuan dicatat setelah akun ada. Kegagalan di sini tidak
+	// menggagalkan pendaftaran, tetapi tercatat untuk ditindaklanjuti.
+	if s.legal != nil {
+		if err := s.legal.AcceptSignup(ctx, user.ID, AcceptanceMeta{}); err != nil {
+			s.recordAudit(ctx, user.ID, "auth.legal_record_failed", "user", user.ID)
+		}
+	}
+
 	return toUserResponse(user), nil
 }
 
@@ -124,6 +173,22 @@ func (s *authService) LoginWithDevice(ctx context.Context, req dto.LoginRequest,
 	if !utils.ComparePassword(user.PasswordHash, req.Password) {
 		s.recordAudit(ctx, user.ID, "auth.login_failed", "user", user.ID)
 		return nil, apperror.ErrUnauthorized
+	}
+
+	// 2FA opsional: bila aktif, sesi belum terbit sampai kode diverifikasi.
+	pending, err := requireTwoFactor(ctx, s.gate, s.challenges, user.ID, PurposeUser)
+	if err != nil {
+		return nil, err
+	}
+	if pending.Step == StepTwoFactor {
+		detail := newTwoFactorRequired(pending)
+		return &dto.LoginResponse{
+			Step:        detail.Step,
+			ChallengeID: detail.ChallengeID,
+			ExpiresAt:   detail.ExpiresAt,
+			ExpiresIn:   detail.ExpiresIn,
+			User:        *toUserResponse(user),
+		}, nil
 	}
 
 	expiresAt := s.now().Add(s.tokenIssuer.TTL())
@@ -158,6 +223,74 @@ func (s *authService) LoginWithDevice(ctx context.Context, req dto.LoginRequest,
 	s.recordAudit(ctx, user.ID, "auth.login", "user", user.ID)
 
 	return &dto.LoginResponse{
+		Step:      string(StepComplete),
+		Token:     token,
+		SessionID: sessionID,
+		ExpiresAt: expiresAt.Format(time.RFC3339),
+		User:      *toUserResponse(user),
+	}, nil
+}
+
+// VerifyTwoFactor menuntaskan masuk user setelah kode 2FA diperiksa.
+func (s *authService) VerifyTwoFactor(ctx context.Context, req dto.VerifyTwoFactorRequest, device LoginContext) (*dto.LoginResponse, error) {
+	if s.challenges == nil {
+		return nil, apperror.ErrUnauthorized
+	}
+
+	owner, err := s.challenges.Owner(ctx, req.ChallengeID, PurposeUser)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.challenges.Redeem(ctx, req.ChallengeID, owner, PurposeUser, req.Code); err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.FindByID(ctx, owner)
+	if err != nil {
+		return nil, apperror.ErrUnauthorized
+	}
+	// Keadaan akun bisa berubah selama tantangan berjalan.
+	if !authstate.CanUsePlatform(user.Status) {
+		return nil, apperror.ErrForbidden
+	}
+
+	return s.issueSession(ctx, user, device)
+}
+
+// issueSession menerbitkan token user beserta data akunnya.
+func (s *authService) issueSession(ctx context.Context, user *model.User, device LoginContext) (*dto.LoginResponse, error) {
+	expiresAt := s.now().Add(s.tokenIssuer.TTL())
+
+	sessionID := ""
+	if s.sessions != nil {
+		id, err := s.sessions.Record(ctx, user.ID, "", utils.ScopeUser, device.UserAgent, device.IPHash, expiresAt)
+		if err != nil {
+			s.recordAudit(ctx, user.ID, "auth.session_record_failed", "user", user.ID)
+		} else {
+			sessionID = id
+		}
+	}
+
+	token, expiresAt, err := s.tokenIssuer.IssueWithClaims(utils.Claims{
+		UserID:    user.ID,
+		Role:      user.Role,
+		Scope:     utils.ScopeUser,
+		Session:   user.SessionVersion,
+		SessionID: sessionID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.userRepo.UpdateLastLogin(ctx, user.ID, s.now()); err != nil {
+		return nil, err
+	}
+
+	s.recordAudit(ctx, user.ID, "auth.login", "user", user.ID)
+
+	return &dto.LoginResponse{
+		Step:      string(StepComplete),
 		Token:     token,
 		SessionID: sessionID,
 		ExpiresAt: expiresAt.Format(time.RFC3339),

@@ -5,6 +5,9 @@ type RegisterRequest struct {
 	Name     string `json:"name" binding:"required,min=3,max=100"`
 	Email    string `json:"email" binding:"required,email,max=150"`
 	Password string `json:"password" binding:"required,min=10,max=72"`
+	// AcceptTerms menandai centang Syarat & Ketentuan + Kebijakan Privasi.
+	// Registrasi tanpa centang ditolak (plans/09 §3).
+	AcceptTerms bool `json:"accept_terms"`
 }
 
 // LoginRequest adalah payload masuk akun.
@@ -36,9 +39,13 @@ type UserResponse struct {
 // LoginResponse membawa data akun; token sesi dikirim lewat cookie HttpOnly
 // dan sengaja tidak pernah masuk badan balasan.
 type LoginResponse struct {
-	Token     string       `json:"token,omitempty"`
-	ExpiresAt string       `json:"expires_at"`
-	User      UserResponse `json:"user"`
+	// Step bernilai "complete" (sesi terbit) atau "two_factor_required".
+	Step        string       `json:"step,omitempty"`
+	ChallengeID string       `json:"challenge_id,omitempty"`
+	ExpiresIn   int          `json:"expires_in_seconds,omitempty"`
+	Token       string       `json:"token,omitempty"`
+	ExpiresAt   string       `json:"expires_at"`
+	User        UserResponse `json:"user"`
 	// SessionID menunjuk baris sesi yang baru dibuat.
 	SessionID string `json:"session_id,omitempty"`
 }

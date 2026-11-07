@@ -43,6 +43,16 @@ func (c Config) WithSessionName(name string) Config {
 	return c
 }
 
+// WithCSRFName mengembalikan salinan dengan nama cookie CSRF lain.
+//
+// Pemisahan ini penting: bila admin dan user berbagi satu cookie CSRF, login
+// di satu pintu menimpa nilai pintu lain dan permintaan berikutnya ditolak 403
+// secara acak.
+func (c Config) WithCSRFName(name string) Config {
+	c.CSRFName = name
+	return c
+}
+
 // SetSession menulis cookie sesi. HttpOnly membuatnya tidak terbaca JavaScript.
 func (c Config) SetSession(ctx *gin.Context, token string, expiresAt time.Time) {
 	http.SetCookie(ctx.Writer, &http.Cookie{

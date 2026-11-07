@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `78a3066`
+> **Commit terakhir saat log ini ditulis:** `5b59ff6`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,189 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-08 — 2FA opsional (user & admin) + Fase C selesai: legal berversi
+
+**Pelaku:** Claude
+**Tipe:** Fitur 2FA + Penyelesaian Fase C
+**Status:** SELESAI — `gofmt -l` kosong, `go vet` bersih, 16 paket tes lulus
+
+---
+
+## Bagian 1 — 2FA (TOTP), opsional untuk user maupun admin
+
+### Prinsip
+
+Tanpa layanan pihak ketiga. Aplikasi authenticator menghitung kode di
+perangkat dari secret yang kita berikan lewat QR; server kita menghitung dengan
+rumus yang sama (RFC 6238). Tidak ada pendaftaran, tidak ada API key, tidak ada
+panggilan ke server Google.
+
+### Berkas baru
+
+| Berkas | Isi |
+|---|---|
+| `internal/totp/totp.go` | TOTP/HOTP murni stdlib: HMAC-SHA1, 6 digit, 30 detik, toleransi ±1 periode |
+| `internal/totp/totp_test.go` | **Sepuluh vektor uji resmi RFC 4226** + tes toleransi & bentuk salah |
+| `internal/model/twofactor.go` | Tabel `user_2fa`, `user_recovery_code`, `two_factor_challenge` |
+| `pkg/cryptox/sealer.go` | Enkripsi AES-GCM terikat pemilik untuk secret 2FA |
+| `internal/repository/twofactor_repository.go` | Secret, kode pemulihan, tantangan |
+| `internal/service/twofactor_service.go` | Aktivasi, verifikasi, recovery, nonaktifkan |
+| `internal/service/challenge_service.go` | Keadaan antara setelah kata sandi benar |
+| `internal/handler/twofactor_handler.go` | Endpoint `/2fa/*` untuk kedua pintu |
+
+### Alur
+
+```
+Kata sandi benar → 2FA aktif?
+                    ├─ tidak → sesi terbit langsung (step: complete)
+                    └─ ya    → terbit challenge_id (step: two_factor_required)
+                                → POST /verify-2fa {challenge_id, code}
+                                → sesi terbit
+```
+
+| Aturan | Nilai |
+|---|---|
+| Umur tantangan | 5 menit, sekali pakai |
+| Kode salah per tantangan | 5, lalu tantangan hangus |
+| Toleransi TOTP | ±1 periode (±30 detik) |
+| Kode pemulihan | 8, hanya ditampilkan sekali, sekali pakai |
+| Secret disimpan | Terenkripsi master key, terikat ke pemiliknya |
+| Kode dipakai ulang | Ditolak (`last_used_step`) |
+
+### Endpoint
+
+| Endpoint | Keterangan |
+|---|---|
+| `POST /api/v1/auth/verify-2fa` | Langkah kedua masuk user |
+| `POST /api/v1/admin/auth/verify-2fa` | Langkah kedua masuk admin |
+| `GET /2fa` | Status 2FA akun ini |
+| `POST /2fa/setup` | Secret baru + `otpauth_url` |
+| `POST /2fa/activate` | Verifikasi kode lalu aktifkan; balasan berisi 8 kode pemulihan |
+| `POST /2fa/disable` | Matikan setelah kode atau kode pemulihan terbukti |
+| `POST /2fa/recovery-codes` | Set kode pemulihan baru (kode lama hangus) |
+
+Semua `/2fa` tersedia di kedua pintu (`/api/v1/2fa*` dan `/api/v1/admin/2fa*`).
+
+### Celah yang ditemukan & ditutup saat mengerjakan 2FA
+
+> **Cookie CSRF admin dan user bertabrakan.** Sebelumnya keduanya memakai
+> `ila_csrf`. Bila user dan admin masuk di peramban yang sama, login kedua
+> menimpa nilai pertama sehingga permintaan berikutnya ditolak 403 secara acak.
+> Sekarang admin memakai `ila_admin_csrf` (env `ADMIN_CSRF_COOKIE_NAME`).
+
+> **Dua jam berbeda untuk satu masa berlaku.** Layanan 2FA dan pengelola
+> tantangan semula punya sumber waktu masing-masing, sehingga masa berlaku
+> tantangan tidak bisa diuji dan berpotensi meleset. Kini jamnya disamakan.
+
+> **Tantangan 2FA tidak memeriksa pemiliknya.** Versi pertama memakai `userID`
+> yang dibaca dari baris tantangan itu sendiri, sehingga pemeriksaan pemilik
+> tidak bermakna. Sekarang pemilik dibaca lewat `Owner()` lalu dicocokkan.
+
+### Tanpa MASTER_KEY
+
+Endpoint 2FA sengaja tidak dipasang dan alasannya dicatat di log. Menyimpan
+secret tanpa enkripsi lebih buruk daripada tidak ada 2FA sama sekali.
+
+---
+
+## Bagian 2 — Fase C: Legal & Persetujuan
+
+### Berkas baru
+
+| Berkas | Isi |
+|---|---|
+| `internal/legal/catalog.go` | Lima jenis dokumen + aturan kapan persetujuan diminta |
+| `internal/legal/drafts.go` | Draf isi versi 1 (ToS, Privasi, Risiko, Refund, Fair Use) |
+| `internal/model/legal.go` | Tabel `legal_document`, `legal_acceptance` |
+| `internal/repository/legal_repository.go` | Dokumen berversi + bukti persetujuan |
+| `internal/repository/legal_seed.go` | Terbitkan versi 1 hanya bila slug belum punya versi |
+| `internal/service/legal_service.go` | Status persetujuan, penegakan, pengelolaan admin |
+| `internal/handler/legal_handler.go` | Endpoint publik, user, dan admin |
+
+### Aturan dokumen
+
+| Aturan | Alasan |
+|---|---|
+| Dokumen tidak pernah ditimpa | Versi lama adalah bukti masa lalu |
+| Perubahan = versi baru | Nomor versi naik otomatis |
+| Draf dan terbit terpisah | `published_at` kosong berarti draf |
+| `effective_at` boleh di masa depan | Menjadwalkan berlaku |
+| Dokumen terbit tidak bisa `PATCH` | Mencegah bukti berubah di belakang |
+
+### Kapan persetujuan diminta
+
+| Momen | Dokumen |
+|---|---|
+| Mendaftar | `tos`, `privacy`, `fair_use` |
+| Menghubungkan akun broker | `risk` |
+| Pembayaran pertama | `refund` (belum aktif, menunggu Fase G) |
+
+`risk` sengaja tidak diminta saat daftar: sebelum ada akun, user belum
+menanggung risiko finansial apa pun.
+
+### Endpoint
+
+| Endpoint | Keterangan |
+|---|---|
+| `GET /api/v1/legal` | Daftar dokumen yang berlaku (publik) |
+| `GET /api/v1/legal/:slug` | Isi versi berlaku (publik) |
+| `GET /api/v1/me/legal` | Status persetujuan + daftar yang tertunda |
+| `POST /api/v1/me/legal/:slug/accept` | Catat persetujuan `{version}` |
+| `GET /api/v1/admin/legal` | Seluruh versi termasuk draf (`cms.view`) |
+| `POST /api/v1/admin/legal` | Buat draf versi baru (`cms.edit`) |
+| `PATCH /api/v1/admin/legal/:id` | Ubah draf (`cms.edit`) |
+| `POST /api/v1/admin/legal/:id/publish` | Terbitkan (`cms.publish`) |
+
+### Penegakan
+
+| Tempat | Perilaku |
+|---|---|
+| Registrasi | Tanpa centang → **400 sebelum menyentuh database** |
+| Hubungkan akun broker | `risk` belum disetujui → **400** |
+| `GET /system/status` | Field `legal_blocked` menandai fitur tertahan |
+| Setuju versi lama | Ditolak: versi harus yang sedang berlaku |
+
+### Migrasi
+
+`cmd/migrate` kini juga menerbitkan versi 1 kelima dokumen. Slug yang sudah
+punya versi apa pun dilewati, sehingga perubahan isi oleh admin tidak tertimpa
+saat migrasi dijalankan ulang.
+
+### Tes yang mengunci perilaku
+
+| Berkas | Yang dikunci |
+|---|---|
+| `internal/totp/totp_test.go` | Sepuluh vektor RFC 4226, toleransi ±1, bentuk salah ditolak |
+| `internal/service/twofactor_service_test.go` | Aktivasi, replay ditolak, recovery sekali pakai, secret terenkripsi & terikat pemilik |
+| `internal/service/login_twofactor_test.go` | Tantangan 5 menit, sekali pakai, hangus setelah 5 salah, purpose salah ditolak |
+| `internal/service/legal_service_test.go` | Registrasi wajib centang, versi tercatat, versi baru memblokir, dokumen terbit tak bisa diubah |
+| `internal/router/router_test.go` | Legal publik tanpa sesi, 2FA butuh sesi, 2FA mati tanpa master key |
+| `pkg/cryptox/sealer_test.go` | Round-trip, pemilik berbeda gagal, nonce acak |
+
+### Belum dikerjakan
+
+Ini daftar jujur, bukan klaim selesai.
+
+| Hal | Keterangan |
+|---|---|
+| **Antarmuka 2FA** | Belum ada halaman frontend; endpoint siap dipakai |
+| **QR code** | Backend hanya mengirim `otpauth_url`; gambar QR dirender frontend |
+| **Sesi terbatas setelah recovery** | Recovery memakai satu kode lalu login normal; pembatasan 15 menit ke `/2fa/*` belum diterapkan |
+| **Reset 2FA lewat CLI** | Jalur darurat `ila-admin reset-2fa` belum dibuat |
+| **Persetujuan ulang paksa** | `legal_blocked` dilaporkan, tetapi Runner belum menolak eksekusi karenanya |
+| **Halaman `/legal/*` frontend** | Belum ada |
+| **CMS FAQ & pengumuman** | Bagian Fase J, belum dikerjakan |
+
+#### Untuk Hermes (`go-trade`)
+
+| Hal | Dampak pada engine |
+|---|---|
+| 2FA | **Tidak ada.** Murni pintu console |
+| Legal | **Belum ada.** Bila Runner nanti perlu menolak eksekusi karena `legal_blocked`, kontrak sinyal tidak berubah |
+| Kontrak sinyal | **Tidak berubah** |
+
+---
 
 ### 2026-11-08 — Fase B selesai: RBAC (role, permission, pintu admin)
 

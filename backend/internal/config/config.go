@@ -50,6 +50,9 @@ type Config struct {
 	CSRFCookieName    string
 	// AdminCookieName memisahkan sesi admin dari sesi user (plans/03 §2).
 	AdminCookieName string
+	// AdminCSRFCookieName terpisah agar pintu admin dan user tidak saling
+	// menimpa nilai CSRF.
+	AdminCSRFCookieName string
 	// AdminJWTExpiry lebih pendek dari sesi user karena kewenangannya lebih besar.
 	AdminJWTExpiry time.Duration
 	// CookieSecure wajib true di produksi (HTTPS). Boleh false saat pengembangan lokal.
@@ -121,6 +124,7 @@ func Load(service string) (*Config, error) {
 		SessionCookieName:     env("SESSION_COOKIE_NAME", "ila_session"),
 		CSRFCookieName:        env("CSRF_COOKIE_NAME", "ila_csrf"),
 		AdminCookieName:       env("ADMIN_COOKIE_NAME", "ila_admin_session"),
+		AdminCSRFCookieName:   env("ADMIN_CSRF_COOKIE_NAME", "ila_admin_csrf"),
 		AdminJWTExpiry:        envDuration("ADMIN_JWT_EXPIRY", 2*time.Hour),
 		CookieSecure:          envBool("COOKIE_SECURE", false),
 		CookieDomain:          env("COOKIE_DOMAIN", ""),
@@ -185,6 +189,9 @@ func (c *Config) validate() error {
 	}
 	if c.AdminCookieName == c.SessionCookieName {
 		return fmt.Errorf("ADMIN_COOKIE_NAME harus berbeda dari SESSION_COOKIE_NAME")
+	}
+	if c.AdminCSRFCookieName == c.CSRFCookieName {
+		return fmt.Errorf("ADMIN_CSRF_COOKIE_NAME harus berbeda dari CSRF_COOKIE_NAME")
 	}
 	// Default localhost di produksi membuat frontend sendiri ditolak CORS
 	// tanpa pesan jelas; lebih baik gagal saat start (plans/21 D3).

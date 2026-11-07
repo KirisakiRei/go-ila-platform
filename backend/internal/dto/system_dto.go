@@ -13,6 +13,9 @@ type SystemStatus struct {
 	// ServerTimePair menyajikan waktu server dalam WIB dan NY sekaligus.
 	ServerTimePair TimePair `json:"server_time_pair"`
 	DailyTimezone  string   `json:"daily_timezone"`
+	// LegalBlocked berarti ada dokumen wajib yang belum disetujui, sehingga
+	// eksekusi dan pembayaran ditahan (plans/09 §3.2).
+	LegalBlocked bool `json:"legal_blocked"`
 }
 
 // MarketStatus adalah status sesi pasar menurut Engine.

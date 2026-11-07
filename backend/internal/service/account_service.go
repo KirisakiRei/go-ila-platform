@@ -56,7 +56,15 @@ type accountService struct {
 	sealer     Sealer
 	strategies StrategyCatalog
 	revoker    CredentialRevoker
-	clock      func() time.Time
+	// legal memastikan disclaimer risiko disetujui sebelum akun broker nyata
+	// dihubungkan (plans/09 §2.2).
+	legal AccountLinkGuard
+	clock func() time.Time
+}
+
+// AccountLinkGuard memeriksa syarat sebelum akun broker dihubungkan.
+type AccountLinkGuard interface {
+	RequireAccountLink(ctx context.Context, userID string) error
 }
 
 // CredentialRevoker meminta Runner memutus sesi broker setelah kredensial
@@ -76,6 +84,7 @@ type AccountServiceDeps struct {
 	Sealer        Sealer
 	Strategies    StrategyCatalog
 	Revoker       CredentialRevoker
+	Legal         AccountLinkGuard
 	Clock         func() time.Time
 }
 
@@ -101,6 +110,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		sealer:     deps.Sealer,
 		strategies: deps.Strategies,
 		revoker:    deps.Revoker,
+		legal:      deps.Legal,
 		clock:      clock,
 	}
 }
@@ -136,6 +146,14 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 	user, err := s.users.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Disclaimer risiko wajib disetujui sebelum akun nyata dihubungkan:
+	// sebelum ada akun, user belum menanggung risiko finansial apa pun.
+	if s.legal != nil {
+		if err := s.legal.RequireAccountLink(ctx, userID); err != nil {
+			return nil, err
+		}
 	}
 
 	tier := effectiveTier(user, s.clock())
