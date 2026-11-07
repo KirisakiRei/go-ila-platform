@@ -2,20 +2,13 @@ package runner
 
 import (
 	"time"
+
+	"ila/backend/internal/timezone"
 )
 
 // NY adalah zona sesi pasar. Jam trading selalu mengikuti New York, sedangkan
 // hari akuntansi mengikuti WIB (plans/22 §1).
-var NY = mustLoadLocation("America/New_York")
-
-func mustLoadLocation(name string) *time.Location {
-	loc, err := time.LoadLocation(name)
-	if err != nil {
-		// Fallback konservatif; hanya terjadi bila basis data zona tidak ada.
-		return time.UTC
-	}
-	return loc
-}
+var NY = timezone.NY
 
 // MarketScheduleAnomaly menandai status pasar yang janggal pada waktu tertentu.
 type MarketScheduleAnomaly string

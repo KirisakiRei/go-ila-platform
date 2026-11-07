@@ -15,7 +15,7 @@ func RequestID() gin.HandlerFunc {
 		if id == "" {
 			id = newRequestID()
 		}
-		c.Set("request_id", id)
+		c.Set(ContextRequestID, id)
 		c.Header("X-Request-ID", id)
 		c.Next()
 	}
@@ -33,7 +33,7 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 			"path", safePath(c.Request.URL.Path),
 			"status", c.Writer.Status(),
 			"latency_ms", time.Since(start).Milliseconds(),
-			"request_id", c.GetString("request_id"),
+			"request_id", c.GetString(ContextRequestID),
 		}
 		if userID, ok := c.Get(ContextUserID); ok {
 			attrs = append(attrs, "user_id", userID)

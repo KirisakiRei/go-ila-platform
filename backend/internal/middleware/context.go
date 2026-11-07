@@ -14,6 +14,10 @@ const ContextRole = "user_role"
 // ContextSessionID adalah kunci context Gin untuk ID sesi perangkat ini.
 const ContextSessionID = "session_id"
 
+// ContextRequestID adalah kunci context Gin untuk nomor permintaan.
+// Nilai ini disalin ke baris audit agar satu permintaan bisa ditelusuri.
+const ContextRequestID = "request_id"
+
 func newRequestID() string {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {

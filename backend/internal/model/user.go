@@ -37,6 +37,22 @@ type User struct {
 	LastLoginAt   *time.Time `json:"last_login_at"`
 	Status        string     `gorm:"type:varchar(20);not null;default:active" json:"status"`
 
+	// BannedAt dan BanReason dicatat saat akun diblokir. Alasan ditampilkan
+	// ke pengguna, jadi ditulis dengan bahasa yang pantas dibaca (plans/07 §4.3).
+	BannedAt    *time.Time `json:"banned_at"`
+	BanReason   string     `gorm:"type:varchar(255)" json:"ban_reason"`
+	BanCategory string     `gorm:"type:varchar(40)" json:"ban_category"`
+
+	// InternalNote hanya untuk staf; tidak pernah dikirim dalam respons user.
+	InternalNote string `gorm:"type:text" json:"-"`
+
+	// DeletedAtUser menandai akun yang dihapus lewat anonimisasi. Barisnya
+	// tetap ada karena invoice wajib disimpan untuk keperluan pajak.
+	DeletedAtUser *time.Time `json:"deleted_at_user"`
+
+	// RunnerDirtyAt memberi tahu Runner bahwa konfigurasi akun berubah.
+	RunnerDirtyAt *time.Time `gorm:"index" json:"-"`
+
 	// SessionVersion dinaikkan saat sesi harus dicabut seketika: ganti password,
 	// ban, ubah role, atau 2FA berubah. Token yang membawa nilai lama ditolak.
 	SessionVersion int `gorm:"not null;default:1" json:"-"`

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ila/backend/internal/model"
+	"ila/backend/internal/timezone"
 )
 
 // Alasan penolakan eksekusi. Nilainya dipakai di telemetry dan kolom
@@ -124,23 +125,15 @@ func EvaluateDaily(d DailyStatus, p DailyPolicy) RejectReason {
 	return RejectNone
 }
 
-// WIB adalah zona waktu basis aturan harian.
-// Penentuan sesi pasar tetap memakai UTC/NY; hanya hari akuntansi yang WIB.
-// Nilainya dapat diganti lewat DAILY_TZ (lihat SetDailyTimezone).
-var WIB = time.FixedZone("WIB", 7*60*60)
+// WIB dan NY diteruskan dari paket timezone agar pemakai lama tetap berjalan.
+// Rumah sebenarnya ada di internal/timezone supaya lapisan lain bisa memakainya.
+var WIB = timezone.WIB
 
 // SetDailyTimezone mengganti zona hari akuntansi dari konfigurasi.
 // Nama zona tak dikenal diabaikan agar Runner tetap memakai WIB.
 func SetDailyTimezone(name string) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return
-	}
-	loc, err := time.LoadLocation(name)
-	if err != nil {
-		return
-	}
-	WIB = loc
+	timezone.SetDaily(name)
+	WIB = timezone.WIB
 }
 
 // DayKey mengubah waktu menjadi kunci hari WIB berformat YYYY-MM-DD.

@@ -29,6 +29,7 @@ const (
 	UserDelete  = "user.delete"
 	UserTier    = "user.tier"
 	UserLegal   = "user.legal"
+	UserExport  = "user.export"
 )
 
 // Akun broker & langganan.
@@ -91,6 +92,7 @@ var Catalog = []Permission{
 	{UserDelete, "Pelanggan", "Hapus akun", RiskHigh},
 	{UserTier, "Pelanggan", "Ubah tier manual", RiskHigh},
 	{UserLegal, "Pelanggan", "Lihat bukti persetujuan legal", RiskLow},
+	{UserExport, "Pelanggan", "Ekspor data pelanggan", RiskHigh},
 
 	{AccountView, "Akun Broker", "Lihat akun broker tanpa kredensial", RiskLow},
 	{AccountEdit, "Akun Broker", "Ubah label, mode, dan risiko", RiskMedium},

@@ -127,6 +127,21 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	trialService := service.NewTrialService(userRepo, auditRepo)
 
 	roleService := service.NewRoleService(roleRepo, userRepo, auditRepo, permCache)
+
+	// Manajemen pelanggan: seluruh aksinya lewat perekam audit standar.
+	adminAudit := service.NewAuditRecorder(auditRepo)
+	adminUserService := service.NewAdminUserService(
+		repository.NewAdminUserRepository(db),
+		service.AdminUserExtras{
+			Accounts:  repository.NewAdminAccountRepository(db),
+			Positions: repository.NewAdminPositionRepository(db),
+			Legal:     repository.NewAdminLegalRepository(db),
+			Notes:     repository.NewAdminNoteRepository(db),
+		},
+		adminAudit,
+		userRepo,
+	)
+	auditAdminService := service.NewAdminAuditService(repository.NewAuditReader(db), adminAudit)
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
 		Users:      userRepo,
 		Audit:      auditRepo,
@@ -169,6 +184,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		cfg.AdminJWTExpiry,
 	)
 	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
+	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
+	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
 	legalHandler := handler.NewLegalHandler(legalService)
 
 	// Alamat surel dipakai sebagai label di aplikasi authenticator.
@@ -278,7 +295,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -303,6 +320,8 @@ func registerAdmin(
 	roleHandler *handler.AdminRoleHandler,
 	twoFactorHandler *handler.TwoFactorHandler,
 	legalHandler *handler.LegalHandler,
+	userHandler *handler.AdminUserHandler,
+	auditHandler *handler.AdminAuditHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -368,6 +387,11 @@ func registerAdmin(
 	admin.PATCH("/roles/:id", guard(http.MethodPatch, "/roles/:id", authz.RoleEdit))
 	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleEdit))
 	admin.PATCH("/users/:id/role", guard(http.MethodPatch, "/users/:id/role", authz.RoleEdit))
+
+	// Pelanggan: daftar, profil, dan aksi berlapis.
+	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.
+	userHandler.Register(admin.Group(""), guard)
+	auditHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")
 }
