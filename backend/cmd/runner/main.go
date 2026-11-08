@@ -38,6 +38,8 @@ const (
 	// Jeda penyelarasan langganan: cukup cepat merespons langganan baru,
 	// cukup jarang agar tidak membebani database.
 	symbolSyncInterval = 2 * time.Minute
+	// Sesi yang bertahan selama ini dianggap sehat, bukan kegagalan berulang.
+	backoffResetAfter = 30 * time.Second
 )
 
 func main() {
@@ -311,8 +313,15 @@ func runEngineLoop(
 	stateID := engineStateID(target.Strategy)
 
 	for ctx.Err() == nil {
+		mulai := time.Now()
 		err := streamOnce(ctx, target, svc, store, logger)
 		recordEngineState(ctx, store, stateID, target.Strategy, err, logger)
+
+		// Sesi yang bertahan cukup lama dianggap sehat: jeda antar percobaan
+		// dikembalikan ke awal agar koneksi berikutnya tidak menunggu lama.
+		if time.Since(mulai) >= backoffResetAfter {
+			backoff = minBackoff
+		}
 
 		if ctx.Err() != nil {
 			return
@@ -367,7 +376,7 @@ func streamOnce(
 			WantStatusUpdates: true,
 		},
 		engineclient.Events{
-			OnConnected: func(client enginev1.EngineServiceClient) {
+			OnConnected: func(client enginev1.EngineServiceClient, connCtx context.Context) {
 				logger.Info("terhubung ke engine",
 					"strategy", target.Strategy, "addr", target.Addr)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
@@ -376,7 +385,7 @@ func streamOnce(
 				// Selaraskan segera: antara hitung kebutuhan dan koneksi
 				// terbuka, langganan pengguna bisa sudah berubah.
 				syncNow(ctx, target, svc, logger)
-				go syncLoop(ctx, target, svc, logger)
+				go syncLoop(connCtx, target, svc, logger)
 			},
 			OnSignal: func(signal *enginev1.Signal) {
 				svc.SetEngineVersion(signal.GetEngineVersion())

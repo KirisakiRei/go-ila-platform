@@ -127,7 +127,8 @@ type Events struct {
 	OnMarketState func(*enginev1.MarketStateEvent)
 	OnHeartbeat   func(*enginev1.Heartbeat)
 	// OnConnected dipanggil setelah stream dan ACK siap dipakai.
-	OnConnected func(enginev1.EngineServiceClient)
+	// ctx berakhir saat stream berakhir; pekerjaan latar di dalamnya ikut berhenti.
+	OnConnected func(client enginev1.EngineServiceClient, ctx context.Context)
 	// OnDisconnected dipanggil sekali saat stream berakhir.
 	OnDisconnected func(error)
 }
@@ -148,7 +149,9 @@ func Run(ctx context.Context, conn *grpc.ClientConn, req *enginev1.SubscribeRequ
 	}
 
 	if handlers.OnConnected != nil {
-		handlers.OnConnected(client)
+		// callCtx mati saat Run kembali, sehingga pekerjaan yang dijalankan
+		// dari OnConnected ikut berhenti pada reconnect berikutnya.
+		handlers.OnConnected(client, callCtx)
 	}
 
 	for {

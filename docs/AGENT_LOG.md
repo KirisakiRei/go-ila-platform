@@ -35,6 +35,41 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 (audit) — Dua bug yang ditemukan saat mengaudit sendiri pekerjaan S8
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug
+**Ringkasan:**
+Setelah langganan dinamis (S8) selesai, pekerjaan itu diaudit ulang dengan
+menguji reconnect berulang. Dua bug nyata muncul yang tidak tertangkap tes
+unit.
+
+**File terdampak:**
+- `backend/internal/engineclient/client.go` — `OnConnected` menerima ctx
+- `backend/cmd/runner/main.go` — `syncLoop` memakai ctx per-koneksi, reset backoff
+
+**Bug 1 — goroutine penyelaras bocor setiap reconnect.**
+
+`go syncLoop(ctx, ...)` memakai konteks **proses**, bukan konteks koneksi.
+Setiap reconnect menambah satu goroutine yang **tidak pernah berhenti**.
+Setelah seminggu koneksi naik-turun, ratusan goroutine menumpuk.
+
+Perbaikan: `OnConnected` sekarang menerima `callCtx` yang berakhir bersama
+stream, dan `syncLoop` memakai konteks itu.
+
+**Bug 2 — jeda reconnect tidak pernah kembali normal.**
+
+`backoff` hanya bertambah dan tidak pernah di-reset setelah koneksi pulih.
+Uji membuktikan: setelah beberapa kali putus, jeda tetap di 16–30 detik
+walaupun engine sudah hidup lagi, sehingga pemulihan jadi lambat.
+
+Perbaikan: bila sesi bertahan >= 30 detik, jeda dikembalikan ke 1 detik.
+
+**Bukti uji:**
+- Reconnect 5x berturut-turut: hanya 2 sesi tercatat, goroutine tidak menumpuk.
+- Sesi sehat 40 detik lalu engine dimatikan: jeda kembali `1s` (dulu 16s+).
+- `go build ./...` bersih, **22 paket tes lulus**.
+
 ### 2026-11-08 (lanjutan) — Langganan simbol dinamis: tutup celah "harus restart Runner"
 
 **Pelaku:** Claude

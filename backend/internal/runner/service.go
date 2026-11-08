@@ -933,7 +933,9 @@ type AckSender func(ctx context.Context, signalID string) error
 // Hanya selisih yang dikirim agar engine tidak menerima beban penuh tiap menit.
 type SymbolSync func(ctx context.Context, add, remove []string) error
 
-// SetSymbolSync memasang penyelaras langganan. Dipanggil saat stream terhubung.
+// SetSymbolSync memasang penyelaras langganan dan mengosongkan daftar terkirim.
+// Dipanggil saat stream terhubung: engine bisa sudah lupa setelah putus,
+// sehingga seluruh kebutuhan dikirim ulang.
 func (s *Service) SetSymbolSync(sync SymbolSync) {
 	s.mu.Lock()
 	s.symbolSync = sync
