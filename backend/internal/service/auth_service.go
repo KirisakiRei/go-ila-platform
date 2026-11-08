@@ -23,6 +23,8 @@ type AuthService interface {
 	ChangePassword(ctx context.Context, userID string, req dto.ChangePasswordRequest) error
 	// LogoutAll menaikkan session_version sehingga semua token lama ditolak.
 	LogoutAll(ctx context.Context, userID string) error
+	// SetIdleWarning mengatur apakah modal "masih di sini?" tampil.
+	SetIdleWarning(ctx context.Context, userID string, enabled bool) error
 	// VerifyTwoFactor menuntaskan masuk setelah kode 2FA diperiksa.
 	VerifyTwoFactor(ctx context.Context, req dto.VerifyTwoFactorRequest, device LoginContext) (*dto.LoginResponse, error)
 }
@@ -304,6 +306,17 @@ func (s *authService) Profile(ctx context.Context, userID string) (*dto.UserResp
 		return nil, err
 	}
 	return toUserResponse(user), nil
+}
+
+// SetIdleWarning hanya mengubah tampilan peringatan. Batas diam di server
+// tidak ikut berubah: mematikannya tidak memperpanjang sesi (plans/23 §5).
+func (s *authService) SetIdleWarning(ctx context.Context, userID string, enabled bool) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	user.IdleWarning = enabled
+	return s.userRepo.Update(ctx, user)
 }
 
 func (s *authService) recordAudit(ctx context.Context, userID, event, entity, entityID string) {

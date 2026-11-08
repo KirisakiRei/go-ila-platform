@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `bd3ea5a`
+> **Commit terakhir saat log ini ditulis:** `dc59d6e`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,56 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-13 (lanjutan) — Sisa pekerjaan Fase I/J/K/P diselesaikan
+
+**Pelaku:** Claude
+**Tipe:** `SELESAI`
+**Status:** Seluruh butir yang sebelumnya tertunda sudah dikerjakan.
+
+**Sisa pekerjaan yang kini selesai**
+
+| Butir | Yang dikerjakan |
+|---|---|
+| Halaman `/pengaturan/keamanan` | Verifikasi email (kirim ulang), ganti sandi, 2FA TOTP + kode pemulihan, daftar sesi + cabut, toggle peringatan diam |
+| Endpoint baru | `PATCH /api/v1/me/idle-warning` — hanya mengubah tampilan dialog, **tidak** memperpanjang sesi |
+| Halaman `/admin/dukungan` | Jurnal dukungan per pelanggan: cari user, baca catatan, tulis catatan baru dengan saluran & sematan |
+| Halaman admin dipisah | `/admin/engine`, `/admin/runner`, `/admin/kesehatan-broker` + endpoint `GET /admin/system/{engine,runner,brokers}` |
+| Jadwal pasar di UI | `runner.ExpectedOpen` diekspor; `GET /api/v1/status` kini memuat `market` (buka/tutup, perubahan berikutnya dalam WIB dan NY). Kartu "Sesi pasar & kuota harian" tampil di dashboard |
+| Rotasi log | Sudah ada di `deploy/docker-compose.yml` (`max-size 10m`, `max-file 2`) untuk semua layanan |
+| Uji skema database | `internal/model/schema_migrate_test.go` — AutoMigrate 47 model di SQLite + pemeriksaan kolom kunci |
+| Penyapu rahasia di log | `pkg/redact` diperluas (`master_key`, `smtp_pass`, `client_secret`, `pass`) + `redact_sweep_test.go` menyapu seluruh sumber `.go` |
+
+**Keputusan yang perlu diketahui Hermes**
+
+1. **`marketWindow` memakai `runner.ExpectedOpen`**, bukan salinan aturan.
+   Aturan tetap: tutup Sabtu & Minggu; Jumat tutup sejak 17:00 NY; Minggu
+   buka 17:00 NY. Perubahan jadwal dicari per jam dalam rentang 8 hari.
+2. **Peringatan diam bersifat tampilan.** Mematikannya tidak memperpanjang
+   sesi; batas diam tetap ditegakkan server.
+3. **Kesehatan Runner disimpulkan dari laporan engine terakhir.** Tidak ada
+   tabel denyut terpisah, jadi jangan hapus baris `engine_state` — Runner akan
+   terlihat mati sampai laporan berikutnya masuk.
+4. **99 tes backend lulus**, 20 paket, `gofmt`/`go vet` bersih; frontend
+   `tsc`/`eslint` bersih, 34 tes vitest lulus, build dua entri sukses.
+
+**Masih belum bisa dilakukan di sini**
+
+- Migrasi ke **PostgreSQL sungguhan** belum dijalankan: Docker Desktop dan
+  `psql` tidak tersedia di mesin ini. Skema sudah divalidasi lewat AutoMigrate
+  SQLite, tetapi jalankan `go run ./cmd/migrate` sekali di VPS 2 untuk
+  memastikan tipe kolom PostgreSQL (khususnya `jsonb`/`filter` query) sesuai.
+
+**File terdampak (utama)**
+
+`backend/internal/service/{system_ops,auth_service}.go`,
+`backend/internal/handler/{admin_system,auth}_handler.go`,
+`backend/internal/runner/schedule.go`, `backend/internal/dto/system_setting_dto.go`,
+`backend/internal/model/schema_migrate_test.go`, `backend/pkg/redact/*`,
+`frontend/src/pages/SecuritySettingsPage.tsx`, `frontend/src/pages/admin/Admin{Support,Engine,Runner,BrokerHealth}Page.tsx`,
+`frontend/src/features/trading/components/MarketSessionCard.tsx`, `.env.example`.
+
+---
 
 ### 2026-11-13 — Fase I, J, K, P: flag sistem, CMS, operasional, alur akun
 

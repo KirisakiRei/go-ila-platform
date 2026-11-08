@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
-import { SessionSection } from '@/features/auth/components/SessionSection'
 import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
 import { formatDate, formatDateTime } from '@/lib/format'
@@ -131,10 +131,19 @@ export default function SettingsPage() {
 
       <Section
         title="Keamanan"
-        description="Perangkat yang masuk ke akun Anda. Batas diam diberlakukan di server."
+        description="Kata sandi, verifikasi email, 2FA, dan perangkat yang sedang masuk."
       >
-        <div className="border border-border p-4">
-          <SessionSection />
+        <div className="flex flex-col gap-3 border border-border p-4">
+          <p className="text-[13px] text-muted-foreground">
+            Pengaturan keamanan lengkap dipisah ke halaman sendiri agar tidak tercampur dengan uji coba
+            dan notifikasi.
+          </p>
+          <Link
+            to="/pengaturan/keamanan"
+            className="inline-flex w-fit rounded-md border border-border px-3 py-1.5 text-[13px] font-medium hover:bg-secondary"
+          >
+            Buka pengaturan keamanan
+          </Link>
         </div>
       </Section>
     </>

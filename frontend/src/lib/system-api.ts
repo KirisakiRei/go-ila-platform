@@ -1,10 +1,12 @@
 import { request } from './http'
 import type {
   AnnouncementItem,
+  PublicStatus,
   BrokerHealth,
   EngineOverview,
   FaqItem,
   MaintenanceState,
+  RunnerOverview,
   SettingRow,
   SupportNoteItem,
   SystemOverview,
@@ -16,6 +18,9 @@ const ADMIN = '/admin'
 /** Flag sistem: membaca, mengubah, dan mengembalikan ke nilai bawaan. */
 export const adminSystemApi = {
   overview: () => request<SystemOverview>(`${ADMIN}/system`),
+  engines: () => request<EngineOverview[]>(`${ADMIN}/system/engine`),
+  runner: () => request<RunnerOverview>(`${ADMIN}/system/runner`),
+  brokers: () => request<BrokerHealth>(`${ADMIN}/system/brokers`),
   settings: () => request<SettingRow[]>(`${ADMIN}/system/settings`),
   updateSetting: (key: string, payload: { value: string; reason: string; confirm: string }) =>
     request<SettingRow>(`${ADMIN}/system/settings/${key}`, { method: 'PUT', body: payload }),
@@ -58,12 +63,4 @@ export const publicContentApi = {
   status: () => request<PublicStatus>('/status'),
 }
 
-export type PublicStatus = {
-  mode: string
-  message: string
-  expected_end?: string
-  server_time: string
-  time_pair: { wib: string; ny: string }
-}
-
-export type { AnnouncementItem, BrokerHealth, EngineOverview, FaqItem, MaintenanceState, SettingRow, SupportNoteItem, SystemOverview }
+export type { AnnouncementItem, BrokerHealth, EngineOverview, FaqItem, MaintenanceState, PublicStatus, RunnerOverview, SettingRow, SupportNoteItem, SystemOverview }

@@ -19,6 +19,7 @@ const TITLES: Record<string, string> = {
   '/langganan': 'Langganan',
   '/langganan/bayar': 'Pembayaran',
   '/pengaturan': 'Pengaturan',
+  '/pengaturan/keamanan': 'Keamanan',
   '/mulai': 'Mulai',
 }
 

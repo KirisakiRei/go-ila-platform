@@ -87,3 +87,21 @@ export type AnnouncementItem = {
   is_active: boolean
   created_at: string
 }
+
+/** Jadwal pasar dalam dua zona: sesi mengikuti NY, hari akuntansi WIB. */
+export type MarketWindow = {
+  open: boolean
+  label: string
+  next_change: string
+  next_label: string
+  next_change_pair: { wib: string; ny: string; utc: string }
+}
+
+export type PublicStatus = {
+  mode: string
+  message: string
+  expected_end?: string
+  server_time: string
+  time_pair: { wib: string; ny: string; utc: string }
+  market: MarketWindow
+}

@@ -86,6 +86,17 @@ type MaintenanceRequest struct {
 	Confirm     string `json:"confirm,omitempty"`
 }
 
+// MarketWindow adalah jadwal pasar dalam dua zona waktu yang ditampilkan
+// berdampingan, sehingga pengguna tidak perlu menghitung sendiri.
+type MarketWindow struct {
+	Open       bool      `json:"open"`
+	Label      string    `json:"label"`
+	NextChange time.Time `json:"next_change"`
+	NextLabel  string    `json:"next_label"`
+	// NextChangePair menyajikan waktu perubahan jadwal dalam WIB dan NY.
+	NextChangePair TimePair `json:"next_change_pair"`
+}
+
 // PublicStatus adalah status publik untuk ditampilkan di halaman masuk dan
 // dashboard pelanggan. Tidak memuat detail internal apa pun.
 type PublicStatus struct {
@@ -94,4 +105,6 @@ type PublicStatus struct {
 	ExpectedEnd *time.Time `json:"expected_end,omitempty"`
 	ServerTime  time.Time  `json:"server_time"`
 	TimePair    TimePair   `json:"time_pair"`
+	// Market menjelaskan jadwal buka/tutup; dihitung dari aturan sesi NY.
+	Market MarketWindow `json:"market"`
 }

@@ -7,6 +7,7 @@ import type { MarketState } from '@/types/api'
 import { PageHeaderActions } from './components/PageHeaderActions'
 import { DailyLimitCard } from './components/DailyLimitCard'
 import { SystemHealthCard } from './components/SystemHealthCard'
+import { MarketSessionCard } from '@/features/trading/components/MarketSessionCard'
 
 function SummaryStats() {
   const { data, isLoading } = useSystemStatus()
@@ -120,6 +121,8 @@ export default function DashboardPage() {
         <DailyLimitCard />
         <SystemHealthCard />
       </div>
+
+      <MarketSessionCard />
 
       <Section
         title="Posisi terbaru"

@@ -323,6 +323,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Ganti password & cabut seluruh sesi (plans/23 §6).
 		me.POST("/me/password", authHandler.ChangePassword)
 		me.POST("/me/logout-all", authHandler.LogoutAll)
+		// Tampilan peringatan diam; batas sesi di server tidak berubah.
+		me.PATCH("/me/idle-warning", authHandler.SetIdleWarning)
 
 		// Perangkat yang sedang masuk & pencabutan per sesi.
 		me.GET("/me/sessions", sessionHandler.List)

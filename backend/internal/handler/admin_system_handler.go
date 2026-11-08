@@ -28,6 +28,9 @@ func NewAdminSystemHandler(flags service.AdminSystemService, ops service.AdminSy
 // Ubah flag dan ubah mode dijaga superadmin lewat authz.SuperadminOnly.
 func (h *AdminSystemHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 	g.GET("/system", guard(http.MethodGet, "/system", authz.SystemView), h.Overview)
+	g.GET("/system/engine", guard(http.MethodGet, "/system/engine", authz.SystemView), h.Engine)
+	g.GET("/system/runner", guard(http.MethodGet, "/system/runner", authz.SystemView), h.Runner)
+	g.GET("/system/brokers", guard(http.MethodGet, "/system/brokers", authz.SystemView), h.Brokers)
 	g.GET("/system/settings", guard(http.MethodGet, "/system/settings", authz.SystemSettings), h.Settings)
 	g.PUT("/system/settings/:key", guard(http.MethodPut, "/system/settings/:key", authz.SystemSettings), h.UpdateSetting)
 	g.DELETE("/system/settings/:key", guard(http.MethodDelete, "/system/settings/:key", authz.SystemSettings), h.ResetSetting)
@@ -46,6 +49,36 @@ func (h *AdminSystemHandler) Overview(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Kondisi sistem", result)
+}
+
+// Engine menangani GET /api/v1/admin/system/engine.
+func (h *AdminSystemHandler) Engine(c *gin.Context) {
+	result, err := h.ops.EngineDetail(c.Request.Context())
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Kondisi engine", result)
+}
+
+// Runner menangani GET /api/v1/admin/system/runner.
+func (h *AdminSystemHandler) Runner(c *gin.Context) {
+	result, err := h.ops.RunnerDetail(c.Request.Context())
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Kondisi runner", result)
+}
+
+// Brokers menangani GET /api/v1/admin/system/brokers.
+func (h *AdminSystemHandler) Brokers(c *gin.Context) {
+	result, err := h.ops.BrokerDetail(c.Request.Context())
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Kesehatan akun broker", result)
 }
 
 // Settings menangani GET /api/v1/admin/system/settings.

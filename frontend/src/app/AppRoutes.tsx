@@ -17,12 +17,17 @@ import CheckoutPage from '@/pages/CheckoutPage'
 import LegalPage from '@/pages/LegalPage'
 import AdminAuditPage from '@/pages/admin/AdminAuditPage'
 import AdminCmsPage from '@/pages/admin/AdminCmsPage'
+import AdminBrokerHealthPage from '@/pages/admin/AdminBrokerHealthPage'
+import AdminEnginePage from '@/pages/admin/AdminEnginePage'
 import AdminHealthPage from '@/pages/admin/AdminHealthPage'
+import AdminRunnerPage from '@/pages/admin/AdminRunnerPage'
 import AdminMaintenancePage from '@/pages/admin/AdminMaintenancePage'
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
+import AdminSupportPage from '@/pages/admin/AdminSupportPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import OnboardingPage from '@/pages/OnboardingPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import SecuritySettingsPage from '@/pages/SecuritySettingsPage'
 import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
@@ -171,6 +176,17 @@ export function AppRoutes() {
       />
 
       <Route
+        path="/pengaturan/keamanan"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <SecuritySettingsPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+
+      <Route
         path="/langganan"
         element={
           <RequireAuth>
@@ -295,11 +311,51 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/admin/engine"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminEnginePage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/runner"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminRunnerPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/kesehatan-broker"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminBrokerHealthPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
         path="/admin/pemeliharaan"
         element={
           <RequireAuth>
             <AdminPage>
               <AdminMaintenancePage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/dukungan"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminSupportPage />
             </AdminPage>
           </RequireAuth>
         }

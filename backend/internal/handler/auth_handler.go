@@ -161,6 +161,22 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 	httpx.OK(c, "Profil akun", result)
 }
 
+// SetIdleWarning menangani PATCH /api/v1/me/idle-warning.
+func (h *AuthHandler) SetIdleWarning(c *gin.Context) {
+	var req struct {
+		Enabled *bool `json:"enabled" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	if err := h.authService.SetIdleWarning(c.Request.Context(), middleware.CurrentUserID(c), *req.Enabled); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Preferensi peringatan diam diperbarui", gin.H{"idle_warning": *req.Enabled})
+}
+
 // ChangePassword menangani POST /api/v1/me/password.
 // Semua sesi dicabut, jadi cookie perangkat ini ikut dibersihkan.
 func (h *AuthHandler) ChangePassword(c *gin.Context) {

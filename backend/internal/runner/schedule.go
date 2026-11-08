@@ -24,6 +24,13 @@ const (
 	AnomalyUnexpectedOpen MarketScheduleAnomaly = "Pasar buka di luar jadwal normal"
 )
 
+// ExpectedOpen memperkirakan apakah pasar forex seharusnya buka pada waktu t.
+// Diekspor agar status publik memakai aturan yang sama dengan Runner, bukan
+// salinan yang bisa berbeda (plans/22 §3).
+func ExpectedOpen(t time.Time) bool {
+	return expectedOpen(t)
+}
+
 // expectedOpen memperkirakan apakah pasar seharusnya buka pada waktu t.
 // Aturan: tutup penuh Sabtu dan Minggu; Jumat tutup sejak 17:00 NY dan
 // Minggu baru buka 17:00 NY (plans/22 §3).

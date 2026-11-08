@@ -8,6 +8,7 @@ import (
 	"ila/backend/internal/audit"
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
+	"ila/backend/internal/runner"
 	"ila/backend/internal/settings"
 	"ila/backend/pkg/apperror"
 )
@@ -34,6 +35,9 @@ type EngineReader interface {
 // AdminSystemOps adalah layanan operasional: mode, kesehatan, catatan dukungan.
 type AdminSystemOps interface {
 	Overview(ctx context.Context) (*dto.SystemOverview, error)
+	EngineDetail(ctx context.Context) ([]dto.EngineOverview, error)
+	RunnerDetail(ctx context.Context) (*dto.RunnerOverview, error)
+	BrokerDetail(ctx context.Context) (*dto.BrokerHealth, error)
 	ChangeMode(ctx context.Context, actor AdminActor, req dto.MaintenanceRequest) (*dto.MaintenanceState, error)
 	SupportNotes(ctx context.Context, userID string) ([]dto.SupportNoteItem, error)
 	AddSupportNote(ctx context.Context, actor AdminActor, userID string, req dto.SupportNoteRequest) (*dto.SupportNoteItem, error)
@@ -99,20 +103,12 @@ func (s *systemOpsService) Overview(ctx context.Context) (*dto.SystemOverview, e
 	var lastSeen *time.Time
 	runnerHealthy := false
 	for _, engine := range engines {
-		stale := engine.LastSeenAt == nil || now.Sub(*engine.LastSeenAt) > staleAfter
-		out.Engines = append(out.Engines, dto.EngineOverview{
-			Strategy:      engine.Strategy,
-			Connected:     engine.Connected && !stale,
-			EngineVersion: engine.EngineVersion,
-			MarketState:   engine.MarketState,
-			LastSeenAt:    engine.LastSeenAt,
-			LastError:     engine.LastError,
-			Stale:         stale,
-		})
+		item := toEngineOverview(engine, now)
+		out.Engines = append(out.Engines, item)
 		if engine.LastSeenAt != nil && (lastSeen == nil || engine.LastSeenAt.After(*lastSeen)) {
 			lastSeen = engine.LastSeenAt
 		}
-		if !stale {
+		if item.Connected {
 			runnerHealthy = true
 		}
 	}
@@ -190,6 +186,71 @@ func (s *systemOpsService) ChangeMode(ctx context.Context, actor AdminActor, req
 	return &result, nil
 }
 
+// EngineDetail mengembalikan kondisi tiap engine tanpa ringkasan lain.
+// Dipakai halaman /admin/engine agar admin bisa fokus pada satu hal.
+func (s *systemOpsService) EngineDetail(ctx context.Context) ([]dto.EngineOverview, error) {
+	engines, err := s.engines.ListEngines(ctx)
+	if err != nil {
+		return nil, err
+	}
+	now := s.clock()
+	out := make([]dto.EngineOverview, 0, len(engines))
+	for _, engine := range engines {
+		out = append(out, toEngineOverview(engine, now))
+	}
+	return out, nil
+}
+
+// RunnerDetail menyimpulkan kesehatan Runner dari laporan engine terakhir.
+// Runner menulis status lewat engine yang dilayaninya, jadi tidak ada tabel
+// terpisah untuk denyutnya.
+func (s *systemOpsService) RunnerDetail(ctx context.Context) (*dto.RunnerOverview, error) {
+	engines, err := s.engines.ListEngines(ctx)
+	if err != nil {
+		return nil, err
+	}
+	now := s.clock()
+	var lastSeen *time.Time
+	healthy := false
+	for _, engine := range engines {
+		if engine.LastSeenAt == nil {
+			continue
+		}
+		if lastSeen == nil || engine.LastSeenAt.After(*lastSeen) {
+			lastSeen = engine.LastSeenAt
+		}
+		if now.Sub(*engine.LastSeenAt) <= staleAfter {
+			healthy = true
+		}
+	}
+	return &dto.RunnerOverview{Connected: healthy, LastSeen: lastSeen, Stale: !healthy}, nil
+}
+
+// BrokerDetail menghitung akun broker sehat, gagal, dan dibekukan.
+func (s *systemOpsService) BrokerDetail(ctx context.Context) (*dto.BrokerHealth, error) {
+	total, connected, errored, frozen, err := s.store.BrokerHealth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.BrokerHealth{Total: total, Connected: connected, ErrorCount: errored, Frozen: frozen}, nil
+}
+
+// toEngineOverview mengubah baris engine menjadi bentuk tampilan.
+// Laporan yang lebih lama dari staleAfter ditandai basi walau statusnya
+// masih tertulis tersambung.
+func toEngineOverview(engine model.EngineState, now time.Time) dto.EngineOverview {
+	stale := engine.LastSeenAt == nil || now.Sub(*engine.LastSeenAt) > staleAfter
+	return dto.EngineOverview{
+		Strategy:      engine.Strategy,
+		Connected:     engine.Connected && !stale,
+		EngineVersion: engine.EngineVersion,
+		MarketState:   engine.MarketState,
+		LastSeenAt:    engine.LastSeenAt,
+		LastError:     engine.LastError,
+		Stale:         stale,
+	}
+}
+
 func (s *systemOpsService) SupportNotes(ctx context.Context, userID string) ([]dto.SupportNoteItem, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, apperror.ErrNotFound
@@ -249,11 +310,41 @@ func (s *systemOpsService) Status(ctx context.Context) (*dto.PublicStatus, error
 		Message:    maintenanceMessage(state.Mode),
 		ServerTime: now,
 		TimePair:   dto.NewTimePair(now),
+		Market:     marketWindow(now),
 	}
 	if state.Mode != model.ModeNormal {
 		out.ExpectedEnd = state.ExpectedEnd
 	}
 	return out, nil
+}
+
+// marketWindow menghitung jadwal pasar memakai aturan yang sama dengan
+// Runner, sehingga dashboard dan eksekusi tidak pernah berbeda pendapat.
+// Perubahan berikutnya dicari per jam: cukup untuk tampilan dan jauh lebih
+// murah daripada memeriksa per menit sepanjang minggu.
+func marketWindow(now time.Time) dto.MarketWindow {
+	open := runner.ExpectedOpen(now)
+	window := dto.MarketWindow{Open: open, Label: "Pasar buka"}
+	if !open {
+		window.Label = "Pasar tutup"
+	}
+
+	cursor := now.UTC().Truncate(time.Hour).Add(time.Hour)
+	limit := now.Add(8 * 24 * time.Hour)
+	for cursor.Before(limit) {
+		if runner.ExpectedOpen(cursor) != open {
+			window.NextChange = cursor
+			window.NextChangePair = dto.NewTimePair(cursor)
+			if open {
+				window.NextLabel = "Pasar tutup"
+			} else {
+				window.NextLabel = "Pasar buka"
+			}
+			break
+		}
+		cursor = cursor.Add(time.Hour)
+	}
+	return window
 }
 
 func toMaintenanceState(state *model.SystemState) dto.MaintenanceState {

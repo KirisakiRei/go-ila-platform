@@ -2,6 +2,9 @@ import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Activity,
+  Cpu,
+  Gauge,
+  Radio,
   BarChart3,
   FileClock,
   FileText,
@@ -9,6 +12,7 @@ import {
   Percent,
   Settings2,
   ShieldAlert,
+  LifeBuoy,
   ShieldCheck,
   Users,
   Wallet,
@@ -23,8 +27,12 @@ const NAV = [
   { to: '/admin/kupon', label: 'Kupon', icon: Percent, end: false },
   { to: '/admin/laporan', label: 'Laporan', icon: BarChart3, end: false },
   { to: '/admin/audit', label: 'Jejak Audit', icon: FileClock, end: false },
+  { to: '/admin/dukungan', label: 'Dukungan', icon: LifeBuoy, end: false },
   { to: '/admin/konten', label: 'Konten', icon: FileText, end: false },
-  { to: '/admin/kesehatan', label: 'Kesehatan', icon: Activity, end: false },
+  { to: '/admin/engine', label: 'Engine', icon: Radio, end: false },
+  { to: '/admin/runner', label: 'Runner', icon: Cpu, end: false },
+  { to: '/admin/kesehatan-broker', label: 'Kesehatan Broker', icon: Activity, end: false },
+  { to: '/admin/kesehatan', label: 'Ringkasan Kesehatan', icon: Gauge, end: false },
   { to: '/admin/pengaturan-sistem', label: 'Flag Sistem', icon: Settings2, end: false },
   { to: '/admin/pemeliharaan', label: 'Pemeliharaan', icon: ShieldAlert, end: false },
 ]

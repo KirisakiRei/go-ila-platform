@@ -20,9 +20,10 @@ var (
 	// Nilai header Authorization yang ikut tercetak.
 	headerBearer = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._-]{8,}`)
 
-	// Parameter sensitif pada query string atau JSON.
+	// Parameter sensitif pada query string atau JSON. Nama kunci mencakup
+	// bentuk yang dipakai konfigurasi platform (MASTER_KEY, SMTP_PASS, dsb).
 	parameterRahasia = regexp.MustCompile(
-		`(?i)("?(?:token|password|secret|api[_-]?key|access[_-]?token)"?\s*[:=]\s*"?)[^"&,\s}]+`,
+		`(?i)("?(?:token|password|pass|secret|api[_-]?key|access[_-]?token|master[_-]?key|private[_-]?key|client[_-]?secret)"?\s*[:=]\s*"?)[^"&,\s}]+`,
 	)
 )
 
