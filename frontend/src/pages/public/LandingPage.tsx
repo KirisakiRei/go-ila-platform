@@ -96,7 +96,7 @@ export default function LandingPage() {
   }, [hash])
 
   return (
-    <div className="bg-transparent text-[#09090b]">
+    <div className="bg-[#f5f5f7] text-[#09090b]">
       {/* 1 & 2. HERO + OVERVIEW + KURVA: transisi diagonal "/" (kiri-atas gelap -> kanan-bawah lebih cepat terang) */}
       <div
         className="relative overflow-hidden"
@@ -273,7 +273,7 @@ export default function LandingPage() {
       </section>
 
       {/* 4. OVERVIEW KONTROL TRADER (menggantikan bagian rantai/non-kustodial) */}
-      <section className="bg-white py-20 sm:py-28">
+      <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
             <div className="space-y-5 lg:col-span-5">
@@ -467,7 +467,7 @@ export default function LandingPage() {
       </section>
 
       {/* 7. OVERVIEW HARGA (TANPA CARD KOTAK, KOLOM TERBUKA + BENEFIT MANUSIAWI) */}
-      <section className="bg-white py-20 sm:py-24">
+      <section className="relative z-10 bg-[#f5f5f7] py-20 sm:py-24">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col justify-between gap-4 pb-10 sm:flex-row sm:items-end">
             <div className="space-y-2">
@@ -572,7 +572,7 @@ export default function LandingPage() {
       </section>
 
       {/* 8. BANNER CTA GET STARTED (transparan di luar agar gradasi kontinu footer menyatu dari belakang kartu) */}
-      <section className="relative z-10 bg-transparent px-4 pt-12 pb-6 sm:px-6 sm:pt-16">
+      <section className="relative z-10 bg-transparent px-4 pt-10 pb-2 sm:px-6 sm:pt-12 sm:pb-4">
         <div className="mx-auto w-full max-w-6xl">
           <div className="rounded-3xl bg-[#050507] px-6 py-12 text-white shadow-2xl shadow-black/15 sm:px-12 sm:py-16">
             <div className="max-w-2xl space-y-6">

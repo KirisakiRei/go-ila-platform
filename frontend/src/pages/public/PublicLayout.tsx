@@ -6,6 +6,54 @@ import { publicContentApi } from '@/lib/system-api'
 import { cn } from '@/lib/utils'
 import { BrandMark } from './components/LandingArtwork'
 
+/**
+ * Gradasi footer situs publik — satu kanvas kontinu, tanpa patahan.
+ *
+ * Prinsip "tidak patah": tepi atas kanvas ditarik sampai persis menyentuh puncak
+ * kartu Banner CTA (Hero 8), sehingga gradasi tidak mengintip dari baliknya
+ * melainkan mengalir: hitam pekat di belakang kartu, memudar ke terang di
+ * sepanjang kolom tautan, lalu turun kembali ke #050507 di belakang IMAGINARY.
+ *
+ * Persentase di bawah ditakar dari tinggi kanvas sebenarnya (bukan tebakan),
+ * lihat komentar tiap lapisan:
+ * - Desktop 1440px: kartu CTA 0%-47%, zona tautan 49%-77%, watermark 77%+.
+ * - Mobile: footer ±3x lebih tinggi, kartu CTA 0%-39%, tautan 40%-96%.
+ * Dua profil ini dipilih di sisi klien mengikuti breakpoint `sm`
+ * (lihat useFooterGradient).
+ */
+const DARK_TOP = '#050507'
+const DARK_BOTTOM = 'rgb(5, 5, 7)'
+
+const FOOTER_GRADIENT_DESKTOP = [
+  // Lumpur cahaya di atas warna dasar, menyala di zona tautan (49%-77% kanvas).
+  'linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 46.5%, rgba(255, 255, 255, 0.2) 50.5%, rgba(255, 255, 255, 0.46) 55%, rgba(255, 255, 255, 0.4) 66%, rgba(255, 255, 255, 0.12) 75%, rgba(5, 5, 7, 0.46) 79%, rgba(5, 5, 7, 0.97) 82.5%, rgba(5, 5, 7, 1) 84.5%)',
+  // Kantung mist lembut supaya zona terang tidak terasa datar.
+  'radial-gradient(58% 14% at 18% 58%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 100%)',
+  'radial-gradient(48% 11% at 82% 70%, rgba(244, 244, 245, 0.26) 0%, rgba(244, 244, 245, 0) 100%)',
+  // Dasar: hitam pekat di area kartu CTA, lalu #050507 di dasar watermark.
+  `linear-gradient(to bottom, ${DARK_TOP} 0%, ${DARK_TOP} 46.5%, rgba(5, 5, 7, 0.9) 51%, rgba(5, 5, 7, 0.66) 62%, rgba(5, 5, 7, 0.35) 72%, ${DARK_BOTTOM} 84%, ${DARK_BOTTOM} 100%)`,
+].join(', ')
+
+const FOOTER_GRADIENT_COMPACT = [
+  // Mobile: kartu CTA 0%-39%, zona tautan 40%-96%. Di mobile footer ±3x lebih
+  // tinggi daripada desktop, sehingga campuran putih transparan saja hanya
+  // menghasilkan abu gelap. Karena itu dasar kanvas dibuat gelap penuh lebih
+  // dulu, lalu pita terangnya ditulis sebagai warna opaque (#f0f0f3) dengan
+  // tepi yang di-soft agar tetap terbaca sebagai gradasi.
+  'linear-gradient(to bottom, #f0f0f3 0%, #f0f0f3 39%, #f0f0f3 82%, #e6e6ea 86%, #d3d3d9 89%, #a9a9b0 91.5%, #6b6b73 94%, #2f2f34 96.5%, rgb(5, 5, 7) 99%, rgb(5, 5, 7) 100%)',
+  'linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 39%, rgba(255, 255, 255, 0.95) 41.5%, rgba(255, 255, 255, 0.5) 44%, rgba(255, 255, 255, 0) 47%)',
+  'linear-gradient(to bottom, rgba(5, 5, 7, 0) 0%, rgba(5, 5, 7, 0) 82%, rgba(5, 5, 7, 0.12) 87%, rgba(5, 5, 7, 0.45) 92%, rgba(5, 5, 7, 0.88) 96.5%, rgb(5, 5, 7) 99.5%)',
+  `radial-gradient(80% 14% at 22% 52%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 100%)`,
+  `linear-gradient(to bottom, ${DARK_TOP} 0%, ${DARK_TOP} 39.5%, rgba(5, 5, 7, 0.92) 42%, rgba(5, 5, 7, 0.85) 60%, rgba(5, 5, 7, 0.8) 85%, ${DARK_BOTTOM} 100%)`,
+].join(', ')
+
+/** Subhalaman bertumpu pada #f5f5f7, jadi kanvas cukup turun ke gelap di dasar. */
+const FOOTER_GRADIENT_SUBPAGE = [
+  'linear-gradient(to bottom, rgba(5, 5, 7, 0) 52%, rgba(5, 5, 7, 0.5) 72%, rgba(5, 5, 7, 0.92) 82%, rgb(5, 5, 7) 88%, rgb(5, 5, 7) 100%)',
+  'radial-gradient(58% 40% at 16% 34%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 100%)',
+  'linear-gradient(196deg, #f5f5f7 0%, #eeeef1 30%, #e2e2e7 52%, #d5d5da 74%, #d0d0d6 100%)',
+].join(', ')
+
 /** Navigasi utama situs publik, mengikuti alur evaluasi calon pengguna. */
 const NAV = [
   { to: '/fitur', label: 'Fitur' },
@@ -16,6 +64,41 @@ const NAV = [
 ]
 
 type HeaderTheme = 'top' | 'hero-scrolled' | 'light'
+
+/** Titik henti Tailwind `sm`: di bawah ini footer bertumpuk sehingga jauh lebih tinggi. */
+const COMPACT_FOOTER_QUERY = '(max-width: 639px)'
+
+/**
+ * useFooterGradient memilih profil gradasi footer sesuai breakpoint.
+ *
+ * Tidak memakai gradasi breakpoint Tailwind karena proyek ini hanya memuat
+ * `tailwindcss-animate` (tanpa plugin arbitrary variant). Perubahan breakpoint
+ * dibaca lewat `matchMedia` di dalam event listener, bukan `setState` sinkron di
+ * `useEffect`, agar lolos aturan `react-hooks/set-state-in-effect`.
+ *
+ * `matchMedia` tidak selalu ada (jsdom, browser sangat lama), jadi profil
+ * desktop dipakai sebagai nilai aman bawaan.
+ */
+function useFooterGradient(isHome: boolean) {
+  const [isCompact, setIsCompact] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia(COMPACT_FOOTER_QUERY).matches,
+  )
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+
+    const query = window.matchMedia(COMPACT_FOOTER_QUERY)
+    const onChange = (event: MediaQueryListEvent) => setIsCompact(event.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+
+  if (!isHome) return FOOTER_GRADIENT_SUBPAGE
+  return isCompact ? FOOTER_GRADIENT_COMPACT : FOOTER_GRADIENT_DESKTOP
+}
 
 /**
  * PublicLayout adalah kerangka situs publik.
@@ -29,6 +112,7 @@ export function PublicLayout() {
   const isHome = pathname === '/'
   const [homeHeaderTheme, setHomeHeaderTheme] = useState<HeaderTheme>('top')
   const status = useQuery({ queryKey: ['public', 'status'], queryFn: publicContentApi.status })
+  const footerGradient = useFooterGradient(isHome)
 
   useEffect(() => {
     if (!isHome) return
@@ -252,25 +336,33 @@ export function PublicLayout() {
       </main>
 
       <footer className="relative z-0 text-[#09090b]">
-        {/* Kanvas gradasi tunggal yang naik ke belakang Banner CTA (Hero 8) agar menyatu tanpa patahan */}
+        {/*
+          Kanvas gradasi tunggal situs publik, dipasang di dalam <footer> karena
+          `top` di sini relatif terhadap footer (di dalam <main> nilainya mengacu
+          ke tinggi main yang ribuan piksel).
+
+          Di beranda kanvas ditarik ke atas sampai menyentuh kaki section
+          sebelumnya (padding bawah section 8 + margin kartu), lalu terus mengalir:
+          mulai dari #f5f5f7, turun ke hitam pekat di belakang kartu CTA, memudar
+          ke terang di zona tautan, dan kembali ke #050507 di belakang IMAGINARY
+          — satu aliran tanpa patahan.
+
+          Nilai `top` dipilih agar tepi atas kanvas tepat berimpit dengan latar
+          #f5f5f7 di atasnya, sehingga tidak ada garis batas walau kadar gelapnya
+          berbeda.
+        */}
         <div
           aria-hidden="true"
           className={cn(
             'pointer-events-none absolute inset-x-0 bottom-0 z-0 overflow-hidden',
-            isHome ? '-top-[32rem]' : 'top-0',
+            isHome ? '-top-[34rem] sm:-top-[28rem]' : 'top-0',
           )}
-          style={{
-            background: [
-              'linear-gradient(182deg, rgba(5,5,7,0) 0%, rgba(5,5,7,0) 62%, rgba(24,24,27,0.78) 78%, #050507 90%)',
-              'radial-gradient(50% 34% at 12% 48%, rgba(24,24,27,0.3) 0%, rgba(82,82,91,0.14) 48%, rgba(255,255,255,0) 100%)',
-              'linear-gradient(194deg, #ffffff 0%, #ffffff 42%, #e4e4e7 56%, #d4d4d8 69%, #52525b 82%, #050507 94%)',
-            ].join(', '),
-          }}
+          style={{ background: footerGradient }}
         />
 
-        {/* Konten tautan footer: berada di zona atas terang dengan kontras tinggi */}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-16 pb-24 sm:px-6 sm:pt-20 sm:pb-28">
-          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-12">
+        {/* Konten tautan footer: lebih rapat dan tetap berada di zona kontras tinggi */}
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-10 pb-10 sm:px-6 sm:pt-12 sm:pb-12">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-12">
             <div className="space-y-3 lg:col-span-2">
               <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#3f3f46]">
                 Produk
@@ -382,24 +474,47 @@ export function PublicLayout() {
               </div>
             </div>
           </div>
-
-          <div className="mt-12 flex flex-col items-start justify-between gap-2 border-t border-zinc-400/35 pt-6 text-[12px] text-[#27272a] sm:flex-row sm:items-center">
-            <span>© {new Date().getFullYear()} Imaginary Liquidity · rekavia.com</span>
-            <span>Akun tetap di broker Anda · Bukan nasihat keuangan</span>
-          </div>
         </div>
 
-        {/* Watermark raksasa di atas dasar hitam paling bawah */}
+        {/*
+          Watermark raksasa IMAGINARY, full-width dan menempel tepat di tepi
+          paling bawah footer tanpa celah. Angka viewBox diukur dari ink box
+          Inter pada fontSize 218: ascent 156 (cap-height) + descent 3, lalu
+          ditambah ruang napas 15.6 (10% cap-height) di atas huruf.
+          preserveAspectRatio "none" membuat tepi kiri-kanan selalu pas penuh
+          tanpa letterbox maupun ruang putih.
+        */}
         <div
           aria-hidden="true"
-          className="pointer-events-none relative z-10 select-none overflow-hidden whitespace-nowrap px-2 pt-4 text-center font-semibold tracking-[-0.045em] text-white/90"
-          style={{
-            fontSize: 'clamp(4.1rem, 19vw, 17rem)',
-            lineHeight: 0.78,
-            marginBottom: '-0.06em',
-          }}
+          className="pointer-events-none relative z-10 w-full select-none overflow-hidden"
         >
-          Imaginary
+          <svg
+            viewBox="0 0 1200 174.6"
+            className="block h-auto w-full"
+            preserveAspectRatio="none"
+            focusable="false"
+          >
+            <defs>
+              <linearGradient id="footer-wordmark-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#f4f4f5" stopOpacity="0.92" />
+                <stop offset="100%" stopColor="#a1a1aa" stopOpacity="0.5" />
+              </linearGradient>
+            </defs>
+            <text
+              x="600"
+              y="171.6"
+              textAnchor="middle"
+              textLength="1176"
+              lengthAdjust="spacing"
+              fill="url(#footer-wordmark-grad)"
+              style={{ fontFamily: 'inherit' }}
+              fontSize="218"
+              fontWeight="600"
+              letterSpacing="-6"
+            >
+              IMAGINARY
+            </text>
+          </svg>
         </div>
       </footer>
     </div>
