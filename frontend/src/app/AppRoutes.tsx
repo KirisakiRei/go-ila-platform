@@ -255,201 +255,161 @@ export function AppRoutes() {
         <Route
           path="/admin"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminHomePage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminHomePage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/pengguna"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminUsersPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminUsersPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/pengguna/:id"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminUserDetailPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminUserDetailPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/paket"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminPlansPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminPlansPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/kupon"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminCouponsPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminCouponsPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/tagihan"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminInvoicesPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminInvoicesPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/trial"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminTrialsPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminTrialsPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/kode-kredit"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminCreditCodesPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminCreditCodesPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/laporan"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminReportsPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminReportsPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/audit"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminAuditPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminAuditPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/pengaturan-sistem"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminSettingsPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminSettingsPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/kesehatan"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminHealthPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminHealthPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/engine"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminEnginePage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminEnginePage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/runner"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminRunnerPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminRunnerPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/kesehatan-broker"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminBrokerHealthPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminBrokerHealthPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/pemeliharaan"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminMaintenancePage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminMaintenancePage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/dukungan"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminSupportPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminSupportPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/konten"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminCmsPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminCmsPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/konten/legal"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminLegalPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminLegalPage />
+            </AdminPage>
           }
         />
         <Route
           path="/admin/konten/halaman"
           element={
-            <RequireAuth>
-              <AdminPage>
-                <AdminPageContentPage />
-              </AdminPage>
-            </RequireAuth>
+            <AdminPage>
+              <AdminPageContentPage />
+            </AdminPage>
           }
         />
 
