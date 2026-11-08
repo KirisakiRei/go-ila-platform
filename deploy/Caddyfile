@@ -8,8 +8,8 @@
 # path paling spesifik harus ditulis lebih dulu.
 #
 # Catatan: email ACME sengaja TIDAK ditulis di sini. Blok global `email`
-# menolak nilai kosong dan membuat Caddy gagal start. Setel lewat variabel
-# environment CADDY_AGENT_EMAIL di produksi bila ingin akun ACME tertentu.
+# menolak nilai kosong dan membuat Caddy gagal start, sehingga email didaftarkan
+# lewat direktif `tls` di blok situs yang hanya aktif bila nilainya terisi.
 
 # ---------------------------------------------------------------------------
 # Log akses HTTP.
@@ -33,6 +33,16 @@
 }
 
 {$SITE_ADDRESS:localhost} {
+	# Sertifikat Let's Encrypt untuk domain sungguhan. Email ACME wajib diisi di
+	# produksi; bila kosong, nilai cadangan dipakai agar Caddy tetap start saat
+	# pengembangan. localhost dan alamat IP memakai sertifikat internal.
+	tls {$ACME_EMAIL:admin@example.com}
+
+	# www diarahkan permanen ke domain utama agar cookie sesi tidak terbagi
+	# ke dua host dan tautan yang dibagikan selalu satu bentuk.
+	@www host www.{$SITE_ADDRESS}
+	redir @www https://{$SITE_ADDRESS}{uri} permanent
+
 	# Kompresi untuk aset teks.
 	encode zstd gzip
 

@@ -65,6 +65,21 @@ check-frontend: ## Type-check frontend tanpa emit
 up: ## Nyalakan semua container
 	$(COMPOSE) up -d --build
 
+# Jalur pembaruan rutin di VPS. Dua hal dikerjakan berurutan:
+# `git pull` untuk kode terbaru, lalu bangun ulang image dari nol.
+#
+# Cache sengaja dilewati karena lapisan `COPY` kadang dianggap sama oleh
+# BuildKit sehingga kode baru tidak ikut terpakai tanpa galat apa pun.
+#
+# Pemakaian:
+#   make update               # semua layanan
+#   make update S=backend-api # satu layanan saja (lebih ringan di RAM 909 MB)
+.PHONY: update
+update: ## Tarik kode lalu build ulang dari nol
+	git pull --ff-only
+	$(COMPOSE) build --no-cache $(S)
+	$(COMPOSE) up -d
+
 .PHONY: up-cold
 up-cold: ## Nyalakan ulang dari nol termasuk volume database
 	$(COMPOSE) down -v
