@@ -34,31 +34,57 @@ type HeaderTheme = 'top' | 'hero-scrolled' | 'light'
 
 const WATERMARK_LETTERS = ['I', 'M', 'A', 'G', 'I', 'N', 'A', 'R', 'Y'] as const
 
-/** Watermark footer IMAGINARY dengan animasi fade in/out per huruf berdasarkan scroll. */
+/** Opasitas awal tiap huruf sebelum animasi gulir menyentuhnya. */
+const BASE_OPACITY = 0.08
+
+/** clampProgress membatasi nilai ke rentang 0..1. */
+function clampProgress(value: number): number {
+  if (Number.isNaN(value)) return 0
+  return Math.max(0, Math.min(1, value))
+}
+
+/**
+ * Watermark footer IMAGINARY dengan animasi fade per huruf berdasarkan scroll.
+ *
+ * Progress ditakar terhadap sisa gulir dokumen, bukan terhadap posisi elemen di
+ * viewport. Alasannya: watermark menempel di dasar halaman, sehingga jarak
+ * pandangnya sangat pendek dan rumus "posisi elemen" berhenti di sekitar 20%
+ * ketika gulir sudah mentok — itulah sebabnya huruf terakhir tidak pernah
+ * mencapai hitam pekat. Dengan menakar sisa gulir, progress dipastikan tuntas
+ * (1.0) tepat saat halaman mencapai dasar, dan memudar kembali saat digulir naik.
+ */
 function FooterWatermark() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [opacities, setOpacities] = useState<number[]>(() => WATERMARK_LETTERS.map(() => 0.12))
+  const [opacities, setOpacities] = useState<number[]>(() => WATERMARK_LETTERS.map(() => BASE_OPACITY))
 
   useEffect(() => {
     const handleScroll = () => {
       if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const windowHeight = window.innerHeight
+      const doc = document.documentElement
+      const viewport = window.innerHeight
+      const maxScroll = doc.scrollHeight - viewport
 
-      // Hitung progress saat watermark mendekati dan masuk ke viewport bawah
-      const totalDist = windowHeight * 0.7
-      const currentPos = windowHeight - rect.top
-      const progress = Math.max(0, Math.min(1, currentPos / totalDist))
+      // Halaman yang tidak dapat digulir: tampilkan watermark sepenuhnya.
+      if (maxScroll <= 0) {
+        setOpacities(WATERMARK_LETTERS.map(() => 1))
+        return
+      }
 
-      const nextOpacities = WATERMARK_LETTERS.map((_, index) => {
-        const start = (index / WATERMARK_LETTERS.length) * 0.65
-        const end = start + 0.35
-        if (progress <= start) return 0.08
-        if (progress >= end) return 1
-        return 0.08 + (0.92 * (progress - start)) / (end - start)
-      })
+      // Lintasan animasi selebar satu layar terakhir. Pada titik ini footer
+      // sudah mulai terlihat dari bawah, lalu animasi tuntas tepat di dasar.
+      const track = Math.min(maxScroll, viewport * 0.85)
+      const start = maxScroll - track
+      const progress = clampProgress((window.scrollY - start) / track)
 
-      setOpacities(nextOpacities)
+      setOpacities(
+        WATERMARK_LETTERS.map((_, index) => {
+          const from = (index / WATERMARK_LETTERS.length) * 0.75
+          const to = from + 0.25
+          if (progress <= from) return BASE_OPACITY
+          if (progress >= to) return 1
+          return BASE_OPACITY + ((1 - BASE_OPACITY) * (progress - from)) / (to - from)
+        }),
+      )
     }
 
     handleScroll()
@@ -98,7 +124,7 @@ function FooterWatermark() {
             <tspan
               key={index}
               style={{
-                opacity: opacities[index] ?? 0.1,
+                opacity: opacities[index] ?? BASE_OPACITY,
                 transition: 'opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
@@ -179,11 +205,28 @@ export function PublicLayout() {
             className="flex items-center gap-2.5 rounded-md focus-visible:ring-zinc-400"
             onClick={() => setOpen(false)}
           >
-            <img
-              src={isLightHeader ? '/logo-dark.png' : '/logo-light.png'}
-              alt="Imaginary Liquidity"
-              className="h-8 w-auto object-contain transition-opacity duration-200"
-            />
+            {/* Dua lapis logo ditumpuk agar pergantian tema berjalan sebagai
+                crossfade halus, bukan pertukaran `src` yang terlihat patah.
+                `logo-light.png` bergaris hitam (latar terang), `logo-dark.png`
+                bergaris putih (latar gelap). */}
+            <span className="relative block h-8 w-8" aria-hidden="true">
+              <img
+                src="/logo-light.png"
+                alt=""
+                className={cn(
+                  'absolute inset-0 h-8 w-8 object-contain transition-opacity duration-300',
+                  isLightHeader ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              <img
+                src="/logo-dark.png"
+                alt=""
+                className={cn(
+                  'absolute inset-0 h-8 w-8 object-contain transition-opacity duration-300',
+                  isLightHeader ? 'opacity-0' : 'opacity-100',
+                )}
+              />
+            </span>
             <span
               className={cn(
                 'text-sm font-semibold tracking-tight transition-colors',
@@ -341,7 +384,7 @@ export function PublicLayout() {
           {/* Logo & Brand Header Footer */}
           <div className="mb-8 flex items-center gap-3.5 border-b border-zinc-200/80 pb-6">
             <img
-              src="/logo-dark.png"
+              src="/logo-light.png"
               alt="Imaginary Liquidity"
               className="h-10 w-auto object-contain"
             />

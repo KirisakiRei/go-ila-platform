@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookOpen, Edit3, Sparkles } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookOpen, Edit3, Eye, Plus, Sparkles, Trash2 } from 'lucide-react'
 import {
   Alert,
   Badge,
@@ -20,6 +20,7 @@ import {
 import { request } from '@/lib/http'
 import { formatDateTime } from '@/lib/format'
 import { LEGAL_DOCUMENTS, type LegalSlug } from '@/pages/public/legal/documents'
+import { MarkdownView } from '@/pages/public/legal/MarkdownView'
 
 /** Satu versi dokumen legal, termasuk draf yang belum terbit. */
 type LegalVersion = {
@@ -34,6 +35,13 @@ type LegalVersion = {
   published_at?: string
 }
 
+/** Satu bagian (pasal/klausul) pada editor terstruktur. */
+type LegalSection = {
+  id: string
+  heading: string
+  content: string
+}
+
 const SLUGS: { slug: LegalSlug; label: string }[] = [
   { slug: 'tos', label: 'Syarat & Ketentuan' },
   { slug: 'privacy', label: 'Kebijakan Privasi' },
@@ -44,11 +52,88 @@ const SLUGS: { slug: LegalSlug; label: string }[] = [
 
 const ADMIN = '/admin'
 
+let sectionSeq = 0
+function nextSectionId(): string {
+  sectionSeq += 1
+  return `legal-bagian-${sectionSeq}`
+}
+
+/**
+ * parseSections memecah markdown menjadi bagian berdasarkan judul `##`.
+ *
+ * Teks sebelum judul pertama dipertahankan sebagai bagian pembuka (tanpa judul),
+ * sehingga naskah lama yang diawali paragraf tetap utuh saat disunting.
+ */
+function parseSections(markdown: string): LegalSection[] {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const sections: LegalSection[] = []
+
+  let heading = ''
+  let buffer: string[] = []
+
+  const flush = () => {
+    const content = buffer.join('\n').trim()
+    if (heading || content) {
+      sections.push({ id: nextSectionId(), heading, content })
+    }
+    heading = ''
+    buffer = []
+  }
+
+  for (const line of lines) {
+    const match = /^##\s+(.+?)\s*$/.exec(line)
+    if (match) {
+      flush()
+      heading = match[1] ?? ''
+      continue
+    }
+    buffer.push(line)
+  }
+  flush()
+
+  return sections
+}
+
+/**
+ * serializeSections mengembalikan bagian terstruktur ke markdown (`##`).
+ *
+ * Penyimpanan tetap markdown agar kontrak server, riwayat versi, dan pencatatan
+ * persetujuan tidak berubah; editor hanya memberi bentuk yang lebih terarah.
+ */
+function serializeSections(sections: LegalSection[]): string {
+  const blocks = sections
+    .map((section) => {
+      const heading = section.heading.trim()
+      const content = section.content.trim()
+      if (!heading) return content
+      return content ? `## ${heading}\n\n${content}` : `## ${heading}`
+    })
+    .filter((block) => block.trim() !== '')
+
+  return blocks.length > 0 ? `${blocks.join('\n\n')}\n` : ''
+}
+
+/** toDateInputValue mengubah RFC3339 dari server menjadi nilai <input type="date">. */
+function toDateInputValue(value?: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+/** fromDateInputValue mengubah tanggal lokal menjadi RFC3339 UTC (awal hari). */
+function fromDateInputValue(value: string): string | undefined {
+  if (!value) return undefined
+  const date = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
+}
+
 /**
  * AdminLegalPage mengelola versi dokumen legal.
  *
- * Menampilkan pratinjau naskah terbit aktif, riwayat versi, serta penyuntingan draf
- * dalam bentuk modal terfokus dengan dukungan template standar sistem.
+ * Menampilkan pratinjau naskah terbit aktif, riwayat versi, serta penyuntingan
+ * draf terstruktur per bagian (judul pasal + isi) dengan pratinjau langsung.
  */
 export default function AdminLegalPage() {
   const [slug, setSlug] = useState<LegalSlug>(SLUGS[0]?.slug ?? 'tos')
@@ -186,11 +271,9 @@ function LegalEditor({ slug }: { slug: LegalSlug }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-2">
-            <p className="text-base font-semibold text-foreground">{activeTitle}</p>
-          </div>
-          <div className="max-h-80 overflow-y-auto rounded-lg border border-border bg-muted/20 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
-            {activeBody}
+          <p className="mb-3 text-base font-semibold text-foreground">{activeTitle}</p>
+          <div className="max-h-80 overflow-y-auto rounded-lg border border-border bg-white px-5 py-4">
+            <MarkdownView source={activeBody} />
           </div>
         </CardContent>
       </Card>
@@ -261,12 +344,12 @@ function LegalEditor({ slug }: { slug: LegalSlug }) {
           description="Perubahan di draf tidak akan mempengaruhi tampilan publik sebelum Anda menekan tombol 'Terbitkan'."
           size="2xl"
         >
-          <DraftModalForm
+          <DraftSectionEditor
             draft={draft}
             fallbackBody={fallback.body}
             fallbackTitle={fallback.title}
             onSaved={invalidate}
-            onPublish={(id) => publish.mutate(id)}
+            onPublish={(id) => publish.mutateAsync(id)}
             isPublishing={publish.isPending}
             onClose={() => setModalOpen(false)}
           />
@@ -276,7 +359,12 @@ function LegalEditor({ slug }: { slug: LegalSlug }) {
   )
 }
 
-function DraftModalForm({
+/**
+ * DraftSectionEditor menyunting naskah sebagai daftar bagian, bukan teks
+ * markdown mentah. Setiap perubahan dirangkai kembali menjadi `body_md` saat
+ * disimpan, sehingga server dan halaman publik tidak perlu tahu bentuk editor.
+ */
+function DraftSectionEditor({
   draft,
   fallbackBody,
   fallbackTitle,
@@ -289,84 +377,259 @@ function DraftModalForm({
   fallbackBody: string
   fallbackTitle: string
   onSaved: () => void
-  onPublish: (id: string) => void
+  onPublish: (id: string) => Promise<unknown>
   isPublishing: boolean
   onClose: () => void
 }) {
-  const [body, setBody] = useState(draft.body_md?.trim() ? draft.body_md : fallbackBody)
+  const sumberAwal = draft.body_md?.trim() ? draft.body_md : fallbackBody
+
   const [title, setTitle] = useState(draft.title || fallbackTitle)
-  const [requireReaccept, setRequireReaccept] = useState(draft.require_reaccept)
-  const [notice, setNotice] = useState<string | null>(null)
-
-  const save = useMutation({
-    mutationFn: () =>
-      request<LegalVersion>(`${ADMIN}/legal/${draft.id}`, {
-        method: 'PATCH',
-        body: { slug: draft.slug, title, body_md: body, require_reaccept: requireReaccept },
-      }),
-    onSuccess: () => {
-      setNotice('Draf berhasil disimpan.')
-      onSaved()
-    },
-    onError: (error) => setNotice(error instanceof Error ? error.message : 'Gagal menyimpan draf.'),
+  const [sections, setSections] = useState<LegalSection[]>(() => {
+    const parsed = parseSections(sumberAwal)
+    return parsed.length > 0 ? parsed : [{ id: nextSectionId(), heading: '', content: '' }]
   })
+  const [requireReaccept, setRequireReaccept] = useState(draft.require_reaccept)
+  const [effectiveDate, setEffectiveDate] = useState(toDateInputValue(draft.effective_at))
+  const [notice, setNotice] = useState<{ tone: 'info' | 'error'; message: string } | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
 
-  const loadStandardTemplate = () => {
+  const markdown = useMemo(() => serializeSections(sections), [sections])
+
+  const ubahBagian = (id: string, patch: Partial<Pick<LegalSection, 'heading' | 'content'>>) => {
+    setSections((current) =>
+      current.map((section) => (section.id === id ? { ...section, ...patch } : section)),
+    )
+  }
+
+  const geser = (index: number, arah: -1 | 1) => {
+    setSections((current) => {
+      const target = index + arah
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      const [item] = next.splice(index, 1)
+      if (!item) return current
+      next.splice(target, 0, item)
+      return next
+    })
+  }
+
+  const hapusBagian = (id: string) => {
+    setSections((current) => {
+      const next = current.filter((section) => section.id !== id)
+      return next.length > 0 ? next : [{ id: nextSectionId(), heading: '', content: '' }]
+    })
+  }
+
+  const tambahBagian = () => {
+    setSections((current) => [...current, { id: nextSectionId(), heading: '', content: '' }])
+  }
+
+  const muatNaskahSistem = () => {
+    const parsed = parseSections(fallbackBody)
     setTitle(fallbackTitle)
-    setBody(fallbackBody)
-    setNotice('Naskah standar sistem berhasil dimuat ke formulir draf.')
+    setSections(parsed.length > 0 ? parsed : [{ id: nextSectionId(), heading: '', content: '' }])
+    setNotice({ tone: 'info', message: 'Naskah standar sistem dimuat ke formulir draf.' })
+  }
+
+  const valid = title.trim().length > 0 && markdown.trim().length >= 20
+
+  const simpanDraf = async () => {
+    const effectiveAt = fromDateInputValue(effectiveDate)
+    const body: Record<string, unknown> = {
+      slug: draft.slug,
+      title: title.trim(),
+      body_md: markdown,
+      require_reaccept: requireReaccept,
+    }
+    // Kosong berarti "ikut waktu draf dibuat"; jangan menimpa dengan string kosong.
+    if (effectiveAt) body.effective_at = effectiveAt
+
+    return request<LegalVersion>(`${ADMIN}/legal/${draft.id}`, {
+      method: 'PATCH',
+      body,
+    })
+  }
+
+  const handleSimpan = async () => {
+    setSaving(true)
+    setNotice(null)
+    try {
+      await simpanDraf()
+      setNotice({ tone: 'info', message: 'Draf berhasil disimpan.' })
+      onSaved()
+    } catch (error) {
+      setNotice({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Gagal menyimpan draf.',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTerbitkan = async () => {
+    if (!draft.id) return
+    setPublishing(true)
+    setNotice(null)
+    try {
+      // Simpan dulu agar suntingan terakhir tidak hilang saat diterbitkan.
+      await simpanDraf()
+      await onPublish(draft.id)
+      onSaved()
+    } catch (error) {
+      setNotice({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Gagal menerbitkan dokumen.',
+      })
+    } finally {
+      setPublishing(false)
+    }
   }
 
   return (
-    <div className="space-y-4">
-      {notice && <Alert>{notice}</Alert>}
+    <div className="space-y-5">
+      {notice && <Alert variant={notice.tone === 'error' ? 'destructive' : 'default'}>{notice.message}</Alert>}
 
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">{body.length} karakter</span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="text-xs"
-          onClick={loadStandardTemplate}
-        >
-          <Sparkles className="mr-1.5 h-3.5 w-3.5 text-yellow-500" />
-          Muat Naskah Bersih Sistem
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {sections.length} bagian • {markdown.length} karakter
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="text-xs"
+            onClick={() => setShowPreview((value) => !value)}
+          >
+            <Eye className="mr-1.5 h-3.5 w-3.5" />
+            {showPreview ? 'Sembunyikan Pratinjau' : 'Pratinjau Publik'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="text-xs"
+            onClick={muatNaskahSistem}
+          >
+            <Sparkles className="mr-1.5 h-3.5 w-3.5 text-yellow-500" />
+            Muat Naskah Sistem
+          </Button>
+        </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="legal-draft-title">Judul Dokumen</Label>
-        <Input
-          id="legal-draft-title"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="legal-draft-title">Judul Dokumen</Label>
+          <Input
+            id="legal-draft-title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="legal-effective">Berlaku Sejak</Label>
+          <Input
+            id="legal-effective"
+            type="date"
+            value={effectiveDate}
+            onChange={(event) => setEffectiveDate(event.target.value)}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Kosongkan bila ingin mengikuti tanggal draf dibuat.
+          </p>
+        </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="legal-draft-body">Isi Naskah (Markdown)</Label>
-        <textarea
-          id="legal-draft-body"
-          value={body}
-          rows={16}
-          onChange={(event) => setBody(event.target.value)}
-          className="w-full rounded-md border border-input bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-ring"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 pt-2">
+      <div className="flex items-center gap-2">
         <input
           type="checkbox"
           id="require-reaccept"
           checked={requireReaccept}
-          onChange={(e) => setRequireReaccept(e.target.checked)}
+          onChange={(event) => setRequireReaccept(event.target.checked)}
           className="rounded border-input"
         />
-        <Label htmlFor="require-reaccept" className="text-xs cursor-pointer">
+        <Label htmlFor="require-reaccept" className="cursor-pointer text-xs">
           Wajibkan pengguna menyetujui ulang naskah ini setelah diterbitkan
         </Label>
       </div>
+
+      {/* Daftar bagian: judul pasal + isi, dapat digeser dan dihapus. */}
+      <div className="space-y-3">
+        {sections.map((section, index) => (
+          <div key={section.id} className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {section.heading.trim() ? `Bagian ${index + 1}` : index === 0 ? 'Pembuka' : `Bagian ${index + 1}`}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={index === 0}
+                  onClick={() => geser(index, -1)}
+                  aria-label={`Naikkan bagian ${index + 1}`}
+                >
+                  <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={index === sections.length - 1}
+                  onClick={() => geser(index, 1)}
+                  aria-label={`Turunkan bagian ${index + 1}`}
+                >
+                  <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:bg-destructive/10"
+                  onClick={() => hapusBagian(section.id)}
+                  aria-label={`Hapus bagian ${index + 1}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+
+            <Input
+              value={section.heading}
+              placeholder="Judul pasal, mis. Ruang Lingkup Layanan"
+              onChange={(event) => ubahBagian(section.id, { heading: event.target.value })}
+            />
+
+            <textarea
+              value={section.content}
+              rows={6}
+              placeholder="Isi pasal. Baris kosong memisahkan paragraf; awali '-' untuk daftar dan '> [!catatan]' untuk catatan."
+              onChange={(event) => ubahBagian(section.id, { content: event.target.value })}
+              className="mt-2 w-full rounded-md border border-input bg-background p-3 font-mono text-xs leading-relaxed outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        ))}
+
+        <Button type="button" size="sm" variant="outline" onClick={tambahBagian}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Tambah Bagian
+        </Button>
+      </div>
+
+      {showPreview && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Pratinjau Publik
+          </p>
+          <div className="max-h-96 overflow-y-auto rounded-xl border border-border bg-white px-5 py-4">
+            <MarkdownView source={markdown} />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
         <Button variant="ghost" size="sm" type="button" onClick={onClose}>
@@ -376,17 +639,17 @@ function DraftModalForm({
           <Button
             size="sm"
             variant="outline"
-            disabled={save.isPending || !title.trim() || body.trim().length < 20}
-            onClick={() => save.mutate()}
+            disabled={saving || publishing || !valid}
+            onClick={handleSimpan}
           >
-            {save.isPending ? 'Menyimpan…' : 'Simpan Draf'}
+            {saving ? 'Menyimpan…' : 'Simpan Draf'}
           </Button>
           <Button
             size="sm"
-            disabled={isPublishing || !draft.id || !title.trim() || body.trim().length < 20}
-            onClick={() => draft.id && onPublish(draft.id)}
+            disabled={saving || publishing || isPublishing || !draft.id || !valid}
+            onClick={handleTerbitkan}
           >
-            {isPublishing ? 'Menerbitkan…' : 'Terbitkan Sekarang'}
+            {publishing || isPublishing ? 'Menerbitkan…' : 'Simpan & Terbitkan'}
           </Button>
         </div>
       </div>

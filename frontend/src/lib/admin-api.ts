@@ -5,6 +5,10 @@ import type {
   AdminAccountItem,
   AdminInvoiceItem,
   AdminTrialItem,
+  AdminPairCatalog,
+  AdminPairCategory,
+  AdminPairGroup,
+  AdminPairItem,
   CreditCodeItem,
   AdminLegalItem,
   AdminNoteItem,
@@ -110,6 +114,35 @@ export const adminAuditApi = {
     requestList<AuditEntry>(`${ADMIN}/audit`, { query }),
   detail: (id: string) => request<AuditEntry>(`${ADMIN}/audit/${id}`),
   catalog: () => request<AuditCatalogEntry[]>(`${ADMIN}/audit-catalog`),
+}
+
+/**
+ * Katalog pair dikelola admin: kategori → grup → pair.
+ *
+ * Pair yang dipakai user pada halaman Pair Pantauan hanya boleh berasal dari
+ * katalog ini, sehingga penulisan simbol bebas tidak pernah terjadi.
+ */
+export const adminPairApi = {
+  catalog: () => request<AdminPairCatalog>(`${ADMIN}/pairs`),
+
+  createPair: (payload: Record<string, unknown>) =>
+    request<AdminPairItem>(`${ADMIN}/pairs`, { method: 'POST', body: payload }),
+  updatePair: (id: string, payload: Record<string, unknown>) =>
+    request<void>(`${ADMIN}/pairs/${id}`, { method: 'PATCH', body: payload }),
+  deletePair: (id: string) => request<void>(`${ADMIN}/pairs/${id}`, { method: 'DELETE' }),
+
+  createCategory: (payload: Record<string, unknown>) =>
+    request<AdminPairCategory>(`${ADMIN}/pair-categories`, { method: 'POST', body: payload }),
+  updateCategory: (id: string, payload: Record<string, unknown>) =>
+    request<void>(`${ADMIN}/pair-categories/${id}`, { method: 'PATCH', body: payload }),
+  deleteCategory: (id: string) =>
+    request<void>(`${ADMIN}/pair-categories/${id}`, { method: 'DELETE' }),
+
+  createGroup: (payload: Record<string, unknown>) =>
+    request<AdminPairGroup>(`${ADMIN}/pair-groups`, { method: 'POST', body: payload }),
+  updateGroup: (id: string, payload: Record<string, unknown>) =>
+    request<void>(`${ADMIN}/pair-groups/${id}`, { method: 'PATCH', body: payload }),
+  deleteGroup: (id: string) => request<void>(`${ADMIN}/pair-groups/${id}`, { method: 'DELETE' }),
 }
 
 export const adminPlanApi = {

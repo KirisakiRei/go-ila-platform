@@ -167,10 +167,14 @@ export type Subscription = {
   is_active: boolean
 }
 
+/**
+ * Pair pantauan bersifat global: `broker_account_id` opsional dan tidak dikirim
+ * lagi oleh halaman Pair Pantauan. Field tetap ada untuk jejak data lama.
+ */
 export type CreateSubscriptionPayload = {
   symbol: string
   strategy: StrategyVersion
-  broker_account_id: string
+  broker_account_id?: string
 }
 
 export type StrategyStatus = 'active' | 'beta' | 'coming_soon'

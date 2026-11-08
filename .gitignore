@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+ssh/
 
 # Sertifikat & kunci
 *.pem

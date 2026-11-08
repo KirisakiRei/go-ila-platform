@@ -40,6 +40,7 @@ import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage'
 import AdminTrialsPage from '@/pages/admin/AdminTrialsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
+import AdminPairsPage from '@/pages/admin/AdminPairsPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
 import AdminUserDetailPage from '@/pages/admin/AdminUserDetailPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
@@ -322,6 +323,14 @@ export function AppRoutes() {
           element={
             <AdminPage>
               <AdminPlansPage />
+            </AdminPage>
+          }
+        />
+        <Route
+          path="/admin/pairs"
+          element={
+            <AdminPage>
+              <AdminPairsPage />
             </AdminPage>
           }
         />

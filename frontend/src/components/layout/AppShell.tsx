@@ -83,8 +83,9 @@ export function AppShell({ user, children }: AppShellProps) {
       <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
         <div className="flex h-14 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2.5">
-            <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
-            <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
+            {/* logo-light.png = garis hitam untuk latar terang; logo-dark.png = garis putih untuk latar gelap. */}
+            <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
+            <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-bold tracking-tight">ILA</span>
               <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import { ArrowUpRight, FileText, ShieldAlert } from 'lucide-react'
 import { request } from '@/lib/http'
@@ -93,6 +93,7 @@ function Breadcrumb({ current }: { current?: string }) {
 /** LegalHubPage menampilkan seluruh dokumen sebagai satu portal terpadu. */
 function LegalHubPage() {
   const page = usePageContent('legal')
+  const queryClient = useQueryClient()
   const heading = page.data?.sections.find((section) => section.kind === 'table')
 
   // Ringkasan kartu diambil dari CMS; bila admin belum mengisi, kartu memakai
@@ -101,8 +102,18 @@ function LegalHubPage() {
     queryKey: ['legal', 'list'],
     queryFn: () => request<LegalListing>('/legal'),
     retry: 0,
-    staleTime: 15 * 60_000,
+    staleTime: 30 * 60_000,
   })
+
+  // Saat kursor berhenti di satu kartu, dokumennya disiapkan lebih dulu sehingga
+  // halaman baca terbuka tanpa menunggu permintaan baru.
+  const prefetchDoc = (slug: string) => {
+    void queryClient.prefetchQuery({
+      queryKey: ['legal', 'doc', slug],
+      queryFn: () => request<LegalDocResponse>(`/legal/${slug}`),
+      staleTime: 30 * 60_000,
+    })
+  }
 
   const summaryBySlug = useMemo(() => {
     const map = new Map<string, string>()
@@ -163,6 +174,8 @@ function LegalHubPage() {
                     <Link
                       key={doc.slug}
                       to={`/legal/${doc.slug}`}
+                      onMouseEnter={() => prefetchDoc(doc.slug)}
+                      onFocus={() => prefetchDoc(doc.slug)}
                       className="group flex h-full flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-6 transition-colors hover:border-zinc-400"
                     >
                       <div>
@@ -242,7 +255,7 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
     queryKey: ['legal', 'doc', slug],
     queryFn: () => request<LegalDocResponse>(`/legal/${slug}`),
     retry: 0,
-    staleTime: 15 * 60_000,
+    staleTime: 30 * 60_000,
   })
 
   const remoteBody = remote.data?.published ? remote.data.body_md : undefined
@@ -357,6 +370,15 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
                     <dt className="font-medium text-[#3f3f46]">Grup</dt>
                     <dd>{fallback.group}</dd>
                   </div>
+                  {remote.isLoading && (
+                    <div className="flex items-center gap-1.5" aria-live="polite">
+                      <span
+                        className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#a1a1aa]"
+                        aria-hidden="true"
+                      />
+                      <span>Memuat versi terbaru…</span>
+                    </div>
+                  )}
                 </dl>
               </header>
 

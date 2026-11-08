@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2.5">
-          <img src="/logo-dark.png" alt="ILA Admin" className="h-8 w-auto object-contain" />
+          <img src="/logo-light.png" alt="ILA Admin" className="h-8 w-auto object-contain" />
           <span className="text-sm font-bold tracking-tight text-[#09090b]">ILA Admin</span>
         </div>
 

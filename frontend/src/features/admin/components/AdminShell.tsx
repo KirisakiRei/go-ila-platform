@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Activity,
+  Coins,
   Cpu,
   Gauge,
   Radio,
@@ -9,6 +10,7 @@ import {
   FileClock,
   FileText,
   LayoutDashboard,
+  LogOut,
   Percent,
   Receipt,
   Ticket,
@@ -20,6 +22,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
+import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -43,6 +46,10 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/admin/pengguna', label: 'Pengguna', icon: Users },
       { to: '/admin/dukungan', label: 'Dukungan', icon: LifeBuoy },
     ],
+  },
+  {
+    category: 'Katalog & Layanan',
+    items: [{ to: '/admin/pairs', label: 'Katalog Pair', icon: Coins }],
   },
   {
     category: 'Billing & Monetisasi',
@@ -87,18 +94,33 @@ const NAV_GROUPS: NavGroup[] = [
  * karena sesi admin memakai pintu sendiri dan tidak saling bergantian.
  */
 export function AdminShell({ children, actorEmail }: { children: ReactNode; actorEmail?: string }) {
+  const { admin, signOut } = useAdminAuth()
+  const email = admin?.email ?? actorEmail
+
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
       <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
-          <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
-          <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
+          {/* logo-light.png = garis hitam (latar terang), logo-dark.png = garis putih (mode gelap). */}
+          <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
+          <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
           <div className="flex items-baseline gap-1">
             <span className="text-sm font-bold tracking-tight">ILA</span>
             <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Admin
             </span>
           </div>
+
+          {/* Pada layar sempit sidebar menjadi bilah atas; tombol keluar ikut pindah ke sini. */}
+          <button
+            type="button"
+            onClick={signOut}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+            aria-label="Keluar dari panel admin"
+          >
+            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+            Keluar
+          </button>
         </div>
 
         <nav
@@ -134,9 +156,25 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
           ))}
         </nav>
 
-        {actorEmail && (
+        {email && (
           <div className="hidden shrink-0 border-t border-border p-3 lg:block">
-            <p className="truncate text-[11px] text-muted-foreground">{actorEmail}</p>
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Masuk sebagai
+                </p>
+                <p className="truncate text-[11px] text-foreground">{email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={signOut}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Keluar dari panel admin"
+              >
+                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                Keluar
+              </button>
+            </div>
           </div>
         )}
       </aside>

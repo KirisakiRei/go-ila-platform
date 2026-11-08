@@ -246,3 +246,47 @@ export type UserActionPayload = {
   confirm_email?: string
   acknowledge?: boolean
 }
+
+// --- Katalog pair -----------------------------------------------------------
+
+/** Satu pair pada katalog admin, lengkap dengan jumlah pelanggan aktif. */
+export type AdminPairItem = {
+  id: string
+  symbol: string
+  display_name: string
+  category_id: string
+  category_key: string
+  group_id?: string
+  group_key?: string
+  aliases?: string
+  correlated_symbols?: string
+  sort_order: number
+  is_enabled: boolean
+  description?: string
+  subscribers: number
+}
+
+/** Sub-kategori (grup) di dalam sebuah kategori pair. */
+export type AdminPairGroup = {
+  id: string
+  key: string
+  label: string
+  sort_order: number
+  is_enabled: boolean
+}
+
+/** Kategori pair beserta grup dan pair di dalamnya. */
+export type AdminPairCategory = {
+  id: string
+  key: string
+  label: string
+  sort_order: number
+  is_enabled: boolean
+  groups: AdminPairGroup[]
+  pairs: AdminPairItem[]
+}
+
+/** Seluruh katalog pair untuk panel admin. */
+export type AdminPairCatalog = {
+  categories: AdminPairCategory[]
+}

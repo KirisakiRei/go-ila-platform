@@ -16,13 +16,14 @@ export function AuthLayout({ children, footer }: { children: ReactNode; footer: 
     <div className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <a href="/" className="mb-6 flex flex-col items-center justify-center gap-2 group">
+          {/* Garis hitam untuk latar terang, garis putih untuk mode gelap. */}
           <img
-            src="/logo-dark.png"
+            src="/logo-light.png"
             alt="Imaginary Liquidity"
             className="h-16 w-auto object-contain transition-transform duration-200 group-hover:scale-105 dark:hidden"
           />
           <img
-            src="/logo-light.png"
+            src="/logo-dark.png"
             alt="Imaginary Liquidity"
             className="h-16 w-auto object-contain transition-transform duration-200 group-hover:scale-105 hidden dark:block"
           />
