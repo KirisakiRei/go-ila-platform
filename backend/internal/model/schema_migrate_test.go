@@ -30,6 +30,7 @@ func allModels() []any {
 		&model.Invoice{}, &model.Payment{}, &model.Refund{},
 		&model.SystemSetting{}, &model.SystemState{}, &model.SupportNote{},
 		&model.Faq{}, &model.Announcement{}, &model.EmailOutbox{}, &model.EmailToken{},
+		&model.Page{}, &model.PageSection{}, &model.PageItem{},
 	}
 }
 

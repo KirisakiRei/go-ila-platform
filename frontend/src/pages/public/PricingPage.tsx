@@ -1,74 +1,374 @@
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@/components/ui'
-import { publicPlanApi } from '@/lib/admin-api'
+import { Check, Minus } from 'lucide-react'
 import { formatIDR } from '@/features/admin/lib/format'
+import { publicPlanApi } from '@/lib/admin-api'
+import type { PublicPlan } from '@/types/admin'
+import type { PageSection } from '@/types/system'
+import { PageEmpty } from './components/PageRenderer'
+import { PublicHero } from './components/PublicSections'
+import { formatPlanBenefits, getPlanAudience } from './lib/plan-benefits'
+import { pageTitle } from './lib/page-title'
+import { usePageContent } from './lib/use-page-content'
+
+/** Baris perbandingan disusun dari fitur paket, bukan dari teks bebas. */
+type ComparisonRow = {
+  label: string
+  value: (plan: PublicPlan) => string
+}
+
+const COMPARISON: ComparisonRow[] = [
+  {
+    label: 'Akun broker',
+    value: (plan) => {
+      const limit = plan.features?.account_limit
+      return limit ? (limit === '1' ? '1 akun' : `${limit} akun`) : '—'
+    },
+  },
+  {
+    label: 'Instrumen dipantau',
+    value: (plan) => {
+      const symbols = plan.features?.max_symbols
+      if (!symbols) return '—'
+      return symbols === '1' ? '1 pair' : `${symbols} pair`
+    },
+  },
+  {
+    label: 'Jeda sinyal',
+    value: (plan) => {
+      const delay = plan.features?.signal_delay_minutes
+      if (delay === undefined) return '—'
+      return delay === '0' ? 'Tanpa jeda' : `${delay} menit`
+    },
+  },
+  {
+    label: 'Eksekusi',
+    value: (plan) => {
+      if (plan.code === 'free') return 'Simulasi'
+      return plan.features?.auto_execute === 'true' ? 'Otomatis & manual' : 'Manual'
+    },
+  },
+  {
+    label: 'Strategi',
+    value: (plan) =>
+      plan.code === 'plus'
+        ? plan.ila3_coming_soon
+          ? 'ILA 2.0 + 3.0 bertahap'
+          : 'ILA 2.0 + 3.0'
+        : 'ILA 2.0',
+  },
+  {
+    label: 'Ringkasan konteks setup',
+    value: (plan) =>
+      plan.features?.reason_ai === 'true' || plan.code === 'plus' ? 'Termasuk' : 'Tidak termasuk',
+  },
+]
 
 /**
- * PricingPage menampilkan katalog paket dari database.
+ * PricingPage menampilkan katalog paket dari basis data.
  *
- * Harga tidak ditulis di kode: perubahan dari panel admin langsung terlihat
- * di sini, sehingga tidak ada dua sumber harga yang bisa berbeda (plans/11 J4).
+ * Harga tidak ditulis di kode: perubahan dari panel admin langsung terlihat di
+ * sini, sehingga tidak ada dua sumber harga yang bisa berbeda (plans/11 J4).
+ * Judul, pengantar, FAQ, dan disclaimer berasal dari halaman "harga" yang
+ * dikelola admin, sehingga kalimat pembuka dapat disunting tanpa deploy.
  */
 export default function PricingPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['public', 'plans'], queryFn: publicPlanApi.list })
-  const plans = data ?? []
+  const plansQuery = useQuery({
+    queryKey: ['public', 'plans'],
+    queryFn: publicPlanApi.list,
+  })
+  const page = usePageContent('harga')
+
+  const plans = plansQuery.data ?? []
+  const sections = page.data?.sections ?? []
+  const faqSection = sections.find((section) => section.kind === 'faq')
+  const noteSection = sections.find((section) => section.kind === 'callout')
+  const comparisonSection = sections.find((section) => section.kind === 'table')
+
+  if (page.isLoading) {
+    return (
+      <div className="bg-[#f5f5f7]">
+        <div className="mx-auto w-full max-w-6xl animate-pulse px-4 py-16 sm:px-6">
+          <div className="h-3 w-20 rounded bg-zinc-200" />
+          <div className="mt-4 h-10 w-2/3 rounded bg-zinc-200" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!page.data) return <PageEmpty title={pageTitle('harga')} />
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Harga</h1>
-      <p className="mt-2 max-w-2xl text-[13px] text-muted-foreground">
-        Semua paket memakai akun broker Anda sendiri. Pembayaran bulanan; masa tenggang tetap memberi
-        akses baca dan pemantauan posisi.
-      </p>
+    <div className="bg-[#f5f5f7] text-[#09090b]">
+      <PublicHero
+        eyebrow={page.data.eyebrow}
+        title={page.data.title}
+        description={page.data.lead}
+        actions={
+          <>
+            <a
+              href="/app/register"
+              className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800"
+            >
+              Mulai dengan paket gratis
+            </a>
+            <a
+              href="/legal/refund"
+              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-5 py-2.5 text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100"
+            >
+              Kebijakan pengembalian dana
+            </a>
+          </>
+        }
+      />
 
-      {isLoading && (
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <Skeleton className="h-56 w-full" />
-          <Skeleton className="h-56 w-full" />
-          <Skeleton className="h-56 w-full" />
-        </div>
-      )}
+      {/* Kartu paket: satu-satunya sumber harga adalah katalog aktif di server. */}
+      <div className="mx-auto w-full max-w-6xl px-4 pb-14 sm:px-6">
+        {plansQuery.isLoading ? (
+          <div className="grid gap-4 lg:grid-cols-3">
+            {[0, 1, 2].map((index) => (
+              <div
+                key={index}
+                className="h-[420px] animate-pulse rounded-2xl border border-zinc-200 bg-white"
+              />
+            ))}
+          </div>
+        ) : plans.length === 0 ? (
+          <p className="rounded-2xl border border-zinc-200 bg-white p-6 text-[13px] text-[#52525b]">
+            Katalog paket belum tersedia saat ini. Silakan periksa kembali sebentar lagi.
+          </p>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-3">
+            {plans.map((plan) => {
+              const highlight = plan.code === 'plus'
+              const benefits = formatPlanBenefits(plan)
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {plans.map((plan) => (
-          <Card key={plan.code}>
-            <CardHeader>
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-sm">{plan.name}</CardTitle>
-                {plan.code === 'plus' && <Badge variant="solid">Favorit</Badge>}
-              </div>
-              <CardDescription className="text-xs">{plan.description || '—'}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-2xl font-semibold tabular-nums">{formatIDR(plan.price_idr)}</p>
-                <p className="text-[11px] text-muted-foreground">per bulan</p>
-              </div>
-              <ul className="space-y-1 text-[12px]">
-                {Object.entries(plan.features ?? {}).map(([key, value]) => (
-                  <li key={key} className="flex justify-between gap-2 border-b border-border pb-1 last:border-0">
-                    <span className="text-muted-foreground">{key}</span>
-                    <span className="text-right font-medium">{value}</span>
-                  </li>
-                ))}
-              </ul>
-              {plan.ila3_coming_soon && <Badge variant="default">ILA 3.0 belum tersedia</Badge>}
-              {/* Anchor biasa: panel pelanggan bundel terpisah di /app/*. */}
-              <a
-                href="/app/register"
-                className="block rounded-md bg-foreground px-3 py-2 text-center text-[13px] font-medium text-background"
-              >
-                Pilih {plan.name}
-              </a>
-            </CardContent>
-          </Card>
-        ))}
+              return (
+                <article
+                  key={plan.code}
+                  className={
+                    highlight
+                      ? 'relative flex flex-col rounded-2xl border border-[#09090b] bg-[#09090b] p-6 text-white sm:p-7'
+                      : 'relative flex flex-col rounded-2xl border border-zinc-200 bg-white p-6 sm:p-7'
+                  }
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-[17px] font-semibold tracking-tight">{plan.name}</h2>
+                      <p
+                        className={
+                          highlight
+                            ? 'mt-1.5 text-[12.5px] leading-relaxed text-zinc-400'
+                            : 'mt-1.5 text-[12.5px] leading-relaxed text-[#52525b]'
+                        }
+                      >
+                        {getPlanAudience(plan)}
+                      </p>
+                    </div>
+                    {highlight && (
+                      <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#09090b]">
+                        Paling lengkap
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className={
+                      highlight
+                        ? 'mt-6 border-b border-white/15 pb-6'
+                        : 'mt-6 border-b border-zinc-200 pb-6'
+                    }
+                  >
+                    <p className="tabular text-[30px] font-semibold leading-none tracking-tight">
+                      {plan.price_idr === 0 ? 'Gratis' : formatIDR(plan.price_idr)}
+                    </p>
+                    <p
+                      className={
+                        highlight
+                          ? 'mt-1.5 text-[11px] uppercase tracking-[0.1em] text-zinc-500'
+                          : 'mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#a1a1aa]'
+                      }
+                    >
+                      {plan.price_idr === 0 ? 'Selamanya' : 'Per bulan'}
+                    </p>
+                  </div>
+
+                  <ul className="mt-6 flex-1 space-y-2.5">
+                    {benefits.map((benefit) => (
+                      <li key={benefit.label} className="flex items-start gap-2 text-[13px]">
+                        <Check
+                          className={
+                            highlight
+                              ? 'mt-0.5 h-3.5 w-3.5 shrink-0 text-white'
+                              : 'mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3f3f46]'
+                          }
+                          aria-hidden="true"
+                        />
+                        <span className={highlight ? 'text-zinc-200' : 'text-[#3f3f46]'}>
+                          {benefit.label}
+                        </span>
+                      </li>
+                    ))}
+                    {plan.ila3_coming_soon && (
+                      <li
+                        className={
+                          highlight
+                            ? 'flex items-start gap-2 text-[12px] text-zinc-500'
+                            : 'flex items-start gap-2 text-[12px] text-[#a1a1aa]'
+                        }
+                      >
+                        <Minus className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>ILA 3.0 dibuka bertahap</span>
+                      </li>
+                    )}
+                  </ul>
+
+                  <a
+                    href="/app/register"
+                    className={
+                      highlight
+                        ? 'mt-7 inline-flex items-center justify-center rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-[#09090b] transition-colors hover:bg-zinc-200'
+                        : 'mt-7 inline-flex items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100'
+                    }
+                  >
+                    {plan.price_idr === 0 ? 'Mulai gratis' : `Pilih ${plan.name}`}
+                  </a>
+                </article>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      <Alert variant="warning" className="mt-8">
-        Hasil trading bergantung pada kondisi pasar dan keputusan Anda. Tidak ada jaminan keuntungan;
-        modal dapat berkurang sebagian atau seluruhnya.
-      </Alert>
+      {/* Tabel perbandingan: nilainya dihitung dari katalog aktif. */}
+      {plans.length > 0 && (
+        <section className="border-t border-zinc-200/80 bg-white">
+          <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <h2 className="text-[24px] font-semibold leading-tight tracking-tight sm:text-[28px]">
+                {comparisonSection?.title ?? 'Perbandingan paket'}
+              </h2>
+              <p className="max-w-sm text-[13px] leading-relaxed text-[#52525b]">
+                {comparisonSection?.lead ||
+                  'Nilai pada tabel dibaca langsung dari katalog aktif dan selalu berlaku sesuai tanggal penagihan.'}
+              </p>
+            </div>
+
+            <div className="mt-8 overflow-x-auto rounded-2xl border border-zinc-200">
+              <table className="w-full min-w-[680px] border-collapse text-left text-[13px]">
+                <thead>
+                  <tr className="bg-[#f4f4f5]">
+                    <th
+                      scope="col"
+                      className="border-b border-zinc-200 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3f3f46]"
+                    >
+                      Kapabilitas
+                    </th>
+                    {plans.map((plan) => (
+                      <th
+                        key={plan.code}
+                        scope="col"
+                        className="border-b border-zinc-200 px-5 py-3.5 text-[13px] font-semibold text-[#09090b]"
+                      >
+                        {plan.name}
+                        <span className="tabular mt-0.5 block text-[11px] font-normal text-[#71717a]">
+                          {plan.price_idr === 0 ? 'Gratis' : formatIDR(plan.price_idr)}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {COMPARISON.map((row) => (
+                    <tr key={row.label} className="even:bg-[#fafafa]">
+                      <th
+                        scope="row"
+                        className="border-b border-zinc-100 px-5 py-3.5 text-[13px] font-medium text-[#3f3f46]"
+                      >
+                        {row.label}
+                      </th>
+                      {plans.map((plan) => (
+                        <td
+                          key={plan.code}
+                          className="border-b border-zinc-100 px-5 py-3.5 text-[13px] text-[#52525b]"
+                        >
+                          {row.value(plan)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-[12px] text-[#71717a]">
+              Uji coba 7 hari memberi fitur setara paket tertinggi dalam mode simulasi.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* FAQ pembayaran dari CMS. */}
+      {faqSection && <PricingFaq section={faqSection} />}
+
+      {/* Disclaimer risiko: wajib tampil di halaman harga. */}
+      <section className="border-t border-zinc-200/80 bg-white">
+        <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
+          <div className="rounded-2xl border border-zinc-300 bg-[#fafafa] p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#09090b]">
+              {noteSection?.title || 'Disclaimer risiko'}
+            </p>
+            <p className="mt-2 max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-[#52525b]">
+              {noteSection?.body ||
+                'Langganan memberi Anda akses ke alat bantu analisis dan eksekusi, bukan jaminan hasil. Hasil trading bergantung pada kondisi pasar dan keputusan Anda sendiri; modal dapat berkurang sebagian atau seluruhnya.'}{' '}
+              <a
+                href="/legal/risk"
+                className="font-medium text-[#09090b] underline underline-offset-2"
+              >
+                Baca Disclaimer Risiko Trading
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
+  )
+}
+
+/** PricingFaq merender tanya-jawab pembayaran dari isi halaman. */
+function PricingFaq({ section }: { section: PageSection }) {
+  return (
+    <section className="border-t border-zinc-200/80">
+      <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+        <div className="grid gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <h2 className="text-[24px] font-semibold leading-tight tracking-tight sm:text-[28px]">
+              {section.title}
+            </h2>
+            {section.lead && (
+              <p className="mt-3 text-[13px] leading-relaxed text-[#52525b]">{section.lead}</p>
+            )}
+            <a
+              href="/bantuan"
+              className="mt-5 inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100"
+            >
+              Buka pusat bantuan
+            </a>
+          </div>
+
+          <div className="lg:col-span-8">
+            <dl className="divide-y divide-zinc-200 border-t border-zinc-200">
+              {section.items.map((item) => (
+                <div key={item.label} className="py-5">
+                  <dt className="text-[14px] font-semibold text-[#09090b]">{item.label}</dt>
+                  <dd className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
+                    {item.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }

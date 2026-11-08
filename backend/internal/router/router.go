@@ -193,6 +193,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// Konten: FAQ dan pengumuman diubah tanpa deploy (plans/11 Fase J).
 	cmsService := service.NewCMSService(repository.NewCMSRepository(db))
 
+	// Halaman publik: isi bagian, FAQ, dan benefit paket dikelola admin.
+	pageService := service.NewPageService(repository.NewPageRepository(db))
+
 	// Alur akun: lupa sandi, verifikasi email, onboarding (plans/17).
 	emailRepo := repository.NewEmailRepository(db)
 	emailAccountStore := struct {
@@ -251,6 +254,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminSystemHandler := handler.NewAdminSystemHandler(adminSystemService, systemOpsService, systemOpsService)
 	publicStatusHandler := handler.NewPublicStatusHandler(systemOpsService)
 	cmsHandler := handler.NewCMSHandler(cmsService)
+	pageHandler := handler.NewPageHandler(pageService)
 	emailAccountHandler := handler.NewEmailAccountHandler(emailAccountService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
 
@@ -327,6 +331,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	{
 		publicStatus.GET("/status", publicStatusHandler.Status)
 		cmsHandler.PublicRegister(publicStatus.Group(""))
+		pageHandler.PublicRegister(publicStatus.Group(""))
 	}
 
 	// API v1
@@ -412,7 +417,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, adminTrialHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -466,6 +471,7 @@ func registerAdmin(
 	reportHandler *handler.AdminReportHandler,
 	systemHandler *handler.AdminSystemHandler,
 	cmsHandler *handler.CMSHandler,
+	pageHandler *handler.PageHandler,
 	adminTrialHandler *handler.AdminTrialHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
@@ -547,6 +553,7 @@ func registerAdmin(
 	reportHandler.Register(admin.Group(""), guard)
 	systemHandler.Register(admin.Group(""), guard)
 	cmsHandler.Register(admin.Group(""), guard)
+	pageHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")
 }

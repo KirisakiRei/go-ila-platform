@@ -2,14 +2,15 @@ import { useEffect, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import { FullPageLoading } from '@/app/FullPageLoading'
+import { ScrollToTop } from '@/app/ScrollToTop'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
-import LegalPage from '@/pages/LegalPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AboutPage from '@/pages/public/AboutPage'
 import FeaturesPage from '@/pages/public/FeaturesPage'
 import HelpCenterPage from '@/pages/public/HelpCenterPage'
 import LandingPage from '@/pages/public/LandingPage'
+import LegalCenterPage from '@/pages/public/legal/LegalCenterPage'
 import PricingPage from '@/pages/public/PricingPage'
 import { PublicLayout } from '@/pages/public/PublicLayout'
 
@@ -56,8 +57,8 @@ function PublicRoutes() {
         <Route path="tentang" element={<AboutPage />} />
         <Route path="bantuan" element={<HelpCenterPage />} />
         <Route path="bantuan/:topik" element={<HelpCenterPage />} />
-        <Route path="legal" element={<LegalPage />} />
-        <Route path="legal/:slug" element={<LegalPage />} />
+        <Route path="legal" element={<LegalCenterPage />} />
+        <Route path="legal/:slug" element={<LegalCenterPage />} />
 
         {/* Alur akun tanpa sesi: tautan dari surel menunjuk ke akar situs,
             bukan ke /app, sehingga rutenya harus ada di entri ini. */}
@@ -79,6 +80,7 @@ export function PublicApp({ children }: { children?: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ScrollToTop />
         <PublicRoutes />
         {children}
       </BrowserRouter>

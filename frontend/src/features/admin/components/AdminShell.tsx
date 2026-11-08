@@ -34,7 +34,8 @@ const NAV = [
   { to: '/admin/laporan', label: 'Laporan', icon: BarChart3, end: false },
   { to: '/admin/audit', label: 'Jejak Audit', icon: FileClock, end: false },
   { to: '/admin/dukungan', label: 'Dukungan', icon: LifeBuoy, end: false },
-  { to: '/admin/konten', label: 'Konten', icon: FileText, end: false },
+  { to: '/admin/konten', label: 'Konten', icon: FileText, end: true },
+  { to: '/admin/konten/halaman', label: 'Halaman Publik', icon: FileText, end: false },
   { to: '/admin/engine', label: 'Engine', icon: Radio, end: false },
   { to: '/admin/runner', label: 'Runner', icon: Cpu, end: false },
   { to: '/admin/kesehatan-broker', label: 'Kesehatan Broker', icon: Activity, end: false },
@@ -54,7 +55,9 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
           <ShieldCheck className="h-4 w-4" aria-hidden />
           <span className="text-sm font-bold tracking-tight">ILA</span>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Admin</span>
+          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Admin
+          </span>
         </div>
 
         <nav aria-label="Navigasi admin" className="flex gap-1 overflow-x-auto p-2 lg:flex-col">

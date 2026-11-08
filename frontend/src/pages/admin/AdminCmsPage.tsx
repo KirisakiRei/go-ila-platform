@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -31,8 +32,16 @@ export default function AdminCmsPage() {
     <>
       <PageHeader
         title="Konten"
-        description="FAQ tampil di pusat bantuan; pengumuman tampil di dashboard pelanggan."
+        description="FAQ tampil di pusat bantuan; pengumuman tampil di dashboard pelanggan; isi halaman publik disunting di menu Halaman Publik."
       />
+      <div className="mb-4">
+        <Link
+          to="/admin/konten/halaman"
+          className="inline-flex items-center gap-1.5 text-sm font-medium underline underline-offset-4"
+        >
+          Buka pengelolaan isi halaman publik
+        </Link>
+      </div>
       <div className="grid gap-4">
         <FaqSection />
         <AnnouncementSection />
@@ -46,7 +55,10 @@ function FaqSection() {
   const [notice, setNotice] = useState<string | null>(null)
   const [draft, setDraft] = useState({ category: '', question: '', answer_md: '' })
 
-  const { data, isLoading } = useQuery({ queryKey: ['admin', 'cms', 'faq'], queryFn: adminCmsApi.faq })
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'cms', 'faq'],
+    queryFn: adminCmsApi.faq,
+  })
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'faq'] })
 
@@ -61,7 +73,8 @@ function FaqSection() {
   })
 
   const toggle = useMutation({
-    mutationFn: (row: FaqItem) => adminCmsApi.updateFaq(row.id, { ...row, is_active: !row.is_active }),
+    mutationFn: (row: FaqItem) =>
+      adminCmsApi.updateFaq(row.id, { ...row, is_active: !row.is_active }),
     onSuccess: invalidate,
     onError: (error) => setNotice(error instanceof Error ? error.message : 'Gagal mengubah FAQ.'),
   })
@@ -93,10 +106,15 @@ function FaqSection() {
         )}
 
         {rows.map((row) => (
-          <div key={row.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2 last:border-0">
+          <div
+            key={row.id}
+            className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2 last:border-0"
+          >
             <div className="min-w-0">
               <p className="text-[13px] font-medium">{row.question}</p>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{row.category}</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {row.category}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {!row.is_active && <Badge variant="default">Nonaktif</Badge>}
@@ -158,14 +176,19 @@ function FaqSection() {
 function AnnouncementSection() {
   const queryClient = useQueryClient()
   const [notice, setNotice] = useState<string | null>(null)
-  const [draft, setDraft] = useState({ title: '', body: '', level: 'info' as 'info' | 'warning' | 'critical' })
+  const [draft, setDraft] = useState({
+    title: '',
+    body: '',
+    level: 'info' as 'info' | 'warning' | 'critical',
+  })
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'cms', 'announcements'],
     queryFn: adminCmsApi.announcements,
   })
 
-  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'announcements'] })
+  const invalidate = () =>
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'announcements'] })
 
   const create = useMutation({
     mutationFn: () => adminCmsApi.createAnnouncement({ ...draft, is_active: true }),
@@ -174,13 +197,16 @@ function AnnouncementSection() {
       setDraft({ title: '', body: '', level: 'info' })
       invalidate()
     },
-    onError: (error) => setNotice(error instanceof Error ? error.message : 'Gagal menerbitkan pengumuman.'),
+    onError: (error) =>
+      setNotice(error instanceof Error ? error.message : 'Gagal menerbitkan pengumuman.'),
   })
 
   const toggle = useMutation({
-    mutationFn: (row: AnnouncementItem) => adminCmsApi.updateAnnouncement(row.id, { ...row, is_active: !row.is_active }),
+    mutationFn: (row: AnnouncementItem) =>
+      adminCmsApi.updateAnnouncement(row.id, { ...row, is_active: !row.is_active }),
     onSuccess: invalidate,
-    onError: (error) => setNotice(error instanceof Error ? error.message : 'Gagal mengubah pengumuman.'),
+    onError: (error) =>
+      setNotice(error instanceof Error ? error.message : 'Gagal mengubah pengumuman.'),
   })
 
   const rows: AnnouncementItem[] = data ?? []
@@ -197,11 +223,17 @@ function AnnouncementSection() {
         {notice && <Alert>{notice}</Alert>}
         {isLoading && <Skeleton className="h-24 w-full" />}
         {!isLoading && rows.length === 0 && (
-          <EmptyState title="Belum ada pengumuman" description="Pengumuman hanya muncul di jendela waktunya." />
+          <EmptyState
+            title="Belum ada pengumuman"
+            description="Pengumuman hanya muncul di jendela waktunya."
+          />
         )}
 
         {rows.map((row) => (
-          <div key={row.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2 last:border-0">
+          <div
+            key={row.id}
+            className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2 last:border-0"
+          >
             <div className="min-w-0">
               <p className="text-[13px] font-medium">{row.title}</p>
               <p className="text-[11px] text-muted-foreground">
@@ -234,7 +266,12 @@ function AnnouncementSection() {
               <select
                 id="ann-level"
                 value={draft.level}
-                onChange={(event) => setDraft({ ...draft, level: event.target.value as 'info' | 'warning' | 'critical' })}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    level: event.target.value as 'info' | 'warning' | 'critical',
+                  })
+                }
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="info">Info</option>

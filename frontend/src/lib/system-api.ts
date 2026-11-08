@@ -6,6 +6,8 @@ import type {
   EngineOverview,
   FaqItem,
   MaintenanceState,
+  PageContent,
+  PageContentPayload,
   RunnerOverview,
   SettingRow,
   SupportNoteItem,
@@ -34,8 +36,14 @@ export const adminSystemApi = {
   }) => request<MaintenanceState>(`${ADMIN}/system/mode`, { method: 'PUT', body: payload }),
   supportNotes: (userID: string) =>
     request<SupportNoteItem[]>(`${ADMIN}/users/${userID}/support-notes`),
-  addSupportNote: (userID: string, payload: { body: string; channel?: string; is_pinned?: boolean }) =>
-    request<SupportNoteItem>(`${ADMIN}/users/${userID}/support-notes`, { method: 'POST', body: payload }),
+  addSupportNote: (
+    userID: string,
+    payload: { body: string; channel?: string; is_pinned?: boolean },
+  ) =>
+    request<SupportNoteItem>(`${ADMIN}/users/${userID}/support-notes`, {
+      method: 'POST',
+      body: payload,
+    }),
 }
 
 /** Konten: FAQ dan pengumuman diubah tanpa deploy ulang. */
@@ -54,6 +62,11 @@ export const adminCmsApi = {
     request<AnnouncementItem>(`${ADMIN}/announcements/${id}`, { method: 'PATCH', body: payload }),
   deleteAnnouncement: (id: string) =>
     request<void>(`${ADMIN}/announcements/${id}`, { method: 'DELETE' }),
+
+  pages: () => request<PageContent[]>(`${ADMIN}/pages`),
+  page: (slug: string) => request<PageContent>(`${ADMIN}/pages/${slug}`),
+  savePage: (slug: string, payload: PageContentPayload) =>
+    request<PageContent>(`${ADMIN}/pages/${slug}`, { method: 'PUT', body: payload }),
 }
 
 /** Konten publik: dibaca halaman bantuan dan dashboard tanpa sesi. */
@@ -61,6 +74,19 @@ export const publicContentApi = {
   faq: () => request<FaqItem[]>('/faq'),
   announcements: () => request<AnnouncementItem[]>('/announcements'),
   status: () => request<PublicStatus>('/status'),
+  /** Isi halaman publik dikelola admin; halaman menampilkan keadaan kosong bila belum ada. */
+  page: (slug: string) => request<PageContent>(`/pages/${slug}`),
 }
 
-export type { AnnouncementItem, BrokerHealth, EngineOverview, FaqItem, MaintenanceState, PublicStatus, RunnerOverview, SettingRow, SupportNoteItem, SystemOverview }
+export type {
+  AnnouncementItem,
+  BrokerHealth,
+  EngineOverview,
+  FaqItem,
+  MaintenanceState,
+  PublicStatus,
+  RunnerOverview,
+  SettingRow,
+  SupportNoteItem,
+  SystemOverview,
+}

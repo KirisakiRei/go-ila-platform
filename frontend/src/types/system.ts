@@ -77,6 +77,58 @@ export type FaqItem = {
   updated_at: string
 }
 
+/** Satu butir bagian halaman: kartu, langkah, pertanyaan, atau sel tabel. */
+export type PageItem = {
+  label: string
+  value: string
+  note: string
+  icon: string
+  href: string
+  sort_order: number
+}
+
+/** Jenis bagian yang punya bentuk render tetap di antarmuka. */
+export type PageSectionKind =
+  'prose' | 'cards' | 'steps' | 'faq' | 'table' | 'callout' | 'features' | 'stats'
+
+/** Satu bagian halaman publik. */
+export type PageSection = {
+  key: string
+  kind: PageSectionKind
+  eyebrow: string
+  title: string
+  lead: string
+  body: string
+  layout: string
+  sort_order: number
+  is_published: boolean
+  items: PageItem[]
+}
+
+/** Isi lengkap satu halaman publik. */
+export type PageContent = {
+  slug: string
+  eyebrow: string
+  title: string
+  lead: string
+  meta_title: string
+  meta_description: string
+  is_published: boolean
+  updated_at: string
+  sections: PageSection[]
+}
+
+/** Bentuk kiriman saat admin menyimpan halaman. */
+export type PageContentPayload = {
+  eyebrow: string
+  title: string
+  lead: string
+  meta_title: string
+  meta_description: string
+  is_published: boolean
+  sections: PageSection[]
+}
+
 export type AnnouncementItem = {
   id: string
   title: string

@@ -12,6 +12,7 @@ import (
 	"ila/backend/internal/config"
 	"ila/backend/internal/legal"
 	"ila/backend/internal/model"
+	"ila/backend/internal/pagecontent"
 	"ila/backend/internal/repository"
 )
 
@@ -83,6 +84,9 @@ func main() {
 		&model.SupportNote{},
 		&model.Faq{},
 		&model.Announcement{},
+		&model.Page{},
+		&model.PageSection{},
+		&model.PageItem{},
 		&model.EmailOutbox{},
 		&model.EmailToken{},
 	}
@@ -131,10 +135,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Isi halaman publik diisi sekali; suntingan admin tidak pernah tertimpa
+	// migrasi berikutnya.
+	pagesSeeded, err := repository.SeedPages(ctx, db, pagecontent.Seeds(), time.Now().UTC())
+	if err != nil {
+		logger.Error("isi halaman awal gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
 	logger.Info("migrasi selesai",
 		"tables", len(models),
 		"support_dipindah", moved,
 		"admin_dilengkapi", filled,
 		"dokumen_legal_diterbitkan", seeded,
+		"halaman_disiapkan", pagesSeeded,
 	)
 }

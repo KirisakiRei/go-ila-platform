@@ -75,6 +75,7 @@ var harapanAksiAudit = map[string]audit.Action{
 	"POST /api/v1/admin/announcements":       audit.CMSAnnouncement,
 	"PATCH /api/v1/admin/announcements/:id":  audit.CMSAnnouncement,
 	"DELETE /api/v1/admin/announcements/:id": audit.CMSAnnouncement,
+	"PUT /api/v1/admin/pages/:slug":          audit.CMSPageChange,
 }
 
 // Setiap route mutasi admin harus punya kode aksi audit yang terdaftar.

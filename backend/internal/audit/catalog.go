@@ -72,6 +72,7 @@ const (
 	LegalPublish     Action = "legal.publish"
 	CMSFaqChange     Action = "cms.faq.change"
 	CMSAnnouncement  Action = "cms.announcement.change"
+	CMSPageChange    Action = "cms.page.change"
 	RoleCreate       Action = "role.create"
 	RoleUpdate       Action = "role.update"
 	RoleDelete       Action = "role.delete"
@@ -138,6 +139,7 @@ var Catalog = []Entry{
 	{LegalPublish, "Sistem", "Dokumen legal diterbitkan", false},
 	{CMSFaqChange, "Konten", "FAQ diubah", false},
 	{CMSAnnouncement, "Konten", "Pengumuman diubah", false},
+	{CMSPageChange, "Konten", "Isi halaman publik diubah", false},
 	{RoleCreate, "Tata Kelola", "Role dibuat", false},
 	{RoleUpdate, "Tata Kelola", "Role diubah", true},
 	{RoleDelete, "Tata Kelola", "Role dihapus", true},
