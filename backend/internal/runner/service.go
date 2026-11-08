@@ -71,6 +71,12 @@ type Options struct {
 	// LegalGate menandai dokumen wajib yang belum disetujui. Bila nil,
 	// pemeriksaan dilewati agar Runner tetap berjalan tanpa penanda.
 	LegalGate func(ctx context.Context, userID string) bool
+	// Flags adalah pengaturan yang bisa diubah admin tanpa deploy ulang.
+	// Bila nil, nilai dari Options yang berlaku.
+	Flags Flags
+	// Mode membaca mode platform (normal/read-only/pemeliharaan).
+	// Bila nil, mode dianggap normal.
+	Mode ModeSource
 }
 
 // Service adalah inti Runner. Aman dipakai dari beberapa goroutine.
@@ -262,7 +268,7 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 	tier := EffectiveTier(user.Tier, user.TrialExpiresAt, user.TierExpiresAt, now)
 
 	// [1] Sinyal sah?
-	if reason := s.validateSignal(signal, now); reason != RejectNone {
+	if reason := s.validateSignal(ctx, signal, now); reason != RejectNone {
 		return s.reject(ctx, user.ID, signal.SignalID, reason)
 	}
 
@@ -308,7 +314,7 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 		// Mode auto mengirim order tanpa konfirmasi. Untuk akun dry-run,
 		// "order" itu tetap dicatat sebagai posisi simulasi sehingga aturan
 		// harian dan riwayat tetap berjalan persis seperti akun nyata.
-		if account.Mode == "auto" && s.opts.AutoExecute {
+		if account.Mode == "auto" && s.autoExecute(ctx) {
 			return s.execute(ctx, user, &account, signal)
 		}
 
@@ -323,14 +329,23 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 }
 
 // validateSignal memeriksa kelengkapan dan masa berlaku sinyal.
-func (s *Service) validateSignal(signal *model.Signal, now time.Time) RejectReason {
+func (s *Service) validateSignal(ctx context.Context, signal *model.Signal, now time.Time) RejectReason {
+	// Mode platform diperiksa paling awal: saat pemeliharaan, sinyal baru
+	// dilewati (bukan ditunda) karena harga sudah berubah. Posisi berjalan
+	// tidak pernah disentuh di sini (plans/18 §4.3).
+	switch s.maintenanceMode(ctx) {
+	case ModeMaintenance:
+		return RejectMaintenance
+	case ModeReadOnly:
+		return RejectReadOnly
+	}
 	if signal.EntryPrice <= 0 || signal.StopLoss <= 0 || signal.TakeProfit <= 0 {
 		return RejectBadSignal
 	}
 	if !now.Before(signal.ExpiresAt) {
 		return RejectExpired
 	}
-	if s.opts.MarketOpenCheck && !s.marketOpen() {
+	if s.marketOpenRequired(ctx) && !s.marketOpen() {
 		return RejectMarketClosed
 	}
 	return RejectNone
@@ -371,7 +386,7 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 
 	// Dokumen wajib harus disetujui sebelum eksekusi. Posisi yang sudah
 	// berjalan tidak disentuh: yang diblokir hanya entry baru (plans/09).
-	if s.opts.LegalGate != nil && s.opts.LegalGate(ctx, user.ID) {
+	if s.opts.LegalGate != nil && s.legalGateActive(ctx) && s.opts.LegalGate(ctx, user.ID) {
 		return RejectLegalPending, nil
 	}
 
@@ -386,7 +401,7 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 	}
 
 	// [3] Broker harus bisa dihubungi; dry-run tidak butuh koneksi.
-	if !s.mustDryRun(&userSession{User: user}, account) {
+	if !s.mustDryRun(ctx, &userSession{User: user}, account) {
 		client, err := s.client(ctx, account)
 		if err != nil {
 			return RejectAccountFrozen, nil
@@ -416,12 +431,12 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 		TotalTrades: summary.TotalTrades,
 		OpenCount:   len(openPositions),
 	}
-	if reason := EvaluateDaily(daily, s.opts.Policy); reason != RejectNone {
+	if reason := EvaluateDaily(daily, s.policy(ctx)); reason != RejectNone {
 		return reason, nil
 	}
 
 	// [5] Slippage guard, kecuali simulasi.
-	if s.opts.SlippageGuard && !s.mustDryRun(&userSession{User: user}, account) {
+	if s.opts.SlippageGuard && !s.mustDryRun(ctx, &userSession{User: user}, account) {
 		if reason := s.checkSlippage(ctx, account, signal); reason != RejectNone {
 			return reason, nil
 		}
@@ -483,7 +498,7 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 		return s.reject(ctx, user.ID, signal.SignalID, RejectDuplicate)
 	}
 
-	dryRun := s.mustDryRun(&userSession{User: user}, account)
+	dryRun := s.mustDryRun(ctx, &userSession{User: user}, account)
 	now := s.opts.Clock()
 
 	position := &model.Position{
@@ -727,7 +742,7 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 		return RejectNone, err
 	}
 
-	if reason := s.validateSignal(signal, now); reason != RejectNone {
+	if reason := s.validateSignal(ctx, signal, now); reason != RejectNone {
 		return reason, nil
 	}
 

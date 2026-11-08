@@ -33,8 +33,11 @@ const (
 	RejectSuspended     RejectReason = "Akun sedang ditangguhkan karena pembayaran. Entry baru diblokir."
 	RejectAccountBanned RejectReason = "Akun diblokir. Hubungi dukungan untuk keterangan lebih lanjut."
 	RejectMarketClosed  RejectReason = "Pasar sedang tutup."
-	RejectDuplicate     RejectReason = "Sinyal ini sudah pernah dieksekusi untuk akun ini."
-	RejectBadSignal     RejectReason = "Data sinyal tidak lengkap atau tidak sah."
+	// Mode platform menahan entry baru tanpa menyentuh posisi berjalan.
+	RejectMaintenance RejectReason = "Sistem sedang dalam pemeliharaan. Setup tetap tampil, entry baru ditahan sementara."
+	RejectReadOnly    RejectReason = "Mode hanya-baca aktif. Setup tetap tampil, entry baru ditahan sementara."
+	RejectDuplicate   RejectReason = "Sinyal ini sudah pernah dieksekusi untuk akun ini."
+	RejectBadSignal   RejectReason = "Data sinyal tidak lengkap atau tidak sah."
 )
 
 // Status sinyal dirujuk dari paket model agar hanya ada satu sumber nilai.

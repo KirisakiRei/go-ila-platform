@@ -33,6 +33,7 @@ const (
 	UserViewSensitive Action = "user.view.sensitive"
 	UserExport        Action = "user.export"
 	UserNoteAdd       Action = "user.note.add"
+	SupportNoteAdd    Action = "support.note.add"
 )
 
 // Akun broker.
@@ -68,6 +69,8 @@ const (
 	SystemFlagChange Action = "system.flag.change"
 	SystemModeChange Action = "system.mode.change"
 	LegalPublish     Action = "legal.publish"
+	CMSFaqChange     Action = "cms.faq.change"
+	CMSAnnouncement  Action = "cms.announcement.change"
 	RoleCreate       Action = "role.create"
 	RoleUpdate       Action = "role.update"
 	RoleDelete       Action = "role.delete"
@@ -104,6 +107,7 @@ var Catalog = []Entry{
 	{UserViewSensitive, "Pengguna", "Membuka data sensitif pengguna", true},
 	{UserExport, "Pengguna", "Ekspor data pengguna", true},
 	{UserNoteAdd, "Pengguna", "Catatan internal ditambah", false},
+	{SupportNoteAdd, "Pengguna", "Catatan dukungan ditambah", false},
 
 	{AccountCreate, "Akun Broker", "Akun broker ditambah", false},
 	{AccountUpdate, "Akun Broker", "Akun broker diubah", false},
@@ -130,6 +134,8 @@ var Catalog = []Entry{
 	{SystemFlagChange, "Sistem", "Flag sistem diubah", true},
 	{SystemModeChange, "Sistem", "Mode pemeliharaan diubah", true},
 	{LegalPublish, "Sistem", "Dokumen legal diterbitkan", false},
+	{CMSFaqChange, "Konten", "FAQ diubah", false},
+	{CMSAnnouncement, "Konten", "Pengumuman diubah", false},
 	{RoleCreate, "Tata Kelola", "Role dibuat", false},
 	{RoleUpdate, "Tata Kelola", "Role diubah", true},
 	{RoleDelete, "Tata Kelola", "Role dihapus", true},

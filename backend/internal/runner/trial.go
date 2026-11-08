@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"time"
 
 	"ila/backend/internal/model"
@@ -23,8 +24,8 @@ func InTrial(user *model.User, now time.Time) bool {
 //
 // Trial sengaja tidak boleh menyentuh uang user (plans/14 §5.5.2): uji coba
 // hanya menilai kualitas sinyal, bukan keberanian menaruh modal.
-func (s *Service) mustDryRun(session *userSession, account *model.BrokerAccount) bool {
-	if account.IsDryRun || s.opts.DryRunAll {
+func (s *Service) mustDryRun(ctx context.Context, session *userSession, account *model.BrokerAccount) bool {
+	if account.IsDryRun || s.dryRunForced(ctx) {
 		return true
 	}
 	return InTrial(session.User, s.opts.Clock())

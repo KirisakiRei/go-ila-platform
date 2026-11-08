@@ -189,6 +189,21 @@ func TestAdminTidakPunyaKewenanganTerkunci(t *testing.T) {
 	t.Fatal("role admin tidak ada di daftar bawaan")
 }
 
+func TestSuperadminOnlyTidakDapatDidelegasikan(t *testing.T) {
+	// Admin biasa yang diberi izin lewat role tetap ditolak: kewenangan
+	// kritis dikunci ke role superadmin (plans/04 §6).
+	admin := NewService(&fakeLoader{perms: []string{SystemSettings, SystemMaintenance}, role: RoleAdmin})
+	ctx := context.Background()
+	if ok, _ := admin.Has(ctx, "a1", SystemSettings); ok {
+		t.Fatal("admin biasa tidak boleh memegang system.settings")
+	}
+
+	super := NewService(&fakeLoader{perms: []string{SystemSettings}, role: RoleSuperadmin})
+	if ok, _ := super.Has(ctx, "s1", SystemSettings); !ok {
+		t.Fatal("superadmin harus memegang system.settings")
+	}
+}
+
 func TestSuperadminOnly(t *testing.T) {
 	if !SuperadminOnly(SystemSettings) || !SuperadminOnly(SystemMaintenance) {
 		t.Fatal("flag sistem harus terkunci ke superadmin")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ import (
 	"ila/backend/internal/runnerclient"
 	"ila/backend/internal/service"
 	"ila/backend/internal/session"
+	"ila/backend/internal/settings"
 	"ila/backend/pkg/cryptox"
 )
 
@@ -148,6 +150,37 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	pricingService := service.NewPricingService(pricingRepo)
 	adminBillingService := service.NewAdminBillingService(pricingRepo, adminAudit)
 	adminReportService := service.NewAdminReportService(repository.NewReportRepository(db))
+
+	// Flag operasional: nilai database menimpa env, dengan cache 10 detik agar
+	// rem darurat berlaku cepat tanpa membebani database (plans/11 I2).
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsService := settings.NewService(settingsRepo, func(key string) string {
+		switch key {
+		case settings.KeyAutoExecute:
+			return strconv.FormatBool(cfg.AutoExecute)
+		case settings.KeyDryRunAll:
+			return strconv.FormatBool(cfg.DryRunAll)
+		case settings.KeyMaxDailyTrades:
+			return strconv.Itoa(cfg.MaxDailyTrades)
+		case settings.KeyMaxDailyLosses:
+			return strconv.Itoa(cfg.MaxDailyLosses)
+		case settings.KeyStopAfterWin:
+			return strconv.FormatBool(cfg.StopAfterWin)
+		case settings.KeyMarketOpenOnly:
+			return "true"
+		case settings.KeyLegalGate:
+			return "true"
+		}
+		return ""
+	})
+
+	systemRepo := repository.NewSystemRepository(db)
+	systemOpsService := service.NewSystemOpsService(systemRepo, runnerRepo, settingsService, adminAudit)
+	adminSystemService := service.NewAdminSystemService(settingsService, settingsRepo, adminAudit)
+
+	// Konten: FAQ dan pengumuman diubah tanpa deploy (plans/11 Fase J).
+	cmsService := service.NewCMSService(repository.NewCMSRepository(db))
+
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
 		Users:      userRepo,
 		Audit:      auditRepo,
@@ -194,6 +227,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
 	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
 	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
+	adminSystemHandler := handler.NewAdminSystemHandler(adminSystemService, systemOpsService, systemOpsService)
+	publicStatusHandler := handler.NewPublicStatusHandler(systemOpsService)
+	cmsHandler := handler.NewCMSHandler(cmsService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
 
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
@@ -249,6 +285,15 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	publicBilling.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
 	{
 		publicBilling.GET("/plans", pricingHandler.Plans)
+	}
+
+	// Status publik: dipakai halaman masuk dan dashboard untuk menampilkan
+	// mode pemeliharaan tanpa memaksa login.
+	publicStatus := r.Group("/api/v1")
+	publicStatus.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
+	{
+		publicStatus.GET("/status", publicStatusHandler.Status)
+		cmsHandler.PublicRegister(publicStatus.Group(""))
 	}
 
 	// API v1
@@ -328,7 +373,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -357,6 +402,8 @@ func registerAdmin(
 	auditHandler *handler.AdminAuditHandler,
 	billingHandler *handler.AdminBillingHandler,
 	reportHandler *handler.AdminReportHandler,
+	systemHandler *handler.AdminSystemHandler,
+	cmsHandler *handler.CMSHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -429,6 +476,8 @@ func registerAdmin(
 	auditHandler.Register(admin.Group(""), guard)
 	billingHandler.Register(admin.Group(""), guard)
 	reportHandler.Register(admin.Group(""), guard)
+	systemHandler.Register(admin.Group(""), guard)
+	cmsHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")
 }

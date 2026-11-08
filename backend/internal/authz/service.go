@@ -56,6 +56,11 @@ func (s *Service) Has(ctx context.Context, userID, permission string) (bool, err
 	if err != nil {
 		return false, err
 	}
+	// Kewenangan kritis tidak pernah lahir dari penugasan permission biasa:
+	// akun wajib memegang role superadmin (plans/04 §6).
+	if SuperadminOnly(permission) {
+		return entry.role == RoleSuperadmin, nil
+	}
 	_, ok := entry.keys[permission]
 	return ok, nil
 }

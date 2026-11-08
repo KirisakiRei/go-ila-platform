@@ -51,6 +51,20 @@ var harapanAksiAudit = map[string]audit.Action{
 	"PATCH /api/v1/admin/coupons/:id":        audit.CouponUpdate,
 	"POST /api/v1/admin/coupons/:id/disable": audit.CouponDisable,
 	"PATCH /api/v1/admin/users/:id/role":     audit.UserRoleAssign,
+
+	// Flag sistem dan mode platform selalu menyentuh jalur trading.
+	"PUT /api/v1/admin/system/settings/:key":     audit.SystemFlagChange,
+	"DELETE /api/v1/admin/system/settings/:key":  audit.SystemFlagChange,
+	"PUT /api/v1/admin/system/mode":              audit.SystemModeChange,
+	"POST /api/v1/admin/users/:id/support-notes": audit.SupportNoteAdd,
+
+	// Konten: FAQ dan pengumuman tidak menyentuh uang maupun trading.
+	"POST /api/v1/admin/faq":                 audit.CMSFaqChange,
+	"PATCH /api/v1/admin/faq/:id":            audit.CMSFaqChange,
+	"DELETE /api/v1/admin/faq/:id":           audit.CMSFaqChange,
+	"POST /api/v1/admin/announcements":       audit.CMSAnnouncement,
+	"PATCH /api/v1/admin/announcements/:id":  audit.CMSAnnouncement,
+	"DELETE /api/v1/admin/announcements/:id": audit.CMSAnnouncement,
 }
 
 // Setiap route mutasi admin harus punya kode aksi audit yang terdaftar.

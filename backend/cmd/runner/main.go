@@ -23,6 +23,7 @@ import (
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
+	"ila/backend/internal/settings"
 	"ila/backend/internal/runner/notify"
 	"ila/backend/internal/telegram"
 	"ila/backend/pkg/cryptox"
@@ -56,6 +57,11 @@ func main() {
 	}
 
 	store := repository.NewRunnerRepository(db)
+
+	// Flag & mode dibaca ulang tiap evaluasi dengan cache 10 detik, sehingga
+	// rem darurat dari panel admin berlaku tanpa restart (plans/11 I2).
+	flags := settings.NewService(repository.NewSettingsRepository(db), envFlagReader(cfg))
+	modeSource := runnerModeSource{store: repository.NewSystemRepository(db)}
 
 	// --- Kanal notifikasi -----------------------------------------------------
 	tgClient := telegram.NewClient(telegram.Config{
@@ -98,6 +104,8 @@ func main() {
 		MarketOpenCheck: true,
 		// Entry baru ditahan bila dokumen wajib belum disetujui.
 		LegalGate: repository.NewLegalGate(db),
+		Flags:     flags,
+		Mode:      modeSource,
 	}
 
 	svc := runner.NewService(store, registry, publisher, logger, opts)

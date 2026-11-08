@@ -78,6 +78,11 @@ func main() {
 		&model.Invoice{},
 		&model.Payment{},
 		&model.Refund{},
+		&model.SystemSetting{},
+		&model.SystemState{},
+		&model.SupportNote{},
+		&model.Faq{},
+		&model.Announcement{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
