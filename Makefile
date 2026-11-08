@@ -74,6 +74,10 @@ up: ## Nyalakan semua container
 # Pemakaian:
 #   make update               # semua layanan
 #   make update S=backend-api # satu layanan saja (lebih ringan di RAM 909 MB)
+# migrate, runner, backend-api, dan seed-superadmin memakai Dockerfile yang
+# sama tetapi mendapat tag image berbeda. Membangun satu service saja membuat
+# yang lain tetap memakai binary lama — pernah membuat migrasi melaporkan
+# sukses padahal kolom baru belum dibuat. Tanpa S, semuanya dibangun.
 .PHONY: update
 update: ## Tarik kode lalu build ulang dari nol
 	git pull --ff-only
