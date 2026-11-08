@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
@@ -133,11 +134,14 @@ const userIDTest = "user-tes-1"
 
 // newTestUser membuat user dengan ID tetap agar seluruh tes memakai identitas sama.
 func newTestUser(tier string) *model.User {
+	verified := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	return &model.User{
 		Base:   model.Base{ID: userIDTest},
 		Email:  "u1@contoh.id",
 		Tier:   tier,
 		Status: "active",
+		// Email terverifikasi agar fokus tes ini pada aturan tier akun.
+		EmailVerifiedAt: &verified,
 	}
 }
 

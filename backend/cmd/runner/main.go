@@ -23,8 +23,8 @@ import (
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
-	"ila/backend/internal/settings"
 	"ila/backend/internal/runner/notify"
+	"ila/backend/internal/settings"
 	"ila/backend/internal/telegram"
 	"ila/backend/pkg/cryptox"
 )

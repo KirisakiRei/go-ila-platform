@@ -270,3 +270,25 @@ export type ApprovalResult = {
   status: SignalStatus
   message: string
 }
+
+/** Posisi terakhir alur mulai; dipakai agar bisa dilanjutkan. */
+export type OnboardingState = {
+  step: number
+  done: boolean
+  total_steps: number
+  steps: string[]
+  has_broker: boolean
+  email_verified: boolean
+  telegram_linked: boolean
+  next_action: string
+}
+
+/** Keadaan langganan untuk banner dashboard. */
+export type SubscriptionBanner = {
+  state: 'normal' | 'ending' | 'grace' | 'expired'
+  title: string
+  message: string
+  expires_at?: string
+  days_left: number
+  level: 'info' | 'warning' | 'critical'
+}

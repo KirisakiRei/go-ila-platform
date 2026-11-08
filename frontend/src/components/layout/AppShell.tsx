@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { BarChart3, Bot, CreditCard, LayoutDashboard, Radio, Settings, Wallet } from 'lucide-react'
+import { BarChart3, Bot, CreditCard, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
 import { useSignOut } from '@/features/auth/hooks/use-auth'
+import { UserBanners } from '@/components/layout/UserBanners'
 import type { Tier, User } from '@/types/api'
 
 const TIER_LABEL: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
@@ -18,6 +19,7 @@ const TITLES: Record<string, string> = {
   '/langganan': 'Langganan',
   '/langganan/bayar': 'Pembayaran',
   '/pengaturan': 'Pengaturan',
+  '/mulai': 'Mulai',
 }
 
 const NAV = [
@@ -27,6 +29,7 @@ const NAV = [
   { to: '/akun', label: 'Akun Broker', short: 'Akun', icon: Wallet, end: false },
   { to: '/strategi', label: 'Strategi', short: 'Strategi', icon: Bot, end: false },
   { to: '/langganan', label: 'Langganan', short: 'Langganan', icon: CreditCard, end: false },
+  { to: '/mulai', label: 'Mulai', short: 'Mulai', icon: Sparkles, end: false },
   { to: '/pengaturan', label: 'Pengaturan', short: 'Setelan', icon: Settings, end: false },
 ]
 
@@ -101,7 +104,10 @@ export function AppShell({ user, children }: AppShellProps) {
         </div>
 
         <main className="min-w-0 flex-1 px-4 py-5 lg:px-6 lg:py-6">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">{children}</div>
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+            <UserBanners />
+            <div className="flex flex-col gap-6">{children}</div>
+          </div>
         </main>
       </div>
     </div>

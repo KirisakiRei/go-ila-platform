@@ -83,6 +83,8 @@ func main() {
 		&model.SupportNote{},
 		&model.Faq{},
 		&model.Announcement{},
+		&model.EmailOutbox{},
+		&model.EmailToken{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

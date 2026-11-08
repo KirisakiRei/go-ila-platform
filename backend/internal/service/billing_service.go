@@ -54,6 +54,7 @@ type creditRedeemer interface {
 }
 
 type billingService struct {
+	users   BillingUserReader
 	store   BillingStore
 	codes   creditRedeemer
 	pricing PricingService
@@ -69,8 +70,14 @@ type couponLookup interface {
 }
 
 // NewBillingService merangkai billing.
-func NewBillingService(store BillingStore, pricing PricingService, coupons couponLookup, gateway payment.Gateway, recorder AdminAudit, codes creditRedeemer) BillingService {
+// BillingUserReader membaca akun untuk memeriksa verifikasi email.
+type BillingUserReader interface {
+	FindByID(ctx context.Context, id string) (*model.User, error)
+}
+
+func NewBillingService(users BillingUserReader, store BillingStore, pricing PricingService, coupons couponLookup, gateway payment.Gateway, recorder AdminAudit, codes creditRedeemer) BillingService {
 	return &billingService{
+		users: users,
 		store: store, pricing: pricing, coupons: coupons, gateway: gateway, audit: recorder, codes: codes,
 		now: func() time.Time { return time.Now().UTC() },
 	}
@@ -78,6 +85,18 @@ func NewBillingService(store BillingStore, pricing PricingService, coupons coupo
 
 // Checkout membuat invoice dan meminta URL pembayaran.
 func (s *billingService) Checkout(ctx context.Context, userID string, req dto.CheckoutRequest) (*dto.CheckoutResult, error) {
+	// Pembayaran dikunci sampai email terbukti: tanpa itu, akun hasil salah
+	// ketik akan menerima invoice yang tidak bisa dipulihkan (plans/17 §2.5).
+	if s.users != nil {
+		user, err := s.users.FindByID(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		if user.EmailVerifiedAt == nil {
+			return nil, ErrEmailNotVerified
+		}
+	}
+
 	quote, err := s.pricing.Quote(ctx, userID, req.PlanCode, req.CouponCode, req.UseCredit)
 	if err != nil {
 		return nil, err

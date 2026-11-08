@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `9aeae72`
+> **Commit terakhir saat log ini ditulis:** `bd3ea5a`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,65 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-13 — Fase I, J, K, P: flag sistem, CMS, operasional, alur akun
+
+**Pelaku:** Claude
+**Tipe:** `SELESAI`
+**Status:** Backend, Runner, dan frontend terpasang. Seluruh tes lulus.
+
+**Ringkasan pekerjaan**
+
+| Fase | Yang dikerjakan |
+|---|---|
+| I | Tabel `system_setting` (murni override), cache 10 detik, 7 flag, ubah/kembalikan lewat panel dengan konfirmasi ketik ulang, audit before→after |
+| I | `settings.Service` disambungkan ke Runner: flag dibaca ulang **setiap evaluasi sinyal**, jadi rem darurat berlaku ≤10 detik tanpa restart |
+| J | Tabel `faq` + `announcement`, endpoint CMS, FAQ publik, pengumuman di dashboard, landing `/`, `/harga`, `/fitur`, `/tentang`, `/bantuan` |
+| J | Entri Vite ganda: `index.html` (publik) dan `app.html` (dashboard di `/app`) |
+| K | Tabel `system_state` satu baris (`normal`/`read-only`/`maintenance`) + `support_note`; penegakan mode di Runner; watchdog peringatan admin; `scripts/backup.sh`, `restore.sh`, `audit-log.sh`; `docs/RUNBOOK.md` |
+| P | Tabel `email_outbox` + `email_token`, worker SMTP di backend-api, lupa sandi (selalu 200), reset (cabut semua sesi), verifikasi email, onboarding 5 langkah, banner langganan |
+
+**Keputusan yang perlu diketahui Hermes**
+
+1. **`system_setting` tidak punya nilai bawaan.** Baris kosong = env yang
+   berlaku. "Kembalikan ke bawaan" = hapus baris.
+2. **Flag yang dibaca Runner:** `AUTO_EXECUTE`, `DRY_RUN_ALL`,
+   `MAX_DAILY_TRADES`, `MAX_DAILY_LOSSES`, `STOP_AFTER_WIN`,
+   `MARKET_OPEN_ONLY`, `LEGAL_GATE`. Nilai int di-clamp oleh `DailyPolicy.Clamp()`
+   sehingga aturan 2-trade / stop-setelah-menang tetap tidak bisa dilanggar.
+3. **Mode `read-only` dan `maintenance` melewati sinyal**, bukan menunda.
+   Alasan penolakan baru: `RejectReadOnly`, `RejectMaintenance`.
+   **Posisi berjalan tidak pernah disentuh** oleh mode mana pun.
+4. **Superadmin kini benar-benar dikunci.** Sebelumnya `SuperadminOnly()` hanya
+   ada di katalog tanpa ditegakkan; sekarang `authz.Service.Has` menolak
+   `system.settings` dan `system.maintenance` untuk selain role superadmin.
+5. **Checkout, trial, dan hubungkan broker menolak email yang belum
+   terverifikasi** (`ErrEmailNotVerified`, 403). Login tetap boleh.
+6. **`POST /auth/forgot-password` selalu 200** apa pun hasilnya (anti enumerasi).
+7. **`email_outbox.payload` hanya memuat `token_id`**, tidak pernah token mentah.
+8. Endpoint publik baru: `GET /api/v1/status`, `/faq`, `/announcements`.
+
+**Pekerjaan yang BELUM dikerjakan**
+
+- Halaman frontend pengaturan keamanan (2FA, daftar sesi, toggle idle warning)
+  masih menempel di `SettingsPage`; belum dipisah menjadi `/pengaturan/keamanan`.
+- Halaman `/admin/dukungan` belum dibuat (endpoint jurnal dukungan sudah ada).
+- Waktu mulai/tutup pasar belum dihitung otomatis di UI; masih membaca laporan
+  engine.
+- Observabilitas masih log terstruktur; belum ada rotasi otomatis di sisi app
+  (diserahkan ke driver log Docker).
+
+**File terdampak (utama)**
+
+`backend/internal/settings/*`, `backend/internal/alert/*`,
+`backend/internal/email/*`, `backend/internal/service/{admin_system,system_ops,cms,email_account,email_onboarding,watchdog}*`,
+`backend/internal/handler/{admin_system,cms,email_account}_handler.go`,
+`backend/internal/router/router.go`, `backend/internal/runner/{flags,service,trial,rules}.go`,
+`backend/cmd/runner/flags.go`, `backend/cmd/backend-api/{main,disk_*}.go`,
+`frontend/src/pages/public/*`, `frontend/src/pages/admin/Admin{Settings,Health,Maintenance,Cms}Page.tsx`,
+`scripts/*.sh`, `docs/RUNBOOK.md`.
+
+---
 
 ### 2026-11-12 — Fase D–H selesai: manajemen pelanggan, audit, harga, billing, laporan
 

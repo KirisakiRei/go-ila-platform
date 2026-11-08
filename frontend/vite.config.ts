@@ -31,7 +31,13 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     chunkSizeWarningLimit: 600,
+    // Dua entri terpisah: situs publik dan panel pelanggan. Bundel dashboard
+    // tidak ikut terunduh pengunjung tanpa akun (plans/11 J5b).
     rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        app: fileURLToPath(new URL('./app.html', import.meta.url)),
+      },
       output: {
         // Vite 8 memakai rolldown; manualChunks kini hanya menerima fungsi.
         manualChunks(id: string) {

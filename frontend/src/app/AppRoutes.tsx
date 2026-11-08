@@ -16,6 +16,14 @@ import BillingPage from '@/pages/BillingPage'
 import CheckoutPage from '@/pages/CheckoutPage'
 import LegalPage from '@/pages/LegalPage'
 import AdminAuditPage from '@/pages/admin/AdminAuditPage'
+import AdminCmsPage from '@/pages/admin/AdminCmsPage'
+import AdminHealthPage from '@/pages/admin/AdminHealthPage'
+import AdminMaintenancePage from '@/pages/admin/AdminMaintenancePage'
+import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
+import OnboardingPage from '@/pages/OnboardingPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
@@ -86,12 +94,27 @@ export function AppRoutes() {
         }
       />
 
+      {/* Lupa sandi & verifikasi email: tanpa sesi. */}
+      <Route path="/lupa-sandi" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verifikasi" element={<VerifyEmailPage />} />
+
       <Route
         path="/"
         element={
           <RequireAuth>
             <ShellPage>
               <DashboardPage />
+            </ShellPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/mulai"
+        element={
+          <RequireAuth>
+            <ShellPage>
+              <OnboardingPage />
             </ShellPage>
           </RequireAuth>
         }
@@ -247,6 +270,46 @@ export function AppRoutes() {
           <RequireAuth>
             <AdminPage>
               <AdminAuditPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/pengaturan-sistem"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminSettingsPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/kesehatan"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminHealthPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/pemeliharaan"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminMaintenancePage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/konten"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminCmsPage />
             </AdminPage>
           </RequireAuth>
         }

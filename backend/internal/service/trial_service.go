@@ -44,6 +44,11 @@ func (s *trialService) Start(ctx context.Context, userID string) (*dto.TrialResp
 		return nil, err
 	}
 
+	// Trial adalah gerbang pertama penyalahgunaan; alamat email wajib terbukti
+	// milik pengguna lebih dulu (plans/17 §2.5).
+	if user.EmailVerifiedAt == nil {
+		return nil, ErrEmailNotVerified
+	}
 	if user.TrialUsed {
 		return nil, errors.Join(apperror.ErrConflict, errors.New("Uji coba hanya tersedia sekali per akun."))
 	}

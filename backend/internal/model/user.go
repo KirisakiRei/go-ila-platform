@@ -60,6 +60,15 @@ type User struct {
 	// IdleWarning menentukan apakah modal peringatan "masih di sini?" muncul.
 	// Batas diam di server tidak ikut berubah (plans/23 §5).
 	IdleWarning bool `gorm:"not null;default:true" json:"idle_warning"`
+
+	// EmailVerifiedAt kosong berarti alamat belum terbukti milik pengguna.
+	// Login tetap boleh; yang dikunci trial, broker, dan checkout (plans/17 §2.5).
+	EmailVerifiedAt *time.Time `json:"email_verified_at"`
+
+	// OnboardingStep mencatat langkah terakhir yang selesai, sehingga alur
+	// bisa dilanjutkan setelah keluar-tengah-jalan (plans/17 §5).
+	OnboardingStep int  `gorm:"not null;default:0" json:"onboarding_step"`
+	OnboardingDone bool `gorm:"not null;default:false" json:"onboarding_done"`
 }
 
 // TableName menetapkan nama tabel tanpa bentuk jamak.

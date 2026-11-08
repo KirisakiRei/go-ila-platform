@@ -148,6 +148,11 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 		return nil, err
 	}
 
+	// Alamat email wajib terbukti sebelum akun broker boleh dihubungkan.
+	if user.EmailVerifiedAt == nil {
+		return nil, ErrEmailNotVerified
+	}
+
 	// Disclaimer risiko wajib disetujui sebelum akun nyata dihubungkan:
 	// sebelum ada akun, user belum menanggung risiko finansial apa pun.
 	if s.legal != nil {

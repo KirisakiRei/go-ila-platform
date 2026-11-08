@@ -27,6 +27,15 @@ import (
 // adminPrefix adalah awalan tunggal seluruh endpoint administrasi.
 const adminPrefix = "/api/v1/admin"
 
+// SystemOps mengembalikan layanan operasional untuk dipakai proses latar
+// seperti watchdog. Disediakan agar cmd tidak perlu merangkai ulang.
+func SystemOps(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.AdminSystemOps {
+	flags := settings.NewService(repository.NewSettingsRepository(db), func(key string) string {
+		return envFlag(cfg, key)
+	})
+	return service.NewSystemOpsService(repository.NewSystemRepository(db), repository.NewRunnerRepository(db), flags, service.NewAuditRecorder(repository.NewAuditRepository(db)))
+}
+
 // NewBackendAPI merangkai seluruh endpoint backend-api.
 // Wiring sengaja dikumpulkan di satu tempat agar alur dependensi terlihat utuh.
 func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.Engine {
@@ -155,23 +164,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// rem darurat berlaku cepat tanpa membebani database (plans/11 I2).
 	settingsRepo := repository.NewSettingsRepository(db)
 	settingsService := settings.NewService(settingsRepo, func(key string) string {
-		switch key {
-		case settings.KeyAutoExecute:
-			return strconv.FormatBool(cfg.AutoExecute)
-		case settings.KeyDryRunAll:
-			return strconv.FormatBool(cfg.DryRunAll)
-		case settings.KeyMaxDailyTrades:
-			return strconv.Itoa(cfg.MaxDailyTrades)
-		case settings.KeyMaxDailyLosses:
-			return strconv.Itoa(cfg.MaxDailyLosses)
-		case settings.KeyStopAfterWin:
-			return strconv.FormatBool(cfg.StopAfterWin)
-		case settings.KeyMarketOpenOnly:
-			return "true"
-		case settings.KeyLegalGate:
-			return "true"
-		}
-		return ""
+		return envFlag(cfg, key)
 	})
 
 	systemRepo := repository.NewSystemRepository(db)
@@ -180,6 +173,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	// Konten: FAQ dan pengumuman diubah tanpa deploy (plans/11 Fase J).
 	cmsService := service.NewCMSService(repository.NewCMSRepository(db))
+
+	// Alur akun: lupa sandi, verifikasi email, onboarding (plans/17).
+	emailRepo := repository.NewEmailRepository(db)
+	emailAccountStore := struct {
+		repository.UserRepository
+		*repository.EmailRepository
+	}{userRepo, emailRepo}
+	emailAccountService := service.NewEmailAccountService(emailAccountStore, auditRepo, cfg.PublicURL)
 
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
 		Users:      userRepo,
@@ -230,12 +231,13 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminSystemHandler := handler.NewAdminSystemHandler(adminSystemService, systemOpsService, systemOpsService)
 	publicStatusHandler := handler.NewPublicStatusHandler(systemOpsService)
 	cmsHandler := handler.NewCMSHandler(cmsService)
+	emailAccountHandler := handler.NewEmailAccountHandler(emailAccountService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
 
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
 	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
 	billingRepo := repository.NewBillingRepository(db)
-	billingService := service.NewBillingService(billingRepo, pricingService, billingRepo, gateway, adminAudit, repository.NewCreditCodeRepository(db))
+	billingService := service.NewBillingService(userRepo, billingRepo, pricingService, billingRepo, gateway, adminAudit, repository.NewCreditCodeRepository(db))
 	billingHandler := handler.NewBillingHandler(billingService)
 	legalHandler := handler.NewLegalHandler(legalService)
 
@@ -305,6 +307,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Logout hanya menghapus cookie; aman tanpa sesi.
 		auth.POST("/logout", authHandler.Logout)
 		auth.GET("/csrf", authHandler.CSRF)
+		// Lupa sandi & verifikasi email: dibatasi per IP karena tanpa sesi.
+		emailAccountHandler.RegisterPublic(auth, middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
 	}
 
 	me := r.Group("/api/v1")
@@ -353,6 +357,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 		// Status pasar, engine, broker, dan kuota harian.
 		me.GET("/system/status", systemHandler.Status)
+		emailAccountHandler.RegisterUser(me)
 
 		// Riwayat untuk dashboard.
 		me.GET("/signals", tradingHandler.Signals)
@@ -382,6 +387,29 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	}
 
 	return r
+}
+
+// envFlag menjadi nilai bawaan flag ketika belum ada override di database.
+// Satu sumber untuk backend-api dan proses latar, sehingga angka yang tampil
+// di panel sama dengan yang dipakai Runner (plans/11 I2).
+func envFlag(cfg *config.Config, key string) string {
+	switch key {
+	case settings.KeyAutoExecute:
+		return strconv.FormatBool(cfg.AutoExecute)
+	case settings.KeyDryRunAll:
+		return strconv.FormatBool(cfg.DryRunAll)
+	case settings.KeyMaxDailyTrades:
+		return strconv.Itoa(cfg.MaxDailyTrades)
+	case settings.KeyMaxDailyLosses:
+		return strconv.Itoa(cfg.MaxDailyLosses)
+	case settings.KeyStopAfterWin:
+		return strconv.FormatBool(cfg.StopAfterWin)
+	case settings.KeyMarketOpenOnly:
+		return "true"
+	case settings.KeyLegalGate:
+		return "true"
+	}
+	return ""
 }
 
 // registerAdmin memasang pintu admin: login, sesi, lalu route ber-permission.

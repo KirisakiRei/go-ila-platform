@@ -108,6 +108,16 @@ type Config struct {
 	TelegramBotUsername string
 	// TelegramWebhookSecret memverifikasi bahwa webhook benar dari Telegram.
 	TelegramWebhookSecret string
+	// TelegramAdminChatID menerima peringatan operasional admin (plans/18 §2).
+	TelegramAdminChatID string
+
+	// SMTP dipakai worker antrean surel. Kosong berarti surel dinonaktifkan
+	// dan pesan tetap menumpuk di antrean, bukan hilang (plans/17 §2.2).
+	SMTPHost string
+	SMTPPort int
+	SMTPUser string
+	SMTPPass string
+	SMTPFrom string
 }
 
 // Load membaca env lalu memvalidasi nilai wajib.
@@ -167,6 +177,12 @@ func Load(service string) (*Config, error) {
 		TelegramTimeout:       envDuration("TELEGRAM_TIMEOUT", 10*time.Second),
 		TelegramBotUsername:   env("TELEGRAM_BOT_USERNAME", ""),
 		TelegramWebhookSecret: env("TELEGRAM_WEBHOOK_SECRET", ""),
+		TelegramAdminChatID:   env("TELEGRAM_ADMIN_CHAT_ID", ""),
+		SMTPHost:              env("SMTP_HOST", ""),
+		SMTPPort:              envInt("SMTP_PORT", 587),
+		SMTPUser:              env("SMTP_USER", ""),
+		SMTPPass:              env("SMTP_PASS", ""),
+		SMTPFrom:              env("SMTP_FROM", ""),
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -187,6 +203,14 @@ func (c *Config) validate() error {
 	}
 	if c.HTTPPort == "" {
 		return fmt.Errorf("HTTP_PORT wajib diisi")
+	}
+	// SMTP yang hanya terisi separuh lebih berbahaya daripada kosong: surel
+	// akan gagal dikirim tanpa alasan yang jelas saat dibaca log.
+	if (c.SMTPHost == "") != (c.SMTPFrom == "") {
+		return fmt.Errorf("SMTP_HOST dan SMTP_FROM harus diisi bersama")
+	}
+	if c.SMTPPort < 1 || c.SMTPPort > 65535 {
+		return fmt.Errorf("SMTP_PORT tidak sah (sekarang %d)", c.SMTPPort)
 	}
 	if c.MaxDailyTrades < 1 || c.MaxDailyTrades > 3 {
 		return fmt.Errorf("MAX_DAILY_TRADES harus 1 sampai 3 (sekarang %d)", c.MaxDailyTrades)

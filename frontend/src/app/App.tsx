@@ -24,7 +24,8 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/* Panel pelanggan dilayani di /app agar entri publik tetap di akar. */}
+      <BrowserRouter basename="/app">
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>

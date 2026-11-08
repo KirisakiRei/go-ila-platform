@@ -128,9 +128,18 @@ func (fakeCouponLookup) FindCouponByCode(ctx context.Context, code string) (*mod
 	return &model.Coupon{Base: model.Base{ID: "coupon-1"}, Code: code}, nil
 }
 
+// verifiedUsers memenuhi syarat email terverifikasi, karena checkout menolak
+// akun yang alamatnya belum terbukti.
+type verifiedUsers struct{}
+
+func (verifiedUsers) FindByID(_ context.Context, id string) (*model.User, error) {
+	now := time.Now().UTC()
+	return &model.User{Base: model.Base{ID: id}, EmailVerifiedAt: &now}, nil
+}
+
 func newTestBilling(store *fakeBillingStore, gw payment.Gateway) BillingService {
 	pricing := NewPricingService(newFakePricingStore())
-	return NewBillingService(store, pricing, fakeCouponLookup{}, gw, &fakeAdminAudit{}, nil)
+	return NewBillingService(verifiedUsers{}, store, pricing, fakeCouponLookup{}, gw, &fakeAdminAudit{}, nil)
 }
 
 func paidWebhook(t *testing.T, gw *payment.Pakasir, orderID string, amount int64, status string) (map[string]string, []byte) {

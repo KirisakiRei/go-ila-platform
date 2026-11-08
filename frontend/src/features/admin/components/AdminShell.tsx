@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
+  Activity,
   BarChart3,
   FileClock,
+  FileText,
   LayoutDashboard,
   Percent,
+  Settings2,
+  ShieldAlert,
   ShieldCheck,
   Users,
   Wallet,
@@ -19,6 +23,10 @@ const NAV = [
   { to: '/admin/kupon', label: 'Kupon', icon: Percent, end: false },
   { to: '/admin/laporan', label: 'Laporan', icon: BarChart3, end: false },
   { to: '/admin/audit', label: 'Jejak Audit', icon: FileClock, end: false },
+  { to: '/admin/konten', label: 'Konten', icon: FileText, end: false },
+  { to: '/admin/kesehatan', label: 'Kesehatan', icon: Activity, end: false },
+  { to: '/admin/pengaturan-sistem', label: 'Flag Sistem', icon: Settings2, end: false },
+  { to: '/admin/pemeliharaan', label: 'Pemeliharaan', icon: ShieldAlert, end: false },
 ]
 
 /**
