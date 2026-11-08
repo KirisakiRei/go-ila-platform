@@ -90,12 +90,15 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
       <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
-        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-          <ShieldCheck className="h-4 w-4" aria-hidden />
-          <span className="text-sm font-bold tracking-tight">ILA</span>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Admin
-          </span>
+        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
+          <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
+          <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-bold tracking-tight">ILA</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Admin
+            </span>
+          </div>
         </div>
 
         <nav

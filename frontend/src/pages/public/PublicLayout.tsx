@@ -4,7 +4,7 @@ import { AlertTriangle, Menu, X } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { publicContentApi } from '@/lib/system-api'
 import { cn } from '@/lib/utils'
-import { BrandMark } from './components/LandingArtwork'
+
 
 /**
  * Gradasi footer situs publik — satu kanvas kontinu, tanpa patahan.
@@ -179,7 +179,11 @@ export function PublicLayout() {
             className="flex items-center gap-2.5 rounded-md focus-visible:ring-zinc-400"
             onClick={() => setOpen(false)}
           >
-            <BrandMark className="h-7 w-7 shrink-0" />
+            <img
+              src={isLightHeader ? '/logo-dark.png' : '/logo-light.png'}
+              alt="Imaginary Liquidity"
+              className="h-8 w-auto object-contain transition-opacity duration-200"
+            />
             <span
               className={cn(
                 'text-sm font-semibold tracking-tight transition-colors',
@@ -334,6 +338,19 @@ export function PublicLayout() {
       <footer className="relative z-0 border-t border-zinc-200/80 bg-[#f5f5f7] text-[#09090b]">
         {/* Konten tautan footer: lebih rapat dan tetap berada di zona kontras tinggi */}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-10 pb-10 sm:px-6 sm:pt-12 sm:pb-12">
+          {/* Logo & Brand Header Footer */}
+          <div className="mb-8 flex items-center gap-3.5 border-b border-zinc-200/80 pb-6">
+            <img
+              src="/logo-dark.png"
+              alt="Imaginary Liquidity"
+              className="h-10 w-auto object-contain"
+            />
+            <div>
+              <p className="text-base font-bold tracking-tight text-[#09090b]">Imaginary Liquidity</p>
+              <p className="text-xs text-zinc-500">Analisis Likuiditas &amp; Eksekusi Trading di Broker Anda</p>
+            </div>
+          </div>
+
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-12">
             <div className="space-y-3 lg:col-span-2">
               <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#3f3f46]">

@@ -15,9 +15,18 @@ export function AuthLayout({ children, footer }: { children: ReactNode; footer: 
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <a href="/" className="mb-6 flex items-baseline justify-center gap-1.5">
-          <span className="text-base font-bold tracking-tight">ILA</span>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Bot</span>
+        <a href="/" className="mb-6 flex flex-col items-center justify-center gap-2 group">
+          <img
+            src="/logo-dark.png"
+            alt="Imaginary Liquidity"
+            className="h-16 w-auto object-contain transition-transform duration-200 group-hover:scale-105 dark:hidden"
+          />
+          <img
+            src="/logo-light.png"
+            alt="Imaginary Liquidity"
+            className="h-16 w-auto object-contain transition-transform duration-200 group-hover:scale-105 hidden dark:block"
+          />
+          <span className="text-base font-bold tracking-tight text-foreground">Imaginary Liquidity</span>
         </a>
 
         <div className="mb-3 flex items-center justify-between">

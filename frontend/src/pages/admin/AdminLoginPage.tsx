@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+
 import { Alert, Button, Input, Label } from '@/components/ui'
 import { adminAuthApi } from '@/lib/admin-api'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
@@ -70,9 +70,9 @@ export default function AdminLoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-[#09090b]" aria-hidden="true" />
-          <span className="text-sm font-bold tracking-tight">ILA Admin</span>
+        <div className="flex items-center gap-2.5">
+          <img src="/logo-dark.png" alt="ILA Admin" className="h-8 w-auto object-contain" />
+          <span className="text-sm font-bold tracking-tight text-[#09090b]">ILA Admin</span>
         </div>
 
         <h1 className="mt-6 text-[24px] font-semibold tracking-tight text-[#09090b]">
