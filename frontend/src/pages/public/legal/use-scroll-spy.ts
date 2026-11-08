@@ -58,11 +58,11 @@ export function useScrollSpy(ids: string[], enabled = true) {
     }
 
     schedule()
-    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('scroll', schedule, { passive: true, capture: true })
     window.addEventListener('resize', schedule, { passive: true })
     return () => {
       if (frame !== 0) window.cancelAnimationFrame(frame)
-      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('scroll', schedule, { capture: true })
       window.removeEventListener('resize', schedule)
     }
   }, [list, enabled])

@@ -61,8 +61,8 @@ export const registerSchema = z.object({
 export type LoginFormValues = z.infer<typeof loginSchema>
 export type RegisterFormValues = z.infer<typeof registerSchema>
 
-/** Langkah pendaftaran dipisah agar satu layar tidak terlalu padat. */
-export const REGISTER_STEPS = ['Identitas', 'Kontak', 'Keamanan'] as const
+/** Langkah pendaftaran dipisah menjadi 2 tahap agar ringkas dan cepat. */
+export const REGISTER_STEPS = ['Akun', 'Keamanan'] as const
 export type RegisterStep = (typeof REGISTER_STEPS)[number]
 
 /**
@@ -70,7 +70,6 @@ export type RegisterStep = (typeof REGISTER_STEPS)[number]
  * sebelum bagiannya sah, tetapi validasi akhir tetap dilakukan saat kirim.
  */
 export const REGISTER_STEP_FIELDS: Record<RegisterStep, (keyof RegisterFormValues)[]> = {
-  Identitas: ['name', 'username'],
-  Kontak: ['email', 'phone'],
+  Akun: ['name', 'username', 'email', 'phone'],
   Keamanan: ['password', 'acceptTerms'],
 }

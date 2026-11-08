@@ -58,8 +58,9 @@ export function useIdleTimer({
     countdownTimer.current = window.setInterval(() => {
       setRemainingSeconds((prev) => {
         if (prev <= 1) {
-          window.clearInterval(countdownTimer.current!)
+          if (countdownTimer.current !== null) window.clearInterval(countdownTimer.current)
           countdownTimer.current = null
+          setWarningVisible(false)
           onTimeout()
           return 0
         }
@@ -129,6 +130,7 @@ export function useIdleTimer({
 
   const leaveNow = useCallback(() => {
     clearTimers()
+    setWarningVisible(false)
     onTimeout()
   }, [clearTimers, onTimeout])
 

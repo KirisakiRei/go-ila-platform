@@ -127,9 +127,9 @@ func (f *fakeRevoker) RevokeSessions(_ context.Context, userID string) error {
 	return nil
 }
 
-// Mencabut satu perangkat harus menaikkan session_version, karena verifikasi
-// per permintaan memakai nilai itu — tanpa ini token perangkat itu tetap sah.
-func TestCabutSesiMenaikkanVersiSesi(t *testing.T) {
+// Mencabut satu perangkat menghapus sesi tersebut tanpa menaikkan session_version akun,
+// agar perangkat saat ini tidak ikut terlempar keluar.
+func TestCabutSesiMencabutSesiTertarget(t *testing.T) {
 	repo := &fakeSessionRepo{
 		sessions: []model.Session{{ID: "s-1", UserID: "u1", Scope: "user"}},
 	}
@@ -140,8 +140,11 @@ func TestCabutSesiMenaikkanVersiSesi(t *testing.T) {
 		t.Fatalf("Revoke galat: %v", err)
 	}
 
-	if len(revoker.users) != 1 || revoker.users[0] != "u1" {
-		t.Fatalf("pencabutan versi sesi tidak dipanggil: %v", revoker.users)
+	if len(repo.revoked) != 1 || repo.revoked[0] != "s-1" {
+		t.Fatalf("sesi s-1 tidak tercabut: %v", repo.revoked)
+	}
+	if len(revoker.users) != 0 {
+		t.Fatalf("session_version tidak boleh dinaikkan saat cabut satu sesi: %v", revoker.users)
 	}
 }
 

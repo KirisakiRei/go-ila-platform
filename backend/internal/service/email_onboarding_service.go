@@ -57,14 +57,73 @@ func (s *emailAccountService) SaveOnboarding(ctx context.Context, userID string,
 }
 
 func (s *emailAccountService) onboardingState(ctx context.Context, user *model.User) (*dto.OnboardingState, error) {
+	verified := user.EmailVerifiedAt != nil
+
+	hasBroker := false
+	hasRisk := false
+	brokers, err := s.store.ListByUser(ctx, user.ID)
+	if err == nil {
+		for _, b := range brokers {
+			if b.IsActive {
+				hasBroker = true
+			}
+			if b.RiskPercent > 0 {
+				hasRisk = true
+			}
+		}
+	}
+
+	hasStrategy := false
+	subs, err := s.store.ListActiveByUser(ctx, user.ID)
+	if err == nil && len(subs) > 0 {
+		hasStrategy = true
+	}
+
+	telegramOK := user.TelegramChatID != nil && strings.TrimSpace(*user.TelegramChatID) != ""
+
+	stepDone := map[string]bool{
+		"verifikasi_email":   verified,
+		"hubungkan_broker":   hasBroker,
+		"pilih_strategi":     hasStrategy,
+		"hubungkan_telegram": telegramOK,
+		"setel_risiko":       hasRisk,
+	}
+
+	completedCount := 0
+	for _, stepKey := range onboardingSteps {
+		if stepDone[stepKey] {
+			completedCount++
+		}
+	}
+
+	effectiveStep := user.OnboardingStep
+	if completedCount > effectiveStep {
+		effectiveStep = completedCount
+	}
+
+	allDone := user.OnboardingDone || completedCount == len(onboardingSteps)
+
+	nextAction := ""
+	for _, stepKey := range onboardingSteps {
+		if !stepDone[stepKey] {
+			nextAction = stepKey
+			break
+		}
+	}
+
 	return &dto.OnboardingState{
-		Step:       user.OnboardingStep,
-		Done:       user.OnboardingDone,
-		TotalSteps: len(onboardingSteps),
-		Steps:      onboardingSteps,
-		Verified:   user.EmailVerifiedAt != nil,
-		TelegramOK: user.TelegramChatID != nil,
-		NextAction: nextOnboardingAction(user),
+		Step:             effectiveStep,
+		Done:             allDone,
+		TotalSteps:       len(onboardingSteps),
+		Steps:            onboardingSteps,
+		StepDone:         stepDone,
+		CompletedCount:   completedCount,
+		HasBroker:        hasBroker,
+		Verified:         verified,
+		TelegramOK:       telegramOK,
+		StrategySelected: hasStrategy,
+		RiskConfigured:   hasRisk,
+		NextAction:       nextAction,
 	}, nil
 }
 

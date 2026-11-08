@@ -259,45 +259,50 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
 
   return (
     <div className="bg-[#f5f5f7] text-[#09090b]">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-10 pb-20 sm:px-6 sm:pt-14 sm:pb-28">
-        <Breadcrumb current={title} />
+      {/* Sticky portal navigation: Breadcrumb dan Tab Dokumen Legal tetap nampak saat dokumen digulir */}
+      <div className="sticky top-14 z-20 border-b border-zinc-200/80 bg-[#f5f5f7]/95 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-4 pb-0 sm:px-6">
+          <Breadcrumb current={title} />
 
-        {/* Tab sub-navigasi: seluruh dokumen legal dalam satu portal terpadu. */}
-        <nav aria-label="Dokumen legal" className="mt-6 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <div className="flex w-max min-w-full gap-1 border-b border-zinc-300/70">
-            {LEGAL_ORDER.map((key) => {
-              const doc = LEGAL_DOCUMENTS[key]
-              const isActive = key === slug
-              return (
-                <Link
-                  key={key}
-                  to={`/legal/${key}`}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={cn(
-                    'relative whitespace-nowrap px-3 py-2.5 text-[13px] transition-colors',
-                    isActive
-                      ? 'font-semibold text-[#09090b]'
-                      : 'text-[#71717a] hover:text-[#09090b]',
-                  )}
-                >
-                  {doc.title}
-                  <span
-                    aria-hidden="true"
+          {/* Tab sub-navigasi: seluruh dokumen legal dalam satu portal terpadu. */}
+          <nav aria-label="Dokumen legal" className="mt-3 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <div className="flex w-max min-w-full gap-1">
+              {LEGAL_ORDER.map((key) => {
+                const doc = LEGAL_DOCUMENTS[key]
+                const isActive = key === slug
+                return (
+                  <Link
+                    key={key}
+                    to={`/legal/${key}`}
+                    aria-current={isActive ? 'page' : undefined}
                     className={cn(
-                      'absolute inset-x-2 -bottom-px h-0.5 rounded-full transition-opacity',
-                      isActive ? 'bg-[#09090b] opacity-100' : 'opacity-0',
+                      'relative whitespace-nowrap px-3 py-2.5 text-[13px] transition-colors',
+                      isActive
+                        ? 'font-semibold text-[#09090b]'
+                        : 'text-[#71717a] hover:text-[#09090b]',
                     )}
-                  />
-                </Link>
-              )
-            })}
-          </div>
-        </nav>
+                  >
+                    {doc.title}
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute inset-x-2 -bottom-px h-0.5 rounded-full transition-opacity',
+                        isActive ? 'bg-[#09090b] opacity-100' : 'opacity-0',
+                      )}
+                    />
+                  </Link>
+                )
+              })}
+            </div>
+          </nav>
+        </div>
+      </div>
 
-        <div className="mt-10 lg:grid lg:grid-cols-12 lg:gap-12">
+      <div className="mx-auto w-full max-w-6xl px-4 pt-6 pb-20 sm:px-6 sm:pb-28">
+        <div className="lg:grid lg:grid-cols-12 lg:gap-12">
           {/* Daftar isi: menempel di kiri pada layar lebar. */}
           <aside className="hidden lg:col-span-3 lg:block">
-            <div className="sticky top-24">
+            <div className="sticky top-40">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
                 Daftar isi
               </p>
@@ -327,9 +332,9 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
             </div>
           </aside>
 
-          {/* Area baca. */}
+          {/* Area baca: scrollable dengan overscroll chaining ke halaman luar. */}
           <div className="lg:col-span-9">
-            <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-8 sm:px-10 sm:py-10">
+            <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-8 sm:px-10 sm:py-10 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:overscroll-auto">
               <header className="border-b border-zinc-200 pb-6">
                 <h1 className="text-[26px] font-semibold leading-tight tracking-tight sm:text-[32px]">
                   {title}

@@ -81,3 +81,21 @@ type StrategyResponse struct {
 	Selected    bool   `json:"selected"`
 	Description string `json:"description"`
 }
+
+// CTraderAuthURLResponse mengembalikan URL otorisasi cTrader OAuth.
+type CTraderAuthURLResponse struct {
+	AuthURL string `json:"auth_url"`
+}
+
+// CTraderCallbackRequest memproses authorization code dari cTrader.
+type CTraderCallbackRequest struct {
+	Code        string  `json:"code" binding:"required"`
+	Mode        string  `json:"mode" binding:"omitempty,oneof=manual auto"`
+	RiskPercent float64 `json:"risk_percent"`
+}
+
+// CTraderCallbackResponse mengembalikan ringkasan akun cTrader yang terhubung.
+type CTraderCallbackResponse struct {
+	TotalConnected int               `json:"total_connected"`
+	Accounts       []AccountResponse `json:"accounts"`
+}

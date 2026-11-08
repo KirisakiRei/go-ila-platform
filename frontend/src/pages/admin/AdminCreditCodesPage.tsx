@@ -10,6 +10,7 @@ import {
   EmptyState,
   Input,
   Label,
+  Modal,
   PageHeader,
   Select,
   Skeleton,
@@ -65,24 +66,31 @@ export default function AdminCreditCodesPage() {
         title="Kode Kredit"
         description="Voucher saldo untuk kompensasi atau kampanye; pengguna menukarnya sendiri dari dashboard."
         actions={
-          <Button size="sm" onClick={() => setCreating((value) => !value)}>
-            {creating ? 'Tutup formulir' : 'Kode baru'}
+          <Button size="sm" onClick={() => setCreating(true)}>
+            Kode baru
           </Button>
         }
       />
 
       {notice && <Alert>{notice}</Alert>}
 
-      {creating && (
+      <Modal
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="Kode Kredit Baru"
+        description="Voucher saldo untuk kompensasi atau kampanye; pengguna menukarnya dari dashboard."
+        size="lg"
+      >
         <CreateCreditCodeForm
           onDone={() => {
             setCreating(false)
             setNotice('Kode kredit dibuat.')
             invalidate()
           }}
+          onCancel={() => setCreating(false)}
           onError={setNotice}
         />
-      )}
+      </Modal>
 
       <Card className="p-3">
         <div className="grid gap-2 sm:grid-cols-2">
@@ -164,9 +172,11 @@ export default function AdminCreditCodesPage() {
 
 function CreateCreditCodeForm({
   onDone,
+  onCancel,
   onError,
 }: {
   onDone: () => void
+  onCancel?: () => void
   onError: (message: string) => void
 }) {
   const [code, setCode] = useState('')
@@ -194,8 +204,8 @@ function CreateCreditCodeForm({
   const ready = code.trim() !== '' && amount !== '' && startsAt !== '' && endsAt !== ''
 
   return (
-    <Card className="p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="credit-code">Kode</Label>
           <Input
@@ -247,11 +257,16 @@ function CreateCreditCodeForm({
           />
         </div>
       </div>
-      <div className="mt-3">
+      <div className="flex justify-end gap-2 border-t border-border pt-4">
+        {onCancel && (
+          <Button variant="outline" size="sm" type="button" onClick={onCancel}>
+            Batal
+          </Button>
+        )}
         <Button size="sm" disabled={!ready || create.isPending} onClick={() => create.mutate()}>
-          Simpan kode
+          {create.isPending ? 'Menyimpan…' : 'Simpan kode'}
         </Button>
       </div>
-    </Card>
+    </div>
   )
 }

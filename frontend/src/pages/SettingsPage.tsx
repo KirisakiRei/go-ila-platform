@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
 import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/lib/queries'
+import { accountFlowApi } from '@/lib/auth-api'
 import { ApiError } from '@/lib/api-error'
 import { formatDate, formatDateTime } from '@/lib/format'
 
@@ -9,6 +12,25 @@ function TrialSection() {
   const { data, isLoading, isError, error } = useTrial()
   const mulai = useStartTrial()
   const [galat, setGalat] = useState<string | null>(null)
+
+  const { data: onboarding, isLoading: isLoadingOnboarding } = useQuery({
+    queryKey: ['me', 'onboarding'],
+    queryFn: accountFlowApi.onboarding,
+  })
+
+  const isEmailVerified = Boolean(onboarding?.email_verified)
+  const stepDoneMap = onboarding?.step_done ?? {
+    verifikasi_email: Boolean(onboarding?.email_verified),
+    hubungkan_broker: Boolean(onboarding?.has_broker),
+    pilih_strategi: Boolean(onboarding?.strategy_selected),
+    hubungkan_telegram: Boolean(onboarding?.telegram_linked),
+    setel_risiko: Boolean(onboarding?.risk_configured),
+  }
+  const completedSteps = Object.values(stepDoneMap).filter(Boolean).length
+  const totalSteps = onboarding?.total_steps || 5
+  const isOnboardingDone = Boolean(onboarding?.done || completedSteps >= totalSteps)
+
+  const canStartTrial = isEmailVerified && isOnboardingDone
 
   const onMulai = async () => {
     setGalat(null)
@@ -25,10 +47,10 @@ function TrialSection() {
       description="Setara tier Plus, namun seluruh eksekusi berjalan sebagai simulasi."
     >
       <div className="flex flex-col gap-3 border border-border p-4">
-        {isLoading && <Skeleton className="h-16 w-full" />}
+        {(isLoading || isLoadingOnboarding) && <Skeleton className="h-16 w-full" />}
         {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}
 
-        {data && (
+        {data && !isLoadingOnboarding && (
           <>
             {data.active ? (
               <div className="flex flex-col gap-2 text-[13px]">
@@ -49,13 +71,54 @@ function TrialSection() {
                 Uji coba sudah pernah dipakai. Masa berlaku tidak dapat diulang.
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <p className="text-[13px] text-muted-foreground">
                   Anda belum memakai uji coba. Uji coba hanya bisa dipakai sekali per akun.
                 </p>
+
+                {!isEmailVerified && (
+                  <Alert variant="warning" className="text-xs">
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                      <span>
+                        Verifikasi email diperlukan sebelum memulai uji coba 7 hari.
+                      </span>
+                      <Link
+                        to="/pengaturan/keamanan"
+                        className="inline-flex items-center gap-1 font-semibold text-amber-800 underline dark:text-amber-300"
+                      >
+                        Verifikasi Email <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </Alert>
+                )}
+
+                {isEmailVerified && !isOnboardingDone && (
+                  <Alert variant="warning" className="text-xs">
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                      <span>
+                        Selesaikan 5 langkah penyiapan akun terlebih dahulu ({completedSteps}/{totalSteps} selesai) agar preferensi broker dan risiko Anda siap.
+                      </span>
+                      <Link
+                        to="/mulai"
+                        className="inline-flex items-center gap-1 font-semibold text-amber-800 underline dark:text-amber-300"
+                      >
+                        Lanjutkan Penyiapan <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </Alert>
+                )}
+
+                {canStartTrial && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Persyaratan terpenuhi. Anda dapat memulai uji coba simulasi sekarang.</span>
+                  </div>
+                )}
+
                 <Button
                   size="sm"
                   className="self-start"
+                  disabled={!canStartTrial || mulai.isPending}
                   isLoading={mulai.isPending}
                   onClick={() => void onMulai()}
                 >

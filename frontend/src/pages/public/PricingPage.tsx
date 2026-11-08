@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Check, Minus } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatIDR } from '@/features/admin/lib/format'
 import { publicPlanApi } from '@/lib/admin-api'
 import type { PublicPlan } from '@/types/admin'
@@ -87,9 +88,45 @@ export default function PricingPage() {
   if (page.isLoading) {
     return (
       <div className="bg-[#f5f5f7]">
-        <div className="mx-auto w-full max-w-6xl animate-pulse px-4 py-16 sm:px-6">
-          <div className="h-3 w-20 rounded bg-zinc-200" />
-          <div className="mt-4 h-10 w-2/3 rounded bg-zinc-200" />
+        <div className="border-b border-zinc-200/80 bg-white">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+            <div className="max-w-2xl space-y-4">
+              <Skeleton className="h-4 w-24 bg-zinc-200" />
+              <Skeleton className="h-10 w-3/4 bg-zinc-200" />
+              <Skeleton className="h-5 w-full bg-zinc-200" />
+              <Skeleton className="h-5 w-4/5 bg-zinc-200" />
+              <div className="flex gap-3 pt-4">
+                <Skeleton className="h-10 w-44 rounded-lg bg-zinc-200" />
+                <Skeleton className="h-10 w-48 rounded-lg bg-zinc-200" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {[1, 2, 3].map((index) => (
+              <div
+                key={index}
+                className="flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-6 space-y-6"
+              >
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-24 bg-zinc-200" />
+                    <Skeleton className="h-4 w-3/4 bg-zinc-200" />
+                  </div>
+                  <Skeleton className="h-9 w-40 bg-zinc-200" />
+                  <div className="space-y-2 pt-4 border-t border-zinc-100">
+                    <Skeleton className="h-4 w-full bg-zinc-200" />
+                    <Skeleton className="h-4 w-5/6 bg-zinc-200" />
+                    <Skeleton className="h-4 w-4/5 bg-zinc-200" />
+                    <Skeleton className="h-4 w-2/3 bg-zinc-200" />
+                  </div>
+                </div>
+                <Skeleton className="h-10 w-full rounded-lg bg-zinc-200" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -125,11 +162,26 @@ export default function PricingPage() {
       <div className="mx-auto w-full max-w-6xl px-4 pb-14 sm:px-6">
         {plansQuery.isLoading ? (
           <div className="grid gap-4 lg:grid-cols-3">
-            {[0, 1, 2].map((index) => (
+            {[1, 2, 3].map((index) => (
               <div
                 key={index}
-                className="h-[420px] animate-pulse rounded-2xl border border-zinc-200 bg-white"
-              />
+                className="flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-6 space-y-6"
+              >
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-24 bg-zinc-200" />
+                    <Skeleton className="h-4 w-3/4 bg-zinc-200" />
+                  </div>
+                  <Skeleton className="h-9 w-40 bg-zinc-200" />
+                  <div className="space-y-2 pt-4 border-t border-zinc-100">
+                    <Skeleton className="h-4 w-full bg-zinc-200" />
+                    <Skeleton className="h-4 w-5/6 bg-zinc-200" />
+                    <Skeleton className="h-4 w-4/5 bg-zinc-200" />
+                    <Skeleton className="h-4 w-2/3 bg-zinc-200" />
+                  </div>
+                </div>
+                <Skeleton className="h-10 w-full rounded-lg bg-zinc-200" />
+              </div>
             ))}
           </div>
         ) : plans.length === 0 ? (

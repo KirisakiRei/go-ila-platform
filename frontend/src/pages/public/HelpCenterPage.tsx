@@ -10,6 +10,7 @@ import {
   Search,
   ShieldCheck,
 } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { publicContentApi } from '@/lib/system-api'
 import { cn } from '@/lib/utils'
 import HelpTimezonePage from './HelpTimezonePage'
@@ -385,12 +386,18 @@ function FaqSection({ query }: { query: string }) {
       </div>
 
       {isLoading && (
-        <div className="mt-5 space-y-2">
-          {[0, 1, 2].map((index) => (
+        <div className="mt-5 space-y-3">
+          {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
-              className="h-16 animate-pulse rounded-xl border border-zinc-200 bg-white"
-            />
+              className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-5 py-4"
+            >
+              <div className="w-3/4 space-y-2">
+                <Skeleton className="h-4 w-2/3 bg-zinc-200" />
+                <Skeleton className="h-3 w-1/3 bg-zinc-200" />
+              </div>
+              <Skeleton className="h-4 w-4 rounded-full bg-zinc-200" />
+            </div>
           ))}
         </div>
       )}

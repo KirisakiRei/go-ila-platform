@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuthContext } from '@/features/auth/auth-context'
+import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { IdleWarningDialog } from '@/features/auth/components/IdleWarningDialog'
 import { useAdminIdleTimer } from '../hooks/use-admin-idle-timer'
 
@@ -11,14 +11,14 @@ import { useAdminIdleTimer } from '../hooks/use-admin-idle-timer'
  * mengubah tier, memblokir akun, dan melihat data pelanggan (plans/23 §2).
  */
 export function AdminIdleGuard() {
-  const { signOut } = useAuthContext()
+  const { signOut } = useAdminAuth()
   const navigate = useNavigate()
 
   const idle = useAdminIdleTimer({
     enabled: true,
     onTimeout: () => {
       signOut()
-      navigate('/login', { replace: true })
+      navigate('/admin/login', { replace: true })
     },
   })
 

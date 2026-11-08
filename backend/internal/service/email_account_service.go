@@ -48,6 +48,8 @@ type EmailAccountStore interface {
 	FindToken(ctx context.Context, hash, purpose string) (*model.EmailToken, error)
 	ConsumeToken(ctx context.Context, id string) (bool, error)
 	CountTokensSince(ctx context.Context, userID, purpose string, since time.Time) (int64, error)
+	ListByUser(ctx context.Context, userID string) ([]model.BrokerAccount, error)
+	ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 }
 
 // EmailAccountService menjalankan verifikasi email, lupa sandi, dan onboarding.

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Badge, Button, Input, Label, StatusDot } from '@/components/ui'
+import { Badge, Button, Input, Label, Modal, StatusDot } from '@/components/ui'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { useDeleteAccount, useUpdateAccount } from '@/lib/queries'
 import type { BrokerAccount } from '@/types/api'
@@ -76,42 +76,9 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
           <p className="border-l-2 border-foreground pl-2.5 text-[12px]">{account.last_error}</p>
         )}
 
-        {gantiToken && (
-          <div className="flex flex-col gap-2 border-t border-border pt-3">
-            <Label htmlFor={`token-${account.id}`}>Access token baru</Label>
-            <p className="text-[11px] text-muted-foreground">
-              Tempel token dari aplikasi Match-Trader. Sesi lama langsung diganti setelah disimpan.
-              Setiap akun memakai token berbeda. Jangan tampilkan token di luar panel ini.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                id={`token-${account.id}`}
-                type="password"
-                autoComplete="off"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                className="max-w-md font-mono"
-              />
-              <Button size="sm" isLoading={update.isPending} onClick={simpanToken}>
-                Simpan token
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setToken('')
-                  setGantiToken(false)
-                }}
-              >
-                Batal
-              </Button>
-            </div>
-          </div>
-        )}
-
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <Button size="sm" variant="outline" onClick={() => setGantiToken(!gantiToken)}>
-            {gantiToken ? 'Tutup ganti token' : 'Ganti token'}
+          <Button size="sm" variant="outline" onClick={() => setGantiToken(true)}>
+            Ganti token
           </Button>
           <Button
             size="sm"
@@ -123,31 +90,94 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
           >
             {account.is_active ? 'Nonaktifkan' : 'Aktifkan'}
           </Button>
+          <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => setKonfirmasiHapus(true)}>
+            Hapus akun
+          </Button>
+        </div>
 
-          {!konfirmasiHapus ? (
-            <Button size="sm" variant="ghost" onClick={() => setKonfirmasiHapus(true)}>
-              Hapus akun
-            </Button>
-          ) : (
-            <span className="flex flex-wrap items-center gap-1.5 text-[12px]">
-              <span className="text-muted-foreground">Hapus kredensial permanen?</span>
+        {/* Modal Ganti Token */}
+        <Modal
+          open={gantiToken}
+          onClose={() => {
+            setToken('')
+            setGantiToken(false)
+          }}
+          title="Ganti Token Akses Match-Trader"
+          description={`Perbarui access token untuk akun ${account.label}. Token lama langsung digantikan seketika.`}
+          footer={
+            <div className="flex justify-end gap-2">
               <Button
+                variant="outline"
                 size="sm"
-                variant="destructive"
-                isLoading={remove.isPending}
-                onClick={() => remove.mutate(account.id)}
+                onClick={() => {
+                  setToken('')
+                  setGantiToken(false)
+                }}
               >
-                Ya, hapus
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setKonfirmasiHapus(false)}>
                 Batal
               </Button>
-            </span>
-          )}
+              <Button size="sm" isLoading={update.isPending} onClick={simpanToken} disabled={!token.trim()}>
+                Simpan Token Baru
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor={`token-${account.id}`}>Access Token Baru</Label>
+              <Input
+                id={`token-${account.id}`}
+                type="password"
+                autoComplete="off"
+                placeholder="Tempel token Match-Trader di sini"
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                className="font-mono text-xs"
+              />
+            </div>
+            <p className="text-[12px] text-muted-foreground leading-relaxed">
+              Token ini dienkripsi di server dan hanya digunakan untuk eksekusi sinyal atas nama Anda.
+              Jangan bagikan token ini kepada siapa pun.
+            </p>
+          </div>
+        </Modal>
 
-          <span className="ml-auto text-[11px] text-muted-foreground">
-            Sinkron terakhir {formatDateTime(account.last_synced_at)}
-          </span>
+        {/* Modal Konfirmasi Hapus Akun */}
+        <Modal
+          open={konfirmasiHapus}
+          onClose={() => setKonfirmasiHapus(false)}
+          title="Hapus Akun Broker?"
+          description={`Anda akan menghapus akun ${account.label} (${account.external_account_id || account.broker_type}) secara permanen.`}
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setKonfirmasiHapus(false)}>
+                Batal
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                isLoading={remove.isPending}
+                onClick={() => {
+                  remove.mutate(account.id, {
+                    onSuccess: () => setKonfirmasiHapus(false),
+                  })
+                }}
+              >
+                Hapus Permanen
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-2 py-2 text-[13px] text-muted-foreground leading-relaxed">
+            <p>
+              Seluruh kredensial token broker yang tersimpan di sistem akan langsung dihapus. Sinyal trading
+              tidak lagi dapat diteruskan ke akun ini.
+            </p>
+          </div>
+        </Modal>
+
+        <div className="flex items-center justify-between border-t border-border pt-2 text-[11px] text-muted-foreground">
+          <span>Sinkron terakhir {formatDateTime(account.last_synced_at)}</span>
         </div>
       </div>
     </article>

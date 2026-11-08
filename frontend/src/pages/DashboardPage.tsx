@@ -8,6 +8,8 @@ import { PageHeaderActions } from './components/PageHeaderActions'
 import { DailyLimitCard } from './components/DailyLimitCard'
 import { SystemHealthCard } from './components/SystemHealthCard'
 import { MarketSessionCard } from '@/features/trading/components/MarketSessionCard'
+import { OnboardingCard } from '@/features/onboarding'
+import { AccountStatusCard } from './components/AccountStatusCard'
 
 function SummaryStats() {
   const { data, isLoading } = useSystemStatus()
@@ -114,6 +116,10 @@ export default function DashboardPage() {
         description="Keadaan sistem, batas harian, dan posisi terakhir."
         actions={<PageHeaderActions />}
       />
+
+      <AccountStatusCard />
+
+      <OnboardingCard />
 
       <SummaryStats />
 

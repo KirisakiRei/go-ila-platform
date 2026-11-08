@@ -75,19 +75,11 @@ func (s *sessionService) List(ctx context.Context, userID, scope, currentID stri
 }
 
 // Revoke mencabut satu sesi. Sesi milik orang lain tidak bisa disentuh.
-//
-// Token perangkat lain tidak bisa dibatalkan satu per satu karena verifikasi
-// memakai session_version; karena itu pencabutan menaikkan versi sehingga
-// seluruh token lama ditolak. Perangkat ini akan otomatis masuk ulang.
+// Pencabutan satu perangkat hanya menghapus sesi tersebut dari daftar aktif
+// tanpa menaikkan session_version global, agar perangkat saat ini tidak ter-logout.
 func (s *sessionService) Revoke(ctx context.Context, userID, sessionID string) error {
 	if err := s.sessions.Revoke(ctx, sessionID, userID); err != nil {
 		return err
-	}
-
-	if s.revoker != nil {
-		if err := s.revoker.RevokeSessions(ctx, userID); err != nil {
-			return err
-		}
 	}
 
 	s.recordAudit(ctx, userID, "auth.session.revoked", sessionID)

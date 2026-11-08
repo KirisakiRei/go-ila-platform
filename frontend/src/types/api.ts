@@ -297,9 +297,13 @@ export type OnboardingState = {
   done: boolean
   total_steps: number
   steps: string[]
+  step_done?: Record<string, boolean>
+  completed_count?: number
   has_broker: boolean
   email_verified: boolean
   telegram_linked: boolean
+  strategy_selected?: boolean
+  risk_configured?: boolean
   next_action: string
 }
 

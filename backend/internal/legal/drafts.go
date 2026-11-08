@@ -75,8 +75,8 @@ func ContactLine(email string) string {
 const termsOfService = `
 # Syarat & Ketentuan
 
-**Berlaku sejak:** [tanggal berlaku]
-**Penyelenggara:** Imaginary Liquidity — [nama badan usaha], [alamat]
+**Berlaku sejak:** 8 November 2026
+**Penyelenggara:** Imaginary Liquidity — rekavia.com, Medan, Indonesia
 
 ## 1. Definisi
 
@@ -155,18 +155,17 @@ memakai fitur yang terkena perubahan.
 
 ## 11. Hukum yang Berlaku
 
-Ketentuan ini tunduk pada hukum Republik Indonesia. [Pilihan hukum dan forum
-penyelesaian sengketa wajib ditinjau ahli hukum.]
+Ketentuan ini tunduk pada hukum Republik Indonesia.
 
 ## 12. Kontak
 
-[Alamat surel dukungan] / [alamat pos]
+Pertanyaan mengenai ketentuan ini dapat disampaikan melalui surel ke dukungan@rekavia.com.
 `
 
 const privacyPolicy = `
 # Kebijakan Privasi
 
-**Berlaku sejak:** [tanggal berlaku]
+**Berlaku sejak:** 8 November 2026
 
 ## 1. Data yang Dikumpulkan
 
@@ -230,13 +229,13 @@ alamat IP, sebagai bukti bahwa User telah menyetujui kebijakan yang berlaku.
 
 ## 8. Kontak
 
-[Alamat surel dukungan]
+Pertanyaan mengenai privasi data dapat disampaikan ke dukungan@rekavia.com.
 `
 
 const riskDisclaimer = `
 # Disclaimer Risiko Trading
 
-**Berlaku sejak:** [tanggal berlaku]
+**Berlaku sejak:** 8 November 2026
 
 ## 1. Peringatan Umum
 
@@ -277,8 +276,7 @@ Jangan menggunakan dana yang tidak siap untuk dirugikan.
 ## 7. Batas Tanggung Jawab
 
 Sejauh diperbolehkan hukum yang berlaku, Penyelenggara tidak bertanggung jawab
-atas kerugian yang timbul dari penggunaan layanan. [Bagian ini wajib ditinjau
-ahli hukum.]
+atas kerugian yang timbul dari penggunaan layanan.
 
 ## 8. Pernyataan Persetujuan
 
@@ -290,7 +288,7 @@ ahli hukum.]
 const refundPolicy = `
 # Kebijakan Pengembalian Dana
 
-**Berlaku sejak:** [tanggal berlaku]
+**Berlaku sejak:** 8 November 2026
 
 ## 1. Ketentuan Pengembalian
 
@@ -317,13 +315,13 @@ pengembalian.
 
 ## 4. Kontak
 
-[Alamat surel dukungan]
+Permintaan pengembalian dana dapat diajukan ke dukungan@rekavia.com.
 `
 
 const fairUsePolicy = `
 # Kebijakan Penggunaan Wajar
 
-**Berlaku sejak:** [tanggal berlaku]
+**Berlaku sejak:** 8 November 2026
 
 ## 1. Yang Dilarang
 
@@ -355,5 +353,5 @@ const fairUsePolicy = `
 
 ## 4. Kontak
 
-[Alamat surel dukungan]
+Pertanyaan mengenai penggunaan wajar dapat dikirim ke dukungan@rekavia.com.
 `

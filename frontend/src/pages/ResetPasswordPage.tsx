@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Alert, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@/components/ui'
+import { Alert, Button, Input, Label } from '@/components/ui'
+import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { authApi } from '@/lib/auth-api'
 
 /**
@@ -21,70 +22,83 @@ export default function ResetPasswordPage() {
   const submit = useMutation({
     mutationFn: () => authApi.resetPassword(token, password),
     onSuccess: () => setDone(true),
-    onError: (err) => setError(err instanceof Error ? err.message : 'Tautan tidak sah atau sudah kedaluwarsa.'),
+    onError: (err) =>
+      setError(err instanceof Error ? err.message : 'Tautan tidak sah atau sudah kedaluwarsa.'),
   })
 
   const mismatch = confirm.length > 0 && password !== confirm
   const canSubmit = token !== '' && password.length >= 8 && password === confirm
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Atur ulang kata sandi</CardTitle>
-          <CardDescription className="text-xs">
+    <AuthLayout
+      footer={
+        <>
+          Sudah ingat kata sandi?{' '}
+          <Link to="/login" className="font-medium text-foreground underline underline-offset-4">
+            Masuk
+          </Link>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold tracking-tight">Atur ulang kata sandi</h1>
+          <p className="text-[13px] text-muted-foreground">
             Minimal 8 karakter. Setelah tersimpan, semua perangkat akan diminta masuk kembali.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!token && <Alert variant="destructive">Tautan tidak lengkap. Minta tautan baru dari halaman lupa kata sandi.</Alert>}
-          {error && <Alert variant="destructive">{error}</Alert>}
-
-          {done ? (
-            <>
-              <Alert variant="success">Kata sandi diperbarui.</Alert>
-              <Button className="w-full" asChild={false} onClick={() => (window.location.href = '/login')}>
-                Masuk dengan kata sandi baru
-              </Button>
-            </>
-          ) : (
-            <>
-              <div>
-                <Label htmlFor="password">Kata sandi baru</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="confirm">Ulangi kata sandi</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirm}
-                  onChange={(event) => setConfirm(event.target.value)}
-                  className="mt-1"
-                />
-                {mismatch && <p className="mt-1 text-[11px] text-muted-foreground">Kata sandi belum sama.</p>}
-              </div>
-              <Button className="w-full" disabled={!canSubmit || submit.isPending} onClick={() => submit.mutate()}>
-                Simpan kata sandi
-              </Button>
-            </>
-          )}
-
-          <p className="text-center text-[12px] text-muted-foreground">
-            <Link to="/login" className="underline">
-              Kembali ke halaman masuk
-            </Link>
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </header>
+
+        {!token && (
+          <Alert variant="destructive">
+            Tautan tidak lengkap. Minta tautan baru dari halaman lupa kata sandi.
+          </Alert>
+        )}
+        {error && <Alert variant="destructive">{error}</Alert>}
+
+        {done ? (
+          <div className="flex flex-col gap-4">
+            <Alert variant="success">Kata sandi diperbarui.</Alert>
+            <Button asChild className="w-full">
+              <Link to="/login">Masuk dengan kata sandi baru</Link>
+            </Button>
+          </div>
+        ) : (
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (canSubmit && !submit.isPending) submit.mutate()
+            }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password">Kata sandi baru</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="confirm">Ulangi kata sandi</Label>
+              <Input
+                id="confirm"
+                type="password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(event) => setConfirm(event.target.value)}
+              />
+              {mismatch && (
+                <p className="text-[11px] text-muted-foreground">Kata sandi belum sama.</p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={!canSubmit || submit.isPending}>
+              {submit.isPending ? 'Menyimpan…' : 'Simpan kata sandi'}
+            </Button>
+          </form>
+        )}
+      </div>
+    </AuthLayout>
   )
 }

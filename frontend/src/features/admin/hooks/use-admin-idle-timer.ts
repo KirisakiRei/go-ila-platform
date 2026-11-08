@@ -55,6 +55,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
           countdownTimer.current = null
           if (!firedRef.current) {
             firedRef.current = true
+            setWarningVisible(false)
             onTimeout()
           }
           return 0
@@ -105,6 +106,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
     leaveNow: () => {
       clearTimers()
       firedRef.current = true
+      setWarningVisible(false)
       onTimeout()
     },
   }

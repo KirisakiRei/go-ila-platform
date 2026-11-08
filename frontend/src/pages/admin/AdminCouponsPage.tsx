@@ -10,6 +10,7 @@ import {
   EmptyState,
   Input,
   Label,
+  Modal,
   PageHeader,
   Select,
   Skeleton,
@@ -67,19 +68,31 @@ export default function AdminCouponsPage() {
         title="Kupon"
         description="Potongan hanya berlaku saat checkout; harga lama di invoice tidak berubah."
         actions={
-          <Button size="sm" onClick={() => setCreating((value) => !value)}>
-            {creating ? 'Tutup formulir' : 'Kupon baru'}
+          <Button size="sm" onClick={() => setCreating(true)}>
+            Kupon baru
           </Button>
         }
       />
 
       {notice && <Alert>{notice}</Alert>}
 
-      {creating && <CreateCouponForm onDone={() => {
-        setCreating(false)
-        setNotice('Kupon dibuat.')
-        invalidate()
-      }} onError={(message) => setNotice(message)} />}
+      <Modal
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="Kupon Baru"
+        description="Potongan harga berlaku saat checkout; kupon lama di invoice tidak berubah."
+        size="lg"
+      >
+        <CreateCouponForm
+          onDone={() => {
+            setCreating(false)
+            setNotice('Kupon dibuat.')
+            invalidate()
+          }}
+          onCancel={() => setCreating(false)}
+          onError={(message) => setNotice(message)}
+        />
+      </Modal>
 
       <Card className="p-3">
         <div className="grid gap-2 sm:grid-cols-2">
@@ -164,7 +177,15 @@ export default function AdminCouponsPage() {
   )
 }
 
-function CreateCouponForm({ onDone, onError }: { onDone: () => void; onError: (message: string) => void }) {
+function CreateCouponForm({
+  onDone,
+  onCancel,
+  onError,
+}: {
+  onDone: () => void
+  onCancel?: () => void
+  onError: (message: string) => void
+}) {
   const [code, setCode] = useState('')
   const [type, setType] = useState<'percent' | 'fixed'>('percent')
   const [value, setValue] = useState('')
@@ -190,8 +211,8 @@ function CreateCouponForm({ onDone, onError }: { onDone: () => void; onError: (m
   const ready = code.trim() !== '' && value !== '' && startsAt !== '' && endsAt !== ''
 
   return (
-    <Card className="p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="coupon-code">Kode</Label>
           <Input id="coupon-code" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} />
@@ -212,6 +233,14 @@ function CreateCouponForm({ onDone, onError }: { onDone: () => void; onError: (m
           <Input id="coupon-value" value={value} onChange={(event) => setValue(event.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
+          <Label htmlFor="coupon-per-user">Maksimal per pengguna</Label>
+          <Input
+            id="coupon-per-user"
+            value={maxPerUser}
+            onChange={(event) => setMaxPerUser(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
           <Label htmlFor="coupon-start">Mulai</Label>
           <Input
             id="coupon-start"
@@ -224,20 +253,17 @@ function CreateCouponForm({ onDone, onError }: { onDone: () => void; onError: (m
           <Label htmlFor="coupon-end">Berakhir</Label>
           <Input id="coupon-end" type="date" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="coupon-per-user">Maksimal per pengguna</Label>
-          <Input
-            id="coupon-per-user"
-            value={maxPerUser}
-            onChange={(event) => setMaxPerUser(event.target.value)}
-          />
-        </div>
       </div>
-      <div className="mt-3">
+      <div className="flex justify-end gap-2 border-t border-border pt-4">
+        {onCancel && (
+          <Button variant="outline" size="sm" type="button" onClick={onCancel}>
+            Batal
+          </Button>
+        )}
         <Button size="sm" disabled={!ready || create.isPending} onClick={() => create.mutate()}>
-          Simpan kupon
+          {create.isPending ? 'Menyimpan…' : 'Simpan kupon'}
         </Button>
       </div>
-    </Card>
+    </div>
   )
 }

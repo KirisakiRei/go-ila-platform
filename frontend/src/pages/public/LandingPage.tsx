@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Check } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatIDR } from '@/features/admin/lib/format'
 import { publicPlanApi } from '@/lib/admin-api'
 import {
@@ -492,7 +493,19 @@ export default function LandingPage() {
           {plansLoading ? (
             <div className="grid gap-8 border-t border-zinc-200 pt-8 sm:grid-cols-3">
               {[0, 1, 2].map((idx) => (
-                <div key={idx} className="h-56 animate-pulse border-t border-zinc-200 pt-4" />
+                <div key={idx} className="flex flex-col justify-between border-t border-zinc-200 pt-6 space-y-6">
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-28 bg-zinc-200" />
+                    <Skeleton className="h-4 w-4/5 bg-zinc-200" />
+                    <Skeleton className="h-8 w-36 bg-zinc-200" />
+                    <div className="space-y-2 pt-2">
+                      <Skeleton className="h-4 w-full bg-zinc-200" />
+                      <Skeleton className="h-4 w-5/6 bg-zinc-200" />
+                      <Skeleton className="h-4 w-3/4 bg-zinc-200" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-10 w-full rounded-lg bg-zinc-200" />
+                </div>
               ))}
             </div>
           ) : plans && plans.length > 0 ? (

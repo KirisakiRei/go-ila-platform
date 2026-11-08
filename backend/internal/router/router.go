@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,8 +13,10 @@ import (
 	"ila/backend/internal/authstate"
 	"ila/backend/internal/authz"
 	"ila/backend/internal/config"
+	"ila/backend/internal/ctraderapi"
 	"ila/backend/internal/handler"
 	"ila/backend/internal/middleware"
+	"ila/backend/internal/model"
 	"ila/backend/internal/payment"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
@@ -144,6 +147,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Kunci sidik jari sederajat rahasia server: dipakai mengenali token
 		// yang dipakai dua akun sekaligus.
 		FingerprintSecret: cfg.InternalSecret,
+		CTrader:           ctraderapi.NewClient(cfg.CTraderClientID, cfg.CTraderClientSecret, cfg.CTraderRedirectURI),
 	})
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
 	systemService := service.NewSystemService(service.SystemServiceDeps{
@@ -198,10 +202,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	// Alur akun: lupa sandi, verifikasi email, onboarding (plans/17).
 	emailRepo := repository.NewEmailRepository(db)
-	emailAccountStore := struct {
-		repository.UserRepository
-		*repository.EmailRepository
-	}{userRepo, emailRepo}
+	emailAccountStore := &emailAccountStoreAdapter{
+		UserRepository:   userRepo,
+		EmailRepository:  emailRepo,
+		accountRepo:      accountRepo,
+		subscriptionRepo: subscriptionRepo,
+	}
 	emailAccountService := service.NewEmailAccountService(emailAccountStore, auditRepo, cfg.PublicURL)
 
 	adminAuthService := service.NewAdminAuthService(service.AdminAuthDeps{
@@ -375,6 +381,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		me.POST("/accounts", accountHandler.Create)
 		me.PATCH("/accounts/:id", accountHandler.Update)
 		me.DELETE("/accounts/:id", accountHandler.Delete)
+		me.GET("/accounts/ctrader/auth-url", accountHandler.CTraderAuthURL)
+		me.POST("/accounts/ctrader/callback", accountHandler.CTraderCallback)
 
 		// Langganan simbol dan pilihan strategi.
 		me.GET("/subscriptions", accountHandler.ListSubscriptions)
@@ -556,4 +564,21 @@ func registerAdmin(
 	pageHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")
+}
+
+// emailAccountStoreAdapter menggabungkan repository yang dibutuhkan alur akun
+// tanpa bentrok nama method FindByID antara UserRepository dan BrokerAccountRepository.
+type emailAccountStoreAdapter struct {
+	repository.UserRepository
+	*repository.EmailRepository
+	accountRepo      repository.BrokerAccountRepository
+	subscriptionRepo repository.SubscriptionRepository
+}
+
+func (a *emailAccountStoreAdapter) ListByUser(ctx context.Context, userID string) ([]model.BrokerAccount, error) {
+	return a.accountRepo.ListByUser(ctx, userID)
+}
+
+func (a *emailAccountStoreAdapter) ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error) {
+	return a.subscriptionRepo.ListActiveByUser(ctx, userID)
 }

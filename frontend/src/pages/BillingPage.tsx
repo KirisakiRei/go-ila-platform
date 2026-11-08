@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Check, Sparkles, Tag } from 'lucide-react'
 import { request } from '@/lib/http'
 import { publicPlanApi } from '@/lib/admin-api'
 import { formatIDR, formatInvoice } from '@/features/admin/lib/format'
@@ -8,14 +9,12 @@ import {
   Alert,
   Badge,
   Button,
-  Input,
-  Label,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   EmptyState,
+  Input,
+  Label,
+  Modal,
   PageHeader,
   Skeleton,
   Table,
@@ -25,6 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui'
+import { formatPlanBenefits, getPlanAudience } from '@/pages/public/lib/plan-benefits'
+import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import type { TimePair } from '@/types/api'
 
 type Invoice = {
@@ -45,14 +46,15 @@ const STATUS_TEXT: Record<string, string> = {
   refunded: 'Dikembalikan',
 }
 
-/**
- * BillingPage menampilkan paket dan riwayat tagihan pelanggan.
- *
- * Halaman ini tidak mengubah tier. Kenaikan tier hanya terjadi setelah
- * webhook pembayaran bertanda tangan sah diterima server.
- */
 export default function BillingPage() {
+  const navigate = useNavigate()
+  const { user } = useAuthContext()
   const queryClient = useQueryClient()
+
+  const [modalRedeem, setModalRedeem] = useState(false)
+  const [creditCode, setCreditCode] = useState('')
+  const [redeemNotice, setRedeemNotice] = useState<string | null>(null)
+
   const plans = useQuery({ queryKey: ['public', 'plans'], queryFn: publicPlanApi.list })
   const invoices = useQuery({
     queryKey: ['billing', 'invoices'],
@@ -60,152 +62,301 @@ export default function BillingPage() {
   })
   const subscription = useQuery({
     queryKey: ['billing', 'subscription'],
-    queryFn: () => request<{ plan_code: string; period_end: TimePair; status: string } | null>(
-      '/billing/subscription',
-    ),
+    queryFn: () =>
+      request<{ plan_code: string; period_end: TimePair; status: string } | null>(
+        '/billing/subscription',
+      ),
   })
-
-  return (
-    <>
-      <PageHeader
-        title="Langganan"
-        description="Pembayaran diproses lewat gateway. Status lunas hanya berubah setelah server menerima konfirmasi resmi."
-      />
-
-      {subscription.data && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Paket aktif: {subscription.data.plan_code}</CardTitle>
-            <CardDescription>
-              Berlaku sampai {formatInvoice(subscription.data.period_end.wib)} WIB.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Pilihan paket</CardTitle>
-          <CardDescription>Harga sudah termasuk pajak sesuai ketentuan yang berlaku.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          {plans.isLoading && <Skeleton className="h-32 w-full sm:col-span-3" />}
-          {(plans.data ?? []).map((plan) => (
-            <div key={plan.code} className="rounded-md border border-border p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[13px] font-semibold">{plan.name}</p>
-                {plan.ila3_coming_soon && <Badge variant="default">ILA 3.0 segera</Badge>}
-              </div>
-              <p className="mt-1 text-[15px] font-semibold tabular-nums">{formatIDR(plan.price_idr)}</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                {plan.description}
-              </p>
-              {plan.code !== 'free' && (
-                <Button className="mt-3 w-full" size="sm" variant="outline" asChild>
-                  <Link to={`/langganan/bayar?paket=${plan.code}`}>Pilih paket</Link>
-                </Button>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <RedeemCreditCard onRedeemed={() => void queryClient.invalidateQueries({ queryKey: ['billing'] })} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Riwayat tagihan</CardTitle>
-          <CardDescription>Invoice lama tidak berubah walau harga paket berubah.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {invoices.isLoading && <Skeleton className="h-24 w-full" />}
-          {invoices.data && invoices.data.length === 0 && (
-            <EmptyState title="Belum ada tagihan" description="Tagihan muncul setelah Anda memilih paket." />
-          )}
-          {invoices.data && invoices.data.length > 0 && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nomor</TableHead>
-                  <TableHead>Paket</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Terbit (WIB)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.data.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-[12px]">{row.number}</TableCell>
-                    <TableCell className="text-[12px]">{row.plan_code}</TableCell>
-                    <TableCell className="text-right text-[12px] tabular-nums">
-                      {formatIDR(row.total_idr)}
-                    </TableCell>
-                    <TableCell className="text-[12px]">{STATUS_TEXT[row.status] ?? row.status}</TableCell>
-                    <TableCell className="text-[12px] text-muted-foreground">
-                      {formatInvoice(row.created_at.wib)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </>
-  )
-}
-
-/**
- * RedeemCreditCard menukar kode kredit menjadi saldo.
- * Saldo hanya bisa dipakai memotong tagihan berikutnya, tidak bisa dicairkan.
- */
-function RedeemCreditCard({ onRedeemed }: { onRedeemed: () => void }) {
-  const [code, setCode] = useState('')
-  const [notice, setNotice] = useState<string | null>(null)
 
   const redeem = useMutation({
     mutationFn: () =>
       request<{ balance_idr: number }>('/billing/credit/redeem', {
         method: 'POST',
-        body: { code: code.trim().toUpperCase() },
+        body: { code: creditCode.trim().toUpperCase() },
       }),
     onSuccess: (data) => {
-      setNotice(`Kode berhasil ditukar. Saldo Anda ${formatIDR(data.balance_idr)}.`)
-      setCode('')
-      onRedeemed()
+      setRedeemNotice(`Kode berhasil ditukar! Saldo kredit Anda: ${formatIDR(data.balance_idr)}.`)
+      setCreditCode('')
+      void queryClient.invalidateQueries({ queryKey: ['billing'] })
     },
-    onError: (error) =>
-      setNotice(error instanceof Error ? error.message : 'Kode tidak dapat ditukar.'),
+    onError: (err) =>
+      setRedeemNotice(err instanceof Error ? err.message : 'Kode kredit tidak valid atau sudah kedaluwarsa.'),
   })
 
+  const currentTier = user?.tier ?? 'free'
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Tukar kode kredit</CardTitle>
-        <CardDescription>Saldo dipakai otomatis memotong tagihan paket berikutnya.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex flex-1 flex-col gap-1">
-            <Label htmlFor="credit-code-input">Kode</Label>
+    <>
+      <PageHeader
+        title="Paket & Langganan"
+        description="Kelola paket langganan aktif, bandingkan benefit secara transparan, dan riwayat tagihan resmi."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="gap-1.5 text-xs">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Kembali ke Dashboard
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setModalRedeem(true)} className="gap-1.5 text-xs">
+              <Tag className="h-3.5 w-3.5" />
+              Tukar Kode Kredit
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Langganan Aktif */}
+      {subscription.data && (
+        <Card className="border-border bg-gradient-to-r from-card to-secondary/30">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground text-background">
+                <Sparkles className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold tracking-tight">
+                    Langganan Aktif: Paket {subscription.data.plan_code.toUpperCase()}
+                  </h3>
+                  <Badge variant="solid" className="text-[10px]">Aktif</Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Masa aktif berlaku sampai dengan{' '}
+                  <strong className="font-semibold text-foreground">
+                    {formatInvoice(subscription.data.period_end.wib)} WIB
+                  </strong>.
+                </p>
+              </div>
+            </div>
+
+            <Button size="sm" variant="outline" asChild className="gap-1 text-xs">
+              <Link to="/langganan/bayar?paket=plus">
+                Upgrade Paket
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pilihan Paket Lengkap & Transparan */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">Pilihan Paket Langganan</h2>
+          <p className="text-xs text-muted-foreground">
+            Semua paket berbayar memiliki masa aktif 30 hari. Harga sudah termasuk pajak sesuai ketentuan resmi.
+          </p>
+        </div>
+
+        {plans.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-96 w-full rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-3">
+            {(plans.data ?? []).map((plan) => {
+              const isCurrent = currentTier === plan.code
+              const isPlus = plan.code === 'plus'
+              const benefits = formatPlanBenefits(plan)
+
+              return (
+                <div
+                  key={plan.code}
+                  className={
+                    isPlus
+                      ? 'relative flex flex-col justify-between rounded-2xl border-2 border-foreground bg-card p-6 shadow-sm'
+                      : 'relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 transition-colors hover:border-zinc-300'
+                  }
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
+                          {plan.ila3_coming_soon && <Badge variant="outline">ILA 3.0 Segera</Badge>}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                          {getPlanAudience(plan)}
+                        </p>
+                      </div>
+
+                      {isPlus && (
+                        <span className="rounded-full bg-foreground px-2.5 py-0.5 text-[10px] font-semibold text-background">
+                          Terlengkap
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border pt-4">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                          {formatIDR(plan.price_idr)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">/ 30 hari</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {plan.code === 'free' ? 'Akses selamanya tanpa biaya' : 'Pembayaran per bulan, batalkan kapan saja'}
+                      </p>
+                    </div>
+
+                    {/* Benefit Checklist */}
+                    <div className="space-y-2 border-t border-border pt-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Benefit Termasuk:
+                      </p>
+                      <ul className="space-y-2 text-xs">
+                        {benefits.map((benefit) => (
+                          <li key={benefit.label} className="flex items-start gap-2">
+                            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-foreground">{benefit.label}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 border-t border-border pt-4">
+                    {isCurrent ? (
+                      <Button className="w-full" size="sm" variant="outline" disabled>
+                        Paket Anda Saat Ini
+                      </Button>
+                    ) : plan.code === 'free' ? (
+                      <Button className="w-full" size="sm" variant="outline" disabled>
+                        Paket Dasar
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full gap-1.5 font-semibold"
+                        size="sm"
+                        variant={isPlus ? 'default' : 'outline'}
+                        asChild
+                      >
+                        <Link to={`/langganan/bayar?paket=${plan.code}`}>
+                          Lanjut ke Checkout
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Riwayat Tagihan */}
+      <div className="space-y-3 pt-4">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight">Riwayat Tagihan &amp; Invoice</h2>
+          <p className="text-xs text-muted-foreground">
+            Daftar seluruh invoice transaksi langganan akun Anda.
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
+            {invoices.isLoading && <Skeleton className="h-32 w-full" />}
+            {invoices.data && invoices.data.length === 0 && (
+              <div className="p-6">
+                <EmptyState
+                  title="Belum ada tagihan"
+                  description="Riwayat tagihan akan otomatis muncul setelah Anda menyelesaikan checkout paket."
+                />
+              </div>
+            )}
+            {invoices.data && invoices.data.length > 0 && (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nomor Tagihan</TableHead>
+                      <TableHead>Paket</TableHead>
+                      <TableHead className="text-right">Total Biaya</TableHead>
+                      <TableHead>Status Pembayaran</TableHead>
+                      <TableHead>Waktu Terbit (WIB)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.data.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-mono text-xs font-semibold">{row.number}</TableCell>
+                        <TableCell className="text-xs font-medium uppercase">{row.plan_code}</TableCell>
+                        <TableCell className="text-right text-xs font-semibold tabular-nums">
+                          {formatIDR(row.total_idr)}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <Badge
+                            variant={row.status === 'paid' ? 'solid' : row.status === 'pending' ? 'outline' : 'muted'}
+                            className="text-[10.5px]"
+                          >
+                            {STATUS_TEXT[row.status] ?? row.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {formatInvoice(row.created_at.wib)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Modal Redeem Kode Kredit */}
+      <Modal
+        open={modalRedeem}
+        onClose={() => {
+          setModalRedeem(false)
+          setRedeemNotice(null)
+          setCreditCode('')
+        }}
+        title="Tukar Kode Kredit"
+        description="Punya voucher atau kode kredit promosi? Masukkan di bawah untuk menambah saldo pemotong tagihan Anda."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setModalRedeem(false)
+                setRedeemNotice(null)
+                setCreditCode('')
+              }}
+            >
+              Tutup
+            </Button>
+            <Button
+              size="sm"
+              disabled={creditCode.trim() === '' || redeem.isPending}
+              onClick={() => redeem.mutate()}
+            >
+              {redeem.isPending ? 'Menukar...' : 'Tukar Sekarang'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 py-2">
+          {redeemNotice && <Alert>{redeemNotice}</Alert>}
+          <div className="space-y-1.5">
+            <Label htmlFor="modal-credit-code">Kode Kredit Promosi</Label>
             <Input
-              id="credit-code-input"
-              value={code}
-              placeholder="ILA-XXXX"
-              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              id="modal-credit-code"
+              value={creditCode}
+              placeholder="Contoh: ILA-KREDIT-2026"
+              onChange={(e) => setCreditCode(e.target.value.toUpperCase())}
+              className="font-mono text-xs"
             />
           </div>
-          <Button
-            size="sm"
-            disabled={code.trim() === '' || redeem.isPending}
-            onClick={() => redeem.mutate()}
-          >
-            {redeem.isPending ? 'Menukar…' : 'Tukar kode'}
-          </Button>
+          <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+            Saldo kredit yang Anda peroleh dapat digunakan untuk memotong total tagihan saat melakukan checkout paket.
+          </p>
         </div>
-        {notice && <Alert className="mt-2">{notice}</Alert>}
-      </CardContent>
-    </Card>
+      </Modal>
+    </>
   )
 }

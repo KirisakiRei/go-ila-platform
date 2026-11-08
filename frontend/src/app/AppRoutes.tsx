@@ -8,9 +8,11 @@ import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import AdminLoginPage from '@/pages/admin/AdminLoginPage'
 import ApprovePage from '@/pages/ApprovePage'
 import DashboardPage from '@/pages/DashboardPage'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import LoginPage from '@/pages/LoginPage'
 import PositionsPage from '@/pages/PositionsPage'
 import RegisterPage from '@/pages/RegisterPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import SettingsPage from '@/pages/SettingsPage'
 import SignalsPage from '@/pages/SignalsPage'
 import StrategiesPage from '@/pages/StrategiesPage'
@@ -125,9 +127,37 @@ export function AppRoutes() {
             </RedirectIfAuthenticated>
           }
         />
+        <Route
+          path="/lupa-sandi"
+          element={
+            <RedirectIfAuthenticated>
+              <ForgotPasswordPage />
+            </RedirectIfAuthenticated>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <RedirectIfAuthenticated>
+              <ForgotPasswordPage />
+            </RedirectIfAuthenticated>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <RedirectIfAuthenticated>
+              <ResetPasswordPage />
+            </RedirectIfAuthenticated>
+          }
+        />
 
         <Route
           path="/"
+          element={<Navigate to="/dashboard" replace />}
+        />
+        <Route
+          path="/dashboard"
           element={
             <RequireAuth>
               <ShellPage>

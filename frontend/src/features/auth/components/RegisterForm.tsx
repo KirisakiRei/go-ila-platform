@@ -97,7 +97,7 @@ export function RegisterForm() {
         <StepIndicator steps={REGISTER_STEPS} current={stepIndex} />
       </header>
 
-      {step === 'Identitas' && (
+      {step === 'Akun' && (
         <>
           <Field
             id="name"
@@ -134,11 +134,7 @@ export function RegisterForm() {
               />
             }
           />
-        </>
-      )}
 
-      {step === 'Kontak' && (
-        <>
           <Field
             id="email"
             label="Email"

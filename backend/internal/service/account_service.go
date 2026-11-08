@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ila/backend/internal/broker"
+	"ila/backend/internal/ctraderapi"
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
 	"ila/backend/pkg/apperror"
@@ -45,6 +46,10 @@ type AccountService interface {
 	Subscribe(ctx context.Context, userID string, req dto.CreateSubscriptionRequest) (*dto.SubscriptionResponse, error)
 	Unsubscribe(ctx context.Context, userID, subscriptionID string) error
 	Strategies(ctx context.Context, userID string) ([]dto.StrategyResponse, error)
+
+	// cTrader OAuth
+	GetCTraderAuthURL(ctx context.Context) (dto.CTraderAuthURLResponse, error)
+	ConnectCTrader(ctx context.Context, userID string, req dto.CTraderCallbackRequest) (*dto.CTraderCallbackResponse, error)
 }
 
 type accountService struct {
@@ -63,8 +68,16 @@ type accountService struct {
 	// features membaca batas akun dan simbol per tier dari katalog paket.
 	features TierFeatureReader
 	// secret mengunci sidik jari token agar tidak bisa dibalik dari database.
-	secret string
-	clock  func() time.Time
+	secret  string
+	clock   func() time.Time
+	ctrader CTraderOAuthClient
+}
+
+// CTraderOAuthClient mendefinisikan kontrak komunikasi ke REST API cTrader Spotware.
+type CTraderOAuthClient interface {
+	BuildAuthURL(scope string) string
+	ExchangeToken(ctx context.Context, code string) (*ctraderapi.TokenResponse, error)
+	GetAccounts(ctx context.Context, accessToken string) ([]ctraderapi.AccountInfo, error)
 }
 
 // AccountLinkGuard memeriksa syarat sebelum akun broker dihubungkan.
@@ -111,6 +124,7 @@ type AccountServiceDeps struct {
 	// kunci internal; kosong membuat pemeriksaan duplikat dimatikan.
 	FingerprintSecret string
 	Clock             func() time.Time
+	CTrader           CTraderOAuthClient
 }
 
 // StrategyCatalog melaporkan ketersediaan strategi bagi user.
@@ -139,6 +153,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		features:   deps.Features,
 		secret:     deps.FingerprintSecret,
 		clock:      clock,
+		ctrader:    deps.CTrader,
 	}
 }
 
@@ -663,7 +678,13 @@ func validateCredential(brokerType string, req dto.CreateAccountRequest) error {
 			return fmt.Errorf("%w: token Match-Trader tampak tidak lengkap", apperror.ErrBadRequest)
 		}
 	case "ctrader":
-		return fmt.Errorf("%w: cTrader belum tersedia", apperror.ErrBadRequest)
+		token := strings.TrimSpace(req.Token)
+		if token == "" {
+			return fmt.Errorf("%w: token cTrader wajib diisi", apperror.ErrBadRequest)
+		}
+		if len(token) < 10 {
+			return fmt.Errorf("%w: token cTrader tampak tidak lengkap", apperror.ErrBadRequest)
+		}
 	default:
 		return fmt.Errorf("%w: platform tidak dikenal", apperror.ErrBadRequest)
 	}
@@ -777,4 +798,212 @@ func toSubscriptionResponse(sub model.Subscription) dto.SubscriptionResponse {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+func (s *accountService) GetCTraderAuthURL(ctx context.Context) (dto.CTraderAuthURLResponse, error) {
+	if s.ctrader == nil {
+		return dto.CTraderAuthURLResponse{}, fmt.Errorf("%w: integrasi cTrader belum dikonfigurasi", apperror.ErrBadRequest)
+	}
+	url := s.ctrader.BuildAuthURL("trading")
+	return dto.CTraderAuthURLResponse{AuthURL: url}, nil
+}
+
+func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req dto.CTraderCallbackRequest) (*dto.CTraderCallbackResponse, error) {
+	if s.ctrader == nil {
+		return nil, fmt.Errorf("%w: integrasi cTrader belum dikonfigurasi", apperror.ErrBadRequest)
+	}
+
+	user, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.EmailVerifiedAt == nil {
+		return nil, ErrEmailNotVerified
+	}
+
+	if s.legal != nil {
+		if err := s.legal.RequireAccountLink(ctx, userID); err != nil {
+			return nil, err
+		}
+	}
+
+	tier := effectiveTier(user, s.clock())
+	limit := s.tierAccountLimit(ctx, tier)
+	if InTrialPeriod(user, s.clock()) && limit > model.MaxAccountsDuringTrial {
+		limit = model.MaxAccountsDuringTrial
+	}
+	if limit == 0 {
+		return nil, fmt.Errorf("%w: tier %s tidak dapat menghubungkan akun broker", apperror.ErrForbidden, tier)
+	}
+
+	active, err := s.accounts.CountActiveByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if int(active) >= limit {
+		return nil, fmt.Errorf("%w: tier %s maksimal %d akun (sudah terhubung %d)", apperror.ErrForbidden, tier, limit, active)
+	}
+
+	tokenResp, err := s.ctrader.ExchangeToken(ctx, req.Code)
+	if err != nil {
+		return nil, fmt.Errorf("%w: pertukaran token cTrader gagal: %v", apperror.ErrBadRequest, err)
+	}
+
+	accounts, err := s.ctrader.GetAccounts(ctx, tokenResp.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("%w: mengambil daftar akun cTrader gagal: %v", apperror.ErrBadRequest, err)
+	}
+	if len(accounts) == 0 {
+		return nil, fmt.Errorf("%w: tidak ada akun cTrader yang ditemukan di profil ini", apperror.ErrNotFound)
+	}
+
+	mode := req.Mode
+	if mode == "" {
+		mode = "manual"
+	}
+	if mode == "auto" && tier != "plus" {
+		return nil, fmt.Errorf("%w: eksekusi otomatis hanya untuk tier Plus", apperror.ErrForbidden)
+	}
+
+	riskPercent, err := clampRisk(req.RiskPercent)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ambil akun yang sudah ada untuk mendeteksi duplikat
+	existingAccounts, err := s.accounts.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	existingMap := make(map[string]*model.BrokerAccount)
+	for i := range existingAccounts {
+		if existingAccounts[i].BrokerType == "ctrader" {
+			existingMap[existingAccounts[i].ExternalAccountID] = &existingAccounts[i]
+		}
+	}
+
+	var connectedResponses []dto.AccountResponse
+
+	for _, acc := range accounts {
+		extID := strconv.FormatInt(acc.AccountID, 10)
+		loginStr := strconv.FormatInt(acc.TraderLogin, 10)
+
+		typeStr := "Live"
+		if !acc.Live {
+			typeStr = "Demo"
+		}
+		label := fmt.Sprintf("cTrader %s (%s)", loginStr, typeStr)
+		if acc.BrokerTitle != "" {
+			label = fmt.Sprintf("%s %s (%s)", acc.BrokerTitle, loginStr, typeStr)
+		}
+
+		if existing, ok := existingMap[extID]; ok {
+			creds := broker.Credentials{
+				Platform:  "ctrader",
+				AccountID: existing.ID,
+				Login:     loginStr,
+				Token:     tokenResp.AccessToken,
+				Extra: map[string]string{
+					"ctid_trader_account_id": extID,
+					"refresh_token":          tokenResp.RefreshToken,
+					"live":                   strconv.FormatBool(acc.Live),
+				},
+			}
+			plaintext, encErr := encodeCredentials(creds)
+			if encErr != nil {
+				return nil, encErr
+			}
+			envelope, sealErr := s.sealer.Seal(plaintext, []byte(existing.ID))
+			if sealErr != nil {
+				return nil, sealErr
+			}
+			_ = s.creds.Upsert(ctx, &model.Credential{
+				BrokerAccountID: existing.ID,
+				UserID:          userID,
+				UserKeyWrapped:  envelope.UserKeyWrapped,
+				UserKeyNonce:    envelope.UserKeyNonce,
+				Ciphertext:      envelope.Ciphertext,
+				Nonce:           envelope.Nonce,
+				KeyVersion:      envelope.KeyVersion,
+				RotatedAt:       s.clock(),
+			})
+			existing.IsActive = true
+			existing.LastError = ""
+			_ = s.accounts.Update(ctx, existing)
+			connectedResponses = append(connectedResponses, s.toResponse(ctx, existing, model.BrokerAccountState{}))
+			continue
+		}
+
+		if int(active) >= limit {
+			break
+		}
+
+		newAcc := &model.BrokerAccount{
+			UserID:            userID,
+			BrokerType:        "ctrader",
+			Label:             label,
+			ExternalAccountID: extID,
+			Mode:              mode,
+			RiskMode:          "percent",
+			RiskPercent:       riskPercent,
+			IsActive:          true,
+			IsDryRun:          !acc.Live,
+		}
+
+		if err := s.accounts.Create(ctx, newAcc); err != nil {
+			return nil, err
+		}
+
+		creds := broker.Credentials{
+			Platform:  "ctrader",
+			AccountID: newAcc.ID,
+			Login:     loginStr,
+			Token:     tokenResp.AccessToken,
+			Extra: map[string]string{
+				"ctid_trader_account_id": extID,
+				"refresh_token":          tokenResp.RefreshToken,
+				"live":                   strconv.FormatBool(acc.Live),
+			},
+		}
+		plaintext, encErr := encodeCredentials(creds)
+		if encErr != nil {
+			newAcc.IsActive = false
+			newAcc.LastError = "kredensial gagal disandikan"
+			_ = s.accounts.Update(ctx, newAcc)
+			return nil, encErr
+		}
+		envelope, sealErr := s.sealer.Seal(plaintext, []byte(newAcc.ID))
+		if sealErr != nil {
+			newAcc.IsActive = false
+			newAcc.LastError = "kredensial gagal dienkripsi"
+			_ = s.accounts.Update(ctx, newAcc)
+			return nil, sealErr
+		}
+
+		if err := s.creds.Upsert(ctx, &model.Credential{
+			BrokerAccountID: newAcc.ID,
+			UserID:          userID,
+			UserKeyWrapped:  envelope.UserKeyWrapped,
+			UserKeyNonce:    envelope.UserKeyNonce,
+			Ciphertext:      envelope.Ciphertext,
+			Nonce:           envelope.Nonce,
+			KeyVersion:      envelope.KeyVersion,
+			RotatedAt:       s.clock(),
+		}); err != nil {
+			newAcc.IsActive = false
+			newAcc.LastError = "kredensial gagal disimpan"
+			_ = s.accounts.Update(ctx, newAcc)
+			return nil, err
+		}
+
+		active++
+		s.recordAudit(ctx, userID, newAcc, "account.create", "")
+		connectedResponses = append(connectedResponses, s.toResponse(ctx, newAcc, model.BrokerAccountState{}))
+	}
+
+	return &dto.CTraderCallbackResponse{
+		TotalConnected: len(connectedResponses),
+		Accounts:       connectedResponses,
+	}, nil
 }

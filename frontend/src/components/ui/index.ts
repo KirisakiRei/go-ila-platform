@@ -20,3 +20,4 @@ export {
   TableRow,
 } from './table'
 export { StatusDot, type StatusState } from './status-dot'
+export { Modal } from './modal'

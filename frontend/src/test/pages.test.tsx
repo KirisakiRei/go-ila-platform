@@ -34,17 +34,14 @@ describe('LoginPage', () => {
 })
 
 describe('RegisterForm', () => {
-  // Pendaftaran dibagi tiga langkah; isian per langkah muncul bergantian,
-  // jadi test harus berjalan melewati tombol Lanjut.
+  // Pendaftaran dibagi dua langkah (Akun -> Keamanan).
   it('menampilkan pesan saat password terlalu pendek', async () => {
     const user = userEvent.setup()
     renderWithProviders(<RegisterForm />)
 
     await user.type(screen.getByLabelText('Nama lengkap'), 'Budi Santoso')
     await user.type(screen.getByLabelText('Username'), 'budi.santoso')
-    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
-
-    await user.type(await screen.findByLabelText('Email'), 'budi@example.com')
+    await user.type(screen.getByLabelText('Email'), 'budi@example.com')
     await user.click(screen.getByRole('button', { name: 'Lanjut' }))
 
     await user.type(await screen.findByLabelText('Password'), 'pendek')
@@ -59,9 +56,10 @@ describe('RegisterForm', () => {
 
     await user.type(screen.getByLabelText('Nama lengkap'), 'Budi Santoso')
     await user.type(screen.getByLabelText('Username'), 'budi santoso')
+    await user.type(screen.getByLabelText('Email'), 'budi@example.com')
     await user.click(screen.getByRole('button', { name: 'Lanjut' }))
 
     expect(await screen.findByText(/Hanya huruf, angka/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
   })
 })

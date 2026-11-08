@@ -123,6 +123,11 @@ type Config struct {
 	SMTPUser string
 	SMTPPass string
 	SMTPFrom string
+
+	// cTrader Open API credentials (OAuth & Socket)
+	CTraderClientID     string
+	CTraderClientSecret string
+	CTraderRedirectURI  string
 }
 
 // Load membaca env lalu memvalidasi nilai wajib.
@@ -190,6 +195,9 @@ func Load(service string) (*Config, error) {
 		SMTPUser:              env("SMTP_USER", ""),
 		SMTPPass:              env("SMTP_PASS", ""),
 		SMTPFrom:              env("SMTP_FROM", ""),
+		CTraderClientID:       env("CTRADER_CLIENT_ID", ""),
+		CTraderClientSecret:   env("CTRADER_CLIENT_SECRET", ""),
+		CTraderRedirectURI:    env("CTRADER_REDIRECT_URI", ""),
 	}
 
 	if err := cfg.validate(); err != nil {

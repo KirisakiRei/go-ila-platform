@@ -20,6 +20,7 @@ import (
 	enginev1 "ila/backend/gen/engine/v1"
 	"ila/backend/internal/alert"
 	"ila/backend/internal/broker"
+	"ila/backend/internal/broker/ctrader"
 	"ila/backend/internal/broker/matchtrader"
 	"ila/backend/internal/config"
 	"ila/backend/internal/engineclient"
@@ -118,6 +119,9 @@ func main() {
 	// Eksekusi nyata lewat access token akun, tanpa menyimpan password.
 	registry.Register("matchtrader", func(accountID, _ string) (broker.Client, error) {
 		return matchtrader.New(accountID), nil
+	})
+	registry.Register("ctrader", func(accountID, _ string) (broker.Client, error) {
+		return ctrader.New(accountID, cfg.CTraderClientID, cfg.CTraderClientSecret), nil
 	})
 
 	// --- Runner ---------------------------------------------------------------

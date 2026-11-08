@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -25,6 +26,15 @@ func (r *legalRepository) SeedInitialDrafts(ctx context.Context, drafts []legal.
 				return fmt.Errorf("memeriksa dokumen %s: %w", draft.Slug, err)
 			}
 			if existing > 0 {
+				var v1 model.LegalDocument
+				if err := tx.Where("slug = ? AND version = 1", draft.Slug).First(&v1).Error; err == nil {
+					if strings.Contains(v1.BodyMD, "[nama badan usaha]") || strings.Contains(v1.BodyMD, "[tanggal berlaku]") || strings.TrimSpace(v1.BodyMD) == "" {
+						_ = tx.Model(&v1).Updates(map[string]any{
+							"body_md": draft.BodyMD,
+							"title":   draft.Title,
+						}).Error
+					}
+				}
 				return nil
 			}
 

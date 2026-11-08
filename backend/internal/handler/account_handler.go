@@ -124,3 +124,29 @@ func (h *AccountHandler) Strategies(c *gin.Context) {
 	}
 	httpx.OK(c, "Ketersediaan strategi", result)
 }
+
+// CTraderAuthURL menangani GET /api/v1/accounts/ctrader/auth-url.
+func (h *AccountHandler) CTraderAuthURL(c *gin.Context) {
+	result, err := h.accounts.GetCTraderAuthURL(c.Request.Context())
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Tautan otorisasi cTrader", result)
+}
+
+// CTraderCallback menangani POST /api/v1/accounts/ctrader/callback.
+func (h *AccountHandler) CTraderCallback(c *gin.Context) {
+	var req dto.CTraderCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+
+	result, err := h.accounts.ConnectCTrader(c.Request.Context(), middleware.CurrentUserID(c), req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.Created(c, "Akun cTrader berhasil dihubungkan", result)
+}

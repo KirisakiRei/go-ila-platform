@@ -20,14 +20,18 @@ type VerifyEmailRequest struct {
 
 // OnboardingState adalah posisi terakhir alur mulai bagi pengguna baru.
 type OnboardingState struct {
-	Step       int      `json:"step"`
-	Done       bool     `json:"done"`
-	TotalSteps int      `json:"total_steps"`
-	Steps      []string `json:"steps"`
-	HasBroker  bool     `json:"has_broker"`
-	Verified   bool     `json:"email_verified"`
-	TelegramOK bool     `json:"telegram_linked"`
-	NextAction string   `json:"next_action"`
+	Step             int             `json:"step"`
+	Done             bool            `json:"done"`
+	TotalSteps       int             `json:"total_steps"`
+	Steps            []string        `json:"steps"`
+	StepDone         map[string]bool `json:"step_done"`
+	CompletedCount   int             `json:"completed_count"`
+	HasBroker        bool            `json:"has_broker"`
+	Verified         bool            `json:"email_verified"`
+	TelegramOK       bool            `json:"telegram_linked"`
+	StrategySelected bool            `json:"strategy_selected"`
+	RiskConfigured   bool            `json:"risk_configured"`
+	NextAction       string          `json:"next_action"`
 }
 
 // OnboardingRequest mencatat langkah yang sudah diselesaikan.

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"ila/backend/internal/ctraderapi"
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
 	"ila/backend/pkg/cryptox"
@@ -493,4 +494,113 @@ func containsBytes(haystack, needle []byte) bool {
 		}
 	}
 	return false
+}
+
+type fakeCTraderClient struct {
+	authURL     string
+	token       *ctraderapi.TokenResponse
+	tokenErr    error
+	accounts    []ctraderapi.AccountInfo
+	accountsErr error
+}
+
+func (f *fakeCTraderClient) BuildAuthURL(scope string) string {
+	return f.authURL
+}
+
+func (f *fakeCTraderClient) ExchangeToken(_ context.Context, _ string) (*ctraderapi.TokenResponse, error) {
+	if f.tokenErr != nil {
+		return nil, f.tokenErr
+	}
+	return f.token, nil
+}
+
+func (f *fakeCTraderClient) GetAccounts(_ context.Context, _ string) ([]ctraderapi.AccountInfo, error) {
+	if f.accountsErr != nil {
+		return nil, f.accountsErr
+	}
+	return f.accounts, nil
+}
+
+func TestCTraderOAuth_AuthURLAndCallback(t *testing.T) {
+	user := newTestUser("plus")
+	users := newFakeUserRepo()
+	users.users[user.Email] = user
+	accounts := &fakeAccountRepo{accounts: map[string]*model.BrokerAccount{}}
+	creds := &fakeCredRepo{creds: map[string]*model.Credential{}}
+	subs := &fakeSubRepo{}
+
+	fakeCTrader := &fakeCTraderClient{
+		authURL: "https://id.ctrader.com/oauth/v2/auth?client_id=123",
+		token: &ctraderapi.TokenResponse{
+			AccessToken:  "ct-access-token-123",
+			RefreshToken: "ct-refresh-token-456",
+			ExpiresIn:    2592000,
+		},
+		accounts: []ctraderapi.AccountInfo{
+			{
+				AccountID:   49366554,
+				TraderLogin: 10131354,
+				BrokerTitle: "IC Markets",
+				Live:        false,
+			},
+		},
+	}
+
+	svc := NewAccountService(AccountServiceDeps{
+		Users:         users,
+		Accounts:      accounts,
+		Credentials:   creds,
+		Subscriptions: subs,
+		Audit:         &fakeAuditRepo{},
+		Sealer:        testKeyring(t),
+		Strategies:    &fakeStrategies{},
+		CTrader:       fakeCTrader,
+	})
+
+	// 1. Tes Auth URL
+	authURLResp, err := svc.GetCTraderAuthURL(context.Background())
+	if err != nil {
+		t.Fatalf("GetCTraderAuthURL: %v", err)
+	}
+	if authURLResp.AuthURL != fakeCTrader.authURL {
+		t.Errorf("got %s, want %s", authURLResp.AuthURL, fakeCTrader.authURL)
+	}
+
+	// 2. Tes Callback & Pembuatan Akun
+	cbResp, err := svc.ConnectCTrader(context.Background(), userIDTest, dto.CTraderCallbackRequest{
+		Code: "auth-code-789",
+		Mode: "manual",
+	})
+	if err != nil {
+		t.Fatalf("ConnectCTrader: %v", err)
+	}
+	if cbResp.TotalConnected != 1 {
+		t.Fatalf("total connected=%d, want 1", cbResp.TotalConnected)
+	}
+	if cbResp.Accounts[0].BrokerType != "ctrader" {
+		t.Errorf("got broker_type %s, want ctrader", cbResp.Accounts[0].BrokerType)
+	}
+	if cbResp.Accounts[0].ExternalAccountID != "49366554" {
+		t.Errorf("got external_account_id %s, want 49366554", cbResp.Accounts[0].ExternalAccountID)
+	}
+	if len(creds.creds) != 1 {
+		t.Errorf("expected 1 credential stored, got %d", len(creds.creds))
+	}
+
+	// 3. Tes Idempoten: sambungkan ulang dengan token baru (rotasi/reconnect)
+	fakeCTrader.token.AccessToken = "ct-new-access-token-999"
+	cbResp2, err := svc.ConnectCTrader(context.Background(), userIDTest, dto.CTraderCallbackRequest{
+		Code: "auth-code-new",
+	})
+	if err != nil {
+		t.Fatalf("ConnectCTrader reconnect: %v", err)
+	}
+	if cbResp2.TotalConnected != 1 {
+		t.Fatalf("total connected=%d on reconnect, want 1", cbResp2.TotalConnected)
+	}
+	// Akun tidak boleh berlipat ganda
+	if len(accounts.accounts) != 1 {
+		t.Errorf("expected still 1 account, got %d", len(accounts.accounts))
+	}
 }

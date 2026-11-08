@@ -14,6 +14,7 @@ import {
   EmptyState,
   Input,
   Label,
+  Modal,
   PageHeader,
   Skeleton,
 } from '@/components/ui'
@@ -118,73 +119,84 @@ export default function AdminPlansPage() {
                 </div>
               </dl>
 
-              {editing === plan.code ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor={`price-${plan.code}`}>Harga baru (IDR)</Label>
-                    <Input
-                      id={`price-${plan.code}`}
-                      value={price}
-                      inputMode="numeric"
-                      onChange={(event) => setPrice(event.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor={`guard-${plan.code}`}>Batas bawah harga</Label>
-                    <Input
-                      id={`guard-${plan.code}`}
-                      value={guard}
-                      inputMode="numeric"
-                      onChange={(event) => setGuard(event.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor={`reason-${plan.code}`}>Alasan perubahan</Label>
-                    <Input
-                      id={`reason-${plan.code}`}
-                      value={reason}
-                      onChange={(event) => setReason(event.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      disabled={reason.trim().length < 10 || save.isPending}
-                      onClick={() => save.mutate(plan.code)}
-                    >
-                      Simpan harga
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={reason.trim().length < 10 || saveGuard.isPending || !guard}
-                      onClick={() => saveGuard.mutate(plan.code)}
-                    >
-                      Simpan batas
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
-                      Batal
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditing(plan.code)
-                    setPrice(String(plan.price_idr))
-                    setGuard('')
-                    setReason('')
-                  }}
-                >
-                  Ubah harga
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => {
+                  setEditing(plan.code)
+                  setPrice(String(plan.price_idr))
+                  setGuard('')
+                  setReason('')
+                }}
+              >
+                Ubah harga
+              </Button>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <Modal
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        title={editing ? `Ubah Harga Paket ${data.find((p) => p.code === editing)?.name ?? editing}` : 'Ubah Harga'}
+        description="Harga di sini menjadi acuan invoice berikutnya. Invoice yang sudah terbit tidak berubah."
+        size="md"
+      >
+        {editing && (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`price-${editing}`}>Harga baru (IDR)</Label>
+              <Input
+                id={`price-${editing}`}
+                value={price}
+                inputMode="numeric"
+                onChange={(event) => setPrice(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`guard-${editing}`}>Batas bawah harga</Label>
+              <Input
+                id={`guard-${editing}`}
+                value={guard}
+                inputMode="numeric"
+                onChange={(event) => setGuard(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`reason-${editing}`}>Alasan perubahan (min. 10 karakter)</Label>
+              <Input
+                id={`reason-${editing}`}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border pt-4">
+              <Button variant="outline" size="sm" type="button" onClick={() => setEditing(null)}>
+                Batal
+              </Button>
+              {guard && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={reason.trim().length < 10 || saveGuard.isPending}
+                  onClick={() => saveGuard.mutate(editing)}
+                >
+                  {saveGuard.isPending ? 'Menyimpan…' : 'Simpan batas'}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                disabled={reason.trim().length < 10 || save.isPending}
+                onClick={() => save.mutate(editing)}
+              >
+                {save.isPending ? 'Menyimpan…' : 'Simpan harga'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   )
 }

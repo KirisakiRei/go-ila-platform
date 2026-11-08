@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   EmptyState,
+  Modal,
   PageHeader,
   Section,
   Skeleton,
@@ -68,21 +69,18 @@ export default function AccountsPage() {
         </Section>
       )}
 
-      {menambah && (
-        <Section
-          title="Hubungkan akun baru"
-          description="Hanya Match-Trader yang didukung saat ini."
-          actions={
-            <Button variant="ghost" size="sm" onClick={() => setMenambah(false)}>
-              Batal
-            </Button>
-          }
-        >
-          <div className="border border-border p-4">
-            <AccountForm tier={tier} onDone={() => setMenambah(false)} />
-          </div>
-        </Section>
-      )}
+      {/* Modal Tambah Akun Broker */}
+      <Modal
+        open={menambah}
+        onClose={() => setMenambah(false)}
+        size="lg"
+        title="Hubungkan Akun Match-Trader"
+        description="Hanya platform broker Match-Trader yang didukung saat ini. Token hanya dikirim sekali dan langsung dienkripsi."
+      >
+        <div className="py-2">
+          <AccountForm tier={tier} onDone={() => setMenambah(false)} />
+        </div>
+      </Modal>
 
       {!bisaTambah && limit > 0 && (
         <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
