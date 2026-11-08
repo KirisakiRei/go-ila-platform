@@ -39,8 +39,27 @@ type RequestOptions = {
  */
 let unauthorizedHandler: (() => void) | null = null
 
-export function onUnauthorized(handler: () => void): void {
+export function onUnauthorized(handler: (() => void) | null): void {
   unauthorizedHandler = handler
+}
+
+/**
+ * selamaPemulihan menandai bahwa 401 yang muncul bukan tanda sesi berakhir.
+ *
+ * Dipakai saat memulihkan sesi: pengunjung yang belum pernah masuk memang
+ * menerima 401 dari /me, dan itu bukan alasan menampilkan "sesi Anda habis".
+ * Penghitung dipakai, bukan boolean, agar dua permintaan yang bertumpuk
+ * tidak saling membatalkan penanda.
+ */
+let penandaPemulihan = 0
+
+export async function selamaPemulihan<T>(fn: () => Promise<T>): Promise<T> {
+  penandaPemulihan++
+  try {
+    return await fn()
+  } finally {
+    penandaPemulihan--
+  }
 }
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
@@ -106,7 +125,7 @@ async function requestEnvelope<T>(
     if (!response.ok || !payload.success) {
       // Sesi habis hanya bermakna bila endpoint memang butuh sesi.
       // 403 berarti sesi sah tetapi tidak berwenang: pengguna tetap masuk.
-      if (response.status === 401) {
+      if (response.status === 401 && penandaPemulihan === 0) {
         unauthorizedHandler?.()
       }
 
@@ -147,7 +166,7 @@ export async function downloadFile(
   })
 
   if (!response.ok) {
-    if (response.status === 401) unauthorizedHandler?.()
+    if (response.status === 401 && penandaPemulihan === 0) unauthorizedHandler?.()
     throw new ApiError(messageForStatus(response.status), response.status, 'DOWNLOAD_FAILED')
   }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/lib/auth-api'
-import { onUnauthorized, readCsrfToken } from '@/lib/http'
+import { onUnauthorized, readCsrfToken, selamaPemulihan } from '@/lib/http'
 import type { User } from '@/types/api'
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { IdleWarningDialog } from './components/IdleWarningDialog'
@@ -73,7 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function restore() {
       try {
-        const currentUser = await authApi.me()
+        // 401 di sini berarti belum masuk, bukan sesi berakhir. Tanpa penanda
+        // ini pengunjung baru melihat "Sesi Anda berakhir" saat pertama membuka
+        // halaman masuk.
+        const currentUser = await selamaPemulihan(() => authApi.me())
         if (cancelled) return
 
         // Cookie CSRF bisa hilang (sesi browser dibersihkan sebagian),
@@ -96,9 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Sesi yang ditolak backend langsung dibuang agar UI tidak bertahan
-  // pada keadaan yang sudah tidak sah.
+  // pada keadaan yang sudah tidak sah. Handler dilepas saat komponen bongkar
+  // supaya tidak tertinggal menunjuk state yang sudah usang.
   useEffect(() => {
     onUnauthorized(() => finishSignOut('expired'))
+    return () => onUnauthorized(null)
   }, [finishSignOut])
 
   const auth = useIdleTimer({
