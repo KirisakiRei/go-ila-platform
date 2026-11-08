@@ -123,10 +123,15 @@ services:
     expose:
       - "8081"
       - "9090"
-    # Port penerima log dibuka ke host agar Engine di VPS 1 bisa menyambung.
-    # Hanya port ini yang perlu dijangkau dari luar, dan wajib mTLS.
+    # Penerima log HANYA diikat ke alamat private, bukan 0.0.0.0.
+    #
+    # Docker menerbitkan DNAT di chain-nya sendiri yang dievaluasi sebelum
+    # UFW, sehingga `ufw deny 9090` tidak berpengaruh pada port yang
+    # di-publish. Satu-satunya cara menahannya adalah tidak mendengarkan di
+    # alamat publik. Engine di VPS 1 menyambung lewat IP private AWS
+    # (LOG_GRPC_BIND), jadi tidak ada yang perlu dijangkau dari internet.
     ports:
-      - "${LOG_GRPC_PORT:-9090}:9090"
+      - "${LOG_GRPC_BIND:-127.0.0.1}:${LOG_GRPC_PORT:-9090}:9090"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health"]
       interval: 30s
