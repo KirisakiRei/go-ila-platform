@@ -35,6 +35,58 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 — Dukungan sinyal ILA 3.0 dan dua bug PostgreSQL di jalur sinyal
+
+**Pelaku:** Claude
+**Tipe:** Fitur + perbaikan bug kritis
+**Ringkasan:**
+Engine (`go-trade`) kini menerbitkan sinyal lewat gRPC. Kontrak protobuf
+ditambah status ILA 3.0, dan Runner diajari menerimanya. Uji integrasi dengan
+engine sungguhan memunculkan dua bug PostgreSQL yang membuat Runner **tidak
+pernah bisa mengirim sinyal ke user mana pun**.
+
+**File terdampak:**
+- `proto/engine/v1/engine.proto` — status ILA 3.0 + field detail
+- `backend/gen/engine/v1/` — hasil generate ulang
+- `backend/buf.gen.yaml` (baru) — konfigurasi generate
+- `backend/internal/runner/ingest/convert.go` — pemetaan status ILA 3.0
+- `backend/internal/runner/ingest/convert_test.go` — tes pemetaan
+- `backend/internal/repository/runner_repository.go` — kutip `"user"`
+- `backend/internal/model/broker_account.go` — `Subscription.IsActive`
+- `backend/internal/repository/runner_query_test.go` (baru) — tes PostgreSQL
+
+**Yang dikerjakan:**
+
+1. **Sinyal ILA 3.0 diterima.** Dulu `statusName()` hanya mengenal 5 status
+   ILA 2.0. Sinyal ILA 3.0 akan dibuang tanpa jejak. Sekarang
+   `READY_ENTRY_1` dan `READY_ENTRY_2` dipetakan ke `READY_TO_ENTRY` (boleh
+   dieksekusi), sedangkan status menunggu dikirim sebagai teks untuk dashboard.
+   Detail asli tersimpan di `sequence_state`.
+
+2. **Bug: JOIN ke `"user"` tanpa kutip.** `user` adalah kata kunci
+   PostgreSQL. `ListUsersBySymbol` gagal dengan `SQLSTATE 42601`, sehingga
+   setiap sinyal berhenti di tahap "membaca pemantau simbol". Tidak terlihat
+   di SQLite.
+
+3. **Bug: langganan dicabut hidup lagi.** `Subscription.IsActive` bertag
+   `default:true`, membuat GORM mengirim `true` saat nilainya `false`.
+
+**Bukti uji:**
+- `go build ./...` bersih, **22 paket tes lulus**.
+- `runner_query_test.go` dijalankan ke PostgreSQL 16 sungguhan
+  (`TEST_POSTGRES_DSN`). Kedua bug dibuktikan tertangkap: kode dirusak
+  sementara, tes gagal, lalu dipulihkan.
+- Integrasi penuh dengan engine: sinyal ILA 2.0 terbit → tersimpan di `signal`
+  → `user_signal` berstatus `READY_TO_ENTRY`.
+- Kotak sinyal (TTL, supersede, cancel, expire) diuji di sisi engine.
+
+**Belum dikerjakan (WAJIB):**
+- **Runner belum memanggil `Subscribe`/`Unsubscribe` berkala.** Simbol hanya
+  dihitung sekali saat koneksi dibuka, jadi user baru subscribe simbol harus
+  menunggu Runner restart.
+- ILA 3.0 belum diuji dengan data pasar nyata; engine-nya baru sampai tahap
+  adapter.
+
 ### 2026-11-14 (lanjutan) — Gateway pembayaran bisa ditukar, siklus tagihan ditutup
 
 **Pelaku:** Claude

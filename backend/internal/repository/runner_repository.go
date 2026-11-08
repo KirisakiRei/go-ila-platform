@@ -544,8 +544,11 @@ func (r *runnerRepository) ListActiveSubscriptions(ctx context.Context) ([]model
 func (r *runnerRepository) ListUsersBySymbol(ctx context.Context, symbol string) ([]model.User, error) {
 	var users []model.User
 	err := r.db.WithContext(ctx).
-		Joins("JOIN subscription s ON s.user_id = user.id").
-		Where("s.is_active = ? AND s.symbol = ?", true, symbol).
+		// "user" adalah kata kunci SQL, jadi wajib dikutip. Tanpa kutip,
+		// PostgreSQL menolak query dan tidak ada user yang pernah menerima
+		// sinyal walau semuanya tampak benar.
+		Joins(`JOIN subscription s ON s.user_id = "user".id`).
+		Where("s.is_active = ? AND s.symbol = ? AND s.deleted_at IS NULL", true, symbol).
 		Find(&users).Error
 	if err != nil {
 		return nil, fmt.Errorf("membaca user pemantau simbol: %w", err)

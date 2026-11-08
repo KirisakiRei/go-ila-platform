@@ -75,6 +75,28 @@ func statusName(s enginev1.SignalStatus) string {
 		return "WAIT_LTF_CISD"
 	case enginev1.SignalStatus_INVALIDATED:
 		return "INVALIDATED"
+
+	// ILA 3.0: dua titik entry dipetakan ke status siap yang sama agar Runner
+	// tidak perlu tahu perbedaan internal strategi. Detail aslinya tetap
+	// tersimpan di sequence_state (plans/07).
+	case enginev1.SignalStatus_READY_ENTRY_1, enginev1.SignalStatus_READY_ENTRY_2:
+		return model.SignalStatusReadyToEntry
+	case enginev1.SignalStatus_WAIT_ILA3_HTF_KEY_LEVEL:
+		return "WAIT_ILA3_HTF_KEY_LEVEL"
+	case enginev1.SignalStatus_WAIT_ILA3_MTF_REVERSAL:
+		return "WAIT_ILA3_MTF_REVERSAL"
+	case enginev1.SignalStatus_WAIT_ILA3_LTF_CISD_1:
+		return "WAIT_ILA3_LTF_CISD_1"
+	case enginev1.SignalStatus_WAIT_ILA3_MTF_FVG_RETR:
+		return "WAIT_ILA3_MTF_FVG_RETR"
+	case enginev1.SignalStatus_WAIT_ILA3_LTF_CISD_2:
+		return "WAIT_ILA3_LTF_CISD_2"
+	case enginev1.SignalStatus_ILA3_EXPANSION_1_ACTIVE:
+		return "ILA3_EXPANSION_1_ACTIVE"
+	case enginev1.SignalStatus_ILA3_EXPANSION_2_ACTIVE:
+		return "ILA3_EXPANSION_2_ACTIVE"
+	case enginev1.SignalStatus_ILA3_TARGET_REACHED:
+		return "ILA3_TARGET_REACHED"
 	default:
 		return ""
 	}

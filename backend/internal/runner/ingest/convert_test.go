@@ -123,3 +123,53 @@ func TestMarketOpen(t *testing.T) {
 		t.Fatal("MARKET_CLOSED harus false")
 	}
 }
+
+// Sinyal ILA 3.0 harus diterima. Sebelum pemetaan ini, status ILA 3.0 tidak
+// dikenal sehingga sinyalnya dibuang tanpa jejak.
+func TestConvertSignalILA3(t *testing.T) {
+	cases := []struct {
+		name   string
+		status enginev1.SignalStatus
+		want   string
+	}{
+		{"entry 1 reversal", enginev1.SignalStatus_READY_ENTRY_1, model.SignalStatusReadyToEntry},
+		{"entry 2 retrace", enginev1.SignalStatus_READY_ENTRY_2, model.SignalStatusReadyToEntry},
+		{"menunggu reversal", enginev1.SignalStatus_WAIT_ILA3_MTF_REVERSAL, "WAIT_ILA3_MTF_REVERSAL"},
+		{"menunggu fvg retrace", enginev1.SignalStatus_WAIT_ILA3_MTF_FVG_RETR, "WAIT_ILA3_MTF_FVG_RETR"},
+		{"target tercapai", enginev1.SignalStatus_ILA3_TARGET_REACHED, "ILA3_TARGET_REACHED"},
+	}
+
+	for _, c := range cases {
+		in := validSignal()
+		in.Status = c.status
+		in.StrategyVersion = "ila-3.0"
+		in.SequenceState = c.want
+
+		got, ok := ConvertSignal(in)
+		if !ok {
+			t.Fatalf("%s: sinyal ILA 3.0 ditolak", c.name)
+		}
+		if got.Status != c.want {
+			t.Errorf("%s: status = %q, ingin %q", c.name, got.Status, c.want)
+		}
+	}
+}
+
+// Dua titik entry ILA 3.0 harus bisa dieksekusi, bukan hanya tampil.
+func TestILA3ReadyBolehDieksekusi(t *testing.T) {
+	for _, st := range []enginev1.SignalStatus{
+		enginev1.SignalStatus_READY_ENTRY_1,
+		enginev1.SignalStatus_READY_ENTRY_2,
+	} {
+		got, ok := ConvertSignal(validSignalWithStatus(st))
+		if !ok || got.Status != model.SignalStatusReadyToEntry {
+			t.Fatalf("status %v harus menjadi READY_TO_ENTRY", st)
+		}
+	}
+}
+
+func validSignalWithStatus(st enginev1.SignalStatus) *enginev1.Signal {
+	in := validSignal()
+	in.Status = st
+	return in
+}

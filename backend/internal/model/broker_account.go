@@ -52,10 +52,13 @@ func (Credential) TableName() string {
 // pasangan (symbol, strategy) saat berlangganan.
 type Subscription struct {
 	Base
-	UserID          string  `gorm:"type:varchar(36);index;not null" json:"user_id"`
-	Symbol          string  `gorm:"type:varchar(20);not null" json:"symbol"`
-	Strategy        string  `gorm:"type:varchar(20);not null;default:ila-2.0" json:"strategy"`
-	IsActive        bool    `gorm:"not null;default:true" json:"is_active"`
+	UserID   string `gorm:"type:varchar(36);index;not null" json:"user_id"`
+	Symbol   string `gorm:"type:varchar(20);not null" json:"symbol"`
+	Strategy string `gorm:"type:varchar(20);not null;default:ila-2.0" json:"strategy"`
+	// Tanpa default di tag: GORM akan mengisi true saat nilainya false,
+	// sehingga langganan yang dicabut bisa hidup lagi. Pencabutan ditandai
+	// is_active=false dan harus bisa tersimpan apa adanya.
+	IsActive        bool    `gorm:"not null" json:"is_active"`
 	BrokerAccountID *string `gorm:"type:varchar(36)" json:"broker_account_id"`
 }
 

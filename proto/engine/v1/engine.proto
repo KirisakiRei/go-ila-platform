@@ -17,6 +17,20 @@ enum SignalStatus {
   WAIT_LTF_CISD             = 3;
   READY_TO_ENTRY            = 4;
   INVALIDATED               = 5;
+
+  // ILA 3.0. Nomor 6 dst. sengaja baru agar kontrak lama tidak berubah.
+  // Runner mengeksekusi HANYA pada READY_TO_ENTRY / READY_ENTRY_1 / READY_ENTRY_2;
+  // status WAIT_ILA3_* hanya untuk tampilan.
+  WAIT_ILA3_HTF_KEY_LEVEL = 6;
+  WAIT_ILA3_MTF_REVERSAL  = 7;
+  WAIT_ILA3_LTF_CISD_1    = 8;
+  READY_ENTRY_1           = 9;
+  ILA3_EXPANSION_1_ACTIVE = 10;
+  WAIT_ILA3_MTF_FVG_RETR  = 11;
+  WAIT_ILA3_LTF_CISD_2    = 12;
+  READY_ENTRY_2           = 13;
+  ILA3_EXPANSION_2_ACTIVE = 14;
+  ILA3_TARGET_REACHED     = 15;
 }
 
 enum SignalAction {
@@ -110,6 +124,14 @@ message Signal {
 
   string engine_version   = 19;
   string strategy_version = 20;
+
+  // Detail khusus ILA 3.0. Kosong untuk ILA 2.0.
+  string setup_type     = 21;  // ENTRY_1_REVERSAL | ENTRY_2_RETRACE | NONE
+  string sequence_state = 22;  // nama state asli, mis. WAIT_ILA3_MTF_REVERSAL
+  double final_zone_tp  = 23;  // target StDev -3.5 s.d. -4.0
+  double critical_zone_tp = 24; // target StDev -2.0 s.d. -2.5
+  string quarter_info   = 25;  // ringkasan Quarterly Theory
+  string ssmt_result    = 26;  // ringkasan SMT
 }
 
 message SignalUpdate {
