@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,6 +35,9 @@ import (
 const (
 	minBackoff = 1 * time.Second
 	maxBackoff = 30 * time.Second
+	// Jeda penyelarasan langganan: cukup cepat merespons langganan baru,
+	// cukup jarang agar tidak membebani database.
+	symbolSyncInterval = 2 * time.Minute
 )
 
 func main() {
@@ -368,6 +372,11 @@ func streamOnce(
 					"strategy", target.Strategy, "addr", target.Addr)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
 				svc.SetAckSender(ackSender(client, subscriberID))
+				svc.SetSymbolSync(symbolSync(client, subscriberID))
+				// Selaraskan segera: antara hitung kebutuhan dan koneksi
+				// terbuka, langganan pengguna bisa sudah berubah.
+				syncNow(ctx, target, svc, logger)
+				go syncLoop(ctx, target, svc, logger)
 			},
 			OnSignal: func(signal *enginev1.Signal) {
 				svc.SetEngineVersion(signal.GetEngineVersion())
@@ -391,6 +400,70 @@ func streamOnce(
 			},
 		},
 	)
+}
+
+// symbolSync mengirim selisih langganan ke engine.
+func symbolSync(client enginev1.EngineServiceClient, subscriberID string) runner.SymbolSync {
+	return func(ctx context.Context, add, remove []string) error {
+		syncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		if len(add) > 0 {
+			resp, err := client.Subscribe(syncCtx, &enginev1.SubscribeRequest{
+				SubscriberId: subscriberID,
+				Symbols:      add,
+			})
+			if err != nil {
+				return fmt.Errorf("menambah langganan engine: %w", err)
+			}
+			if !resp.GetOk() {
+				return errors.New(resp.GetMessage())
+			}
+		}
+		if len(remove) > 0 {
+			resp, err := client.Unsubscribe(syncCtx, &enginev1.UnsubscribeRequest{
+				SubscriberId: subscriberID,
+				Symbols:      remove,
+			})
+			if err != nil {
+				return fmt.Errorf("mencabut langganan engine: %w", err)
+			}
+			if !resp.GetOk() {
+				return errors.New(resp.GetMessage())
+			}
+		}
+		return nil
+	}
+}
+
+// syncNow menghitung kebutuhan terkini lalu menyelaraskannya dengan engine.
+//
+// Gagal di sini bukan alasan memutus stream: langganan lama masih berjalan dan
+// percobaan berikutnya akan mengulang dengan daftar terbaru.
+func syncNow(ctx context.Context, target engineTarget, svc *runner.Service, logger *slog.Logger) {
+	desired := subscribedSymbols(ctx, target, svc)
+	if err := svc.SyncSubscriptions(ctx, desired); err != nil {
+		logger.Warn("gagal menyelaraskan langganan engine",
+			"strategy", target.Strategy, "error", errorText(err))
+	}
+}
+
+// syncLoop menyelaraskan langganan secara berkala selama stream hidup.
+//
+// Tanpa ini, pengguna yang baru berlangganan simbol tidak akan dipantau sampai
+// Runner dijalankan ulang (plans/05 §8).
+func syncLoop(ctx context.Context, target engineTarget, svc *runner.Service, logger *slog.Logger) {
+	ticker := time.NewTicker(symbolSyncInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			syncNow(ctx, target, svc, logger)
+		}
+	}
 }
 
 // applySnapshot memulihkan sinyal yang masih berlaku setelah reconnect (D19).

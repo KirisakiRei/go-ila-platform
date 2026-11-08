@@ -35,6 +35,48 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-08 (lanjutan) — Langganan simbol dinamis: tutup celah "harus restart Runner"
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug
+**Ringkasan:**
+Runner menghitung simbol **sekali** saat koneksi engine dibuka; `Subscribe`
+dan `Unsubscribe` tidak pernah dipanggil. Pengguna yang baru berlangganan
+sebuah simbol tidak akan dipantau sampai Runner dijalankan ulang. Untuk SaaS
+ini tidak bisa diterima, jadi sekarang diselaraskan berkala.
+
+**File terdampak:**
+- `backend/internal/runner/service.go` — `SyncSubscriptions`, `SetSymbolSync`
+- `backend/cmd/runner/main.go` — `symbolSync`, `syncNow`, `syncLoop`
+- `backend/internal/runner/symbol_sync_test.go` (baru)
+
+**Yang dikerjakan:**
+
+1. **Hanya selisih yang dikirim.** `SyncSubscriptions` membandingkan simbol
+   yang sudah dikirim dengan kebutuhan saat ini, lalu mengirim `add` dan
+   `remove`. Tanpa perubahan, tidak ada panggilan ke engine.
+2. **Penyelarasan berkala 2 menit** selama stream hidup.
+3. **Selaras ulang saat reconnect**: daftar yang dianggap terkirim dikosongkan,
+   karena engine bisa sudah lupa setelah putus.
+4. **Gagal kirim tidak dianggap terkirim**, sehingga percobaan berikutnya
+   mengulang daftar yang benar.
+
+**Bukti uji end-to-end** (engine dan Runner berjalan bersamaan, PostgreSQL):
+```
+17:01:40  engine menerima  ["XAUUSD"]
+          EURUSD ditambahkan ke database — Runner TIDAK di-restart
+17:03:40  engine menerima  ["EURUSD"]
+          EURUSD dinonaktifkan
+17:06:09  engine mencabut  ["EURUSD"]
+```
+
+**Tes:**
+- `go build ./...` bersih, **22 paket tes lulus**.
+- Tes baru: selisih tambah/cabut, tidak mengirim bila sama, mengulang setelah
+  gagal, mengulang penuh setelah reconnect, aman tanpa engine.
+
+**Sisa pekerjaan:** ILA 3.0 belum diuji dengan data pasar nyata.
+
 ### 2026-11-08 — Dukungan sinyal ILA 3.0 dan dua bug PostgreSQL di jalur sinyal
 
 **Pelaku:** Claude

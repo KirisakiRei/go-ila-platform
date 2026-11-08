@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -103,8 +104,12 @@ type Service struct {
 	market    enginev1.MarketState
 	engineVer string
 	ack       AckSender
-	clients   map[string]broker.Client
-	keyring   *cryptox.Keyring
+	// symbolSync dan symbolsSent menjaga agar engine hanya memantau simbol
+	// yang benar-benar dibutuhkan pengguna saat ini.
+	symbolSync  SymbolSync
+	symbolsSent map[string]struct{}
+	clients     map[string]broker.Client
+	keyring     *cryptox.Keyring
 	// schedule mengawasi kecocokan status pasar dengan jadwal NY.
 	schedule *ScheduleWatch
 }
@@ -923,6 +928,91 @@ func (s *Service) ackSignal(ctx context.Context, signalID string) error {
 
 // AckSender dipasang setelah stream engine tersambung.
 type AckSender func(ctx context.Context, signalID string) error
+
+// SymbolSync mengirim selisih simbol terakhir ke engine.
+// Hanya selisih yang dikirim agar engine tidak menerima beban penuh tiap menit.
+type SymbolSync func(ctx context.Context, add, remove []string) error
+
+// SetSymbolSync memasang penyelaras langganan. Dipanggil saat stream terhubung.
+func (s *Service) SetSymbolSync(sync SymbolSync) {
+	s.mu.Lock()
+	s.symbolSync = sync
+	s.symbolsSent = nil
+	s.mu.Unlock()
+}
+
+// SyncSubscriptions membandingkan kebutuhan engine saat ini dengan yang sudah
+// dikirim, lalu mengirim selisihnya lewat Subscribe/Unsubscribe.
+//
+// Tanpa ini, simbol hanya dihitung sekali saat koneksi dibuka: user yang baru
+// berlangganan harus menunggu Runner restart. Fungsi ini dipanggil berkala.
+func (s *Service) SyncSubscriptions(ctx context.Context, desired []string) error {
+	s.mu.Lock()
+	sync := s.symbolSync
+	sent := s.symbolsSent
+	s.mu.Unlock()
+
+	if sync == nil {
+		return nil
+	}
+
+	add, remove := diffSymbols(sent, desired)
+	if len(add) == 0 && len(remove) == 0 {
+		return nil
+	}
+
+	if err := sync(ctx, add, remove); err != nil {
+		// Daftar terkirim tidak diperbarui: percobaan berikutnya mengulang.
+		return err
+	}
+
+	s.mu.Lock()
+	s.symbolsSent = toSymbolSet(desired)
+	s.mu.Unlock()
+
+	s.logger.Info("langganan engine diselaraskan",
+		"ditambah", add, "dicabut", remove, "total", len(desired))
+	return nil
+}
+
+// SymbolsSent mengembalikan salinan simbol yang sudah dikirim ke engine.
+func (s *Service) SymbolsSent() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.symbolsSent))
+	for sym := range s.symbolsSent {
+		out = append(out, sym)
+	}
+	return out
+}
+
+func toSymbolSet(items []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(items))
+	for _, it := range items {
+		if it != "" {
+			out[it] = struct{}{}
+		}
+	}
+	return out
+}
+
+// diffSymbols menghitung tambah dan cabut antara kondisi terkirim dan kebutuhan.
+func diffSymbols(sent map[string]struct{}, desired []string) (add, remove []string) {
+	wanted := toSymbolSet(desired)
+	for sym := range wanted {
+		if _, ok := sent[sym]; !ok {
+			add = append(add, sym)
+		}
+	}
+	for sym := range sent {
+		if _, ok := wanted[sym]; !ok {
+			remove = append(remove, sym)
+		}
+	}
+	sort.Strings(add)
+	sort.Strings(remove)
+	return add, remove
+}
 
 // SetAckSender memasang pengirim ACK. Dipanggil saat stream terhubung.
 func (s *Service) SetAckSender(sender AckSender) {
