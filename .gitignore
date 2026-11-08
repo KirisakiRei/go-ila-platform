@@ -42,3 +42,6 @@ coverage.html
 # Skrip bantu sementara
 *.py.tmp
 tmp_patch*.py
+
+# Artefak uji visual lokal
+.tmp-*
