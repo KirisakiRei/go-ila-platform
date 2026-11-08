@@ -152,6 +152,9 @@ func main() {
 		// PairGate memastikan simbol yang dinonaktifkan admin tidak pernah
 		// diminta ke engine, tanpa memutus posisi yang sudah terbuka.
 		PairGate: runner.NewCachedPairGate(store, time.Minute),
+		// CorrelationGate meneruskan pasangan SMT (mis. XAUUSD → XAGUSD) agar
+		// engine ikut menarik lilin instrumen pembanding.
+		CorrelationGate: runner.NewCachedCorrelationGate(store, time.Minute),
 	}
 
 	svc := runner.NewService(store, registry, publisher, logger, opts)

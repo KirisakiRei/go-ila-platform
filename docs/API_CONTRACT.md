@@ -267,14 +267,14 @@ Balasan `200`:
           "key": "usd",
           "label": "USD Quote",
           "pairs": [
-            { "symbol": "EURUSD", "name": "Euro / US Dollar", "aliases": "" }
+            { "symbol": "EURUSD", "name": "Euro / US Dollar", "aliases": "", "correlated_symbols": ["GBPUSD"] }
           ]
         },
         {
           "key": "umum",
           "label": "Umum",
           "pairs": [
-            { "symbol": "XAUUSD", "name": "Gold / US Dollar", "aliases": "GOLD" }
+            { "symbol": "XAUUSD", "name": "Gold / US Dollar", "aliases": "GOLD", "correlated_symbols": ["XAGUSD", "XAUEUR"] }
           ]
         }
       ]
@@ -287,7 +287,7 @@ Balasan `200`:
           "key": "umum",
           "label": "Umum",
           "pairs": [
-            { "symbol": "USTEC", "name": "US Tech 100", "aliases": "NAS100,US100,NDX" }
+            { "symbol": "USTEC", "name": "US Tech 100", "aliases": "NAS100,US100,NDX", "correlated_symbols": ["US500", "US30"] }
           ]
         }
       ]
@@ -329,6 +329,16 @@ Balasan `200`: objek balasan yang sama dengan `GET /accounts/:id/pairs`.
 - Jumlah simbol terpilih dibatasi oleh tier paket pengguna (Basic maks 8, Plus maks 8).
 - Posisi terbuka yang sudah berjalan di broker tetap dikelola Runner sampai ditutup walau simbolnya di-uncheck.
 
+### Korelasi SMT (`correlated_symbols`)
+
+Setiap pair boleh punya **lebih dari satu** instrumen pembanding SMT (mis. `XAUUSD` → `XAGUSD`, `XAUEUR`). Field ini murni **data**: platform hanya menyimpan dan meneruskannya, sedangkan cara membandingkan lilin sepenuhnya milik engine.
+
+- Nilai selalu berupa simbol kanonik, huruf besar, urut abjad, tanpa duplikat.
+- Alias yang dikirim admin/admin API dipetakan ke simbol kanonik (`gold` → `XAUUSD`).
+- Korelasi diri sendiri (`XAUUSD` → `XAUUSD`) dan simbol yang tidak terdaftar ditolak `400 BAD_REQUEST`.
+- Instrumen pembanding yang dinonaktifkan admin otomatis tidak diminta ke engine.
+- Runner hanya meminta feed instrumen pembanding untuk strategi evaluasi SMT (`ila-3.0`). Simbol tersebut **tidak** menghasilkan order untuk pengguna yang tidak melangganinya.
+
 ---
 
 ## 4.1. Manajemen Katalog Pair (Admin Only 🛡️)
@@ -342,7 +352,7 @@ Endpoint khusus admin (permission `subscription.edit`):
 | `/admin/pair-categories/:id` | PATCH / DELETE | Mengubah atau menghapus kategori (hapus diblokir bila masih punya pair) |
 | `/admin/pair-groups` | POST | Membuat sub-kategori baru (`category_id`, `key`, `label`, dll.) |
 | `/admin/pair-groups/:id` | PATCH / DELETE | Mengubah atau menghapus sub-kategori (hapus diblokir bila masih punya pair) |
-| `/admin/pairs` | POST | Mendaftarkan simbol baru (`symbol`, `category_id`, `group_id`, `aliases`, dll.) |
+| `/admin/pairs` | POST | Mendaftarkan simbol baru (`symbol`, `category_id`, `group_id`, `aliases`, `correlated_symbols`, dll.) |
 | `/admin/pairs/:id` | PATCH / DELETE | Mengubah atau menghapus simbol (hapus diblokir bila ada subscriber aktif) |
 
 Seluruh mutasi tercatat otomatis pada log audit admin (`pair.category.change`, `pair.group.change`, `pair.change`).

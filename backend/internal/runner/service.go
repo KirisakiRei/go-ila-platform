@@ -93,6 +93,9 @@ type Options struct {
 	// PairGate menyaring simbol yang masih diaktifkan admin. Bila nil, semua
 	// simbol dianggap aktif sehingga pemasangan lama tetap berjalan.
 	PairGate PairGate
+	// CorrelationGate menyediakan pasangan instrumen pembanding SMT. Bila nil,
+	// engine hanya diminta simbol yang benar-benar dilanggani user.
+	CorrelationGate CorrelationGate
 }
 
 // PairGate memberi tahu Runner simbol mana yang masih boleh diminta ke engine.
@@ -101,6 +104,15 @@ type Options struct {
 type PairGate interface {
 	// EnabledSymbols mengembalikan himpunan simbol kanonik yang masih aktif.
 	EnabledSymbols(ctx context.Context) (map[string]bool, error)
+}
+
+// CorrelationGate memberi tahu Runner instrumen pembanding SMT per simbol.
+//
+// Runner hanya memakainya sebagai data: cara membandingkan lilin sepenuhnya
+// milik engine. Tujuan gate ini adalah memastikan engine menerima feed untuk
+// instrumen pembanding, tanpa membuat user harus melangganinya.
+type CorrelationGate interface {
+	Correlations(ctx context.Context) (map[string][]string, error)
 }
 
 // Service adalah inti Runner. Aman dipakai dari beberapa goroutine.

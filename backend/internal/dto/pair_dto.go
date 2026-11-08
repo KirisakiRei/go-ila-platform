@@ -8,6 +8,9 @@ type PairItem struct {
 	DisplayName string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Aliases     string `json:"aliases,omitempty"`
+	// CorrelatedSymbols adalah instrumen pembanding SMT (bisa lebih dari satu).
+	// Nilainya hanya informasi; evaluasi korelasi tetap milik engine.
+	CorrelatedSymbols []string `json:"correlated_symbols,omitempty"`
 }
 
 // PairGroupView adalah sub-kategori beserta pair di dalamnya.
@@ -72,20 +75,23 @@ type CreatePairRequest struct {
 	CategoryID  string `json:"category_id" binding:"required"`
 	GroupID     string `json:"group_id"`
 	Aliases     string `json:"aliases" binding:"max=120"`
-	SortOrder   int    `json:"sort_order"`
-	IsEnabled   *bool  `json:"is_enabled"`
-	Description string `json:"description" binding:"max=255"`
+	// CorrelatedSymbols diisi simbol pembanding SMT dipisah koma.
+	CorrelatedSymbols string `json:"correlated_symbols" binding:"max=120"`
+	SortOrder         int    `json:"sort_order"`
+	IsEnabled         *bool  `json:"is_enabled"`
+	Description       string `json:"description" binding:"max=255"`
 }
 
 // UpdatePairRequest mengubah simbol.
 type UpdatePairRequest struct {
-	DisplayName *string `json:"display_name" binding:"omitempty,max=60"`
-	CategoryID  *string `json:"category_id"`
-	GroupID     *string `json:"group_id"`
-	Aliases     *string `json:"aliases" binding:"omitempty,max=120"`
-	SortOrder   *int    `json:"sort_order"`
-	IsEnabled   *bool   `json:"is_enabled"`
-	Description *string `json:"description" binding:"omitempty,max=255"`
+	DisplayName       *string `json:"display_name" binding:"omitempty,max=60"`
+	CategoryID        *string `json:"category_id"`
+	GroupID           *string `json:"group_id"`
+	Aliases           *string `json:"aliases" binding:"omitempty,max=120"`
+	CorrelatedSymbols *string `json:"correlated_symbols" binding:"omitempty,max=120"`
+	SortOrder         *int    `json:"sort_order"`
+	IsEnabled         *bool   `json:"is_enabled"`
+	Description       *string `json:"description" binding:"omitempty,max=255"`
 }
 
 // AdminPairView menampilkan pair lengkap untuk panel admin.
@@ -98,9 +104,11 @@ type AdminPairView struct {
 	GroupID     string `json:"group_id,omitempty"`
 	GroupKey    string `json:"group_key,omitempty"`
 	Aliases     string `json:"aliases,omitempty"`
-	SortOrder   int    `json:"sort_order"`
-	IsEnabled   bool   `json:"is_enabled"`
-	Description string `json:"description,omitempty"`
+	// CorrelatedSymbols dikirim sebagai CSV agar mudah disunting sebagai teks.
+	CorrelatedSymbols string `json:"correlated_symbols,omitempty"`
+	SortOrder         int    `json:"sort_order"`
+	IsEnabled         bool   `json:"is_enabled"`
+	Description       string `json:"description,omitempty"`
 	// Subscribers adalah jumlah langganan aktif yang memakai simbol ini.
 	// Admin perlu melihatnya sebelum menonaktifkan atau menghapus pair.
 	Subscribers int64 `json:"subscribers"`

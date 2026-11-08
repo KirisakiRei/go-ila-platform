@@ -107,6 +107,20 @@ func buildPairCatalog(categories []model.PairCategory, groups []model.PairGroup,
 	}
 	byCategory := make(map[string]*bucket, len(categories))
 
+	// Simbol yang benar-benar tampil untuk user. Dipakai menyaring daftar
+	// korelasi agar kartu pair tidak menyebut instrumen yang sedang
+	// dinonaktifkan admin (instrumen itu juga tidak diminta ke engine).
+	visible := make(map[string]bool, len(pairs))
+	for _, p := range pairs {
+		if !p.IsEnabled || !enabledCategory[p.CategoryID] {
+			continue
+		}
+		if p.GroupID != nil && !groupEnabled[*p.GroupID] {
+			continue
+		}
+		visible[p.Symbol] = true
+	}
+
 	for _, p := range pairs {
 		if !p.IsEnabled || !enabledCategory[p.CategoryID] {
 			continue
@@ -127,10 +141,11 @@ func buildPairCatalog(categories []model.PairCategory, groups []model.PairGroup,
 			b.order = append(b.order, groupKey)
 		}
 		b.groups[groupKey] = append(b.groups[groupKey], dto.PairItem{
-			Symbol:      p.Symbol,
-			DisplayName: p.DisplayName,
-			Description: p.Description,
-			Aliases:     p.Aliases,
+			Symbol:            p.Symbol,
+			DisplayName:       p.DisplayName,
+			Description:       p.Description,
+			Aliases:           p.Aliases,
+			CorrelatedSymbols: filterVisible(splitCSV(p.CorrelatedSymbols), visible),
 		})
 	}
 
@@ -171,5 +186,42 @@ func buildPairCatalog(categories []model.PairCategory, groups []model.PairGroup,
 
 	sort.Strings(symbols)
 	out.Symbols = symbols
+	return out
+}
+
+// filterVisible menyisakan simbol yang masih tampil di katalog.
+func filterVisible(symbols []string, visible map[string]bool) []string {
+	if len(symbols) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(symbols))
+	for _, symbol := range symbols {
+		if visible[symbol] {
+			out = append(out, symbol)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// splitCSV memecah daftar dipisah koma menjadi irisan bersih tanpa entri kosong.
+func splitCSV(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.ToUpper(strings.TrimSpace(part))
+		if value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	if len(out) == 0 {
+		return nil
+	}
 	return out
 }

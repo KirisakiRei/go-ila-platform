@@ -18,6 +18,13 @@ type Requirement struct {
 	Strategy string
 }
 
+// smtStrategies adalah strategi yang evaluasinya membandingkan instrumen
+// korelasi (Smart Money Technique). Hanya strategi ini yang membuat Runner
+// meminta feed tambahan ke engine; strategi lain cukup simbol yang dilanggan.
+var smtStrategies = map[string]bool{
+	"ila-3.0": true,
+}
+
 // ComputeRequirements menyusun daftar (symbol, strategy) yang perlu dihitung
 // engine, berdasarkan user aktif, tier, dan pilihan strategi mereka.
 //
@@ -78,6 +85,11 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 		byStrategy[sub.Strategy][sub.Symbol] = true
 	}
 
+	// Strategi SMT butuh lilin instrumen pembanding. Tanpa feed itu engine
+	// tidak dapat menghitung divergence, walau user hanya melanggan simbol
+	// utamanya.
+	s.expandCorrelations(ctx, byStrategy, enabled)
+
 	out := make(map[string][]string, len(byStrategy))
 	for _, location := range available {
 		symbols, ok := byStrategy[location.Strategy]
@@ -94,6 +106,62 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 	}
 
 	return out, nil
+}
+
+// expandCorrelations menambahkan instrumen pembanding SMT ke kebutuhan engine.
+//
+// Ekspansi hanya satu tingkat: pembanding ditambahkan apa adanya, tanpa ikut
+// dipecah lagi, sehingga rantai korelasi tidak pernah melebar tanpa batas.
+// Instrumen yang dinonaktifkan admin tetap dilewati, sama seperti simbol utama.
+func (s *Service) expandCorrelations(ctx context.Context, byStrategy map[string]map[string]bool, enabled map[string]bool) {
+	if s.opts.CorrelationGate == nil {
+		return
+	}
+
+	needsSMT := false
+	for strategy := range byStrategy {
+		if smtStrategies[strategy] {
+			needsSMT = true
+			break
+		}
+	}
+	if !needsSMT {
+		return
+	}
+
+	correlations, err := s.opts.CorrelationGate.Correlations(ctx)
+	if err != nil {
+		// Kegagalan membaca korelasi tidak boleh mematikan trading: engine tetap
+		// menerima simbol utama, hanya evaluasi SMT yang kehilangan pembanding.
+		s.logger.Warn("gagal membaca korelasi pair", "error", err.Error())
+		return
+	}
+	if len(correlations) == 0 {
+		return
+	}
+
+	for strategy, symbols := range byStrategy {
+		if !smtStrategies[strategy] {
+			continue
+		}
+		// Salin kunci lebih dulu: penambahan saat iterasi peta membuat hasil
+		// bergantung urutan, padahal kebutuhan engine harus deterministik.
+		base := make([]string, 0, len(symbols))
+		for symbol := range symbols {
+			base = append(base, symbol)
+		}
+		for _, symbol := range base {
+			for _, correlated := range correlations[symbol] {
+				if correlated == "" {
+					continue
+				}
+				if enabled != nil && !enabled[correlated] {
+					continue
+				}
+				symbols[correlated] = true
+			}
+		}
+	}
 }
 
 // DiffRequirements membandingkan kebutuhan lama dan baru.

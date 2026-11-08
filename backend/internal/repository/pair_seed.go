@@ -33,8 +33,11 @@ type PairSeedPair struct {
 	CategoryKey string
 	GroupKey    string
 	Aliases     string
-	SortOrder   int
-	Description string
+	// CorrelatedSymbols adalah simbol pembanding SMT bawaan, dipisah koma.
+	// Hanya data awal; admin bebas mengubahnya lewat panel.
+	CorrelatedSymbols string
+	SortOrder         int
+	Description       string
 }
 
 // DefaultPairSeeds mengembalikan katalog awal yang mencakup simbol yang sudah
@@ -74,30 +77,33 @@ func DefaultPairSeeds() (categories []PairSeedCategory, pairs []PairSeedPair) {
 	}
 
 	pairs = []PairSeedPair{
-		{Symbol: "EURUSD", DisplayName: "Euro vs US Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "EUR/USD", SortOrder: 10},
-		{Symbol: "GBPUSD", DisplayName: "British Pound vs US Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "GBP/USD", SortOrder: 20},
+		// Korelasi awal mengikuti pasangan yang lazim dipakai evaluasi SMT.
+		// Arah korelasi tidak harus simetris; admin bisa mengubahnya kapan saja.
+		{Symbol: "EURUSD", DisplayName: "Euro vs US Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "EUR/USD", CorrelatedSymbols: "GBPUSD", SortOrder: 10},
+		{Symbol: "GBPUSD", DisplayName: "British Pound vs US Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "GBP/USD", CorrelatedSymbols: "EURUSD", SortOrder: 20},
 		{Symbol: "AUDUSD", DisplayName: "Australian Dollar vs US Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "AUD/USD", SortOrder: 30},
 		{Symbol: "NZDUSD", DisplayName: "New Zealand Dollar vs US Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "NZD/USD", SortOrder: 40},
 		{Symbol: "USDCAD", DisplayName: "US Dollar vs Canadian Dollar", CategoryKey: "forex", GroupKey: "usd", Aliases: "USD/CAD", SortOrder: 50},
 		{Symbol: "USDCHF", DisplayName: "US Dollar vs Swiss Franc", CategoryKey: "forex", GroupKey: "usd", Aliases: "USD/CHF", SortOrder: 60},
-		{Symbol: "USDJPY", DisplayName: "US Dollar vs Japanese Yen", CategoryKey: "forex", GroupKey: "jpy", Aliases: "USD/JPY", SortOrder: 70},
-		{Symbol: "EURJPY", DisplayName: "Euro vs Japanese Yen", CategoryKey: "forex", GroupKey: "jpy", Aliases: "EUR/JPY", SortOrder: 80},
-		{Symbol: "GBPJPY", DisplayName: "British Pound vs Japanese Yen", CategoryKey: "forex", GroupKey: "jpy", Aliases: "GBP/JPY", SortOrder: 90},
-		{Symbol: "EURGBP", DisplayName: "Euro vs British Pound", CategoryKey: "forex", GroupKey: "gbp", Aliases: "EUR/GBP", SortOrder: 100},
+		{Symbol: "USDJPY", DisplayName: "US Dollar vs Japanese Yen", CategoryKey: "forex", GroupKey: "jpy", Aliases: "USD/JPY", CorrelatedSymbols: "EURJPY,GBPJPY", SortOrder: 70},
+		{Symbol: "EURJPY", DisplayName: "Euro vs Japanese Yen", CategoryKey: "forex", GroupKey: "jpy", Aliases: "EUR/JPY", CorrelatedSymbols: "GBPJPY,USDJPY", SortOrder: 80},
+		{Symbol: "GBPJPY", DisplayName: "British Pound vs Japanese Yen", CategoryKey: "forex", GroupKey: "jpy", Aliases: "GBP/JPY", CorrelatedSymbols: "EURJPY,USDJPY", SortOrder: 90},
+		{Symbol: "EURGBP", DisplayName: "Euro vs British Pound", CategoryKey: "forex", GroupKey: "gbp", Aliases: "EUR/GBP", CorrelatedSymbols: "EURUSD,GBPUSD", SortOrder: 100},
 
 		// USTEC adalah simbol kanonik yang dipakai adapter cTrader (ID 10014).
 		// NAS100 dan US100 hanya alias, supaya sinyal nama lain tetap dikenali.
-		{Symbol: "USTEC", DisplayName: "US Tech 100", CategoryKey: "indices", GroupKey: "us", Aliases: "NAS100,US100,NDX", SortOrder: 10},
-		{Symbol: "US30", DisplayName: "Wall Street 30", CategoryKey: "indices", GroupKey: "us", Aliases: "DOW30,DJ30", SortOrder: 20},
-		{Symbol: "US500", DisplayName: "US 500", CategoryKey: "indices", GroupKey: "us", Aliases: "SPX500,SP500", SortOrder: 30},
+		{Symbol: "USTEC", DisplayName: "US Tech 100", CategoryKey: "indices", GroupKey: "us", Aliases: "NAS100,US100,NDX", CorrelatedSymbols: "US30,US500", SortOrder: 10},
+		{Symbol: "US30", DisplayName: "Wall Street 30", CategoryKey: "indices", GroupKey: "us", Aliases: "DOW30,DJ30", CorrelatedSymbols: "US500,USTEC", SortOrder: 20},
+		{Symbol: "US500", DisplayName: "US 500", CategoryKey: "indices", GroupKey: "us", Aliases: "SPX500,SP500", CorrelatedSymbols: "US30,USTEC", SortOrder: 30},
 		{Symbol: "GER40", DisplayName: "Germany 40", CategoryKey: "indices", GroupKey: "eu", Aliases: "DAX40,DE40", SortOrder: 40},
 
-		{Symbol: "XAUUSD", DisplayName: "Gold vs US Dollar", CategoryKey: "commodity", GroupKey: "metals", Aliases: "GOLD,XAU/USD", SortOrder: 10},
-		{Symbol: "XAGUSD", DisplayName: "Silver vs US Dollar", CategoryKey: "commodity", GroupKey: "metals", Aliases: "SILVER,XAG/USD", SortOrder: 20},
+		{Symbol: "XAUUSD", DisplayName: "Gold vs US Dollar", CategoryKey: "commodity", GroupKey: "metals", Aliases: "GOLD,XAU/USD", CorrelatedSymbols: "XAGUSD,XAUEUR", SortOrder: 10},
+		{Symbol: "XAGUSD", DisplayName: "Silver vs US Dollar", CategoryKey: "commodity", GroupKey: "metals", Aliases: "SILVER,XAG/USD", CorrelatedSymbols: "XAUUSD", SortOrder: 20},
+		{Symbol: "XAUEUR", DisplayName: "Gold vs Euro", CategoryKey: "commodity", GroupKey: "metals", Aliases: "XAU/EUR", CorrelatedSymbols: "XAUUSD", SortOrder: 25},
 		{Symbol: "USOIL", DisplayName: "WTI Crude Oil", CategoryKey: "commodity", GroupKey: "energy", Aliases: "WTI,CRUDEOIL", SortOrder: 30},
 
-		{Symbol: "BTCUSD", DisplayName: "Bitcoin vs US Dollar", CategoryKey: "crypto", GroupKey: "major", Aliases: "BTC/USD,XBTUSD", SortOrder: 10},
-		{Symbol: "ETHUSD", DisplayName: "Ethereum vs US Dollar", CategoryKey: "crypto", GroupKey: "major", Aliases: "ETH/USD", SortOrder: 20},
+		{Symbol: "BTCUSD", DisplayName: "Bitcoin vs US Dollar", CategoryKey: "crypto", GroupKey: "major", Aliases: "BTC/USD,XBTUSD", CorrelatedSymbols: "ETHUSD", SortOrder: 10},
+		{Symbol: "ETHUSD", DisplayName: "Ethereum vs US Dollar", CategoryKey: "crypto", GroupKey: "major", Aliases: "ETH/USD", CorrelatedSymbols: "BTCUSD", SortOrder: 20},
 	}
 
 	return categories, pairs
@@ -117,8 +123,15 @@ func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 
 		for _, cat := range categories {
 			var existing model.PairCategory
-			err := tx.Where("LOWER(key) = ?", cat.Key).First(&existing).Error
+			// Unscoped: baris yang pernah dihapus (soft delete) masih memegang
+			// kunci unik, sehingga pembuatan ulang akan gagal. Baris terhapus
+			// sengaja dilewati agar katalog tidak menghidupkan kembali data
+			// yang sudah dibuang admin.
+			err := tx.Unscoped().Where("LOWER(key) = ?", cat.Key).First(&existing).Error
 			if err == nil {
+				if existing.DeletedAt.Valid {
+					continue
+				}
 				categoryID[cat.Key] = existing.ID
 			} else if errors.Is(err, gorm.ErrRecordNotFound) {
 				row := &model.PairCategory{
@@ -139,8 +152,9 @@ func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 
 			for _, grp := range cat.Groups {
 				var existingGroup model.PairGroup
-				err := tx.Where("category_id = ? AND LOWER(key) = ?", categoryID[cat.Key], grp.Key).First(&existingGroup).Error
+				err := tx.Unscoped().Where("category_id = ? AND LOWER(key) = ?", categoryID[cat.Key], grp.Key).First(&existingGroup).Error
 				if err == nil {
+					// Grup terhapus tidak dibuatkan ulang, juga tidak dipakai
 					continue
 				}
 				if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -175,22 +189,37 @@ func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 			if !ok {
 				continue
 			}
-			var count int64
-			if err := tx.Model(&model.TradingPair{}).Where("symbol = ?", pair.Symbol).Count(&count).Error; err != nil {
-				return fmt.Errorf("memeriksa pair %s: %w", pair.Symbol, err)
-			}
-			if count > 0 {
+			var existing model.TradingPair
+			err := tx.Unscoped().Where("symbol = ?", pair.Symbol).First(&existing).Error
+			if err == nil {
+				if existing.DeletedAt.Valid {
+					// Pair yang sudah dihapus admin tidak dihidupkan kembali.
+					continue
+				}
+				// Korelasi hanya diisi bila masih kosong; nilai yang sudah diubah
+				// admin tidak pernah ditimpa migrasi berikutnya.
+				if existing.CorrelatedSymbols == "" && pair.CorrelatedSymbols != "" {
+					if err := tx.Model(&model.TradingPair{}).
+						Where("id = ?", existing.ID).
+						Update("correlated_symbols", pair.CorrelatedSymbols).Error; err != nil {
+						return fmt.Errorf("mengisi korelasi %s: %w", pair.Symbol, err)
+					}
+				}
 				continue
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("memeriksa pair %s: %w", pair.Symbol, err)
 			}
 
 			row := &model.TradingPair{
-				Symbol:      pair.Symbol,
-				DisplayName: pair.DisplayName,
-				CategoryID:  catID,
-				Aliases:     pair.Aliases,
-				SortOrder:   pair.SortOrder,
-				IsEnabled:   true,
-				Description: pair.Description,
+				Symbol:            pair.Symbol,
+				DisplayName:       pair.DisplayName,
+				CategoryID:        catID,
+				Aliases:           pair.Aliases,
+				CorrelatedSymbols: pair.CorrelatedSymbols,
+				SortOrder:         pair.SortOrder,
+				IsEnabled:         true,
+				Description:       pair.Description,
 			}
 			if id, ok := groupID[catID+"|"+pair.GroupKey]; ok {
 				gid := id

@@ -113,15 +113,16 @@ func (s *pairAdminService) Catalog(ctx context.Context) (dto.AdminPairCatalogRes
 
 func toAdminPairView(p model.TradingPair, category model.PairCategory, groups map[string]model.PairGroup) dto.AdminPairView {
 	view := dto.AdminPairView{
-		ID:          p.ID,
-		Symbol:      p.Symbol,
-		DisplayName: p.DisplayName,
-		CategoryID:  p.CategoryID,
-		CategoryKey: category.Key,
-		Aliases:     p.Aliases,
-		SortOrder:   p.SortOrder,
-		IsEnabled:   p.IsEnabled,
-		Description: p.Description,
+		ID:                p.ID,
+		Symbol:            p.Symbol,
+		DisplayName:       p.DisplayName,
+		CategoryID:        p.CategoryID,
+		CategoryKey:       category.Key,
+		Aliases:           p.Aliases,
+		CorrelatedSymbols: p.CorrelatedSymbols,
+		SortOrder:         p.SortOrder,
+		IsEnabled:         p.IsEnabled,
+		Description:       p.Description,
 	}
 	if p.GroupID != nil {
 		view.GroupID = *p.GroupID
@@ -323,24 +324,30 @@ func (s *pairAdminService) CreatePair(ctx context.Context, actorID string, req d
 		return nil, err
 	}
 
+	correlated, err := s.resolveCorrelations(ctx, symbol, req.CorrelatedSymbols)
+	if err != nil {
+		return nil, err
+	}
+
 	enabled := true
 	if req.IsEnabled != nil {
 		enabled = *req.IsEnabled
 	}
 	pair := &model.TradingPair{
-		Symbol:      symbol,
-		DisplayName: strings.TrimSpace(req.DisplayName),
-		CategoryID:  category.ID,
-		GroupID:     groupID,
-		Aliases:     normalizeAliases(req.Aliases),
-		SortOrder:   req.SortOrder,
-		IsEnabled:   enabled,
-		Description: strings.TrimSpace(req.Description),
+		Symbol:            symbol,
+		DisplayName:       strings.TrimSpace(req.DisplayName),
+		CategoryID:        category.ID,
+		GroupID:           groupID,
+		Aliases:           normalizeAliases(req.Aliases),
+		CorrelatedSymbols: correlated,
+		SortOrder:         req.SortOrder,
+		IsEnabled:         enabled,
+		Description:       strings.TrimSpace(req.Description),
 	}
 	if err := s.pairs.CreatePair(ctx, pair); err != nil {
 		return nil, err
 	}
-	s.record(ctx, actorID, audit.PairChange, "create", pair.ID, map[string]any{"symbol": symbol})
+	s.record(ctx, actorID, audit.PairChange, "create", pair.ID, map[string]any{"symbol": symbol, "correlated": pair.CorrelatedSymbols})
 
 	view := toAdminPairView(*pair, *category, map[string]model.PairGroup{})
 	return &view, nil
@@ -380,6 +387,13 @@ func (s *pairAdminService) UpdatePair(ctx context.Context, actorID, id string, r
 	if req.Aliases != nil {
 		pair.Aliases = normalizeAliases(*req.Aliases)
 	}
+	if req.CorrelatedSymbols != nil {
+		correlated, err := s.resolveCorrelations(ctx, pair.Symbol, *req.CorrelatedSymbols)
+		if err != nil {
+			return err
+		}
+		pair.CorrelatedSymbols = correlated
+	}
 	if req.SortOrder != nil {
 		pair.SortOrder = *req.SortOrder
 	}
@@ -395,7 +409,7 @@ func (s *pairAdminService) UpdatePair(ctx context.Context, actorID, id string, r
 	if err := s.pairs.UpdatePair(ctx, pair); err != nil {
 		return err
 	}
-	s.record(ctx, actorID, audit.PairChange, "update", pair.ID, map[string]any{"enabled": pair.IsEnabled})
+	s.record(ctx, actorID, audit.PairChange, "update", pair.ID, map[string]any{"enabled": pair.IsEnabled, "correlated": pair.CorrelatedSymbols})
 	return nil
 }
 
@@ -450,6 +464,48 @@ func normalizeAliases(raw string) string {
 	}
 	sort.Strings(out)
 	return strings.Join(out, ",")
+}
+
+// resolveCorrelations merapikan dan memvalidasi daftar simbol pembanding SMT.
+//
+// Setiap entri dipetakan ke simbol kanonik lewat katalog, sehingga alias yang
+// diketik admin (mis. "GOLD") tersimpan sebagai simbol yang dikenal engine.
+// Korelasi diri sendiri ditolak karena tidak menghasilkan perbandingan apa pun.
+func (s *pairAdminService) resolveCorrelations(ctx context.Context, ownerSymbol, raw string) (string, error) {
+	owner := strings.ToUpper(strings.TrimSpace(ownerSymbol))
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+
+	for _, part := range parts {
+		input := strings.ToUpper(strings.TrimSpace(part))
+		if input == "" {
+			continue
+		}
+		if input == owner {
+			return "", fmt.Errorf("%w: simbol %s tidak boleh menjadi korelasi dirinya sendiri", apperror.ErrBadRequest, owner)
+		}
+
+		found, err := s.pairs.FindPairBySymbol(ctx, input)
+		if err != nil {
+			if errors.Is(err, apperror.ErrNotFound) {
+				return "", fmt.Errorf("%w: simbol korelasi %s belum terdaftar di katalog", apperror.ErrBadRequest, input)
+			}
+			return "", err
+		}
+		canonical := strings.ToUpper(found.Symbol)
+		if canonical == owner {
+			return "", fmt.Errorf("%w: simbol %s tidak boleh menjadi korelasi dirinya sendiri", apperror.ErrBadRequest, owner)
+		}
+		if seen[canonical] {
+			continue
+		}
+		seen[canonical] = true
+		out = append(out, canonical)
+	}
+
+	sort.Strings(out)
+	return strings.Join(out, ","), nil
 }
 
 func (s *pairAdminService) record(ctx context.Context, actorID string, action audit.Action, operation, entityID string, meta map[string]any) {

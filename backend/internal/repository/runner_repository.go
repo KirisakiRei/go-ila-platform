@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -72,6 +73,10 @@ type RunnerRepository interface {
 	// EnabledPairSymbols mengembalikan simbol kanonik yang masih diaktifkan
 	// admin. Symbol lain tidak boleh diminta ke engine.
 	EnabledPairSymbols(ctx context.Context) ([]string, error)
+	// CorrelationMap mengembalikan peta simbol ke simbol pembanding SMT-nya.
+	// Hanya pair aktif yang punya korelasi yang ikut, sehingga engine tidak
+	// pernah diminta menarik feed instrumen yang sudah dinonaktifkan admin.
+	CorrelationMap(ctx context.Context) (map[string][]string, error)
 
 	// Status engine.
 	UpsertEngineState(ctx context.Context, state *model.EngineState) error
@@ -636,12 +641,14 @@ func (r *runnerRepository) ListAccountsBySymbol(ctx context.Context, symbol stri
 // Kategori atau grup yang dinonaktifkan ikut mematikan pair di dalamnya.
 func (r *runnerRepository) EnabledPairSymbols(ctx context.Context) ([]string, error) {
 	var symbols []string
+	// Table() tidak mengenal model, jadi filter soft delete ditulis eksplisit.
+	// Sisa baris yang pernah dihapus tidak boleh dianggap pair aktif.
 	err := r.db.WithContext(ctx).
 		Table("trading_pair AS p").
 		Select("p.symbol").
-		Joins("JOIN pair_category c ON c.id = p.category_id AND c.is_enabled = ?", true).
-		Joins("LEFT JOIN pair_group g ON g.id = p.group_id").
-		Where("p.is_enabled = ?", true).
+		Joins("JOIN pair_category c ON c.id = p.category_id AND c.is_enabled = ? AND c.deleted_at IS NULL", true).
+		Joins("LEFT JOIN pair_group g ON g.id = p.group_id AND g.deleted_at IS NULL").
+		Where("p.is_enabled = ? AND p.deleted_at IS NULL", true).
 		Where("g.id IS NULL OR g.is_enabled = ?", true).
 		Order("p.symbol ASC").
 		Pluck("p.symbol", &symbols).Error
@@ -649,6 +656,55 @@ func (r *runnerRepository) EnabledPairSymbols(ctx context.Context) ([]string, er
 		return nil, fmt.Errorf("membaca pair aktif: %w", err)
 	}
 	return symbols, nil
+}
+
+// CorrelationMap membaca pasangan korelasi SMT yang diatur admin.
+//
+// Hanya pair aktif di kategori/grup aktif yang diikutkan, sehingga instrumen
+// yang disembunyikan admin tidak pernah diminta ke engine. Nilai dipisah koma
+// dipecah menjadi irisan simbol kanonik tanpa entri kosong.
+func (r *runnerRepository) CorrelationMap(ctx context.Context) (map[string][]string, error) {
+	type row struct {
+		Symbol            string
+		CorrelatedSymbols string
+	}
+
+	var rows []row
+	// Table() tidak mengenal model, jadi filter soft delete ditulis eksplisit.
+	err := r.db.WithContext(ctx).
+		Table("trading_pair AS p").
+		Select("p.symbol, p.correlated_symbols").
+		Joins("JOIN pair_category c ON c.id = p.category_id AND c.is_enabled = ? AND c.deleted_at IS NULL", true).
+		Joins("LEFT JOIN pair_group g ON g.id = p.group_id AND g.deleted_at IS NULL").
+		Where("p.is_enabled = ? AND p.deleted_at IS NULL", true).
+		Where("g.id IS NULL OR g.is_enabled = ?", true).
+		Where("p.correlated_symbols <> ''").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca korelasi pair: %w", err)
+	}
+
+	out := make(map[string][]string, len(rows))
+	for _, item := range rows {
+		symbol := strings.ToUpper(strings.TrimSpace(item.Symbol))
+		if symbol == "" {
+			continue
+		}
+		correlations := make([]string, 0, 4)
+		seen := make(map[string]bool, 4)
+		for _, part := range strings.Split(item.CorrelatedSymbols, ",") {
+			value := strings.ToUpper(strings.TrimSpace(part))
+			if value == "" || value == symbol || seen[value] {
+				continue
+			}
+			seen[value] = true
+			correlations = append(correlations, value)
+		}
+		if len(correlations) > 0 {
+			out[symbol] = correlations
+		}
+	}
+	return out, nil
 }
 
 func (r *runnerRepository) UpsertEngineState(ctx context.Context, state *model.EngineState) error {

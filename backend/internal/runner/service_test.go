@@ -34,19 +34,22 @@ type fakeStore struct {
 	accounts    map[string]*model.BrokerAccount
 	subs        []model.Subscription
 	events      []model.SignalEvent
+	// correlations adalah peta korelasi SMT yang disajikan ke Runner.
+	correlations map[string][]string
 	// staleClaims menandai klaim yang dianggap tertinggal pada pengujian.
 	staleClaims map[string]struct{}
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		signals:     map[string]*model.Signal{},
-		userSignals: map[string]*model.UserSignal{},
-		positions:   map[string]*model.Position{},
-		executions:  map[string]*model.ExecutionRecord{},
-		daily:       map[string]*model.DailySummary{},
-		users:       map[string]*model.User{},
-		accounts:    map[string]*model.BrokerAccount{},
+		signals:      map[string]*model.Signal{},
+		userSignals:  map[string]*model.UserSignal{},
+		positions:    map[string]*model.Position{},
+		executions:   map[string]*model.ExecutionRecord{},
+		daily:        map[string]*model.DailySummary{},
+		users:        map[string]*model.User{},
+		accounts:     map[string]*model.BrokerAccount{},
+		correlations: map[string][]string{},
 	}
 }
 
@@ -389,6 +392,17 @@ func (s *fakeStore) EnabledPairSymbols(_ context.Context) ([]string, error) {
 			seen[sub.Symbol] = true
 			out = append(out, sub.Symbol)
 		}
+	}
+	return out, nil
+}
+
+// CorrelationMap mengembalikan peta korelasi SMT yang dipasang tes.
+func (s *fakeStore) CorrelationMap(_ context.Context) (map[string][]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string][]string, len(s.correlations))
+	for symbol, list := range s.correlations {
+		out[symbol] = append([]string(nil), list...)
 	}
 	return out, nil
 }

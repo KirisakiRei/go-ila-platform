@@ -51,10 +51,14 @@ type TradingPair struct {
 	GroupID *string `gorm:"type:varchar(36);index" json:"group_id"`
 	// Aliases berisi alias dipisah koma, mis. "GOLD,XAU". Pencocokan
 	// case-insensitive dan membuang spasi.
-	Aliases     string `gorm:"type:varchar(120)" json:"aliases"`
-	SortOrder   int    `gorm:"not null;default:0" json:"sort_order"`
-	IsEnabled   bool   `gorm:"not null;default:true" json:"is_enabled"`
-	Description string `gorm:"type:varchar(255)" json:"description"`
+	Aliases string `gorm:"type:varchar(120)" json:"aliases"`
+	// CorrelatedSymbols berisi satu atau lebih simbol pembanding SMT dipisah
+	// koma, mis. "XAGUSD,XAUEUR". Nilainya hanya data: cara memakainya
+	// (mis. SMT divergence) sepenuhnya milik engine.
+	CorrelatedSymbols string `gorm:"type:varchar(120)" json:"correlated_symbols"`
+	SortOrder         int    `gorm:"not null;default:0" json:"sort_order"`
+	IsEnabled         bool   `gorm:"not null;default:true" json:"is_enabled"`
+	Description       string `gorm:"type:varchar(255)" json:"description"`
 }
 
 // TableName menetapkan nama tabel.

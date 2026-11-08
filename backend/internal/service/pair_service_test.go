@@ -384,6 +384,94 @@ func TestPairAdmin_PairTidakBolehMasukKategoriNonaktif(t *testing.T) {
 	}
 }
 
+// Korelasi SMT boleh lebih dari satu, dinormalisasi, dan dipetakan ke simbol
+// kanonik lewat alias katalog.
+func TestPairAdmin_KorelasiSMTDinormalisasi(t *testing.T) {
+	repo := newFakePairRepo()
+	forex, _, _ := seedPairFixture(t, repo)
+	svc := NewPairAdminService(repo, &pairAuditRecorder{})
+	ctx := context.Background()
+
+	view, err := svc.CreatePair(ctx, "admin-1", dto.CreatePairRequest{
+		Symbol:            "AUDJPY",
+		CategoryID:        forex.ID,
+		CorrelatedSymbols: " gold, nas100 ,,GOLD,US100 ",
+	})
+	if err != nil {
+		t.Fatalf("buat pair berkorelasi: %v", err)
+	}
+	// GOLD → XAUUSD, NAS100/US100 → USTEC; duplikat dibuang, urut abjad.
+	if view.CorrelatedSymbols != "USTEC,XAUUSD" {
+		t.Fatalf("korelasi = %q, ingin USTEC,XAUUSD", view.CorrelatedSymbols)
+	}
+}
+
+func TestPairAdmin_KorelasiDiriSendiriDitolak(t *testing.T) {
+	repo := newFakePairRepo()
+	forex, _, _ := seedPairFixture(t, repo)
+	svc := NewPairAdminService(repo, &pairAuditRecorder{})
+	ctx := context.Background()
+
+	// Saat membuat pair: simbol sama dengan dirinya sendiri.
+	_, err := svc.CreatePair(ctx, "admin-1", dto.CreatePairRequest{
+		Symbol: "AUDCAD", CategoryID: forex.ID, CorrelatedSymbols: "audcad",
+	})
+	if !errors.Is(err, apperror.ErrBadRequest) {
+		t.Fatalf("korelasi diri sendiri saat create harus bad request, dapat %v", err)
+	}
+
+	// Saat mengubah: alias yang menunjuk ke simbol itu sendiri juga ditolak.
+	eur, err := repo.FindPairBySymbol(ctx, "EURUSD")
+	if err != nil {
+		t.Fatalf("cari EURUSD: %v", err)
+	}
+	self := "EURUSD"
+	if err := svc.UpdatePair(ctx, "admin-1", eur.ID, dto.UpdatePairRequest{CorrelatedSymbols: &self}); !errors.Is(err, apperror.ErrBadRequest) {
+		t.Fatalf("korelasi diri sendiri saat update harus bad request, dapat %v", err)
+	}
+}
+
+func TestPairAdmin_KorelasiTakDikenalDitolak(t *testing.T) {
+	repo := newFakePairRepo()
+	forex, _, _ := seedPairFixture(t, repo)
+	svc := NewPairAdminService(repo, &pairAuditRecorder{})
+	ctx := context.Background()
+
+	_, err := svc.CreatePair(ctx, "admin-1", dto.CreatePairRequest{
+		Symbol: "AUDCAD", CategoryID: forex.ID, CorrelatedSymbols: "NGAWUR",
+	})
+	if !errors.Is(err, apperror.ErrBadRequest) {
+		t.Fatalf("korelasi di luar katalog harus bad request, dapat %v", err)
+	}
+}
+
+func TestPairAdmin_KorelasiDapatDikosongkan(t *testing.T) {
+	repo := newFakePairRepo()
+	forex, _, _ := seedPairFixture(t, repo)
+	svc := NewPairAdminService(repo, &pairAuditRecorder{})
+	ctx := context.Background()
+
+	view, err := svc.CreatePair(ctx, "admin-1", dto.CreatePairRequest{
+		Symbol: "AUDCAD", CategoryID: forex.ID, CorrelatedSymbols: "EURUSD",
+	})
+	if err != nil {
+		t.Fatalf("buat pair: %v", err)
+	}
+
+	empty := ""
+	if err := svc.UpdatePair(ctx, "admin-1", view.ID, dto.UpdatePairRequest{CorrelatedSymbols: &empty}); err != nil {
+		t.Fatalf("kosongkan korelasi: %v", err)
+	}
+
+	pair, err := repo.FindPairByID(ctx, view.ID)
+	if err != nil {
+		t.Fatalf("baca pair: %v", err)
+	}
+	if pair.CorrelatedSymbols != "" {
+		t.Fatalf("korelasi = %q, ingin kosong", pair.CorrelatedSymbols)
+	}
+}
+
 // --- Katalog publik ---------------------------------------------------------
 
 func TestPairCatalog_HanyaYangAktifTampil(t *testing.T) {
@@ -449,6 +537,75 @@ func TestPairCatalog_PairTanpaGrupMasukUmum(t *testing.T) {
 		}
 	}
 	t.Fatal("grup sintetis umum tidak ditemukan di kategori forex")
+}
+
+// Katalog publik memuat daftar korelasi SMT agar frontend bisa menampilkan
+// instrumen pembanding pada kartu pair.
+func TestPairCatalog_MemuatKorelasiSMT(t *testing.T) {
+	repo := newFakePairRepo()
+	seedPairFixture(t, repo)
+	for i := range repo.pairs {
+		if repo.pairs[i].Symbol == "XAUUSD" {
+			repo.pairs[i].CorrelatedSymbols = "EURUSD,USTEC"
+		}
+	}
+	svc := NewPairCatalogService(repo)
+
+	catalog, err := svc.Catalog(context.Background())
+	if err != nil {
+		t.Fatalf("Catalog: %v", err)
+	}
+
+	for _, category := range catalog.Categories {
+		for _, group := range category.Groups {
+			for _, pair := range group.Pairs {
+				if pair.Symbol != "XAUUSD" {
+					continue
+				}
+				if got := strings.Join(pair.CorrelatedSymbols, ","); got != "EURUSD,USTEC" {
+					t.Fatalf("korelasi XAUUSD = %q, ingin EURUSD,USTEC", got)
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("XAUUSD tidak ditemukan di katalog")
+}
+
+// Instrumen pembanding yang tidak tampil (nonaktif) tidak boleh disebut di
+// katalog publik, karena engine juga tidak meminta feed-nya.
+func TestPairCatalog_KorelasiNonaktifTidakDitampilkan(t *testing.T) {
+	repo := newFakePairRepo()
+	seedPairFixture(t, repo)
+	for i := range repo.pairs {
+		switch repo.pairs[i].Symbol {
+		case "XAUUSD":
+			repo.pairs[i].CorrelatedSymbols = "EURUSD,GBPUSD"
+		case "EURUSD":
+			repo.pairs[i].IsEnabled = false
+		}
+	}
+	svc := NewPairCatalogService(repo)
+
+	catalog, err := svc.Catalog(context.Background())
+	if err != nil {
+		t.Fatalf("Catalog: %v", err)
+	}
+
+	for _, category := range catalog.Categories {
+		for _, group := range category.Groups {
+			for _, pair := range group.Pairs {
+				if pair.Symbol != "XAUUSD" {
+					continue
+				}
+				if got := strings.Join(pair.CorrelatedSymbols, ","); got != "GBPUSD" {
+					t.Fatalf("korelasi XAUUSD = %q, ingin hanya GBPUSD", got)
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("XAUUSD tidak ditemukan di katalog")
 }
 
 func TestPairCatalog_ResolveAliasKeKanonik(t *testing.T) {
