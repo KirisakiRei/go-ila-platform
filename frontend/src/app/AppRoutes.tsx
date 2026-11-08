@@ -17,6 +17,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import SignalsPage from '@/pages/SignalsPage'
 import StrategiesPage from '@/pages/StrategiesPage'
 import AccountsPage from '@/pages/AccountsPage'
+import AccountDetailPage from '@/pages/AccountDetailPage'
 import BillingPage from '@/pages/BillingPage'
 import CheckoutPage from '@/pages/CheckoutPage'
 import LegalCenterPage from '@/pages/public/legal/LegalCenterPage'
@@ -202,6 +203,16 @@ export function AppRoutes() {
             <RequireAuth>
               <ShellPage>
                 <AccountsPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/akun/:id"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <AccountDetailPage />
               </ShellPage>
             </RequireAuth>
           }

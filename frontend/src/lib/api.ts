@@ -1,10 +1,12 @@
 import { request } from './http'
 import type {
+  AccountPairSelectionResponse,
   Approval,
   ApprovalResult,
   BrokerAccount,
   CreateAccountPayload,
   CreateSubscriptionPayload,
+  PairCatalogResponse,
   Position,
   Session,
   Signal,
@@ -24,6 +26,22 @@ export const accountApi = {
   update: (id: string, payload: UpdateAccountPayload) =>
     request<BrokerAccount>(`/accounts/${id}`, { method: 'PATCH', body: payload }),
   remove: (id: string) => request<void>(`/accounts/${id}`, { method: 'DELETE' }),
+  ctraderAuthUrl: () => request<{ auth_url: string }>('/accounts/ctrader/auth-url'),
+  ctraderCallback: (payload: { code: string; mode?: string; risk_percent?: number }) =>
+    request<{ total_connected: number; accounts: BrokerAccount[] }>('/accounts/ctrader/callback', {
+      method: 'POST',
+      body: payload,
+    }),
+  pairs: (id: string) => request<AccountPairSelectionResponse>(`/accounts/${id}/pairs`),
+  updatePairs: (id: string, symbols: string[]) =>
+    request<{ symbols: string[] }>(`/accounts/${id}/pairs`, {
+      method: 'PUT',
+      body: { symbols },
+    }),
+}
+
+export const pairApi = {
+  catalog: () => request<PairCatalogResponse>('/pairs'),
 }
 
 export const subscriptionApi = {

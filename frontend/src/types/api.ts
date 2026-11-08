@@ -82,7 +82,7 @@ export type LoginResult = {
 /** Hasil verifikasi 2FA: sama seperti login yang tuntas. */
 export type VerifyTwoFactorResult = LoginResult & { step: 'complete' }
 
-export type BrokerType = 'matchtrader'
+export type BrokerType = 'matchtrader' | 'ctrader'
 export type AccountMode = 'manual' | 'auto'
 
 export type BrokerAccount = {
@@ -127,6 +127,37 @@ export type UpdateAccountPayload = {
 }
 
 export type StrategyVersion = 'ila-2.0' | 'ila-3.0'
+
+export type PairItem = {
+  symbol: string
+  name: string
+  description?: string
+  aliases?: string
+}
+
+export type PairGroupView = {
+  key: string
+  label: string
+  pairs: PairItem[]
+}
+
+export type PairCategoryView = {
+  key: string
+  label: string
+  groups: PairGroupView[]
+}
+
+export type PairCatalogResponse = {
+  categories: PairCategoryView[]
+  symbols: string[]
+}
+
+export type AccountPairSelectionResponse = {
+  account_id: string
+  risk_percent: number
+  selected: string[]
+  catalog: PairCatalogResponse
+}
 
 export type Subscription = {
   id: string

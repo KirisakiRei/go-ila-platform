@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Settings } from 'lucide-react'
 import { Badge, Button, Input, Label, Modal, StatusDot } from '@/components/ui'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { useDeleteAccount, useUpdateAccount } from '@/lib/queries'
@@ -76,21 +78,41 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
           <p className="border-l-2 border-foreground pl-2.5 text-[12px]">{account.last_error}</p>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <Button size="sm" variant="outline" onClick={() => setGantiToken(true)}>
-            Ganti token
-          </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/akun/${account.id}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-colors hover:bg-foreground/90"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span>Detail & Pengaturan</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+
+            {account.broker_type === 'matchtrader' && (
+              <Button size="sm" variant="outline" onClick={() => setGantiToken(true)}>
+                Ganti token
+              </Button>
+            )}
+
+            <Button
+              size="sm"
+              variant="outline"
+              isLoading={update.isPending}
+              onClick={() =>
+                update.mutate({ id: account.id, payload: { is_active: !account.is_active } })
+              }
+            >
+              {account.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+            </Button>
+          </div>
+
           <Button
             size="sm"
-            variant="outline"
-            isLoading={update.isPending}
-            onClick={() =>
-              update.mutate({ id: account.id, payload: { is_active: !account.is_active } })
-            }
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10"
+            onClick={() => setKonfirmasiHapus(true)}
           >
-            {account.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-          </Button>
-          <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => setKonfirmasiHapus(true)}>
             Hapus akun
           </Button>
         </div>

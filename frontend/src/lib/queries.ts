@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accountApi,
+  pairApi,
   securityApi,
   sessionApi,
   strategyApi,
@@ -26,6 +27,8 @@ export const queryKeys = {
   systemStatus: ['system', 'status'] as const,
   trial: ['trial'] as const,
   sessions: ['me', 'sessions'] as const,
+  accountPairs: (id: string) => ['accounts', id, 'pairs'] as const,
+  pairCatalog: ['pairs', 'catalog'] as const,
 }
 
 export function useAccounts() {
@@ -56,6 +59,46 @@ export function useDeleteAccount() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => accountApi.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.accounts })
+      void qc.invalidateQueries({ queryKey: queryKeys.systemStatus })
+    },
+  })
+}
+
+export function useAccountPairs(accountId: string) {
+  return useQuery({
+    queryKey: queryKeys.accountPairs(accountId),
+    queryFn: () => accountApi.pairs(accountId),
+    enabled: Boolean(accountId),
+  })
+}
+
+export function useUpdateAccountPairs() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, symbols }: { id: string; symbols: string[] }) =>
+      accountApi.updatePairs(id, symbols),
+    onSuccess: (_, variables) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.accountPairs(variables.id) })
+      void qc.invalidateQueries({ queryKey: queryKeys.subscriptions })
+      void qc.invalidateQueries({ queryKey: queryKeys.accounts })
+    },
+  })
+}
+
+export function usePairCatalog() {
+  return useQuery({
+    queryKey: queryKeys.pairCatalog,
+    queryFn: pairApi.catalog,
+  })
+}
+
+export function useCTraderCallback() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: { code: string; mode?: string; risk_percent?: number }) =>
+      accountApi.ctraderCallback(payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.accounts })
       void qc.invalidateQueries({ queryKey: queryKeys.systemStatus })
