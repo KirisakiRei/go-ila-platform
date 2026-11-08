@@ -3,7 +3,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { AdminShell } from '@/features/admin/components/AdminShell'
 import { AdminIdleGuard } from '@/features/admin/components/AdminIdleGuard'
+import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
+import AdminLoginPage from '@/pages/admin/AdminLoginPage'
 import ApprovePage from '@/pages/ApprovePage'
 import DashboardPage from '@/pages/DashboardPage'
 import LoginPage from '@/pages/LoginPage'
@@ -59,20 +61,33 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
 }
 
 /**
- * AdminPage membungkus halaman panel admin.
+ * AdminPage membungkus halaman panel admin dan menuntut sesi admin.
  *
- * Panel admin terpisah dari aplikasi pelanggan: pintunya beda cookie, dan
- * akun tanpa role admin ditolak backend meski lolos di sini.
+ * Panel admin memakai cookie sesi sendiri di server. Karena itu yang diperiksa
+ * di sini bukan sesi pelanggan: masuk sebagai pelanggan tidak membuka panel,
+ * dan admin yang belum masuk diarahkan ke pintu admin, bukan pintu pelanggan.
  */
 function AdminPage({ children }: { children: ReactNode }) {
-  const { user } = useAuthContext()
-  if (!user) return null
+  const { admin, isLoading } = useAdminAuth()
+
+  if (isLoading) return <FullPageLoading label="Memeriksa sesi admin…" />
+  if (!admin) return <Navigate to="/admin/login" replace />
+
   return (
     <>
       <AdminIdleGuard />
-      <AdminShell actorEmail={user.email}>{children}</AdminShell>
+      <AdminShell actorEmail={admin.email}>{children}</AdminShell>
     </>
   )
+}
+
+/** RedirectIfAdmin masuk: admin yang sudah bersesi tidak perlu melihat pintunya. */
+function RedirectIfAdmin({ children }: { children: ReactNode }) {
+  const { admin, isLoading } = useAdminAuth()
+
+  if (isLoading) return <FullPageLoading label="Memeriksa sesi admin…" />
+  if (admin) return <Navigate to="/admin" replace />
+  return <>{children}</>
 }
 
 /** Halaman dalam kerangka aplikasi; user dijamin tersedia oleh RequireAuth. */
@@ -223,6 +238,16 @@ export function AppRoutes() {
                 <ApprovePage />
               </ShellPage>
             </RequireAuth>
+          }
+        />
+
+        {/* Pintu admin: tanpa sesi admin. Tidak ada pendaftaran di sini. */}
+        <Route
+          path="/admin/login"
+          element={
+            <RedirectIfAdmin>
+              <AdminLoginPage />
+            </RedirectIfAdmin>
           }
         />
 

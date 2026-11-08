@@ -24,12 +24,45 @@ import type {
 
 /** Envelope daftar: data dan meta dikirim terpisah oleh backend. */
 
-
 /** Lampiran sesi admin memakai cookie sendiri, jadi path berbeda dari sesi user. */
 const ADMIN = '/admin'
 
+/** Identitas admin yang dikirim server pada login dan profil. */
+export type AdminIdentity = {
+  id: string
+  name: string
+  email: string
+  role: string
+}
+
+/** Hasil login admin: sesi terbit, atau perlu kode dua faktor. */
+export type AdminLoginResult = {
+  step?: 'complete' | 'two_factor_required'
+  challenge_id?: string
+  expires_in_seconds?: number
+  expires_at: string
+  user: AdminIdentity
+  role_code: string
+  permissions: string[]
+}
+
+/** Profil sesi admin beserta role RBAC-nya. */
+export type AdminProfile = {
+  user: AdminIdentity
+  role: { code: string; name: string; is_superadmin: boolean }
+  permissions: string[]
+}
+
 export const adminAuthApi = {
-  me: () => request<{ id: string; email: string; name: string; role: string }>(`${ADMIN}/auth/me`),
+  /**
+   * Masuk ke pintu admin. Server hanya menerima akun ber-role admin dan
+   * menerbitkan cookie sesi admin yang terpisah dari sesi pelanggan.
+   */
+  login: (payload: { identifier: string; password: string }) =>
+    request<AdminLoginResult>(`${ADMIN}/auth/login`, { method: 'POST', body: payload }),
+  verify2fa: (payload: { challenge_id: string; code: string }) =>
+    request<AdminLoginResult>(`${ADMIN}/auth/verify-2fa`, { method: 'POST', body: payload }),
+  me: () => request<AdminProfile>(`${ADMIN}/auth/me`),
   /** Memperpanjang cookie sesi; dipanggil hanya saat ada interaksi nyata. */
   heartbeat: () =>
     request<{ expires_at: string; idle_minutes: number }>(`${ADMIN}/auth/heartbeat`, {
