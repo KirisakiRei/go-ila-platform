@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { AdminShell } from '@/features/admin/components/AdminShell'
+import { AdminIdleGuard } from '@/features/admin/components/AdminIdleGuard'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import ApprovePage from '@/pages/ApprovePage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -24,11 +25,8 @@ import AdminRunnerPage from '@/pages/admin/AdminRunnerPage'
 import AdminMaintenancePage from '@/pages/admin/AdminMaintenancePage'
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
 import AdminSupportPage from '@/pages/admin/AdminSupportPage'
-import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import OnboardingPage from '@/pages/OnboardingPage'
-import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import SecuritySettingsPage from '@/pages/SecuritySettingsPage'
-import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
@@ -62,8 +60,13 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
  */
 function AdminPage({ children }: { children: ReactNode }) {
   const { user } = useAuthContext()
-  if (!user) return null
-  return <AdminShell actorEmail={user.email}>{children}</AdminShell>
+  	if (!user) return null
+  	return (
+  		<>
+  			<AdminIdleGuard />
+  			<AdminShell actorEmail={user.email}>{children}</AdminShell>
+  		</>
+  	)
 }
 
 /** Halaman dalam kerangka aplikasi; user dijamin tersedia oleh RequireAuth. */
@@ -98,11 +101,6 @@ export function AppRoutes() {
           </RedirectIfAuthenticated>
         }
       />
-
-      {/* Lupa sandi & verifikasi email: tanpa sesi. */}
-      <Route path="/lupa-sandi" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/verifikasi" element={<VerifyEmailPage />} />
 
       <Route
         path="/"

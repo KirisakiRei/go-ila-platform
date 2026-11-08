@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Input, Label } from '@/components/ui'
 import { ApiError } from '@/lib/api-error'
 import { LOGOUT_REASON_KEY } from '../AuthProvider'
-import { useSignIn } from '../hooks/use-auth'
+import { useSignIn, useVerifyTwoFactor } from '../hooks/use-auth'
 import { loginSchema, type LoginFormValues } from '../schemas'
 
 export function LoginForm() {
   const signIn = useSignIn()
+  const verify = useVerifyTwoFactor()
   const [formError, setFormError] = useState('')
   const [logoutNotice] = useState(readLogoutNotice)
+  // Tantangan 2FA dipegang di sini: selama belum diverifikasi, belum ada sesi.
+  const [challenge, setChallenge] = useState<{ id: string; code: string } | null>(null)
   const {
     register,
     handleSubmit,
@@ -23,9 +27,66 @@ export function LoginForm() {
   const onSubmit = handleSubmit((values) => {
     setFormError('')
     signIn.mutate(values, {
+      onSuccess: (result) => {
+        if (result.step === 'two_factor_required' && result.challenge_id) {
+          setChallenge({ id: result.challenge_id, code: '' })
+        }
+      },
       onError: (error) => setFormError(describeError(error)),
     })
   })
+
+  const onSubmitCode = (event: FormEvent) => {
+    event.preventDefault()
+    if (!challenge) return
+    setFormError('')
+    verify.mutate(
+      { challengeId: challenge.id, code: challenge.code },
+      { onError: (error) => setFormError(describeError(error)) },
+    )
+  }
+
+  if (challenge) {
+    return (
+      <form className="flex flex-col gap-4" onSubmit={onSubmitCode} noValidate>
+        <header className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold tracking-tight">Verifikasi dua langkah</h1>
+          <p className="text-[13px] text-muted-foreground">
+            Masukkan kode 6 digit dari aplikasi authenticator, atau salah satu kode pemulihan Anda.
+          </p>
+        </header>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="otp">Kode</Label>
+          <Input
+            id="otp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            maxLength={40}
+            value={challenge.code}
+            onChange={(event) => setChallenge({ ...challenge, code: event.target.value.trim() })}
+          />
+        </div>
+
+        {formError && <Alert>{formError}</Alert>}
+
+        <Button type="submit" className="w-full" isLoading={verify.isPending} disabled={!challenge.code}>
+          Verifikasi
+        </Button>
+        <button
+          type="button"
+          className="text-[12px] text-muted-foreground underline"
+          onClick={() => {
+            setChallenge(null)
+            setFormError('')
+          }}
+        >
+          Kembali ke halaman masuk
+        </button>
+      </form>
+    )
+  }
 
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
@@ -76,6 +137,10 @@ export function LoginForm() {
       <Button type="submit" className="w-full" isLoading={signIn.isPending}>
         Masuk
       </Button>
+
+      <Link to="/lupa-sandi" className="self-center text-[12px] text-muted-foreground underline">
+        Lupa kata sandi?
+      </Link>
     </form>
   )
 }

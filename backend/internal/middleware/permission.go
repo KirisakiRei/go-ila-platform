@@ -130,7 +130,6 @@ var adminPublicRoutes = map[string]struct{}{
 	http.MethodPost + " /api/v1/admin/auth/reset-2fa":  {},
 	http.MethodGet + " /api/v1/admin/auth/me":          {},
 	http.MethodGet + " /api/v1/admin/auth/csrf":        {},
-	http.MethodPost + " /api/v1/admin/auth/heartbeat":  {},
 }
 
 // RegisterAdminRoute mencatat pasangan metode+path dengan permission-nya.

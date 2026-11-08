@@ -34,6 +34,8 @@ type fakeStore struct {
 	accounts    map[string]*model.BrokerAccount
 	subs        []model.Subscription
 	events      []model.SignalEvent
+	// staleClaims menandai klaim yang dianggap tertinggal pada pengujian.
+	staleClaims map[string]struct{}
 }
 
 func newFakeStore() *fakeStore {
@@ -198,6 +200,27 @@ func (s *fakeStore) ClaimExecution(_ context.Context, record *model.ExecutionRec
 
 func (s *fakeStore) CompleteExecution(_ context.Context, _ string, _ string) error { return nil }
 func (s *fakeStore) FailExecution(_ context.Context, _ string, _ string) error     { return nil }
+
+// reclaims mencatat kunci klaim yang berhasil diambil alih pada pengujian.
+func (s *fakeStore) ReclaimStaleExecution(_ context.Context, key string, _ time.Time) (bool, error) {
+	if s.staleClaims == nil {
+		return false, nil
+	}
+	if _, ok := s.staleClaims[key]; !ok {
+		return false, nil
+	}
+	delete(s.staleClaims, key)
+	delete(s.executions, key)
+	return true, nil
+}
+
+func (s *fakeStore) ListStaleExecutions(_ context.Context, _ time.Time) ([]model.ExecutionRecord, error) {
+	out := make([]model.ExecutionRecord, 0, len(s.staleClaims))
+	for key := range s.staleClaims {
+		out = append(out, model.ExecutionRecord{IdempotencyKey: key, Status: "CLAIMED"})
+	}
+	return out, nil
+}
 
 func (s *fakeStore) FindExecution(_ context.Context, _ string) (*model.ExecutionRecord, error) {
 	return nil, apperror.ErrNotFound
@@ -978,5 +1001,51 @@ func TestComputeRequirementsBlocksIla3ForBasic(t *testing.T) {
 
 	if _, ok := reqs["ila-3.0"]; ok {
 		t.Fatal("basic tidak boleh memicu ILA 3.0")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Klaim eksekusi
+// ---------------------------------------------------------------------------
+
+// TestKlaimTertinggalDiambilAlih menjaga sinyal tidak hilang diam-diam ketika
+// proses berhenti setelah klaim tetapi sebelum order terkirim.
+func TestKlaimTertinggalDiambilAlih(t *testing.T) {
+	store := newFakeStore()
+	pub := &fakePublisher{}
+	addUser(store, "u1", "plus", "auto", true)
+
+	signal := readySignal("XAUUSD", time.Hour)
+	key := runner.IdempotencyKey(signal.SignalId, "acct-u1")
+
+	// Klaim lama tertinggal; tanpa masa tenggang, sinyal ini akan dilewati.
+	store.staleClaims = map[string]struct{}{key: {}}
+
+	svc := newService(store, pub)
+	svc.HandleSignal(context.Background(), signal)
+
+	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
+	if len(positions) != 1 {
+		t.Fatalf("posisi terbuka = %d, ingin 1 setelah klaim diambil alih", len(positions))
+	}
+}
+
+// TestKlaimBaruTidakDiambilAlih memastikan eksekusi ganda tetap dicegah.
+func TestKlaimBaruTidakDiambilAlih(t *testing.T) {
+	store := newFakeStore()
+	pub := &fakePublisher{}
+	addUser(store, "u1", "plus", "auto", true)
+
+	signal := readySignal("XAUUSD", time.Hour)
+	svc := newService(store, pub)
+	svc.HandleSignal(context.Background(), signal)
+
+	// Kiriman ulang sinyal yang sama tidak boleh membuka posisi kedua.
+	store.staleClaims = nil
+	svc.HandleSignal(context.Background(), signal)
+
+	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
+	if len(positions) != 1 {
+		t.Fatalf("posisi terbuka = %d, ingin 1 karena kunci idempotensi", len(positions))
 	}
 }

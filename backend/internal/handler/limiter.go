@@ -10,3 +10,10 @@ type LoginLimiter interface {
 	Reset(key string)
 	RetryAfter(key string) time.Duration
 }
+
+// RegisterLimiter membatasi pendaftaran per IP dan per alamat surel.
+// Dideklarasikan di sisi pemakai agar handler tidak terikat implementasi.
+type RegisterLimiter interface {
+	Allow(ip, email string) (bool, int)
+	Record(ip, email string)
+}

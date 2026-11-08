@@ -61,9 +61,18 @@ export type RegisterPayload = {
 }
 
 export type LoginResult = {
+  /** "complete" berarti sesi sudah terbit; "two_factor_required" belum. */
+  step?: 'complete' | 'two_factor_required'
+  /** Diisi hanya saat langkah 2FA diperlukan. */
+  challenge_id?: string
+  expires_in_seconds?: number
+  session_id?: string
   expires_at: string
   user: User
 }
+
+/** Hasil verifikasi 2FA: sama seperti login yang tuntas. */
+export type VerifyTwoFactorResult = LoginResult & { step: 'complete' }
 
 export type BrokerType = 'matchtrader'
 export type AccountMode = 'manual' | 'auto'

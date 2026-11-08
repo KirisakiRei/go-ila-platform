@@ -1,8 +1,11 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import { FullPageLoading } from '@/app/FullPageLoading'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import LegalPage from '@/pages/LegalPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AboutPage from '@/pages/public/AboutPage'
 import FeaturesPage from '@/pages/public/FeaturesPage'
 import HelpCenterPage from '@/pages/public/HelpCenterPage'
@@ -22,6 +25,14 @@ const queryClient = new QueryClient({
     mutations: { retry: 0 },
   },
 })
+
+/** RedirectTo memindahkan rute akar ke entri panel tanpa menambah bundel. */
+function RedirectTo({ to }: { to: string }) {
+  useEffect(() => {
+    window.location.replace(to)
+  }, [to])
+  return <FullPageLoading label="Mengalihkan…" />
+}
 
 function NotFound() {
   return (
@@ -47,6 +58,17 @@ function PublicRoutes() {
         <Route path="bantuan/:topik" element={<HelpCenterPage />} />
         <Route path="legal" element={<LegalPage />} />
         <Route path="legal/:slug" element={<LegalPage />} />
+
+        {/* Alur akun tanpa sesi: tautan dari surel menunjuk ke akar situs,
+            bukan ke /app, sehingga rutenya harus ada di entri ini. */}
+        <Route path="lupa-sandi" element={<ForgotPasswordPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
+        <Route path="verifikasi" element={<VerifyEmailPage />} />
+
+        {/* Masuk dan daftar dilayani entri panel di /app/*; tautan akar
+            diarahkan ke sana agar alamat yang dibagikan tetap satu bentuk. */}
+        <Route path="login" element={<RedirectTo to="/app/login" />} />
+        <Route path="register" element={<RedirectTo to="/app/register" />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

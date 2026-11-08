@@ -30,6 +30,32 @@ type TwoFactorStatus = {
 type TwoFactorSetup = {
   secret: string
   otpauth_url: string
+  expires_at: string
+}
+
+/**
+ * Penyiapan 2FA disimpan di sessionStorage agar tahan refresh namun hilang saat
+ * tab ditutup. Tanpa ini, pengguna yang menekan refresh harus memindai ulang
+ * QR dan secret lama tetap menunggu di server sampai kedaluwarsa.
+ */
+const TWO_FACTOR_SETUP_KEY = 'ila_2fa_setup'
+
+function readStoredSetup(): TwoFactorSetup | null {
+  const raw = sessionStorage.getItem(TWO_FACTOR_SETUP_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as TwoFactorSetup
+    if (!parsed.secret || !parsed.expires_at) return null
+    if (new Date(parsed.expires_at).getTime() <= Date.now()) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function storeSetup(value: TwoFactorSetup | null) {
+  if (value) sessionStorage.setItem(TWO_FACTOR_SETUP_KEY, JSON.stringify(value))
+  else sessionStorage.removeItem(TWO_FACTOR_SETUP_KEY)
 }
 
 const twoFactorApi = {
@@ -181,7 +207,7 @@ function PasswordCard() {
 
 function TwoFactorCard() {
   const queryClient = useQueryClient()
-  const [setup, setSetup] = useState<TwoFactorSetup | null>(null)
+  const [setup, setSetup] = useState<TwoFactorSetup | null>(() => readStoredSetup())
   const [code, setCode] = useState('')
   const [codes, setCodes] = useState<string[] | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -190,7 +216,11 @@ function TwoFactorCard() {
 
   const begin = useMutation({
     mutationFn: () => twoFactorApi.setup(),
-    onSuccess: (data) => setSetup(data),
+    onSuccess: (data) => {
+      storeSetup(data)
+      setSetup(data)
+      setNotice(null)
+    },
     onError: (error) => setNotice(error instanceof Error ? error.message : 'Gagal memulai 2FA.'),
   })
 
@@ -198,6 +228,7 @@ function TwoFactorCard() {
     mutationFn: () => twoFactorApi.activate(code),
     onSuccess: (data) => {
       setCodes(data.recovery_codes)
+      storeSetup(null)
       setSetup(null)
       setCode('')
       void queryClient.invalidateQueries({ queryKey: ['2fa'] })
@@ -214,6 +245,12 @@ function TwoFactorCard() {
     },
     onError: (error) => setNotice(error instanceof Error ? error.message : 'Kode tidak sah.'),
   })
+
+  const cancelSetup = () => {
+    storeSetup(null)
+    setSetup(null)
+    setCode('')
+  }
 
   const enabled = status.data?.enabled ?? false
 
@@ -268,6 +305,9 @@ function TwoFactorCard() {
               />
               <Button size="sm" disabled={code.length !== 6 || activate.isPending} onClick={() => activate.mutate()}>
                 Aktifkan
+              </Button>
+              <Button size="sm" variant="ghost" onClick={cancelSetup}>
+                Batal
               </Button>
             </div>
           </div>

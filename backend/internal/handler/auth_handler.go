@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,22 +20,26 @@ import (
 type AuthHandler struct {
 	authService service.AuthService
 	limiter     LoginLimiter
-	cookies     session.Config
-	jwtExpiry   time.Duration
+	// registerLimiter opsional; nil berarti hanya batas per IP middleware.
+	registerLimiter RegisterLimiter
+	cookies         session.Config
+	jwtExpiry       time.Duration
 }
 
 // NewAuthHandler merangkai handler autentikasi.
 func NewAuthHandler(
 	authService service.AuthService,
 	limiter LoginLimiter,
+	registerLimiter RegisterLimiter,
 	cookies session.Config,
 	jwtExpiry time.Duration,
 ) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		limiter:     limiter,
-		cookies:     cookies,
-		jwtExpiry:   jwtExpiry,
+		authService:     authService,
+		limiter:         limiter,
+		registerLimiter: registerLimiter,
+		cookies:         cookies,
+		jwtExpiry:       jwtExpiry,
 	}
 }
 
@@ -44,12 +51,27 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Pendaftaran massal dari satu jaringan membebani database dan mengotori
+	// data trial. Batasnya diperiksa sebelum akun dibuat.
+	if h.registerLimiter != nil {
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		if ok, retry := h.registerLimiter.Allow(c.ClientIP(), email); !ok {
+			c.Header("Retry-After", strconv.Itoa(retry))
+			c.Error(errors.Join(apperror.ErrTooManyRequests,
+				errors.New("Terlalu banyak pendaftaran dari jaringan ini. Coba lagi nanti.")))
+			return
+		}
+	}
+
 	result, err := h.authService.Register(c.Request.Context(), req)
 	if err != nil {
 		c.Error(err)
 		return
 	}
 
+	if h.registerLimiter != nil {
+		h.registerLimiter.Record(c.ClientIP(), strings.ToLower(strings.TrimSpace(req.Email)))
+	}
 	httpx.Created(c, "Akun berhasil dibuat", result)
 }
 

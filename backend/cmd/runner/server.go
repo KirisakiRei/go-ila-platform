@@ -32,6 +32,7 @@ func newInternalServer(svc *runner.Service, secret string, logger *slog.Logger) 
 	mux.HandleFunc("/internal/approve", handler.authenticate(handler.approve))
 	mux.HandleFunc("/internal/skip", handler.authenticate(handler.skip))
 	mux.HandleFunc("/internal/account/revoke", handler.authenticate(handler.revokeAccount))
+	mux.HandleFunc("/internal/account/reload", handler.authenticate(handler.reloadAccount))
 
 	return &http.Server{
 		Addr:              ":" + envOr("RUNNER_HTTP_PORT", "8081"),
@@ -119,6 +120,18 @@ type revokePayload struct {
 
 // revokeAccount memutus sesi broker setelah kredensialnya dihapus.
 func (s *internalServer) revokeAccount(w http.ResponseWriter, r *http.Request) {
+	var payload revokePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.AccountID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload tidak sah"})
+		return
+	}
+
+	s.svc.DropClient(payload.AccountID)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// reloadAccount memaksa sesi broker dibuka ulang setelah kredensial berganti.
+func (s *internalServer) reloadAccount(w http.ResponseWriter, r *http.Request) {
 	var payload revokePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.AccountID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload tidak sah"})

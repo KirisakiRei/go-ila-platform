@@ -11,6 +11,14 @@ export const authApi = {
     return request<LoginResult>('/auth/login', { method: 'POST', body: payload })
   },
 
+  /** Menuntaskan masuk setelah kode 2FA diverifikasi. */
+  verifyTwoFactor(challengeId: string, code: string) {
+    return request<LoginResult>('/auth/verify-2fa', {
+      method: 'POST',
+      body: { challenge_id: challengeId, code },
+    })
+  },
+
   register(payload: RegisterPayload) {
     return request<LoginResult>('/auth/register', { method: 'POST', body: payload })
   },

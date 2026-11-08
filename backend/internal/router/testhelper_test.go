@@ -34,6 +34,7 @@ func testConfig(t *testing.T) *config.Config {
 		JWTSecret:         "rahasia-panjang-untuk-uji-1234567890",
 		JWTExpiry:         time.Hour,
 		AdminJWTExpiry:    2 * time.Hour,
+		AdminIdleTimeout:  10 * time.Minute,
 		AllowedOrigins:    []string{"http://localhost:3000"},
 		ShutdownTimeout:   time.Second,
 		LogLevel:          "error",

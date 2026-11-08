@@ -206,6 +206,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	authHandler := handler.NewAuthHandler(
 		authService,
 		middleware.NewLoginLimiter(),
+		middleware.NewRegisterLimiter(),
 		cookies,
 		cfg.JWTExpiry,
 	)
@@ -222,6 +223,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		adminCookies,
 		cfg.AdminCSRFCookieName,
 		cfg.AdminJWTExpiry,
+		cfg.AdminIdleTimeout,
 	)
 	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
@@ -457,6 +459,11 @@ func registerAdmin(
 	// Ditandai "-" karena hanya butuh sesi admin, bukan permission tertentu.
 	middleware.RegisterAdminRoute(http.MethodGet, adminPrefix+"/auth/me", "-")
 	admin.GET("/auth/me", authHandler.Profile)
+
+	// Heartbeat memperpanjang cookie selama sesi masih sah. Dipanggil panel
+	// admin berkala saat pengguna benar-benar berinteraksi (plans/23 §3).
+	middleware.RegisterAdminRoute(http.MethodPost, adminPrefix+"/auth/heartbeat", "-")
+	admin.POST("/auth/heartbeat", authHandler.Heartbeat)
 
 	// guard mencatat izin sebuah route lalu mengembalikan penjaganya. Path
 	// lengkap dibentuk dari awalan grup agar deklarasi tidak bisa meleset.

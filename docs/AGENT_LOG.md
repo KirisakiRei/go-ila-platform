@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `dc59d6e`
+> **Commit terakhir saat log ini ditulis:** `3fb6b0b`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,53 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-13 (lanjutan 2) — Enam celah keamanan & konsistensi ditutup
+
+**Pelaku:** Claude
+**Tipe:** `SELESAI`
+**Status:** Semua butir selesai dan teruji. Sisa dua butir butuh VPS 2.
+
+**Yang diperbaiki**
+
+| Celah | Bug | Perbaikan |
+|---|---|---|
+| Rotasi kredensial broker | Token Match-Trader tidak bisa diganti dari dashboard. Akun yang tokennya kedaluwarsa mati permanen sampai Runner di-restart. | `PATCH /accounts/:id` menerima `token` + `base_url` opsional. Token baru dienkripsi lalu sesi lama diputus lewat `/internal/account/reload` sehingga login berikutnya memakai token terbaru. |
+| Sesi admin kedaluwarsa di tengah kerja | Tidak ada perpanjangan sesi. Admin yang bekerja >2 jam terlempar keluar. | `POST /api/v1/admin/auth/heartbeat` memperpanjang cookie **hanya** bila `AdminScope` sudah meloloskan token. Panel admin: diam 10 menit → modal 60 detik → keluar. Batas diatur `ADMIN_IDLE_TIMEOUT`. |
+| Penyiapan 2FA hilang saat refresh | Secret TOTP disimpan di state React. Refresh = harus scan ulang. | Disimpan di `sessionStorage` (bukan localStorage) dengan cek `expires_at`; tombol **Batal** untuk membuang penyiapan. |
+| Filter admin tidak lengkap | Halaman pengguna hanya punya status, tier, dan akun broker. Ekspor CSV mengabaikan filter. | Tambah filter trial, peran, dan rentang tanggal. Ekspor mengikuti filter aktif. |
+| Batas akun hard-code | `limit > 2` di Runner adalah angka ajaib. | Diganti konstanta `maxAccountsPerUser`. |
+| Kolom `RunnerDirtyAt` tanpa pengisi | Sempat dianggap tidak terpakai. | Sudah diisi di 4 jalur (ubah tier admin, aktivasi invoice, penurunan kedaluwarsa, anonimisasi). Runner memang membaca ulang user per sinyal, jadi kolom ini dipakai untuk **telusur waktu perubahan**, bukan pemicu muat ulang. |
+
+**Catatan penting untuk Hermes**
+
+- **Kredensial kini bisa diperbarui.** Sebelumnya satu-satunya jalan adalah hapus akun lalu buat lagi.
+- **Runner punya endpoint baru `/internal/account/reload`** (selain `/internal/account/revoke`).
+  Keduanya wajib membawa `X-Internal-Secret` dan hanya terbuka di jaringan container.
+- **Aturan diam admin terpisah** dari peringatan diam pelanggan. Admin lebih ketat
+  karena panelnya bisa mengubah tier dan memblokir akun.
+
+**Belum bisa dikerjakan dari sini**
+
+- Uji pemulihan backup (`scripts/restore.sh`) dan migrasi PostgreSQL nyata:
+  keduanya butuh VPS 2 yang berjalan.
+
+**Verifikasi**
+
+`gofmt` bersih, `go vet` bersih, **20 paket tes backend lulus** (termasuk 2 tes rotasi
+kredensial dan tes heartbeat tanpa sesi). Frontend: `tsc` bersih, `eslint --max-warnings 0`
+bersih, 34 tes vitest lulus, build dua entri sukses.
+
+**File terdampak (utama)**
+
+`backend/internal/{service/account_service,handler/admin_auth_handler,runnerclient/client,runner/service,model/user,config/config}.go`,
+`backend/cmd/runner/server.go`, `backend/internal/router/{router,router_test,audit_route_test}.go`,
+`backend/internal/service/account_rotate_test.go`,
+`frontend/src/{lib/admin-api,app/AppRoutes,pages/SecuritySettingsPage,pages/admin/AdminUsersPage}.tsx`,
+`frontend/src/features/admin/{hooks/use-admin-idle-timer,components/AdminIdleGuard}.ts*`,
+`.env.example`
+
+---
 
 ### 2026-11-13 (lanjutan) — Sisa pekerjaan Fase I/J/K/P diselesaikan
 

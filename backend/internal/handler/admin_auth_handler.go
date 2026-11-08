@@ -20,6 +20,8 @@ type AdminAuthHandler struct {
 	cookies  session.Config
 	csrfName string
 	expiry   time.Duration
+	// idle adalah batas diam sebelum panel menampilkan peringatan.
+	idle time.Duration
 }
 
 // NewAdminAuthHandler merangkai handler autentikasi admin.
@@ -29,15 +31,23 @@ func NewAdminAuthHandler(
 	cookies session.Config,
 	csrfName string,
 	expiry time.Duration,
+	idle time.Duration,
 ) *AdminAuthHandler {
+	if idle <= 0 {
+		idle = defaultAdminIdle
+	}
 	return &AdminAuthHandler{
 		auth:     auth,
 		limiter:  limiter,
 		cookies:  cookies,
 		csrfName: csrfName,
 		expiry:   expiry,
+		idle:     idle,
 	}
 }
+
+// defaultAdminIdle dipakai bila konfigurasi tidak menyebut batas diam.
+const defaultAdminIdle = 10 * time.Minute
 
 // Login menangani POST /api/v1/admin/auth/login.
 //
@@ -116,6 +126,27 @@ func (h *AdminAuthHandler) VerifyTwoFactor(c *gin.Context) {
 
 	result.Token = ""
 	httpx.OK(c, "Berhasil masuk", result)
+}
+
+// Heartbeat menandai sesi admin masih dipakai.
+//
+// Cookie sesi diperpanjang selama sesi lama masih sah; tanpa heartbeat
+// panel admin akan terlempar keluar di tengah pekerjaan panjang. Token yang
+// sudah tidak sah tidak pernah diperpanjang karena middleware AdminScope
+// menolaknya lebih dulu.
+func (h *AdminAuthHandler) Heartbeat(c *gin.Context) {
+	raw := session.CookieValue(c, h.cookies.SessionName)
+	if raw == "" {
+		c.Error(apperror.ErrUnauthorized)
+		return
+	}
+
+	expiresAt := time.Now().UTC().Add(h.expiry)
+	h.cookies.SetSession(c, raw, expiresAt)
+	httpx.OK(c, "Sesi diperpanjang", gin.H{
+		"expires_at":   expiresAt.Format(time.RFC3339),
+		"idle_minutes": h.idle.Minutes(),
+	})
 }
 
 // Logout menangani POST /api/v1/admin/auth/logout.

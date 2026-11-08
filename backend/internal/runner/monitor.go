@@ -32,6 +32,24 @@ func (s *Service) SetClock(clock func() time.Time) {
 	}
 }
 
+// reportStaleClaims mencatat klaim eksekusi yang tertinggal karena proses
+// berhenti sebelum order terkirim. Klaim ini sengaja TIDAK diubah di sini:
+// mengambil alih dilakukan saat sinyal yang sama datang lagi, agar tidak ada
+// order ganda bila ternyata order lama ternyata berhasil.
+func (s *Service) reportStaleClaims(ctx context.Context) {
+	rows, err := s.store.ListStaleExecutions(ctx, s.opts.Clock().Add(-ClaimStaleAfter))
+	if err != nil {
+		s.logger.Error("rekonsiliasi: gagal membaca klaim tertinggal", "error", err.Error())
+		return
+	}
+	for _, row := range rows {
+		s.logger.Warn("klaim eksekusi tertinggal",
+			"signal_id", row.SignalID,
+			"account_id", row.BrokerAccountID,
+			"claimed_at", row.CreatedAt.Format(time.RFC3339))
+	}
+}
+
 // closeReasonFromStatus menerjemahkan status akhir posisi ke alasan broker.
 func closeReasonFromStatus(status string) broker.CloseReason {
 	switch status {
@@ -201,6 +219,8 @@ func (s *Service) applyClose(ctx context.Context, pos *model.Position, closed br
 // menyentuh posisi nyata tanpa keputusan manusia lebih berbahaya daripada
 // mencatat selisih dan memberi tahu (plans/16 §8.1).
 func (s *Service) Reconcile(ctx context.Context) {
+	s.reportStaleClaims(ctx)
+
 	positions, err := s.store.ListOpenPositions(ctx)
 	if err != nil {
 		s.logger.Error("rekonsiliasi: gagal membaca posisi", "error", err.Error())

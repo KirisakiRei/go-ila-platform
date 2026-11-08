@@ -103,8 +103,14 @@ func (s *billingService) Checkout(ctx context.Context, userID string, req dto.Ch
 	}
 
 	now := s.now()
+	// Periode dihitung sekali di sini dan dipakai lagi saat pembayaran tuntas,
+	// sehingga angka yang tertera di invoice sama dengan hak yang diberikan.
+	// Perpanjangan menyambung periode berjalan, bukan menimpanya.
 	periodStart := now
-	periodEnd := now.AddDate(0, 1, 0)
+	if sub, subErr := s.store.ActiveSubscription(ctx, userID); subErr == nil && sub != nil && sub.CurrentPeriodEnd.After(now) {
+		periodStart = sub.CurrentPeriodEnd
+	}
+	periodEnd := periodStart.AddDate(0, 1, 0)
 	expiresAt := now.Add(24 * time.Hour)
 
 	number, err := s.store.NextInvoiceNumber(ctx, now)
@@ -235,12 +241,17 @@ func (s *billingService) activate(ctx context.Context, invoice *model.Invoice, n
 		return nil
 	}
 
-	// Perpanjangan menyambung periode berjalan, bukan menimpanya.
-	start := now
-	if sub, err := s.store.ActiveSubscription(ctx, invoice.UserID); err == nil && sub != nil && sub.CurrentPeriodEnd.After(now) {
-		start = sub.CurrentPeriodEnd
+	// Periode sudah dibekukan saat invoice terbit. Menghitung ulang di sini
+	// akan membuat hak berbeda dari yang tertulis di invoice, terutama bila
+	// pembayaran datang beberapa jam kemudian.
+	start := invoice.PeriodStart
+	if start.IsZero() {
+		start = now
 	}
-	end := start.AddDate(0, 1, 0)
+	end := invoice.PeriodEnd
+	if !end.After(start) {
+		end = start.AddDate(0, 1, 0)
+	}
 
 	invoice.Status = model.InvoicePaid
 	invoice.PaidAt = &now

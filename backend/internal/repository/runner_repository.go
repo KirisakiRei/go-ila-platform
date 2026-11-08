@@ -42,6 +42,10 @@ type RunnerRepository interface {
 	CompleteExecution(ctx context.Context, key string, positionID string) error
 	FailExecution(ctx context.Context, key, reason string) error
 	FindExecution(ctx context.Context, key string) (*model.ExecutionRecord, error)
+	// ReclaimStaleExecution mengambil alih klaim yang tertinggal karena proses
+	// berhenti sebelum order terkirim. Nilai false berarti klaim sudah selesai.
+	ReclaimStaleExecution(ctx context.Context, key string, staleBefore time.Time) (bool, error)
+	ListStaleExecutions(ctx context.Context, staleBefore time.Time) ([]model.ExecutionRecord, error)
 
 	// Kuota harian.
 	GetDailySummary(ctx context.Context, userID, day string) (*model.DailySummary, error)
@@ -304,6 +308,37 @@ func (r *runnerRepository) FailExecution(ctx context.Context, key, reason string
 		return fmt.Errorf("menandai eksekusi gagal: %w", res.Error)
 	}
 	return nil
+}
+
+// ReclaimStaleExecution memindahkan klaim lama menjadi FAILED agar sinyal yang
+// sama bisa diproses ulang. Hanya baris yang masih CLAIMED dan sudah basi yang
+// diambil, sehingga eksekusi yang sedang berjalan tidak tersentuh.
+func (r *runnerRepository) ReclaimStaleExecution(ctx context.Context, key string, staleBefore time.Time) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.ExecutionRecord{}).
+		Where("idempotency_key = ? AND status = ? AND created_at < ?", key, "CLAIMED", staleBefore).
+		Updates(map[string]any{
+			"status":         "FAILED",
+			"failure_reason": "klaim kedaluwarsa: proses berhenti sebelum order terkirim",
+		})
+	if res.Error != nil {
+		return false, fmt.Errorf("mengambil alih klaim eksekusi: %w", res.Error)
+	}
+	return res.RowsAffected == 1, nil
+}
+
+// ListStaleExecutions membaca seluruh klaim yang tertinggal, untuk dilaporkan
+// ke admin saat rekonsiliasi.
+func (r *runnerRepository) ListStaleExecutions(ctx context.Context, staleBefore time.Time) ([]model.ExecutionRecord, error) {
+	var rows []model.ExecutionRecord
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND created_at < ?", "CLAIMED", staleBefore).
+		Order("created_at ASC").
+		Limit(200).
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca klaim tertinggal: %w", err)
+	}
+	return rows, nil
 }
 
 func (r *runnerRepository) FindExecution(ctx context.Context, key string) (*model.ExecutionRecord, error) {

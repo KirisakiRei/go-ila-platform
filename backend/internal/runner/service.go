@@ -49,6 +49,15 @@ type Store interface {
 	repository.RunnerRepository
 }
 
+// ClaimStaleAfter adalah umur klaim yang dianggap tertinggal. Lima menit jauh
+// lebih lama daripada waktu yang dibutuhkan untuk mengirim satu order, sehingga
+// eksekusi yang masih berjalan tidak pernah diambil alih.
+const ClaimStaleAfter = 5 * time.Minute
+
+// maxAccountsPerUser membatasi akun yang boleh menerima order dari satu sinyal.
+// Satu sinyal melahirkan satu order; akun pertama yang lolos evaluasi dipakai.
+const maxAccountsPerUser = 2
+
 // Options mengatur perilaku Runner.
 type Options struct {
 	// Policy adalah pagar aturan harian default.
@@ -359,8 +368,8 @@ func (s *Service) executableAccounts(ctx context.Context, user *model.User, tier
 	}
 
 	limit := MaxAccounts(tier)
-	if limit > 2 {
-		limit = 2
+	if limit > maxAccountsPerUser {
+		limit = maxAccountsPerUser
 	}
 
 	out := make([]model.BrokerAccount, 0, limit)
@@ -492,10 +501,25 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 		return err
 	}
 	if !claimed {
-		// Kunci sudah ada: sinyal ini pernah diproses untuk akun ini.
-		s.logger.Warn("eksekusi ganda dicegah",
-			"signal_id", signal.SignalID, "account_id", account.ID)
-		return s.reject(ctx, user.ID, signal.SignalID, RejectDuplicate)
+		// Kunci sudah ada. Bila klaim itu tertinggal karena proses berhenti
+		// sebelum order terkirim, ambil alih agar sinyal tidak hilang diam-diam.
+		retaken, err := s.store.ReclaimStaleExecution(ctx, key, s.opts.Clock().Add(-ClaimStaleAfter))
+		if err == nil && retaken {
+			s.logger.Warn("klaim eksekusi kedaluwarsa diambil alih",
+				"signal_id", signal.SignalID, "account_id", account.ID)
+			record.ID = ""
+			if claimed, err = s.store.ClaimExecution(ctx, record); err != nil {
+				return err
+			}
+			if !claimed {
+				return s.reject(ctx, user.ID, signal.SignalID, RejectDuplicate)
+			}
+		} else {
+			// Sinyal ini pernah diproses untuk akun ini.
+			s.logger.Warn("eksekusi ganda dicegah",
+				"signal_id", signal.SignalID, "account_id", account.ID)
+			return s.reject(ctx, user.ID, signal.SignalID, RejectDuplicate)
+		}
 	}
 
 	dryRun := s.mustDryRun(ctx, &userSession{User: user}, account)

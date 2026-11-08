@@ -43,6 +43,7 @@ func TestRouteRbacTerpasang(t *testing.T) {
 		"DELETE /api/v1/admin/roles/:id":     false,
 		"PATCH /api/v1/admin/users/:id/role": false,
 		"GET /api/v1/admin/auth/me":          false,
+		"POST /api/v1/admin/auth/heartbeat":  false,
 		"POST /api/v1/admin/auth/login":      false,
 		// Fase C: dokumen legal & 2FA.
 		"GET /api/v1/admin/legal":               false,
@@ -80,6 +81,12 @@ func TestEndpointAdminButuhSesi(t *testing.T) {
 		if w.Code != http.StatusUnauthorized {
 			t.Errorf("%s = %d; ingin 401", path, w.Code)
 		}
+	}
+
+	// Heartbeat tanpa sesi juga harus ditolak: ia memperpanjang cookie sesi.
+	w := performRequest(r, http.MethodPost, "/api/v1/admin/auth/heartbeat")
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("heartbeat = %d; ingin 401", w.Code)
 	}
 }
 

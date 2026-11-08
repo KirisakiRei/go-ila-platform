@@ -55,6 +55,9 @@ type Config struct {
 	AdminCSRFCookieName string
 	// AdminJWTExpiry lebih pendek dari sesi user karena kewenangannya lebih besar.
 	AdminJWTExpiry time.Duration
+	// AdminIdleTimeout adalah batas diam yang memicu modal "masih di sini?"
+	// di panel admin (plans/23 §2).
+	AdminIdleTimeout time.Duration
 	// CookieSecure wajib true di produksi (HTTPS). Boleh false saat pengembangan lokal.
 	CookieSecure bool
 	// CookieDomain kosong berarti host-only cookie.
@@ -143,6 +146,7 @@ func Load(service string) (*Config, error) {
 		AdminCookieName:       env("ADMIN_COOKIE_NAME", "ila_admin_session"),
 		AdminCSRFCookieName:   env("ADMIN_CSRF_COOKIE_NAME", "ila_admin_csrf"),
 		AdminJWTExpiry:        envDuration("ADMIN_JWT_EXPIRY", 2*time.Hour),
+		AdminIdleTimeout:      envDuration("ADMIN_IDLE_TIMEOUT", 10*time.Minute),
 		CookieSecure:          envBool("COOKIE_SECURE", false),
 		CookieDomain:          env("COOKIE_DOMAIN", ""),
 		EngineGRPCAddr:        env("ENGINE_GRPC_ADDR", ""),

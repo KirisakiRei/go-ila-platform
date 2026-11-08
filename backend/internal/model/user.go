@@ -50,7 +50,9 @@ type User struct {
 	// tetap ada karena invoice wajib disimpan untuk keperluan pajak.
 	DeletedAtUser *time.Time `json:"deleted_at_user"`
 
-	// RunnerDirtyAt memberi tahu Runner bahwa konfigurasi akun berubah.
+	// RunnerDirtyAt dicatat setiap tier, status, atau kredensial berubah.
+	// Runner membaca ulang user di setiap sinyal, tetapi kolom ini tetap
+	// berguna untuk menelusuri kapan konfigurasi terakhir kali berubah.
 	RunnerDirtyAt *time.Time `gorm:"index" json:"-"`
 
 	// SessionVersion dinaikkan saat sesi harus dicabut seketika: ganti password,

@@ -27,6 +27,13 @@ const ADMIN = '/admin'
 
 export const adminAuthApi = {
   me: () => request<{ id: string; email: string; name: string; role: string }>(`${ADMIN}/auth/me`),
+  /** Memperpanjang cookie sesi; dipanggil hanya saat ada interaksi nyata. */
+  heartbeat: () =>
+    request<{ expires_at: string; idle_minutes: number }>(`${ADMIN}/auth/heartbeat`, {
+      method: 'POST',
+      body: {},
+    }),
+  logout: () => request<void>(`${ADMIN}/auth/logout`, { method: 'POST', body: {} }),
 }
 
 export const adminUserApi = {

@@ -120,3 +120,12 @@ type revokeRequest struct {
 func (c *Client) RevokeAccount(ctx context.Context, accountID string) error {
 	return c.post(ctx, "/internal/account/revoke", revokeRequest{AccountID: accountID}, nil)
 }
+
+// ReloadAccount memaksa Runner membuka ulang sesi broker.
+//
+// Dipakai setelah kredensial diganti di dashboard: tanpa ini Runner tetap
+// memakai sesi lama yang tokennya sudah tidak berlaku, sehingga akun sehat
+// terlihat mati sampai Runner restart (plans/12 §3.4).
+func (c *Client) ReloadAccount(ctx context.Context, accountID string) error {
+	return c.post(ctx, "/internal/account/reload", revokeRequest{AccountID: accountID}, nil)
+}

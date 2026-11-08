@@ -14,6 +14,8 @@ var mutasiTanpaAudit = map[string]bool{
 	"POST /api/v1/admin/auth/login":      true,
 	"POST /api/v1/admin/auth/verify-2fa": true,
 	"POST /api/v1/admin/auth/logout":     true,
+	// Heartbeat hanya memperpanjang sesi sendiri, tidak mengubah data.
+	"POST /api/v1/admin/auth/heartbeat": true,
 }
 
 // Aksi audit yang diharapkan muncul untuk setiap pasangan metode+path.

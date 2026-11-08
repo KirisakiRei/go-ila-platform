@@ -264,8 +264,36 @@ func (s *accountService) Update(ctx context.Context, userID, accountID string, r
 		account.IsDryRun = *req.IsDryRun
 	}
 
+	// Rotasi kredensial: token baru ditulis lalu sesi lama di Runner diputus,
+	// sehingga login berikutnya memakai token terbaru (plans/12 §3.4).
+	credentialRotated := false
+	if req.Token != nil && strings.TrimSpace(*req.Token) != "" {
+		rotate := dto.CreateAccountRequest{
+			BrokerType: account.BrokerType,
+			Token:      *req.Token,
+		}
+		if req.BaseURL != nil {
+			rotate.BaseURL = *req.BaseURL
+		}
+		if err := validateCredential(account.BrokerType, rotate); err != nil {
+			return nil, err
+		}
+		if err := s.storeCredential(ctx, userID, account.ID, account.BrokerType, rotate); err != nil {
+			return nil, err
+		}
+		credentialRotated = true
+	}
+
 	if err := s.accounts.Update(ctx, account); err != nil {
 		return nil, err
+	}
+
+	if credentialRotated && s.revoker != nil {
+		// Kegagalan tidak membatalkan penyimpanan: Runner akan gagal login
+		// dan mencoba ulang, bukan memakai sesi mati selamanya.
+		revokeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		_ = s.revoker.RevokeAccount(revokeCtx, account.ID)
 	}
 
 	s.recordAudit(ctx, userID, account, "account.update", "")

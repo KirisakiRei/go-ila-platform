@@ -25,6 +25,10 @@ type UpdateAccountRequest struct {
 	RiskPercent *float64 `json:"risk_percent"`
 	IsActive    *bool    `json:"is_active"`
 	IsDryRun    *bool    `json:"is_dry_run"`
+	// Token bersifat opsional: diisi hanya saat kredensial broker berganti
+	// (mis. token MatchTrader kedaluwarsa). Kosong berarti token lama dipakai.
+	Token   *string `json:"token" binding:"omitempty,max=4000"`
+	BaseURL *string `json:"base_url" binding:"omitempty,max=200"`
 }
 
 // AccountResponse adalah tampilan akun broker untuk dashboard.

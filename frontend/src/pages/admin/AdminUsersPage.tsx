@@ -40,14 +40,39 @@ export default function AdminUsersPage() {
   const [status, setStatus] = useState('')
   const [tier, setTier] = useState('')
   const [accounts, setAccounts] = useState('')
+  const [trial, setTrial] = useState('')
+  const [role, setRole] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
 
   const debounced = useDebouncedValue(search, 300)
 
   const query = useMemo(
-    () => ({ page, per_page: 25, q: debounced, status, tier, accounts }),
-    [page, debounced, status, tier, accounts],
+    () => ({
+      page,
+      per_page: 25,
+      q: debounced,
+      status,
+      tier,
+      accounts,
+      trial,
+      role,
+      from,
+      to,
+    }),
+    [page, debounced, status, tier, accounts, trial, role, from, to],
   )
+
+  const exportUrl = useMemo(() => {
+    // Ekspor mengikuti filter yang sedang aktif, bukan seluruh basis pengguna.
+    const params = new URLSearchParams({ q: debounced, status, tier, accounts, trial, role, from, to })
+    for (const [key, value] of [...params]) {
+      if (!value) params.delete(key)
+    }
+    const qs = params.toString()
+    return `/api/v1/admin/users-export${qs ? `?${qs}` : ''}`
+  }, [debounced, status, tier, accounts, trial, role, from, to])
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['admin', 'users', query],
@@ -63,7 +88,7 @@ export default function AdminUsersPage() {
         title="Pengguna"
         description="Daftar pelanggan beserta tier dan status. Membuka detail tercatat di jejak audit."
         actions={
-          <Button variant="outline" size="sm" onClick={() => window.open('/api/v1/admin/users-export')}>
+          <Button variant="outline" size="sm" onClick={() => window.open(exportUrl)}>
             Ekspor CSV
           </Button>
         }
@@ -119,6 +144,46 @@ export default function AdminUsersPage() {
             <option value="yes">Punya akun broker</option>
             <option value="no">Belum punya akun</option>
           </Select>
+          <Select
+            aria-label="Filter trial"
+            value={trial}
+            onChange={(event) => {
+              setTrial(event.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="">Semua pengguna</option>
+            <option value="yes">Pernah memakai trial</option>
+          </Select>
+          <Select
+            aria-label="Filter peran"
+            value={role}
+            onChange={(event) => {
+              setRole(event.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="">Semua peran</option>
+            <option value="admin">Admin</option>
+          </Select>
+          <Input
+            type="date"
+            aria-label="Terdaftar mulai"
+            value={from}
+            onChange={(event) => {
+              setFrom(event.target.value)
+              setPage(1)
+            }}
+          />
+          <Input
+            type="date"
+            aria-label="Terdaftar sampai"
+            value={to}
+            onChange={(event) => {
+              setTo(event.target.value)
+              setPage(1)
+            }}
+          />
         </div>
       </Card>
 
