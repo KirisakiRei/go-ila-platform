@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +60,8 @@ type accountService struct {
 	// legal memastikan disclaimer risiko disetujui sebelum akun broker nyata
 	// dihubungkan (plans/09 §2.2).
 	legal AccountLinkGuard
+	// features membaca batas akun dan simbol per tier dari katalog paket.
+	features TierFeatureReader
 	// secret mengunci sidik jari token agar tidak bisa dibalik dari database.
 	secret string
 	clock  func() time.Time
@@ -82,6 +85,13 @@ type CredentialRevoker interface {
 	RevokeAccount(ctx context.Context, accountID string) error
 }
 
+// TierFeatureReader membaca batas paket dari database.
+// Batas tier sengaja tidak ditulis di kode: admin harus bisa mengubahnya
+// tanpa deploy (plans/19 C2).
+type TierFeatureReader interface {
+	Feature(ctx context.Context, tier, key, fallback string) string
+}
+
 // AccountServiceDeps mengumpulkan dependensi agar konstruktor tetap ringkas.
 type AccountServiceDeps struct {
 	Users         UserRepository
@@ -94,6 +104,9 @@ type AccountServiceDeps struct {
 	Strategies    StrategyCatalog
 	Revoker       CredentialRevoker
 	Legal         AccountLinkGuard
+	// Features membaca batas akun dan simbol per tier. Bila nil, dipakai
+	// batas bawaan.
+	Features TierFeatureReader
 	// FingerprintSecret mengunci sidik jari token. Disarankan sama dengan
 	// kunci internal; kosong membuat pemeriksaan duplikat dimatikan.
 	FingerprintSecret string
@@ -123,6 +136,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		strategies: deps.Strategies,
 		revoker:    deps.Revoker,
 		legal:      deps.Legal,
+		features:   deps.Features,
 		secret:     deps.FingerprintSecret,
 		clock:      clock,
 	}
@@ -175,7 +189,7 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 	}
 
 	tier := effectiveTier(user, s.clock())
-	limit := tierAccountLimit(tier)
+	limit := s.tierAccountLimit(ctx, tier)
 	if limit == 0 {
 		return nil, fmt.Errorf("%w: tier %s tidak dapat menghubungkan akun broker", apperror.ErrForbidden, tier)
 	}
@@ -421,8 +435,10 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 			activeCount++
 		}
 	}
-	if activeCount >= MaxSubscriptionsPerUser {
-		return nil, fmt.Errorf("%w: maksimal %d simbol dipantau", apperror.ErrForbidden, MaxSubscriptionsPerUser)
+	// Batas simbol mengikuti tier dan bisa diubah admin tanpa deploy.
+	limit := s.tierSymbolLimit(ctx, tier)
+	if activeCount >= limit {
+		return nil, fmt.Errorf("%w: tier %s maksimal %d simbol dipantau", apperror.ErrForbidden, tier, limit)
 	}
 
 	sub := &model.Subscription{
@@ -662,12 +678,40 @@ func clampRisk(value float64) (float64, error) {
 	return value, nil
 }
 
-// tierAccountLimit adalah batas akun broker per tier.
-func tierAccountLimit(tier string) int {
+// tierAccountLimit membaca batas akun broker dari katalog paket.
+// Nilai kode hanya cadangan bila baris fitur tidak ada.
+func (s *accountService) tierAccountLimit(ctx context.Context, tier string) int {
+	fallback := defaultAccountLimit(tier)
+	if s.features == nil {
+		return fallback
+	}
+	raw := s.features.Feature(ctx, tier, model.FeatureAccountLimit, strconv.Itoa(fallback))
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value < 0 {
+		return fallback
+	}
+	return value
+}
+
+// tierSymbolLimit membaca batas simbol yang dipantau per tier.
+func (s *accountService) tierSymbolLimit(ctx context.Context, tier string) int {
+	if s.features == nil {
+		return MaxSubscriptionsPerUser
+	}
+	raw := s.features.Feature(ctx, tier, model.FeatureMaxSymbols, strconv.Itoa(MaxSubscriptionsPerUser))
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || value <= 0 {
+		return MaxSubscriptionsPerUser
+	}
+	return value
+}
+
+// defaultAccountLimit adalah cadangan bila katalog paket tidak terbaca.
+func defaultAccountLimit(tier string) int {
 	switch tier {
-	case "plus":
+	case model.TierPlus:
 		return 2
-	case "basic":
+	case model.TierBasic:
 		return 1
 	default:
 		return 0

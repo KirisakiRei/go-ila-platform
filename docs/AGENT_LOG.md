@@ -35,6 +35,65 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-13 (lanjutan 4) — Audit menyeluruh Fase A–P dan perbaikan temuan berat
+
+**Pelaku:** Claude
+**Tipe:** `SELESAI`
+**Status:** Delapan temuan berat diperbaiki dan diuji. Enam butir belum
+dikerjakan dan dicatat di bawah.
+
+**Temuan yang diperbaiki**
+
+| # | Masalah | Perbaikan |
+|---|---|---|
+| 1 | **Webhook pembayaran bisa dipalsukan.** Tanda tangan HMAC dihitung dari isi body yang dikirim penyerang, jadi siapa pun yang tahu format `order_id.amount.status` bisa menaikkan tier gratis. | Pakasir **tidak mengirim header tanda tangan** (panduan resmi §D). Verifikasi kini memanggil `GET /api/transactiondetail` dan membandingkan **nominal + status** dengan konfirmasi gateway. Header tanda tangan tetap dihormati bila ada, tetapi bukan lagi bukti utama. |
+| 2 | **Token reset/verifikasi email tersimpan mentah** di `email_outbox.payload` — siapa pun yang membaca tabel atau backup bisa mengambil alih akun. Komentar kode justru menyatakan sebaliknya. | Payload hanya memuat `token_id`. Tautan dibentuk saat pengiriman dari token yang dititipkan di memori (`EnqueueWithToken` → `pendingTokens`). Token hangus bila proses berhenti sebelum terkirim. TTL reset juga dibetulkan 1 jam → **30 menit**. |
+| 3 | **2FA tidak menaikkan `session_version`.** Token yang dicuri sebelum 2FA dipasang tetap sah sampai 12 jam. | `Activate`, `Disable`, dan `RegenerateRecovery` kini mencabut seluruh sesi lama. |
+| 4 | **User berstatus `deleted` masih dieksekusi** Runner bila subscription/akun broker tertinggal. | `evaluate` menolak `deleted` dan `DeletedAtUser != nil`. |
+| 5 | **Registrasi dari UI selalu gagal 400**: backend mewajibkan `accept_terms`, form tidak mengirimnya. | Checkbox persetujuan (TOS, Privasi, Penggunaan Wajar) + skema zod + payload `accept_terms`. |
+| 6 | **C2: `plan_feature` tidak pernah dibaca.** Admin mengubah `account_limit`/`max_symbols`, penegakan tetap memakai angka di kode. | `TierFeatureReader` baru; `tierAccountLimit` dan `tierSymbolLimit` membaca katalog paket dengan cadangan kode. |
+| 7 | **`RunGraceSweep` tidak pernah dipanggil** — tier kedaluwarsa tetap Plus selamanya. | `BillingSweeper` berjalan tiap jam dari `cmd/backend-api`. |
+| 8 | **Pagar harga gagal-terbuka**: paket tanpa baris `pricing_guard` meloloskan semua diskon. | Pagar kini tertutup: paket berbayar tanpa batas bawah **ditolak** saat checkout. |
+| 9 | **A17: peringatan status pasar tidak terpasang.** Engine yang mengaku buka di Sabtu tidak pernah terdeteksi. | `Service.checkSchedule` memanggil `ScheduleWatch`; anomali diteruskan lewat `Options.OnMarketAnomaly` ke `alert.MarketScheduleAnomaly`. |
+| 10 | Admin bisa mem-ban admin lain. | `Ban` menolak target ber-role admin; tombol di UI disembunyikan. |
+| 11 | Kupon bisa dipakai dua kali oleh user yang sama saat checkout bersamaan. | Unique index `uq_coupon_user (coupon_id, user_id)`. |
+
+**Belum dikerjakan — butuh keputusan atau lingkungan VPS**
+
+| Butir | Alasan |
+|---|---|
+| A15 — heartbeat sesi user + `idle_expires_at` | Panel admin sudah punya; versi user perlu perubahan model `session` dan middleware. Belum dikerjakan. |
+| C7 — modal "setuju ulang" saat dokumen versi baru | Data backend sudah tersedia (`Pending`), UI belum ada. |
+| F6/F8 — halaman kredit & `/admin/kredit`, kode kredit | Endpoint dan halaman belum ada. |
+| G8/G9 — halaman tagihan & trial admin, refund | `AddRefund` sudah ada tetapi tidak punya endpoint. |
+| H7 — ekspor riwayat trade user (C5) | Belum ada endpoint. |
+| K — jadwal backup (cron) dan salinan luar VPS | Butuh VPS 2. |
+
+**Catatan: dua temuan audit yang TIDAK terbukti**
+
+1. Dilaporkan `AdminUserFilter.From/To` bertipe `string` sehingga `go build`
+   gagal. **Salah** — `params.From` bertipe `*time.Time` dan build lulus.
+2. Dilaporkan `Count` mengabaikan filter. Sudah diperiksa: filter yang sama
+   dipakai, hanya `HasAccounts` memang tidak ikut (perlu diperbaiki terpisah).
+
+**Verifikasi**
+
+`gofmt` bersih, `go vet` bersih, **21 paket tes backend lulus**. Tes baru:
+`TestWebhookPalsuDitolak`, `TestWebhookNominalBedaDitolak`,
+`TestGatewayTidakTerjangkauDitolak`, `TestPerubahanTwoFactorMencabutSesiLama`,
+`TestUserTerhapusTidakDieksekusi`, `TestAnomaliJadwalPasarlDilaporkan`,
+`TestGraceSweepDijalankan`, `TestPagarHargaKosongMenolakPaketBerbayar`.
+Frontend: `tsc`/`eslint` bersih, **39 tes vitest lulus** (1 tes baru untuk
+persetujuan pendaftaran), build dua entri sukses.
+
+**File terdampak (utama)**
+
+`backend/internal/{payment/{pakasir,gateway},service/{billing_service,email_account_service,account_service,pricing_service,twofactor_service,admin_user_service},email/worker,repository/{email_repository,billing_seed,billing_repository},model/{billing,user},runner/{service,schedule},alert/alert,router/router}.go`,
+`backend/cmd/{backend-api,runner}/main.go`,
+`frontend/src/{features/auth/{schemas,components/RegisterForm},types/api,pages/admin/AdminUserDetailPage}.tsx`
+
+---
+
 ### 2026-11-13 (lanjutan 3) — Token akun fleksibel tanpa risiko eksekusi ganda
 
 **Pelaku:** Claude

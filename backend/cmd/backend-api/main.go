@@ -61,12 +61,20 @@ func main() {
 		logger.Warn("SMTP belum dikonfigurasi; surel menumpuk di antrean")
 	}
 
+	// Tautan surel memakai alamat publik yang sama dengan halaman web.
+	email.PublicBaseURL = cfg.PublicURL
+
 	// Peringatan admin: gangguan terdeteksi ≤2 menit, anti-banjir 15 menit
 	// per pemicu agar ponsel admin tidak bergetar terus (plans/18 §2).
 	tgClient := telegram.NewClient(telegram.Config{
 		BotToken: cfg.TelegramBotToken, Timeout: cfg.TelegramTimeout,
 	}, logger)
 	notifier := alert.New(tgClient, cfg.TelegramAdminChatID, logger)
+	// Penyapu langganan: menurunkan tier yang masa tenggangnya habis. Tanpa
+	// ini user kedaluwarsa tetap mendapat akses Plus selamanya.
+	sweeper := service.NewBillingSweeper(router.Billing(cfg, db, logger), logger)
+	go sweeper.Run(ctx, time.Hour)
+
 	watchdog := service.NewWatchdog(router.SystemOps(cfg, db, logger), notifier, logger).
 		WithDiskProbe(diskUsage)
 	go watchdog.Run(ctx, service.WatchInterval)

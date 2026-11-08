@@ -15,6 +15,8 @@ type OutboxStore interface {
 	Pending(ctx context.Context, limit int) ([]model.EmailOutbox, error)
 	MarkSent(ctx context.Context, id string) error
 	MarkFailed(ctx context.Context, id string, reason string, retryAt time.Time, final bool) error
+	// TokenFor mengambil token mentah sekali pakai milik satu baris antrean.
+	TokenFor(outboxID string) (string, bool)
 }
 
 // MaxAttempts membatasi percobaan sebelum pesan dianggap gagal permanen.
@@ -69,7 +71,7 @@ func (w *Worker) Drain(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		msg, err := Render(row)
+		msg, err := Render(row, w.store)
 		if err != nil {
 			// Pesan yang tidak bisa dirender tidak akan pernah berhasil:
 			// langsung ditandai gagal agar tidak berputar.
@@ -93,7 +95,10 @@ func (w *Worker) Drain(ctx context.Context) {
 
 // Render menyusun judul dan isi berdasarkan template.
 // Data yang tidak dikenal menghasilkan kesalahan, bukan surel kosong.
-func Render(row model.EmailOutbox) (Message, error) {
+//
+// Tautan dibentuk di sini dari token yang dititipkan di memori, bukan dibaca
+// dari kolom payload, sehingga token tidak pernah tersimpan di basis data.
+func Render(row model.EmailOutbox, tokens TokenSource) (Message, error) {
 	var payload struct {
 		TokenID string `json:"token_id"`
 		Name    string `json:"name"`
@@ -107,6 +112,17 @@ func Render(row model.EmailOutbox) (Message, error) {
 		name = "Pengguna"
 	}
 
+	link := payload.Link
+	if link == "" && tokens != nil {
+		raw, ok := tokens.TokenFor(row.ID)
+		if !ok {
+			// Token sudah hangus atau proses pernah berhenti: kirim ulang
+			// lebih aman daripada mengirim tautan rusak.
+			return Message{}, errTokenGone
+		}
+		link = LinkFor(row.Template, raw)
+	}
+
 	switch row.Template {
 	case "reset_password":
 		return Message{
@@ -114,8 +130,8 @@ func Render(row model.EmailOutbox) (Message, error) {
 			Subject: "Atur ulang kata sandi Imaginary Liquidity",
 			Body: "Halo " + name + ",\n\n" +
 				"Kami menerima permintaan untuk mengatur ulang kata sandi akun Anda.\n" +
-				"Buka tautan berikut dalam 1 jam ke depan:\n\n" +
-				payload.Link + "\n\n" +
+				"Buka tautan berikut dalam 30 menit ke depan:\n\n" +
+				link + "\n\n" +
 				"Setelah kata sandi diganti, seluruh perangkat akan keluar otomatis.\n" +
 				"Bila Anda tidak meminta ini, abaikan pesan ini; kata sandi tidak berubah.\n",
 		}, nil
@@ -125,7 +141,7 @@ func Render(row model.EmailOutbox) (Message, error) {
 			Subject: "Verifikasi alamat email Imaginary Liquidity",
 			Body: "Halo " + name + ",\n\n" +
 				"Konfirmasi alamat email Anda dengan membuka tautan berikut:\n\n" +
-				payload.Link + "\n\n" +
+				link + "\n\n" +
 				"Tautan berlaku 24 jam. Selama email belum terverifikasi, akun tetap " +
 				"bisa digunakan untuk melihat dashboard, namun trial, koneksi broker, " +
 				"dan pembayaran belum tersedia.\n",
@@ -134,6 +150,30 @@ func Render(row model.EmailOutbox) (Message, error) {
 		return Message{}, errUnknownTemplate
 	}
 }
+
+// TokenSource menyediakan token mentah sekali pakai per baris antrean.
+type TokenSource interface {
+	TokenFor(outboxID string) (string, bool)
+}
+
+// LinkFor menyusun tautan bertoken untuk template tertentu.
+func LinkFor(template, rawToken string) string {
+	switch template {
+	case "reset_password":
+		return PublicBaseURL + "/reset-password?token=" + rawToken
+	case "verify_email":
+		return PublicBaseURL + "/verifikasi?token=" + rawToken
+	default:
+		return ""
+	}
+}
+
+// PublicBaseURL adalah alamat situs publik untuk tautan surel.
+// Diisi saat start dari konfigurasi.
+var PublicBaseURL = "http://localhost:3000"
+
+// errTokenGone menandai token yang sudah tidak tersedia di memori.
+var errTokenGone = &renderError{"tautan kedaluwarsa; minta ulang"}
 
 // errUnknownTemplate menandai template yang tidak dikenali kode.
 var errUnknownTemplate = &renderError{"template surel tidak dikenal"}

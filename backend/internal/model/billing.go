@@ -109,12 +109,15 @@ func (Coupon) TableName() string {
 	return "coupon"
 }
 
-// CouponRedemption mencatat pemakaian kupon pada satu invoice.
-// Unik (coupon_id, invoice_id) mencegah kupon terpakai dua kali di invoice sama.
+// CouponRedemption mencatat pemakaian kupon oleh satu user.
+//
+// Unik (coupon_id, user_id) menegakkan aturan "satu kali per user" di tingkat
+// basis data, bukan hanya lewat hitungan: dua checkout bersamaan tidak bisa
+// memakai kupon yang sama dua kali (plans/14 §5).
 type CouponRedemption struct {
 	ID          string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	CouponID    string    `gorm:"type:varchar(36);index;not null" json:"coupon_id"`
-	UserID      string    `gorm:"type:varchar(36);index;not null" json:"user_id"`
+	CouponID    string    `gorm:"type:varchar(36);not null;uniqueIndex:uq_coupon_user" json:"coupon_id"`
+	UserID      string    `gorm:"type:varchar(36);not null;uniqueIndex:uq_coupon_user" json:"user_id"`
 	InvoiceID   string    `gorm:"type:varchar(36);index;not null" json:"invoice_id"`
 	DiscountIDR int64     `gorm:"not null" json:"discount_idr"`
 	RedeemedAt  time.Time `json:"redeemed_at"`

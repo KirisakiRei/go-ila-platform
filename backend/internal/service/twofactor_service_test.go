@@ -276,3 +276,34 @@ func TestSecretTerikatPemilik(t *testing.T) {
 		t.Fatal("secret milik akun lain seharusnya tidak bisa dipakai")
 	}
 }
+
+// Token yang terbit sebelum 2FA berubah tidak boleh tetap sah. Tanpa
+// pencabutan ini, token curian bertahan sampai kedaluwarsa walau korban
+// sudah memasang 2FA.
+func TestPerubahanTwoFactorMencabutSesiLama(t *testing.T) {
+	f := newTwoFactorFixture(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0).UTC()
+	*f.clock = now
+
+	setup, err := f.svc.Setup(ctx, "u1", "user@ila.id")
+	if err != nil {
+		t.Fatalf("Setup error: %v", err)
+	}
+	if _, err := f.svc.Activate(ctx, "u1", codeFor(t, setup.Secret, now)); err != nil {
+		t.Fatalf("Activate error: %v", err)
+	}
+	if len(f.revoke.ids) != 1 {
+		t.Fatalf("aktivasi 2FA harus mencabut sesi lama, tercatat %d", len(f.revoke.ids))
+	}
+
+	// Kode harus dari jendela TOTP berikutnya: kode yang sama tidak boleh
+	// dipakai dua kali.
+	*f.clock = now.Add(60 * time.Second)
+	if err := f.svc.Disable(ctx, "u1", codeFor(t, setup.Secret, *f.clock)); err != nil {
+		t.Fatalf("Disable error: %v", err)
+	}
+	if len(f.revoke.ids) != 2 {
+		t.Fatalf("mematikan 2FA harus mencabut sesi lama, tercatat %d", len(f.revoke.ids))
+	}
+}

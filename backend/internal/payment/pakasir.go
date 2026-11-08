@@ -124,26 +124,92 @@ func (p *Pakasir) Signature(orderID string, amount int64, status string) string 
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// VerifyWebhook memastikan tanda tangan cocok. Perbandingan memakai HMAC
-// constant-time agar tidak bisa ditebak lewat waktu respons.
-func (p *Pakasir) VerifyWebhook(header map[string]string, body []byte) error {
-	if strings.TrimSpace(p.WebhookKey) == "" {
+// VerifyWebhook memastikan webhook benar berasal dari Pakasir.
+//
+// Pakasir TIDAK mengirim header tanda tangan apa pun (lihat panduan resmi
+// bagian D). Karena itu isi body tidak boleh dipercaya sendiri: setiap webhook
+// diverifikasi balik ke Transaction Detail API dengan API Key. Hanya status
+// yang dikonfirmasi gateway yang boleh dipakai menaikkan langganan.
+//
+// Tanpa API Key, gateway dianggap belum siap dan seluruh webhook ditolak.
+func (p *Pakasir) VerifyWebhook(ctx context.Context, header map[string]string, body []byte) error {
+	if strings.TrimSpace(p.APIKey) == "" || strings.TrimSpace(p.Slug) == "" {
 		return ErrDisabled
-	}
-	signature := lookupHeader(header, "x-pakasir-signature")
-	if signature == "" {
-		return errors.New("tanda tangan webhook tidak ada")
 	}
 
 	event, err := p.ParseWebhook(body)
 	if err != nil {
 		return err
 	}
-	expected := p.Signature(event.InvoiceNumber, event.AmountIDR, rawStatus(body))
-	if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
-		return errors.New("tanda tangan webhook tidak sah")
+
+	// Header opsional tetap dihormati bila suatu saat dipasang di depan
+	// gateway: hanya dipakai untuk menolak lebih awal, bukan sebagai bukti.
+	if signature := lookupHeader(header, "x-pakasir-signature"); signature != "" {
+		expected := p.Signature(event.InvoiceNumber, event.AmountIDR, rawStatus(body))
+		if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
+			return errors.New("tanda tangan webhook tidak sah")
+		}
+	}
+
+	verified, err := p.TransactionDetail(ctx, event.InvoiceNumber, event.AmountIDR)
+	if err != nil {
+		return fmt.Errorf("memverifikasi pembayaran ke gateway: %w", err)
+	}
+	// Nominal dan status harus sama dengan yang diklaim; selisih sekecil apa
+	// pun membuat webhook ditolak.
+	if verified.AmountIDR != event.AmountIDR {
+		return errors.New("nominal webhook tidak cocok dengan gateway")
+	}
+	if p.MapStatus(verified.RawStatus) != event.Status {
+		return errors.New("status webhook tidak cocok dengan gateway")
 	}
 	return nil
+}
+
+// TransactionDetail membaca status sebenarnya dari gateway.
+func (p *Pakasir) TransactionDetail(ctx context.Context, orderID string, amountIDR int64) (*VerifiedTransaction, error) {
+	query := url.Values{}
+	query.Set("project", p.Slug)
+	query.Set("amount", strconv.FormatInt(amountIDR, 10))
+	query.Set("order_id", orderID)
+	query.Set("api_key", p.APIKey)
+
+	endpoint := p.BaseURL + "/api/transactiondetail?" + query.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("menyusun pemeriksaan transaksi: %w", err)
+	}
+
+	resp, err := p.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("menghubungi gateway pembayaran: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("gateway menolak pemeriksaan (status %d)", resp.StatusCode)
+	}
+
+	var payload struct {
+		Transaction struct {
+			OrderID string `json:"order_id"`
+			Amount  int64  `json:"amount"`
+			Status  string `json:"status"`
+		} `json:"transaction"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("membaca balasan gateway: %w", err)
+	}
+	if payload.Transaction.OrderID == "" {
+		return nil, errors.New("transaksi tidak ditemukan di gateway")
+	}
+
+	return &VerifiedTransaction{
+		OrderID:   payload.Transaction.OrderID,
+		AmountIDR: payload.Transaction.Amount,
+		RawStatus: payload.Transaction.Status,
+	}, nil
 }
 
 // ParseWebhook mengurai isi webhook menjadi kejadian internal.

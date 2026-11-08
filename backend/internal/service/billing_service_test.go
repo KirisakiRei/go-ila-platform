@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -18,6 +21,11 @@ type fakeBillingStore struct {
 	sub         *model.SubscriptionRecord
 	tierChanges []tierChange
 	redemptions int
+
+	graceStarted []string
+	downgraded   []string
+	graceRan     bool
+	downgradeRan bool
 }
 
 type tierChange struct {
@@ -111,12 +119,15 @@ func (f *fakeBillingStore) ExtendTier(ctx context.Context, userID, plan string, 
 	return nil
 }
 
-func (f *fakeBillingStore) DowngradeExpired(ctx context.Context, at time.Time) ([]string, error) {
-	return nil, nil
+func (f *fakeBillingStore) StartGrace(ctx context.Context, at time.Time) ([]string, error) {
+	f.graceRan = true
+	return f.graceStarted, nil
 }
 
-func (f *fakeBillingStore) StartGrace(ctx context.Context, at time.Time) ([]string, error) {
-	return nil, nil
+// DowngradeExpired mencatat penurunan tier agar tes bisa memastikannya jalan.
+func (f *fakeBillingStore) DowngradeExpired(ctx context.Context, at time.Time) ([]string, error) {
+	f.downgradeRan = true
+	return f.downgraded, nil
 }
 
 func (f *fakeBillingStore) AddRefund(ctx context.Context, r *model.Refund) error { return nil }
@@ -140,6 +151,23 @@ func (verifiedUsers) FindByID(_ context.Context, id string) (*model.User, error)
 func newTestBilling(store *fakeBillingStore, gw payment.Gateway) BillingService {
 	pricing := NewPricingService(newFakePricingStore())
 	return NewBillingService(verifiedUsers{}, store, pricing, fakeCouponLookup{}, gw, &fakeAdminAudit{}, nil)
+}
+
+// statusGateway meniru Transaction Detail API: gateway mengonfirmasi status
+// yang sama dengan isi webhook. Verifikasi asli memanggil endpoint ini.
+func statusGateway(t *testing.T, amount int64, status string) *payment.Pakasir {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"transaction": map[string]any{
+				"order_id": r.URL.Query().Get("order_id"),
+				"amount":   amount,
+				"status":   status,
+			},
+		})
+	}))
+	t.Cleanup(server.Close)
+	return payment.NewPakasir(server.URL, "proyek", "kunci", "")
 }
 
 func paidWebhook(t *testing.T, gw *payment.Pakasir, orderID string, amount int64, status string) (map[string]string, []byte) {
@@ -180,7 +208,7 @@ func TestWebhookWrongSignatureRejected(t *testing.T) {
 // Webhook duplikat tidak menambah periode dua kali.
 func TestWebhookDuplicateDoesNotExtendTwice(t *testing.T) {
 	store := newFakeBillingStore()
-	gw := payment.NewPakasir("", "p", "k", "rahasia")
+	gw := statusGateway(t, 666000, "completed")
 	svc := newTestBilling(store, gw)
 
 	// Invoice sudah terbit dan menunggu pembayaran.
@@ -213,7 +241,7 @@ func TestWebhookDuplicateDoesNotExtendTwice(t *testing.T) {
 // Status tak dikenal tidak menaikkan tier.
 func TestUnknownWebhookStatusStaysPending(t *testing.T) {
 	store := newFakeBillingStore()
-	gw := payment.NewPakasir("", "p", "k", "rahasia")
+	gw := statusGateway(t, 666000, "settlement_pending")
 	svc := newTestBilling(store, gw)
 
 	store.invoices["ILA-2026-000001"] = &model.Invoice{
@@ -236,7 +264,7 @@ func TestUnknownWebhookStatusStaysPending(t *testing.T) {
 // Kurang bayar tidak menaikkan tier.
 func TestUnderpaymentRejected(t *testing.T) {
 	store := newFakeBillingStore()
-	gw := payment.NewPakasir("", "p", "k", "rahasia")
+	gw := statusGateway(t, 1000, "completed")
 	svc := newTestBilling(store, gw)
 
 	store.invoices["ILA-2026-000001"] = &model.Invoice{
@@ -268,5 +296,26 @@ func TestSuccessPageCannotActivate(t *testing.T) {
 	}
 	if len(store.tierChanges) != 0 {
 		t.Fatal("membaca halaman tidak boleh mengubah tier")
+	}
+}
+
+// Penyapu masa tenggang harus benar-benar memanggil repository, karena tanpa
+// itu tier kedaluwarsa tidak pernah turun.
+func TestGraceSweepDijalankan(t *testing.T) {
+	store := newFakeBillingStore()
+	store.graceStarted = []string{"u1"}
+	store.downgraded = []string{"u2"}
+
+	svc := newTestBilling(store, statusGateway(t, 0, ""))
+
+	affected, err := svc.RunGraceSweep(context.Background())
+	if err != nil {
+		t.Fatalf("sweep error: %v", err)
+	}
+	if affected != 2 {
+		t.Fatalf("perubahan = %d; ingin 2", affected)
+	}
+	if !store.graceRan || !store.downgradeRan {
+		t.Fatal("kedua langkah masa tenggang harus dijalankan")
 	}
 }

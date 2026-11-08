@@ -80,7 +80,10 @@ type TwoFactorSetup struct {
 type twoFactorService struct {
 	repo   TwoFactorRepository
 	sealer SecretSealer
-	now    func() time.Time
+	// sessions mencabut seluruh sesi lama saat 2FA berubah. Tanpa ini, token
+	// yang dicuri sebelum 2FA dipasang tetap berlaku sampai kedaluwarsa.
+	sessions SessionRevoker
+	now      func() time.Time
 }
 
 // TwoFactorRepository adalah kebutuhan service atas penyimpanan 2FA.
@@ -95,12 +98,24 @@ type TwoFactorRepository interface {
 }
 
 // NewTwoFactorService merangkai layanan 2FA.
-func NewTwoFactorService(repo TwoFactorRepository, sealer SecretSealer) TwoFactorService {
+// revoker boleh nil saat pengujian; bila ada, sesi lama dicabut setiap 2FA
+// diaktifkan, dimatikan, atau kode pemulihannya diganti (plans/03 §5).
+func NewTwoFactorService(repo TwoFactorRepository, sealer SecretSealer, revoker SessionRevoker) TwoFactorService {
 	return &twoFactorService{
-		repo:   repo,
-		sealer: sealer,
-		now:    func() time.Time { return time.Now().UTC() },
+		repo:     repo,
+		sealer:   sealer,
+		sessions: revoker,
+		now:      func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// revokeOldSessions mencabut token lama. Kegagalan dicatat lewat error agar
+// pemanggil tahu sesi belum benar-benar mati.
+func (s *twoFactorService) revokeOldSessions(ctx context.Context, userID string) error {
+	if s.sessions == nil {
+		return nil
+	}
+	return s.sessions.RevokeSessions(ctx, userID)
 }
 
 // Enabled menandai 2FA yang sudah aktif. Akun tanpa 2FA bukan kesalahan.
@@ -210,6 +225,11 @@ func (s *twoFactorService) Activate(ctx context.Context, userID, code string) ([
 	if err := s.repo.Upsert(ctx, settings); err != nil {
 		return nil, err
 	}
+	// 2FA baru berlaku: token yang terbit sebelum faktor ini ada tidak boleh
+	// tetap sah, termasuk token yang mungkin sudah dicuri.
+	if err := s.revokeOldSessions(ctx, userID); err != nil {
+		return nil, err
+	}
 
 	return s.issueRecoveryCodes(ctx, userID)
 }
@@ -279,7 +299,11 @@ func (s *twoFactorService) Disable(ctx context.Context, userID, code string) err
 		}
 	}
 
-	return s.repo.Deactivate(ctx, userID)
+	if err := s.repo.Deactivate(ctx, userID); err != nil {
+		return err
+	}
+	// Mematikan 2FA mengubah syarat masuk, jadi sesi lama dicabut.
+	return s.revokeOldSessions(ctx, userID)
 }
 
 // RegenerateRecovery mengganti seluruh kode pemulihan dengan set baru.
@@ -288,6 +312,9 @@ func (s *twoFactorService) RegenerateRecovery(ctx context.Context, userID, code 
 		return nil, validation("masukkan kode 2FA")
 	}
 	if err := s.Verify(ctx, userID, code); err != nil {
+		return nil, err
+	}
+	if err := s.revokeOldSessions(ctx, userID); err != nil {
 		return nil, err
 	}
 	return s.issueRecoveryCodes(ctx, userID)

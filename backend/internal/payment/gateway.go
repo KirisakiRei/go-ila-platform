@@ -40,7 +40,9 @@ type Gateway interface {
 	// CreateTransaction membuat tagihan dan mengembalikan URL pembayaran.
 	CreateTransaction(ctx context.Context, invoiceNumber string, amountIDR int64) (*Transaction, error)
 	// VerifyWebhook memastikan permintaan benar berasal dari gateway.
-	VerifyWebhook(header map[string]string, body []byte) error
+	// VerifyWebhook memastikan permintaan benar berasal dari gateway.
+	// Gateway tanpa tanda tangan wajib memverifikasi balik ke sumbernya.
+	VerifyWebhook(ctx context.Context, header map[string]string, body []byte) error
 	// ParseWebhook mengurai isi webhook menjadi kejadian yang bisa diproses.
 	ParseWebhook(body []byte) (*WebhookEvent, error)
 	// MapStatus memetakan status gateway ke status internal.
@@ -51,3 +53,11 @@ type Gateway interface {
 
 // ErrDisabled menandai gateway yang belum dikonfigurasi.
 var ErrDisabled = errors.New("gateway pembayaran belum dikonfigurasi")
+
+// VerifiedTransaction adalah status pembayaran yang sudah dikonfirmasi
+// langsung oleh gateway, bukan dari isi webhook.
+type VerifiedTransaction struct {
+	OrderID   string
+	AmountIDR int64
+	RawStatus string
+}

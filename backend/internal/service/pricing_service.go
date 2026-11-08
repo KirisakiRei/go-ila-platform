@@ -100,10 +100,20 @@ func (s *pricingService) Quote(ctx context.Context, userID, planCode, couponCode
 	quote.Total = subtotal - quote.Discount - quote.CreditUsed
 
 	// Pagar terakhir: total tidak boleh di bawah batas yang ditetapkan admin.
-	if guard, err := s.store.FindGuard(ctx, plan.Code); err == nil && guard != nil {
-		if quote.Total < guard.MinPriceIDR {
-			return nil, validation("total setelah diskon berada di bawah batas harga yang diizinkan")
+	//
+	// Pagar ini bersikap tertutup: paket berbayar tanpa baris pagar ditolak
+	// daripada diloloskan. Paket baru yang belum punya batas bawah berarti
+	// admin belum memutuskan harga minimumnya (plans/14 §6).
+	guard, guardErr := s.store.FindGuard(ctx, plan.Code)
+	if guardErr != nil {
+		return nil, guardErr
+	}
+	if guard == nil {
+		if plan.PriceIDR > 0 || subtotal > 0 {
+			return nil, validation("batas harga minimum paket ini belum ditetapkan admin")
 		}
+	} else if quote.Total < guard.MinPriceIDR {
+		return nil, validation("total setelah diskon berada di bawah batas harga yang diizinkan")
 	}
 	if quote.Total < 0 {
 		return nil, validation("total tidak boleh negatif")

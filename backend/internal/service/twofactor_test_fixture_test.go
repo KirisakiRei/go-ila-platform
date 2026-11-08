@@ -89,9 +89,10 @@ const testMasterKey = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 
 // twoFactorFixture menyiapkan layanan 2FA dengan jam yang bisa digeser.
 type twoFactorFixture struct {
-	svc   TwoFactorService
-	store *fakeTwoFactorStore
-	clock *time.Time
+	svc    TwoFactorService
+	store  *fakeTwoFactorStore
+	revoke *revokeSpy
+	clock  *time.Time
 }
 
 func newTwoFactorFixture(t *testing.T) *twoFactorFixture {
@@ -107,10 +108,11 @@ func newTwoFactorFixture(t *testing.T) *twoFactorFixture {
 	// Jam disimpan di fikstur agar tes bisa menggeser waktu (mis. periode
 	// TOTP berikutnya) tanpa menunggu 30 detik sungguhan.
 	clock := time.Unix(1_700_000_000, 0).UTC()
-	svc := NewTwoFactorService(store, sealer).(*twoFactorService)
+	revoke := &revokeSpy{}
+	svc := NewTwoFactorService(store, sealer, revoke).(*twoFactorService)
 	svc.now = func() time.Time { return clock }
 
-	return &twoFactorFixture{svc: svc, store: store, clock: &clock}
+	return &twoFactorFixture{svc: svc, store: store, revoke: revoke, clock: &clock}
 }
 
 // codeFor menghitung kode TOTP yang sah pada waktu tertentu.
@@ -122,4 +124,14 @@ func codeFor(t *testing.T, secret string, at time.Time) string {
 		t.Fatalf("Generate error: %v", err)
 	}
 	return code
+}
+
+// revokeSpy menghitung berapa kali sesi lama dicabut.
+type revokeSpy struct {
+	ids []string
+}
+
+func (r *revokeSpy) RevokeSessions(_ context.Context, userID string) error {
+	r.ids = append(r.ids, userID)
+	return nil
 }

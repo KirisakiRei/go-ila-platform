@@ -31,8 +31,13 @@ func newFakePricingStore() *fakePricingStore {
 			model.TierPlus:  {Code: model.TierPlus, Name: "Plus", PriceIDR: 999000, IsActive: true},
 		},
 		features: map[string]map[string]string{},
-		guard:    map[string]int64{},
-		coupons:  map[string]model.Coupon{},
+		// Pagar harga tidak boleh kosong: paket berbayar tanpa batas bawah
+		// ditolak, jadi fikstur memberi batas yang wajar.
+		guard: map[string]int64{
+			model.TierBasic: 100000,
+			model.TierPlus:  150000,
+		},
+		coupons: map[string]model.Coupon{},
 	}
 }
 
@@ -265,3 +270,16 @@ func TestVoucherDoesNotChangeTradingLimits(t *testing.T) {
 }
 
 var _ = repository.ApplyCreditInput{}
+
+// Paket berbayar tanpa baris pagar harus ditolak, bukan diloloskan: kesalahan
+// konfigurasi tidak boleh berubah menjadi harga hampir gratis.
+func TestPagarHargaKosongMenolakPaketBerbayar(t *testing.T) {
+	store := newFakePricingStore()
+	delete(store.guard, model.TierBasic)
+	svc := NewPricingService(store)
+
+	_, err := svc.Quote(context.Background(), "u1", model.TierBasic, "", false)
+	if err == nil {
+		t.Fatal("paket berbayar tanpa batas bawah harus ditolak")
+	}
+}

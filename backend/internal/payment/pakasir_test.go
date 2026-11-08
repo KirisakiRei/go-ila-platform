@@ -18,46 +18,103 @@ func webhookBody(orderID string, amount int64, status string) []byte {
 	return raw
 }
 
-func TestWebhookSignatureValid(t *testing.T) {
-	gw := NewPakasir("", "proyek", "kunci", "rahasia")
+// gatewayStub meniru Transaction Detail API Pakasir.
+func gatewayStub(t *testing.T, amount int64, status string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/transactiondetail" {
+			t.Errorf("path tidak dikenal: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("api_key") == "" {
+			t.Error("api_key wajib ikut pada pemeriksaan status")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"transaction": map[string]any{
+				"order_id": r.URL.Query().Get("order_id"),
+				"amount":   amount,
+				"status":   status,
+			},
+		})
+	}))
+}
+
+// Webhook yang cocok dengan konfirmasi gateway diterima.
+func TestWebhookDikonfirmasiGateway(t *testing.T) {
+	server := gatewayStub(t, 666000, "completed")
+	defer server.Close()
+
+	gw := NewPakasir(server.URL, "proyek", "kunci", "")
 	body := webhookBody("ILA-2026-000001", 666000, "paid")
+
+	if err := gw.VerifyWebhook(t.Context(), nil, body); err != nil {
+		t.Fatalf("webhook yang sah harus diterima: %v", err)
+	}
+}
+
+// Tanpa API Key, webhook tidak bisa diverifikasi dan harus ditolak. Ini
+// menggantikan "tanpa kunci rahasia" pada desain tanda tangan lokal.
+func TestWebhookTanpaAPIKeyDitolak(t *testing.T) {
+	gw := NewPakasir("", "proyek", "", "")
+	body := webhookBody("ILA-2026-000001", 666000, "paid")
+
+	if err := gw.VerifyWebhook(t.Context(), nil, body); err != ErrDisabled {
+		t.Fatalf("tanpa API Key harus ErrDisabled, dapat %v", err)
+	}
+}
+
+// Inti perbaikan: webhook palsu yang mengaku lunas ditolak karena gateway
+// menyatakan transaksinya belum dibayar.
+func TestWebhookPalsuDitolak(t *testing.T) {
+	server := gatewayStub(t, 666000, "pending")
+	defer server.Close()
+
+	gw := NewPakasir(server.URL, "proyek", "kunci", "")
+	body := webhookBody("ILA-2026-000001", 666000, "paid")
+
+	if err := gw.VerifyWebhook(t.Context(), nil, body); err == nil {
+		t.Fatal("webhook yang mengaku lunas padahal gateway belum lunas harus ditolak")
+	}
+}
+
+// Nominal berbeda dari gateway berarti webhook dipalsukan atau tertukar.
+func TestWebhookNominalBedaDitolak(t *testing.T) {
+	server := gatewayStub(t, 1000, "completed")
+	defer server.Close()
+
+	gw := NewPakasir(server.URL, "proyek", "kunci", "")
+	body := webhookBody("ILA-2026-000001", 666000, "paid")
+
+	if err := gw.VerifyWebhook(t.Context(), nil, body); err == nil {
+		t.Fatal("nominal yang tidak cocok harus ditolak")
+	}
+}
+
+// Header tanda tangan tetap dihormati bila dipasang di depan gateway.
+func TestHeaderTandaTanganBilaAda(t *testing.T) {
+	server := gatewayStub(t, 666000, "completed")
+	defer server.Close()
+
+	gw := NewPakasir(server.URL, "proyek", "kunci", "rahasia")
+	body := webhookBody("ILA-2026-000001", 666000, "paid")
+
+	if err := gw.VerifyWebhook(t.Context(), map[string]string{"X-Pakasir-Signature": "palsu"}, body); err == nil {
+		t.Fatal("tanda tangan header yang salah harus ditolak")
+	}
+
 	sig := gw.Signature("ILA-2026-000001", 666000, "paid")
-
-	if err := gw.VerifyWebhook(map[string]string{"X-Pakasir-Signature": sig}, body); err != nil {
-		t.Fatalf("tanda tangan sah harus diterima: %v", err)
+	if err := gw.VerifyWebhook(t.Context(), map[string]string{"X-Pakasir-Signature": sig}, body); err != nil {
+		t.Fatalf("tanda tangan header yang benar harus diterima: %v", err)
 	}
 }
 
-func TestWebhookSignatureWrong(t *testing.T) {
-	gw := NewPakasir("", "proyek", "kunci", "rahasia")
+// Gateway yang tidak terjangkau membuat webhook ditolak, bukan diterima
+// diam-diam.
+func TestGatewayTidakTerjangkauDitolak(t *testing.T) {
+	gw := NewPakasir("http://127.0.0.1:1", "proyek", "kunci", "")
 	body := webhookBody("ILA-2026-000001", 666000, "paid")
 
-	err := gw.VerifyWebhook(map[string]string{"X-Pakasir-Signature": "palsu"}, body)
-	if err == nil {
-		t.Fatal("tanda tangan salah harus ditolak")
-	}
-}
-
-func TestWebhookTamperedAmountRejected(t *testing.T) {
-	gw := NewPakasir("", "proyek", "kunci", "rahasia")
-	original := webhookBody("ILA-2026-000001", 666000, "paid")
-	sig := gw.Signature("ILA-2026-000001", 666000, "paid")
-
-	// Nominal diubah setelah tanda tangan dibuat.
-	tampered := webhookBody("ILA-2026-000001", 1000, "paid")
-	if err := gw.VerifyWebhook(map[string]string{"x-pakasir-signature": sig}, tampered); err == nil {
-		t.Fatal("nominal yang diubah harus menggagalkan verifikasi")
-	}
-	_ = original
-}
-
-func TestWebhookMissingSecretDisabled(t *testing.T) {
-	gw := NewPakasir("", "proyek", "kunci", "")
-	body := webhookBody("ILA-2026-000001", 666000, "paid")
-
-	err := gw.VerifyWebhook(map[string]string{"X-Pakasir-Signature": "apa saja"}, body)
-	if err != ErrDisabled {
-		t.Fatalf("tanpa kunci webhook harus ErrDisabled, dapat %v", err)
+	if err := gw.VerifyWebhook(t.Context(), nil, body); err == nil {
+		t.Fatal("verifikasi yang gagal tidak boleh dianggap sah")
 	}
 }
 

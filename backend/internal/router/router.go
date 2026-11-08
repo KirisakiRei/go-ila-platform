@@ -27,6 +27,17 @@ import (
 // adminPrefix adalah awalan tunggal seluruh endpoint administrasi.
 const adminPrefix = "/api/v1/admin"
 
+// Billing returns the billing service so a background sweeper can run without
+// duplicating the wiring in cmd.
+func Billing(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.BillingService {
+	userRepo := repository.NewUserRepository(db)
+	billingRepo := repository.NewBillingRepository(db)
+	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
+	pricing := service.NewPricingService(repository.NewPricingRepository(db))
+	adminAudit := service.NewAuditRecorder(repository.NewAuditRepository(db))
+	return service.NewBillingService(userRepo, billingRepo, pricing, billingRepo, gateway, adminAudit, repository.NewCreditCodeRepository(db))
+}
+
 // SystemOps mengembalikan layanan operasional untuk dipakai proses latar
 // seperti watchdog. Disediakan agar cmd tidak perlu merangkai ulang.
 func SystemOps(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.AdminSystemOps {
@@ -84,7 +95,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	legalService := service.NewLegalService(legalRepo, auditRepo)
 	var twoFactorSvc service.TwoFactorService
 	if sealer != nil {
-		twoFactorSvc = service.NewTwoFactorService(twoFactorRepo, sealer)
+		twoFactorSvc = service.NewTwoFactorService(twoFactorRepo, sealer, userRepo)
 	}
 
 	authService := service.WithTwoFactor(
@@ -124,6 +135,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		Strategies:    runner.LoadSettings(),
 		Revoker:       runnerAPI,
 		Legal:         legalService,
+		// Batas akun & simbol dibaca dari katalog paket, bukan dari kode.
+		Features: repository.NewTierFeatureReader(db),
 		// Kunci sidik jari sederajat rahasia server: dipakai mengenali token
 		// yang dipakai dua akun sekaligus.
 		FingerprintSecret: cfg.InternalSecret,

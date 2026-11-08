@@ -58,6 +58,8 @@ export type RegisterPayload = {
   name: string
   email: string
   password: string
+  /** Wajib true: backend menolak pendaftaran tanpa persetujuan. */
+  accept_terms: boolean
 }
 
 export type LoginResult = {

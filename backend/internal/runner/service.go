@@ -86,6 +86,9 @@ type Options struct {
 	// Mode membaca mode platform (normal/read-only/pemeliharaan).
 	// Bila nil, mode dianggap normal.
 	Mode ModeSource
+	// OnMarketAnomaly melaporkan status pasar yang tidak sesuai jadwal, mis.
+	// engine mengaku buka pada Sabtu. Bila nil, temuan hanya dicatat di log.
+	OnMarketAnomaly func(anomalies []MarketScheduleAnomaly)
 }
 
 // Service adalah inti Runner. Aman dipakai dari beberapa goroutine.
@@ -102,6 +105,8 @@ type Service struct {
 	ack       AckSender
 	clients   map[string]broker.Client
 	keyring   *cryptox.Keyring
+	// schedule mengawasi kecocokan status pasar dengan jadwal NY.
+	schedule *ScheduleWatch
 }
 
 // NewService membuat Runner.
@@ -118,13 +123,14 @@ func NewService(store Store, brokers *broker.Registry, pub Publisher, logger *sl
 	opts.Policy = opts.Policy.Clamp()
 
 	return &Service{
-		store:   store,
-		brokers: brokers,
-		pub:     pub,
-		logger:  logger,
-		opts:    opts,
-		market:  enginev1.MarketState_MARKET_OPEN,
-		clients: make(map[string]broker.Client),
+		store:    store,
+		brokers:  brokers,
+		pub:      pub,
+		logger:   logger,
+		opts:     opts,
+		market:   enginev1.MarketState_MARKET_OPEN,
+		clients:  make(map[string]broker.Client),
+		schedule: NewScheduleWatch(10*time.Minute, 10*time.Minute),
 	}
 }
 
@@ -139,6 +145,39 @@ func (s *Service) SetMarketState(state enginev1.MarketState) {
 	// agar Console bisa menampilkannya tanpa bertanya ke Engine.
 	if changed {
 		s.persistMarketState(state)
+	}
+
+	s.checkSchedule(state)
+}
+
+// checkSchedule membandingkan status pasar engine dengan jadwal NY.
+//
+// Engine yang salah zona waktu akan mengaku buka di akhir pekan. Tanpa
+// pemeriksaan ini, kekeliruan itu tidak pernah terlihat sampai ada yang
+// menyadari tidak ada sinyal selama berhari-hari (plans/22 §3).
+func (s *Service) checkSchedule(state enginev1.MarketState) {
+	if s.schedule == nil {
+		return
+	}
+	now := s.opts.Clock()
+
+	// Status MARKET_UNKNOWN tidak dibandingkan: engine belum tahu apa pun.
+	if state == enginev1.MarketState_MARKET_STATE_UNSPECIFIED {
+		if s.schedule.Stale(now) {
+			s.logger.Warn("status pasar belum pernah diterima dari engine")
+		}
+		return
+	}
+
+	anomalies := s.schedule.Observe(state == enginev1.MarketState_MARKET_OPEN, now)
+	if len(anomalies) == 0 {
+		return
+	}
+	for _, anomaly := range anomalies {
+		s.logger.Warn("status pasar tidak sesuai jadwal", "anomali", string(anomaly))
+	}
+	if s.opts.OnMarketAnomaly != nil {
+		s.opts.OnMarketAnomaly(anomalies)
 	}
 }
 
@@ -381,7 +420,7 @@ func (s *Service) executableAccounts(ctx context.Context, user *model.User, tier
 		if !account.IsActive || account.IsFrozen {
 			continue
 		}
-		if key := accountIdentity(account); key != "" {
+		if key := AccountIdentity(account); key != "" {
 			if _, dup := seen[key]; dup {
 				s.logger.Warn("akun broker kembar diabaikan",
 					"user_id", user.ID, "account_id", account.ID, "identity", key)
@@ -397,8 +436,9 @@ func (s *Service) executableAccounts(ctx context.Context, user *model.User, tier
 	return out, nil
 }
 
-// accountIdentity mengembalikan penanda unik akun di sisi broker.
-func accountIdentity(account model.BrokerAccount) string {
+// AccountIdentity mengembalikan penanda unik akun di sisi broker.
+// Akun tanpa penanda tidak pernah digabung: lebih baik dianggap berbeda.
+func AccountIdentity(account model.BrokerAccount) string {
 	if account.ExternalAccountID == "" {
 		return ""
 	}
@@ -410,6 +450,13 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 	// Ban berlaku seketika: akun ter-ban tidak boleh dieksekusi sama sekali,
 	// walau sesinya masih hidup di perangkat user (plans/19 C3).
 	if user.Status == authstate.StatusBanned {
+		return RejectAccountBanned, nil
+	}
+
+	// Akun yang sudah dihapus tidak pernah boleh trading. Sisa subscription
+	// atau akun broker yang tertinggal tidak boleh menghidupkan kembali
+	// eksekusi atas nama akun yang sudah tidak ada (plans/19 C3).
+	if user.Status == model.UserStatusDeleted || user.DeletedAtUser != nil {
 		return RejectAccountBanned, nil
 	}
 

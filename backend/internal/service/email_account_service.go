@@ -23,7 +23,7 @@ import (
 // Masa berlaku tautan surel (plans/17 §3).
 const (
 	verifyTokenTTL = 24 * time.Hour
-	resetTokenTTL  = 1 * time.Hour
+	resetTokenTTL  = 30 * time.Minute
 	// tokenRateWindow membatasi penerbitan tautan per alamat surel.
 	tokenRateWindow = time.Hour
 	tokenRateMax    = 3
@@ -43,6 +43,7 @@ type EmailAccountStore interface {
 	MarkEmailVerified(ctx context.Context, userID string) error
 	Update(ctx context.Context, user *model.User) error
 	Enqueue(ctx context.Context, row *model.EmailOutbox) error
+	EnqueueWithToken(ctx context.Context, row *model.EmailOutbox, rawToken string) error
 	CreateToken(ctx context.Context, token *model.EmailToken) error
 	FindToken(ctx context.Context, hash, purpose string) (*model.EmailToken, error)
 	ConsumeToken(ctx context.Context, id string) (bool, error)
@@ -120,19 +121,18 @@ func (s *emailAccountService) ForgotPassword(ctx context.Context, email, ipHash 
 		return err
 	}
 
-	link := s.baseURL + "/reset-password?token=" + raw
 	payload, _ := json.Marshal(map[string]string{
-		// Payload hanya memuat id token; token mentah tidak disimpan di antrean.
+		// Payload tidak memuat tautan bertoken: kolom ini bisa terbaca dari
+		// backup dan panel dukungan (plans/17 §2).
 		"token_id": token.ID,
 		"name":     user.Name,
-		"link":     link,
 	})
-	if err := s.store.Enqueue(ctx, &model.EmailOutbox{
+	if err := s.store.EnqueueWithToken(ctx, &model.EmailOutbox{
 		ToEmail:  user.Email,
 		Template: templateReset,
 		Payload:  string(payload),
 		Status:   model.EmailPending,
-	}); err != nil {
+	}, raw); err != nil {
 		return err
 	}
 
@@ -232,18 +232,16 @@ func (s *emailAccountService) ResendVerification(ctx context.Context, userID str
 	if err := s.store.CreateToken(ctx, token); err != nil {
 		return err
 	}
-	link := s.baseURL + "/verifikasi?token=" + raw
 	payload, _ := json.Marshal(map[string]string{
 		"token_id": token.ID,
 		"name":     user.Name,
-		"link":     link,
 	})
-	return s.store.Enqueue(ctx, &model.EmailOutbox{
+	return s.store.EnqueueWithToken(ctx, &model.EmailOutbox{
 		ToEmail:  user.Email,
 		Template: templateVerify,
 		Payload:  string(payload),
 		Status:   model.EmailPending,
-	})
+	}, raw)
 }
 
 func (s *emailAccountService) record(ctx context.Context, userID string, action audit.Action, ipHash string, meta map[string]any) {

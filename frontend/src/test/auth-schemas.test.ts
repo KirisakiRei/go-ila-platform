@@ -45,7 +45,20 @@ describe('registerSchema', () => {
       name: 'Budi Santoso',
       email: 'budi@example.com',
       password: 'rahasia-panjang-123',
+      acceptTerms: true,
     })
     expect(result.success).toBe(true)
+  })
+
+  // Backend menolak pendaftaran tanpa persetujuan, jadi formulir harus
+  // menolaknya lebih dulu agar pengguna tidak melihat galat server.
+  it('menolak pendaftaran tanpa persetujuan', () => {
+    const result = registerSchema.safeParse({
+      name: 'Budi Santoso',
+      email: 'budi@example.com',
+      password: 'rahasia-panjang-123',
+      acceptTerms: false,
+    })
+    expect(result.success).toBe(false)
   })
 })

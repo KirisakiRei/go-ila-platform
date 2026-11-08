@@ -304,6 +304,11 @@ func (s *adminUserService) Ban(ctx context.Context, actor AdminActor, userID str
 	if guardSelf(actor.ID, userID, "memblokir") {
 		return validation("tidak dapat memblokir akun sendiri")
 	}
+	// Blokir hanya untuk pelanggan. Mencabut hak admin dilakukan lewat role,
+	// agar admin biasa tidak bisa mem-boot admin lain.
+	if guardAdminTarget(*row) {
+		return validation("akun admin tidak dapat diblokir; cabut role-nya terlebih dahulu")
+	}
 	if err := confirmEmail(row.Email, req.ConfirmEmail); err != nil {
 		return err
 	}

@@ -16,6 +16,11 @@ export const registerSchema = z.object({
     .string()
     .min(10, 'Password minimal 10 karakter')
     .max(72, 'Password maksimal 72 karakter'),
+  // Backend mewajibkan persetujuan Syarat Layanan, Kebijakan Privasi, dan
+  // Kebijakan Penggunaan Wajar sebelum akun dibuat.
+  acceptTerms: z.boolean().refine((value) => value, {
+    message: 'Anda harus menyetujui syarat dan kebijakan',
+  }),
 })
 
 export type LoginFormValues = z.infer<typeof loginSchema>

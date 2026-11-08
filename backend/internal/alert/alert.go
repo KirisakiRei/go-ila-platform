@@ -31,20 +31,24 @@ const (
 	DiskAlmostFull       Trigger = "disk_almost_full"
 	NotifyQueueFull      Trigger = "notify_queue_full"
 	AdminLoginBruteforce Trigger = "admin_login_bruteforce"
+	// MarketScheduleAnomaly menandai engine yang melaporkan status pasar di
+	// luar jadwal NY, biasanya karena zona waktu salah (plans/22 §3).
+	MarketScheduleAnomaly Trigger = "market_schedule_anomaly"
 )
 
 // Label menjelaskan pemicu dalam bahasa manusia untuk pesan Telegram.
 var Label = map[Trigger]string{
-	EngineDisconnected:   "Engine terputus",
-	ExecutionFailing:     "Eksekusi gagal berulang",
-	BrokerErrors:         "Banyak akun broker bermasalah",
-	WebhookSignature:     "Webhook dengan tanda tangan salah",
-	EmailQueueStuck:      "Antrean surel macet",
-	UntrackedPosition:    "Posisi tidak terlacak",
-	SlowQuery:            "Query lambat berulang",
-	DiskAlmostFull:       "Disk hampir penuh",
-	NotifyQueueFull:      "Antrean notifikasi penuh",
-	AdminLoginBruteforce: "Login admin gagal berulang",
+	EngineDisconnected:    "Engine terputus",
+	ExecutionFailing:      "Eksekusi gagal berulang",
+	BrokerErrors:          "Banyak akun broker bermasalah",
+	WebhookSignature:      "Webhook dengan tanda tangan salah",
+	EmailQueueStuck:       "Antrean surel macet",
+	UntrackedPosition:     "Posisi tidak terlacak",
+	SlowQuery:             "Query lambat berulang",
+	DiskAlmostFull:        "Disk hampir penuh",
+	NotifyQueueFull:       "Antrean notifikasi penuh",
+	AdminLoginBruteforce:  "Login admin gagal berulang",
+	MarketScheduleAnomaly: "Status pasar tidak sesuai jadwal",
 }
 
 // Sender mengirim teks ke satu chat.

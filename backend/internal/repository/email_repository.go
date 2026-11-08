@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -36,6 +37,35 @@ func (r *EmailRepository) Enqueue(ctx context.Context, row *model.EmailOutbox) e
 	}
 	return nil
 }
+
+// EnqueueWithToken menambahkan surel bertoken tanpa menyimpan tokennya.
+//
+// Baris antrean hanya memuat id token. Tautan bertoken dititipkan ke kanal
+// dalam memori dan habis sekali pakai; bila proses berhenti sebelum terkirim,
+// tokennya hangus dan pengguna diminta meminta ulang. Ini disengaja: kolom
+// payload terbaca dari dump basis data dan backup (plans/17 §2).
+func (r *EmailRepository) EnqueueWithToken(ctx context.Context, row *model.EmailOutbox, rawToken string) error {
+	if err := r.Enqueue(ctx, row); err != nil {
+		return err
+	}
+	if rawToken != "" {
+		pendingTokens.Store(row.ID, rawToken)
+	}
+	return nil
+}
+
+// TokenFor mengambil token mentah sekali pakai untuk satu baris antrean.
+func (r *EmailRepository) TokenFor(outboxID string) (string, bool) {
+	value, ok := pendingTokens.LoadAndDelete(outboxID)
+	if !ok {
+		return "", false
+	}
+	raw, _ := value.(string)
+	return raw, true
+}
+
+// pendingTokens menyimpan token mentah sementara di memori proses.
+var pendingTokens sync.Map
 
 // Pending mengambil surel yang siap dikirim.
 // Status gagal tidak diambil lagi agar tidak berputar selamanya.

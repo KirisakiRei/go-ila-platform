@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -187,7 +188,7 @@ func (s *billingService) Checkout(ctx context.Context, userID string, req dto.Ch
 // HandleWebhook memproses webhook dengan tujuh langkah berurutan (plans/08 §5.1).
 func (s *billingService) HandleWebhook(ctx context.Context, header map[string]string, body []byte) error {
 	// 1. Verifikasi tanda tangan lebih dulu: tidak ada pemrosesan sebelum sah.
-	if err := s.gateway.VerifyWebhook(header, body); err != nil {
+	if err := s.gateway.VerifyWebhook(ctx, header, body); err != nil {
 		if errors.Is(err, payment.ErrDisabled) {
 			return errors.Join(apperror.ErrServiceUnavailable, errors.New("gateway belum dikonfigurasi"))
 		}
@@ -363,4 +364,48 @@ func truncateRaw(body []byte) string {
 		return string(body)
 	}
 	return string(body[:max])
+}
+
+// BillingSweeper menjalankan pekerjaan harian masa tenggang secara berkala.
+//
+// Tanpa ini, tier kedaluwarsa tidak pernah turun: user tetap Plus selamanya
+// sampai ada admin yang mengubahnya manual (plans/08 §4).
+type BillingSweeper struct {
+	service BillingService
+	logger  *slog.Logger
+}
+
+// NewBillingSweeper merangkai penyapu langganan.
+func NewBillingSweeper(svc BillingService, logger *slog.Logger) *BillingSweeper {
+	return &BillingSweeper{service: svc, logger: logger}
+}
+
+// Run menyapu sekali saat mulai, lalu setiap interval sampai konteks selesai.
+func (b *BillingSweeper) Run(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Hour
+	}
+	b.sweep(ctx)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			b.sweep(ctx)
+		}
+	}
+}
+
+func (b *BillingSweeper) sweep(ctx context.Context) {
+	affected, err := b.service.RunGraceSweep(ctx)
+	if err != nil {
+		b.logger.Error("sapu masa tenggang gagal", "error", err.Error())
+		return
+	}
+	if affected > 0 {
+		b.logger.Info("masa tenggang diperbarui", "changed", affected)
+	}
 }

@@ -17,15 +17,23 @@ export function RegisterForm() {
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', password: '' },
+    defaultValues: { name: '', email: '', password: '', acceptTerms: false },
   })
 
   const onSubmit = handleSubmit((values) => {
     setFormError('')
-    signUp.mutate(values, {
-      onSuccess: () => setIsDone(true),
-      onError: (error) => setFormError(describeError(error)),
-    })
+    signUp.mutate(
+      {
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        accept_terms: values.acceptTerms,
+      },
+      {
+        onSuccess: () => setIsDone(true),
+        onError: (error) => setFormError(describeError(error)),
+      },
+    )
   })
 
   if (isDone) {
@@ -104,6 +112,30 @@ export function RegisterForm() {
           <p id="password-hint" className="text-xs text-muted-foreground">
             Minimal 10 karakter.
           </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="flex items-start gap-2 text-[13px]">
+          <input type="checkbox" className="mt-0.5" {...register('acceptTerms')} />
+          <span>
+            Saya menyetujui{' '}
+            <Link to="/legal/tos" className="underline underline-offset-2">
+              Syarat Layanan
+            </Link>
+            ,{' '}
+            <Link to="/legal/privacy" className="underline underline-offset-2">
+              Kebijakan Privasi
+            </Link>
+            , dan{' '}
+            <Link to="/legal/fair_use" className="underline underline-offset-2">
+              Kebijakan Penggunaan Wajar
+            </Link>
+            .
+          </span>
+        </label>
+        {errors.acceptTerms && (
+          <p className="text-xs text-destructive">{errors.acceptTerms.message}</p>
         )}
       </div>
 

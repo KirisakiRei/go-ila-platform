@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	enginev1 "ila/backend/gen/engine/v1"
+	"ila/backend/internal/alert"
 	"ila/backend/internal/broker"
 	"ila/backend/internal/broker/matchtrader"
 	"ila/backend/internal/config"
@@ -72,6 +73,9 @@ func main() {
 	notifier := notify.New(store, repository.NewNotificationRepository(db), tgClient, logger, 2)
 	defer notifier.Close()
 
+	// Peringatan gangguan platform ke admin; anti-banjir 15 menit per pemicu.
+	alerts := alert.New(tgClient, cfg.TelegramAdminChatID, logger)
+
 	publisher := &runnerPublisher{
 		store:    store,
 		notifier: notifier,
@@ -106,6 +110,15 @@ func main() {
 		LegalGate: repository.NewLegalGate(db),
 		Flags:     flags,
 		Mode:      modeSource,
+		// Engine yang mengaku buka di akhir pekan hampir pasti salah zona
+		// waktu; ini satu-satunya cara mengetahuinya tanpa menunggu keluhan.
+		OnMarketAnomaly: func(anomalies []runner.MarketScheduleAnomaly) {
+			details := make([]string, 0, len(anomalies))
+			for _, anomaly := range anomalies {
+				details = append(details, string(anomaly))
+			}
+			alerts.Fire(ctx, alert.MarketScheduleAnomaly, strings.Join(details, "; "))
+		},
 	}
 
 	svc := runner.NewService(store, registry, publisher, logger, opts)

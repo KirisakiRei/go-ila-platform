@@ -93,6 +93,9 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 		}
 
 		for code, min := range guards {
+			// Pagar harga wajib ada: tanpa baris ini paket berbayar ditolak
+			// saat checkout. Paket yang ditambah admin juga harus punya pagar,
+			// jadi baris yang hilang dibuatkan dengan batas yang sama.
 			guard := &model.PricingGuard{PlanCode: code, MinPriceIDR: min, UpdatedBy: "seed", UpdatedAt: now}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(guard).Error; err != nil {
 				return fmt.Errorf("mengisi batas bawah %s: %w", code, err)
@@ -111,4 +114,17 @@ func TierFeature(ctx context.Context, db *gorm.DB, tier, key, fallback string) s
 		return fallback
 	}
 	return row.Value
+}
+
+// tierFeatureReader menyediakan TierFeature dalam bentuk antarmuka service.
+type tierFeatureReader struct{ db *gorm.DB }
+
+// NewTierFeatureReader membuat pembaca fitur paket dari database.
+func NewTierFeatureReader(db *gorm.DB) *tierFeatureReader {
+	return &tierFeatureReader{db: db}
+}
+
+// Feature membaca satu fitur paket dengan nilai cadangan.
+func (r *tierFeatureReader) Feature(ctx context.Context, tier, key, fallback string) string {
+	return TierFeature(ctx, r.db, tier, key, fallback)
 }

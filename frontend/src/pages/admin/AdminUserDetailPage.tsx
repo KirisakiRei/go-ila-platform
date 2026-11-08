@@ -28,7 +28,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui'
-import type { AdminAccountItem, AdminPositionItem, UserActionPayload } from '@/types/admin'
+import type {
+  AdminAccountItem,
+  AdminPositionItem,
+  AdminUserDetail,
+  UserActionPayload,
+} from '@/types/admin'
+import type { Tier } from '@/types/api'
 
 const TIER_LABEL: Record<string, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
 
@@ -204,13 +210,13 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** UserActions menaungi seluruh aksi berlapis terhadap pelanggan. */
-function UserActions({ user, onDone }: { user: { id: string; status: string; email: string; tier: string }; onDone: () => void }) {
+function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => void }) {
   const [pending, setPending] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [category, setCategory] = useState('tos')
   const [confirmEmail, setConfirmEmail] = useState('')
   const [acknowledge, setAcknowledge] = useState(false)
-  const [tier, setTier] = useState(user.tier)
+  const [tier, setTier] = useState<Tier>(user.tier)
   const [notice, setNotice] = useState<string | null>(null)
 
   const mutation = useMutation({
@@ -279,7 +285,8 @@ function UserActions({ user, onDone }: { user: { id: string; status: string; ema
             Buka penangguhan
           </Button>
         )}
-        {user.status !== 'banned' && (
+        {/* Admin tidak bisa diblokir dari sini: hak admin dicabut lewat role. */}
+        {user.status !== 'banned' && user.role !== 'admin' && (
           <Button variant="destructive" size="sm" onClick={() => setPending('ban')}>
             Blokir
           </Button>
@@ -308,7 +315,7 @@ function UserActions({ user, onDone }: { user: { id: string; status: string; ema
             {pending === 'tier' && (
               <div className="flex flex-col gap-1">
                 <Label htmlFor="tier-select">Tier baru</Label>
-                <Select id="tier-select" value={tier} onChange={(event) => setTier(event.target.value)}>
+                <Select id="tier-select" value={tier} onChange={(event) => setTier(event.target.value as Tier)}>
                   <option value="free">Free</option>
                   <option value="basic">Basic</option>
                   <option value="plus">Plus</option>
