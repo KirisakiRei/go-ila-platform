@@ -62,8 +62,10 @@ func KnownSectionKind(kind string) bool {
 // bebas yang sulit disunting dan divalidasi.
 type PageSection struct {
 	Base
-	PageSlug string `gorm:"type:varchar(40);not null;index" json:"page_slug"`
-	// Key unik per halaman, dipakai sebagai anchor dan kunci penyuntingan.
+	PageSlug string `gorm:"type:varchar(40);not null;uniqueIndex:idx_page_section_key" json:"page_slug"`
+	// Kunci unik per halaman, bukan global: dua halaman boleh sama-sama punya
+	// bagian "faq" atau "catatan" tanpa saling bentrok. Inilah sebabnya
+	// page_slug ikut menjadi bagian dari indeks unik yang sama.
 	Key         string `gorm:"type:varchar(60);not null;uniqueIndex:idx_page_section_key" json:"key"`
 	Kind        string `gorm:"type:varchar(20);not null" json:"kind"`
 	Eyebrow     string `gorm:"type:varchar(80);not null;default:''" json:"eyebrow"`
