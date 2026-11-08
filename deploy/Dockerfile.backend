@@ -21,7 +21,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/backend
 FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tzdata wget \
- && addgroup -S app && adduser -S -G app app
+ && addgroup -S -g 1001 app && adduser -S -G app -u 1001 app
+
+# UID/GID tetap agar folder log di host bisa diberi izin yang tepat.
+# Dengan UID acak, chown di host tidak bisa diprediksi.
 
 WORKDIR /app
 

@@ -13,6 +13,53 @@ Prinsip yang berlaku di seluruh runbook:
 
 ---
 
+## 0. Di Mana Log Berada
+
+Semua layanan menulis JSONL harian ke folder yang sama di **disk VPS**, bukan di
+dalam container. Log tetap ada walau container dibuat ulang atau dijalankan
+`docker compose down -v`.
+
+| VPS | Lokasi | Masa simpan |
+|---|---|---|
+| 2 (platform) | `/var/log/ila/YYYY/MM/DD/` | 30 hari |
+| 1 (engine) | `/opt/data/ila-engine/logs/YYYY/MM/DD/` | 7 hari / 150 MB |
+
+Isi folder di VPS 2:
+
+```
+/var/log/ila/2026/11/08/
+  backend-api-2026-11-08.log
+  runner-2026-11-08.log
+  engine-2026-11-08.log     ← kiriman dari VPS 1
+  caddy.log                 ← dirotasi Caddy sendiri
+```
+
+**Membaca log.** Tidak perlu `docker exec`:
+
+```bash
+./scripts/log.sh                          # hari ini, semua layanan
+./scripts/log.sh 2026/11/07 runner        # satu layanan
+LOG_LEVEL=ERROR ./scripts/log.sh          # hanya error
+LOG_CARI=a1b2c3 ./scripts/log.sh          # lacak satu trace
+```
+
+**Satu insiden, dua VPS.** Cari `trace` yang sama di kedua tempat:
+
+```bash
+grep a1b2c3 /opt/data/ila-engine/logs/2026/11/08/engine-*.log   # VPS 1
+grep a1b2c3 /var/log/ila/2026/11/08/runner-*.log                # VPS 2
+```
+
+**Level yang dipakai.** `DEBUG` detail internal (butuh `LOG_LEVEL=debug`),
+`INFO` alur normal, `WARN` bisa pulih sendiri (reconnect, feed retry, login
+gagal), `ERROR` butuh manusia. Penolakan input pengguna adalah `WARN`, bukan
+`ERROR`: bila semua hal ditandai ERROR, tidak ada lagi yang menonjol.
+
+**Deploy pertama wajib** menjalankan `sudo ./scripts/siapkan-log.sh` sekali,
+agar container (UID 1001) bisa menulis ke folder tersebut.
+
+---
+
 ## 1. Runner Mati
 
 **Gejala.** Dashboard admin menampilkan Runner tidak tersambung. Peringatan
@@ -81,14 +128,17 @@ terhadap user, bukan terhadap gangguan teknis.
 **Periksa.**
 
 1. `df -h` dan `docker system df`.
-2. Ukuran log: `du -sh /var/lib/docker/containers/*/*-json.log`.
+2. Ukuran log: `du -sh /var/log/ila /var/lib/docker/containers/*/*-json.log`.
 
 **Tindakan.**
 
-1. Putar log: `docker compose up -d --force-recreate` setelah mengatur
-   `max-size` pada driver log.
-2. Hapus backup lama di luar retensi: `ls -1 /var/backups/ila`.
-3. Bila masih penuh, lihat tabel terbesar di PostgreSQL dan arsipkan.
+1. Log aplikasi sudah merawat diri sendiri (30 hari / 1 GB di VPS 2, 7 hari /
+   150 MB di VPS 1). Bila masih penuh, periksa `du -sh /var/log/ila/*`, lalu
+   hapus hari terlama manual: `rm -rf /var/log/ila/2026/11/01`.
+2. Stdout container tetap dibatasi `max-size 10m, max-file 2`; bila perlu
+   diputar: `docker compose up -d --force-recreate`.
+3. Hapus backup lama di luar retensi: `ls -1 /var/backups/ila`.
+4. Bila masih penuh, lihat tabel terbesar di PostgreSQL dan arsipkan.
 
 **Jangan.** Menghapus tabel audit untuk menghemat ruang.
 

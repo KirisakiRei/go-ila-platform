@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-AKAR="${LOG_DIR:-/var/log/ila}"
+AKAR="${LOG_DIR:-${LOG_DIR_HOST:-/var/log/ila}}"
 HARI="${1:-$(date -u +%Y/%m/%d)}"
 LAYANAN="${2:-}"
 FOLDER="$AKAR/$HARI"

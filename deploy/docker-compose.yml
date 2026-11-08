@@ -53,7 +53,7 @@ services:
       migrate:
         condition: service_completed_successfully
     volumes:
-      - log_data:/var/log/ila
+      - ${LOG_DIR_HOST:-/var/log/ila}:/var/log/ila
     networks: [platform]
     # Hanya Caddy yang berbicara dengan backend-api.
     expose:
@@ -98,7 +98,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./certs:/certs:ro
-      - log_data:/var/log/ila
+      - ${LOG_DIR_HOST:-/var/log/ila}:/var/log/ila
     networks: [platform]
     # Runner tidak pernah menerima koneksi dari luar. Port internal 8081 hanya
     # dijangkau backend-api lewat jaringan compose.
@@ -157,7 +157,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       # Log akses HTTP ikut ke folder yang sama dengan log layanan.
-      - log_data:/var/log/ila
+      - ${LOG_DIR_HOST:-/var/log/ila}:/var/log/ila
     networks: [platform]
     depends_on:
       backend-api:
@@ -187,6 +187,8 @@ services:
     volumes:
       - ../scripts:/scripts:ro
       - backup_data:/var/backups/ila
+      # Log ikut diarsipkan mingguan agar tidak bergantung pada disk VPS saja.
+      - ${LOG_DIR_HOST:-/var/log/ila}:/var/log/ila:ro
       - ${BACKUP_REMOTE_DIR:-./backups-remote}:/remote
     networks: [platform]
     depends_on:
@@ -226,9 +228,6 @@ networks:
     driver: bridge
 
 volumes:
-  # Log dua VPS berkumpul di sini. Caddy, Runner, dan Engine menulis ke
-  # subfolder berbeda di dalamnya.
-  log_data:
   pgdata:
   backup_data:
   caddy_data:

@@ -50,4 +50,24 @@ fi
 find "$BACKUP_DIR" -maxdepth 1 -name 'ila-*.dump' -type f -mtime "+$DAILY_KEEP" -delete
 find "$BACKUP_DIR/weekly" -name 'ila-*.dump' -type f -mtime "+$((WEEKLY_KEEP * 7))" -delete 2>/dev/null || true
 
+# --- Log layanan ---------------------------------------------------------
+# Log harian ikut diarsipkan: berkas di host terlindungi dari container yang
+# dibuat ulang, tapi tidak dari disk VPS yang rusak. Arsip mingguan dipakai
+# saat menelusuri insiden lama setelah berkas aslinya melewati masa simpan.
+LOG_SOURCE="${LOG_DIR_HOST:-/var/log/ila}"
+if [[ -d "$LOG_SOURCE" ]]; then
+  if [[ "$(date -u +%u)" == "7" ]]; then
+    mkdir -p "$BACKUP_DIR/logs"
+    arsip="$BACKUP_DIR/logs/ila-log-$stamp.tar.gz"
+    tar -czf "$arsip" -C "$(dirname "$LOG_SOURCE")" "$(basename "$LOG_SOURCE")" 2>/dev/null || true
+    if [[ -f "$arsip" ]]; then
+      echo "[backup] arsip log mingguan: $arsip"
+      if [[ -n "$REMOTE_DIR" ]]; then
+        cp "$arsip" "$REMOTE_DIR/"
+      fi
+    fi
+  fi
+  find "$BACKUP_DIR/logs" -name 'ila-log-*.tar.gz' -type f -mtime "+$((WEEKLY_KEEP * 7))" -delete 2>/dev/null || true
+fi
+
 echo "[backup] selesai: $target ($checksum)"
