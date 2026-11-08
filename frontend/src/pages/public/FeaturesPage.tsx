@@ -51,9 +51,10 @@ export default function FeaturesPage() {
       </div>
 
       <div className="mt-8 flex flex-wrap gap-2">
-        <Link to="/app/register" className="rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background">
+        {/* Anchor biasa: panel pelanggan bundel terpisah di /app/*. */}
+        <a href="/app/register" className="rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background">
           Mulai uji coba
-        </Link>
+        </a>
         <Link to="/bantuan/zona-waktu" className="rounded-md border border-border px-4 py-2 text-[13px] font-medium">
           Bagaimana zona waktu bekerja
         </Link>

@@ -53,12 +53,15 @@ export function PublicLayout() {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
-            <Link to="/app/login" className="rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground hover:text-foreground">
+            {/* Anchor biasa, bukan <Link>: panel pelanggan adalah bundel
+                terpisah di /app/*. Navigasi client-side akan mencari rute itu
+                di router publik dan berakhir di halaman tidak ditemukan. */}
+            <a href="/app/login" className="rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground hover:text-foreground">
               Masuk
-            </Link>
-            <Link to="/app/register" className="rounded-md bg-foreground px-3 py-1.5 text-[13px] font-medium text-background">
+            </a>
+            <a href="/app/register" className="rounded-md bg-foreground px-3 py-1.5 text-[13px] font-medium text-background">
               Daftar
-            </Link>
+            </a>
           </div>
 
           <button
@@ -78,16 +81,16 @@ export function PublicLayout() {
                 {item.label}
               </Link>
             ))}
-            <Link to="/app/login" className="rounded-md px-2 py-1.5 text-[13px]" onClick={() => setOpen(false)}>
+            <a href="/app/login" className="rounded-md px-2 py-1.5 text-[13px]" onClick={() => setOpen(false)}>
               Masuk
-            </Link>
-            <Link
-              to="/app/register"
+            </a>
+            <a
+              href="/app/register"
               className="rounded-md bg-foreground px-2 py-1.5 text-center text-[13px] font-medium text-background"
               onClick={() => setOpen(false)}
             >
               Daftar
-            </Link>
+            </a>
           </nav>
         )}
       </header>

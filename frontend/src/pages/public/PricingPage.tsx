@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@/components/ui'
 import { publicPlanApi } from '@/lib/admin-api'
@@ -54,12 +53,13 @@ export default function PricingPage() {
                 ))}
               </ul>
               {plan.ila3_coming_soon && <Badge variant="default">ILA 3.0 belum tersedia</Badge>}
-              <Link
-                to="/app/register"
+              {/* Anchor biasa: panel pelanggan bundel terpisah di /app/*. */}
+              <a
+                href="/app/register"
                 className="block rounded-md bg-foreground px-3 py-2 text-center text-[13px] font-medium text-background"
               >
                 Pilih {plan.name}
-              </Link>
+              </a>
             </CardContent>
           </Card>
         ))}

@@ -40,9 +40,10 @@ export default function LandingPage() {
           dikenali, risiko dibatasi, dan setiap keputusan tercatat. Akun tetap milik Anda, di broker Anda.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link to="/app/register" className="rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background">
+          {/* Anchor biasa: panel pelanggan bundel terpisah di /app/*. */}
+          <a href="/app/register" className="rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background">
             Mulai uji coba 7 hari
-          </Link>
+          </a>
           <Link to="/fitur" className="rounded-md border border-border px-4 py-2 text-[13px] font-medium">
             Lihat cara kerja
           </Link>

@@ -1,18 +1,32 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 
 /**
  * AuthLayout memusatkan formulir masuk dan daftar.
- * Lebar dibatasi agar baris teks tetap nyaman dibaca.
+ *
+ * Lebar dibatasi agar baris teks tetap nyaman dibaca. Tautan kembali ditaruh
+ * di atas kartu, bukan di dalamnya, supaya tidak tertukar dengan tombol kirim
+ * formulir dan tetap terlihat saat formulir berganti langkah.
+ *
+ * Tautan kembali memakai anchor biasa: beranda dilayani bundel publik yang
+ * terpisah, jadi navigasi client-side tidak akan menemukan rutenya.
  */
 export function AuthLayout({ children, footer }: { children: ReactNode; footer: ReactNode }) {
   return (
     <div className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <Link to="/" className="mb-8 flex items-baseline justify-center gap-1.5">
+        <a
+          href="/"
+          className="mb-6 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          Kembali ke beranda
+        </a>
+
+        <a href="/" className="mb-8 flex items-baseline justify-center gap-1.5">
           <span className="text-base font-bold tracking-tight">ILA</span>
           <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Bot</span>
-        </Link>
+        </a>
 
         <div className="border border-border p-6">{children}</div>
 
