@@ -80,6 +80,12 @@ update: ## Tarik kode lalu build ulang dari nol
 	$(COMPOSE) build --no-cache $(S)
 	$(COMPOSE) up -d
 
+# Membuat atau menyetel ulang akun superadmin. Password dibaca dari
+# SEED_ADMIN_PASSWORD di .env agar tidak tertinggal di riwayat shell.
+.PHONY: seed-admin
+seed-admin: ## Buat/setel ulang akun superadmin
+	$(COMPOSE) run --rm seed-superadmin
+
 .PHONY: up-cold
 up-cold: ## Nyalakan ulang dari nol termasuk volume database
 	$(COMPOSE) down -v

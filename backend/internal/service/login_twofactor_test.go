@@ -71,7 +71,7 @@ func TestLoginAdminTanpa2FALangsungSelesai(t *testing.T) {
 	f := newAdminLoginFixture(t)
 
 	result, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 	if err != nil {
 		t.Fatalf("Login error: %v", err)
@@ -91,7 +91,7 @@ func TestLoginAdminDengan2FAMenuntutKode(t *testing.T) {
 	f.sealerGate.(*stubGate).code = "123456"
 
 	result, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 	if err != nil {
 		t.Fatalf("Login error: %v", err)
@@ -116,7 +116,7 @@ func TestVerifikasi2FAMenuntaskanLogin(t *testing.T) {
 	ctx := context.Background()
 
 	first, err := f.svc.Login(ctx, dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 	if err != nil {
 		t.Fatalf("Login error: %v", err)
@@ -152,7 +152,7 @@ func TestTantanganSekaliPakai(t *testing.T) {
 	ctx := context.Background()
 
 	first, _ := f.svc.Login(ctx, dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 
 	if _, err := f.svc.VerifyTwoFactor(ctx, dto.VerifyTwoFactorRequest{
@@ -176,7 +176,7 @@ func TestTantanganHangusSetelahLimaSalah(t *testing.T) {
 	ctx := context.Background()
 
 	first, _ := f.svc.Login(ctx, dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 
 	for i := 0; i < MaxChallengeAttempts; i++ {
@@ -204,7 +204,7 @@ func TestTantanganKedaluwarsaDitolak(t *testing.T) {
 	ctx := context.Background()
 
 	first, _ := f.svc.Login(ctx, dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 
 	// Majukan jam melewati umur tantangan.
@@ -225,7 +225,7 @@ func TestTantanganPurposeSalahDitolak(t *testing.T) {
 	ctx := context.Background()
 
 	first, _ := f.svc.Login(ctx, dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 
 	// Tandai tantangan sebagai milik pintu user.

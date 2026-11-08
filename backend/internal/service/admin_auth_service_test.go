@@ -103,7 +103,7 @@ func TestAdminLoginBerhasil(t *testing.T) {
 	f := newAdminAuthFixture(t)
 
 	result, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{UserAgent: "uji"})
 	if err != nil {
 		t.Fatalf("Login error: %v", err)
@@ -131,7 +131,7 @@ func TestPelangganTidakBisaMasukPintuAdmin(t *testing.T) {
 	f := newAdminAuthFixture(t)
 
 	_, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "user@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "user@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 	if !errors.Is(err, apperror.ErrUnauthorized) {
 		t.Fatalf("error = %v; ingin UNAUTHORIZED", err)
@@ -143,7 +143,7 @@ func TestPasswordSalah401(t *testing.T) {
 	f := newAdminAuthFixture(t)
 
 	_, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "admin@ila.id", Password: "salah",
+		Identifier: "admin@ila.id", Password: "salah",
 	}, LoginContext{})
 	if !errors.Is(err, apperror.ErrUnauthorized) {
 		t.Fatalf("error = %v; ingin UNAUTHORIZED", err)
@@ -155,7 +155,7 @@ func TestAdminTanpaRoleRbacDitolak(t *testing.T) {
 	f := newAdminAuthFixture(t)
 
 	_, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "noro le@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "noro le@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 	if !errors.Is(err, apperror.ErrForbidden) {
 		t.Fatalf("error = %v; ingin FORBIDDEN", err)
@@ -168,7 +168,7 @@ func TestAdminDitangguhkanDitolak(t *testing.T) {
 	f.users.users["a1"].Status = "suspended"
 
 	_, err := f.svc.Login(context.Background(), dto.LoginRequest{
-		Email: "admin@ila.id", Password: "rahasia-panjang-123",
+		Identifier: "admin@ila.id", Password: "rahasia-panjang-123",
 	}, LoginContext{})
 	if !errors.Is(err, apperror.ErrForbidden) {
 		t.Fatalf("error = %v; ingin FORBIDDEN", err)

@@ -40,6 +40,18 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 	return r.findOne(ctx, "email = ?", email)
 }
 
+// FindByUsername memakai kolom yang sudah diindeks unik sehingga tetap satu baris.
+func (r *userRepository) FindByUsername(ctx context.Context, username string) (*model.User, error) {
+	return r.findOne(ctx, "username = ?", username)
+}
+
+// FindByIdentifier menerima email atau username pada satu kolom masuk.
+// Email dicocokkan lebih dulu karena kolomnya wajib, sehingga akun lama
+// tanpa username tetap bisa masuk.
+func (r *userRepository) FindByIdentifier(ctx context.Context, identifier string) (*model.User, error) {
+	return r.findOne(ctx, "email = ? OR username = ?", identifier, identifier)
+}
+
 func (r *userRepository) FindByTelegramChatID(ctx context.Context, chatID string) (*model.User, error) {
 	return r.findOne(ctx, "telegram_chat_id = ?", chatID)
 }

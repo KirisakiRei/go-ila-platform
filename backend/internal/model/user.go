@@ -6,7 +6,12 @@ import "time"
 // Tier dan status trial menentukan apa yang boleh dilakukan Runner atas namanya.
 type User struct {
 	Base
-	Name         string `gorm:"type:varchar(100);not null" json:"name"`
+	Name string `gorm:"type:varchar(100);not null" json:"name"`
+	// Username dipakai untuk masuk sebagai alternatif email. Disimpan huruf
+	// kecil agar `Budi` dan `budi` tidak menjadi dua akun berbeda.
+	Username string `gorm:"type:varchar(32);uniqueIndex" json:"username"`
+	// Phone belum diverifikasi; hanya dipakai admin untuk menghubungi akun.
+	Phone        string `gorm:"type:varchar(24)" json:"phone"`
 	Email        string `gorm:"type:varchar(150);uniqueIndex;not null" json:"email"`
 	PasswordHash string `gorm:"type:varchar(255);not null" json:"-"`
 	Role         string `gorm:"type:varchar(20);not null;default:user" json:"role"`

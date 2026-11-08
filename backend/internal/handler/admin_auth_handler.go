@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -60,7 +61,7 @@ func (h *AdminAuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	key := "admin|" + c.ClientIP() + "|" + req.Email
+	key := "admin|" + c.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(req.Identifier))
 	if h.limiter != nil && h.limiter.Blocked(key) {
 		c.Error(apperror.ErrTooManyRequests)
 		return

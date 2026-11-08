@@ -17,6 +17,9 @@ type UserRepository interface {
 	Create(ctx context.Context, user *model.User) error
 	FindByID(ctx context.Context, id string) (*model.User, error)
 	FindByEmail(ctx context.Context, email string) (*model.User, error)
+	FindByUsername(ctx context.Context, username string) (*model.User, error)
+	// FindByIdentifier mencocokkan email atau username untuk satu kolom masuk.
+	FindByIdentifier(ctx context.Context, identifier string) (*model.User, error)
 	FindByTelegramChatID(ctx context.Context, chatID string) (*model.User, error)
 	UpdateLastLogin(ctx context.Context, id string, at time.Time) error
 	Update(ctx context.Context, user *model.User) error

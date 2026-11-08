@@ -28,21 +28,40 @@ describe('LoginPage', () => {
     renderWithProviders(<LoginPage />)
 
     expect(screen.getByRole('heading', { name: 'Masuk' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Email')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email atau username')).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
   })
 })
 
 describe('RegisterForm', () => {
+  // Pendaftaran dibagi tiga langkah; isian per langkah muncul bergantian,
+  // jadi test harus berjalan melewati tombol Lanjut.
   it('menampilkan pesan saat password terlalu pendek', async () => {
     const user = userEvent.setup()
     renderWithProviders(<RegisterForm />)
 
-    await user.type(screen.getByLabelText('Nama'), 'Budi')
-    await user.type(screen.getByLabelText('Email'), 'budi@example.com')
-    await user.type(screen.getByLabelText('Password'), 'pendek')
-    await user.click(screen.getByRole('button', { name: 'Daftar' }))
+    await user.type(screen.getByLabelText('Nama lengkap'), 'Budi Santoso')
+    await user.type(screen.getByLabelText('Username'), 'budi.santoso')
+    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    await user.type(await screen.findByLabelText('Email'), 'budi@example.com')
+    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    await user.type(await screen.findByLabelText('Password'), 'pendek')
+    await user.click(screen.getByRole('button', { name: 'Buat akun' }))
 
     expect(await screen.findByText(/minimal 10/i)).toBeInTheDocument()
+  })
+
+  it('menahan langkah pertama bila username tidak sah', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<RegisterForm />)
+
+    await user.type(screen.getByLabelText('Nama lengkap'), 'Budi Santoso')
+    await user.type(screen.getByLabelText('Username'), 'budi santoso')
+    await user.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    expect(await screen.findByText(/Hanya huruf, angka/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
   })
 })

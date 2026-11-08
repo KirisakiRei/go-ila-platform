@@ -1,31 +1,68 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Alert, Button, Input, Label } from '@/components/ui'
 import { ApiError } from '@/lib/api-error'
+import { cn } from '@/lib/utils'
 import { useSignUp } from '../hooks/use-auth'
-import { registerSchema, type RegisterFormValues } from '../schemas'
+import {
+  REGISTER_STEPS,
+  REGISTER_STEP_FIELDS,
+  registerSchema,
+  type RegisterFormValues,
+  type RegisterStep,
+} from '../schemas'
 
+/**
+ * RegisterForm membagi pendaftaran menjadi tiga langkah.
+ *
+ * Satu layar berisi lima isian membuat pengguna melewatkan bagian yang salah
+ * tanpa sadar. Dengan langkah, kesalahan tertangkap per bagian dan pengguna
+ * tahu seberapa jauh prosesnya.
+ */
 export function RegisterForm() {
   const signUp = useSignUp()
   const [formError, setFormError] = useState('')
   const [isDone, setIsDone] = useState(false)
+  const [stepIndex, setStepIndex] = useState(0)
+
   const {
     register,
     handleSubmit,
+    trigger,
+    control,
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', password: '', acceptTerms: false },
+    mode: 'onTouched',
+    defaultValues: { name: '', username: '', email: '', phone: '', password: '', acceptTerms: false },
   })
+
+  const step = REGISTER_STEPS[stepIndex] ?? REGISTER_STEPS[0]
+  const isLastStep = stepIndex === REGISTER_STEPS.length - 1
+  const username = useWatch({ control, name: 'username' })
+
+  /** Lanjut hanya bila bagian ini sah; validasi akhir tetap saat kirim. */
+  async function next() {
+    setFormError('')
+    const valid = await trigger(REGISTER_STEP_FIELDS[step])
+    if (valid) setStepIndex((index) => Math.min(index + 1, REGISTER_STEPS.length - 1))
+  }
+
+  function back() {
+    setFormError('')
+    setStepIndex((index) => Math.max(index - 1, 0))
+  }
 
   const onSubmit = handleSubmit((values) => {
     setFormError('')
     signUp.mutate(
       {
         name: values.name,
+        username: values.username,
         email: values.email,
+        phone: values.phone,
         password: values.password,
         accept_terms: values.acceptTerms,
       },
@@ -42,7 +79,8 @@ export function RegisterForm() {
         <header className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold tracking-tight">Akun dibuat</h1>
           <p className="text-[13px] text-muted-foreground">
-            Sekarang Anda bisa masuk dengan email tersebut.
+            Masuk dengan email Anda, atau dengan username{' '}
+            <span className="font-medium text-foreground">{username}</span>.
           </p>
         </header>
         <Button asChild className="w-full">
@@ -53,98 +91,218 @@ export function RegisterForm() {
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
-      <header className="flex flex-col gap-1">
+    <form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate>
+      <header className="flex flex-col gap-2">
         <h1 className="text-xl font-semibold tracking-tight">Daftar</h1>
-        <p className="text-[13px] text-muted-foreground">Akun baru dimulai pada tier Free.</p>
+        <StepIndicator steps={REGISTER_STEPS} current={stepIndex} />
       </header>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="name">Nama</Label>
-        <Input
-          id="name"
-          type="text"
-          autoComplete="name"
-          hasError={Boolean(errors.name)}
-          aria-describedby={errors.name ? 'name-error' : undefined}
-          {...register('name')}
-        />
-        {errors.name && (
-          <p id="name-error" className="text-xs text-destructive">
-            {errors.name.message}
-          </p>
-        )}
-      </div>
+      {step === 'Identitas' && (
+        <>
+          <Field
+            id="name"
+            label="Nama lengkap"
+            error={errors.name?.message}
+            input={
+              <Input
+                id="name"
+                type="text"
+                autoComplete="name"
+                placeholder="Nama yang ditampilkan"
+                hasError={Boolean(errors.name)}
+                {...register('name')}
+              />
+            }
+          />
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="nama@email.com"
-          hasError={Boolean(errors.email)}
-          aria-describedby={errors.email ? 'email-error' : undefined}
-          {...register('email')}
-        />
-        {errors.email && (
-          <p id="email-error" className="text-xs text-destructive">
-            {errors.email.message}
-          </p>
-        )}
-      </div>
+          <Field
+            id="username"
+            label="Username"
+            hint="Dipakai untuk masuk. Huruf, angka, titik, garis bawah, dan strip."
+            error={errors.username?.message}
+            input={
+              <Input
+                id="username"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="mis. budi.santoso"
+                hasError={Boolean(errors.username)}
+                {...register('username')}
+              />
+            }
+          />
+        </>
+      )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          hasError={Boolean(errors.password)}
-          aria-describedby={errors.password ? 'password-error' : 'password-hint'}
-          {...register('password')}
-        />
-        {errors.password ? (
-          <p id="password-error" className="text-xs text-destructive">
-            {errors.password.message}
-          </p>
-        ) : (
-          <p id="password-hint" className="text-xs text-muted-foreground">
-            Minimal 10 karakter.
-          </p>
-        )}
-      </div>
+      {step === 'Kontak' && (
+        <>
+          <Field
+            id="email"
+            label="Email"
+            hint="Dipakai untuk pemulihan akun dan pemberitahuan penting."
+            error={errors.email?.message}
+            input={
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="nama@email.com"
+                hasError={Boolean(errors.email)}
+                {...register('email')}
+              />
+            }
+          />
 
-      <div className="flex flex-col gap-1">
-        <label className="flex items-start gap-2 text-[13px]">
-          <input type="checkbox" className="mt-0.5" {...register('acceptTerms')} />
-          <span>
-            Saya menyetujui{' '}
-            <Link to="/legal/tos" className="underline underline-offset-2">
-              Syarat Layanan
-            </Link>
-            ,{' '}
-            <Link to="/legal/privacy" className="underline underline-offset-2">
-              Kebijakan Privasi
-            </Link>
-            , dan{' '}
-            <Link to="/legal/fair_use" className="underline underline-offset-2">
-              Kebijakan Penggunaan Wajar
-            </Link>
-            .
-          </span>
-        </label>
-        {errors.acceptTerms && (
-          <p className="text-xs text-destructive">{errors.acceptTerms.message}</p>
-        )}
-      </div>
+          <Field
+            id="phone"
+            label="Nomor telepon"
+            hint="Opsional. Hanya dipakai bila kami perlu menghubungi Anda."
+            error={errors.phone?.message}
+            input={
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="+62 812 3456 7890"
+                hasError={Boolean(errors.phone)}
+                {...register('phone')}
+              />
+            }
+          />
+        </>
+      )}
+
+      {step === 'Keamanan' && (
+        <>
+          <Field
+            id="password"
+            label="Password"
+            hint="Minimal 10 karakter. Gunakan kombinasi yang tidak dipakai di tempat lain."
+            error={errors.password?.message}
+            input={
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                hasError={Boolean(errors.password)}
+                {...register('password')}
+              />
+            }
+          />
+
+          <div className="flex flex-col gap-1">
+            <label className="flex items-start gap-2 text-[13px]">
+              <input type="checkbox" className="mt-0.5" {...register('acceptTerms')} />
+              <span>
+                Saya menyetujui{' '}
+                <Link to="/legal/tos" className="underline underline-offset-2">
+                  Syarat Layanan
+                </Link>
+                ,{' '}
+                <Link to="/legal/privacy" className="underline underline-offset-2">
+                  Kebijakan Privasi
+                </Link>
+                , dan{' '}
+                <Link to="/legal/fair_use" className="underline underline-offset-2">
+                  Kebijakan Penggunaan Wajar
+                </Link>
+                .
+              </span>
+            </label>
+            {errors.acceptTerms && (
+              <p className="text-xs text-destructive">{errors.acceptTerms.message}</p>
+            )}
+          </div>
+        </>
+      )}
+
+      <p className="text-[12px] text-muted-foreground">Akun baru dimulai pada tier Free.</p>
 
       {formError && <Alert>{formError}</Alert>}
 
-      <Button type="submit" className="w-full" isLoading={signUp.isPending}>
-        Daftar
-      </Button>
+      <div className="flex gap-2">
+        {stepIndex > 0 && (
+          <Button type="button" variant="outline" className="flex-1" onClick={back}>
+            Kembali
+          </Button>
+        )}
+        {isLastStep ? (
+          <Button type="submit" className="flex-1" isLoading={signUp.isPending}>
+            Buat akun
+          </Button>
+        ) : (
+          <Button type="button" className="flex-1" onClick={() => void next()}>
+            Lanjut
+          </Button>
+        )}
+      </div>
     </form>
+  )
+}
+
+/** StepIndicator menunjukkan posisi dan panjang proses pendaftaran. */
+function StepIndicator({ steps, current }: { steps: readonly string[]; current: number }) {
+  return (
+    <ol className="flex items-center gap-1.5" aria-label="Langkah pendaftaran">
+      {steps.map((label, index) => {
+        const state = index < current ? 'done' : index === current ? 'active' : 'next'
+        return (
+          <li key={label} className="flex flex-1 flex-col gap-1.5">
+            <span
+              className={cn(
+                'h-1 w-full rounded-full',
+                state === 'next' ? 'bg-border' : 'bg-foreground',
+              )}
+            />
+            <span
+              className={cn(
+                'text-[10px] uppercase tracking-[0.15em]',
+                state === 'active' ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {label}
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/** Field membungkus label, isian, bantuan, dan galat dengan susunan seragam. */
+function Field({
+  id,
+  label,
+  hint,
+  error,
+  input,
+}: {
+  id: string
+  label: string
+  hint?: string
+  error?: string
+  input: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      {input}
+      {error ? (
+        <p id={`${id}-error`} className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : (
+        hint && (
+          <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+            {hint}
+          </p>
+        )
+      )}
+    </div>
   )
 }
 
@@ -158,3 +316,5 @@ function describeError(error: unknown): string {
   }
   return 'Terjadi kesalahan tak terduga.'
 }
+
+export type { RegisterStep }

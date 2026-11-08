@@ -43,6 +43,27 @@ func (f *fakeUserRepo) FindByEmail(_ context.Context, email string) (*model.User
 	return nil, apperror.ErrNotFound
 }
 
+func (f *fakeUserRepo) FindByUsername(_ context.Context, username string) (*model.User, error) {
+	for _, u := range f.users {
+		if u.Username != "" && u.Username == username {
+			return u, nil
+		}
+	}
+	return nil, apperror.ErrNotFound
+}
+
+func (f *fakeUserRepo) FindByIdentifier(_ context.Context, identifier string) (*model.User, error) {
+	if u, ok := f.users[identifier]; ok {
+		return u, nil
+	}
+	for _, u := range f.users {
+		if u.Username != "" && u.Username == identifier {
+			return u, nil
+		}
+	}
+	return nil, apperror.ErrNotFound
+}
+
 func (f *fakeUserRepo) FindByTelegramChatID(_ context.Context, _ string) (*model.User, error) {
 	return nil, apperror.ErrNotFound
 }
@@ -157,7 +178,7 @@ func TestLoginWithWrongPasswordIsUnauthorized(t *testing.T) {
 
 	_, _ = svc.Register(ctx, dto.RegisterRequest{Name: "Budi", Email: "budi@example.com", Password: "rahasia-panjang-123"})
 
-	_, err := svc.Login(ctx, dto.LoginRequest{Email: "budi@example.com", Password: "salah-sekali"})
+	_, err := svc.Login(ctx, dto.LoginRequest{Identifier: "budi@example.com", Password: "salah-sekali"})
 	if err != apperror.ErrUnauthorized {
 		t.Errorf("password salah harus ErrUnauthorized, dapat %v", err)
 	}
@@ -166,7 +187,7 @@ func TestLoginWithWrongPasswordIsUnauthorized(t *testing.T) {
 func TestLoginUnknownEmailDoesNotLeakExistence(t *testing.T) {
 	svc, _, _ := newTestAuth()
 
-	_, err := svc.Login(context.Background(), dto.LoginRequest{Email: "tidak-ada@example.com", Password: "apa-saja"})
+	_, err := svc.Login(context.Background(), dto.LoginRequest{Identifier: "tidak-ada@example.com", Password: "apa-saja"})
 	if err != apperror.ErrUnauthorized {
 		t.Errorf("email tak dikenal harus ErrUnauthorized (bukan NOT_FOUND), dapat %v", err)
 	}
@@ -179,7 +200,7 @@ func TestLoginSucceedsAndRecordsAudit(t *testing.T) {
 	_, _ = svc.Register(ctx, dto.RegisterRequest{Name: "Budi", Email: "budi@example.com", Password: "rahasia-panjang-123"})
 	audit.events = nil
 
-	got, err := svc.Login(ctx, dto.LoginRequest{Email: "budi@example.com", Password: "rahasia-panjang-123"})
+	got, err := svc.Login(ctx, dto.LoginRequest{Identifier: "budi@example.com", Password: "rahasia-panjang-123"})
 	if err != nil {
 		t.Fatalf("login gagal: %v", err)
 	}

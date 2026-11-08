@@ -107,6 +107,13 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 	}
 
 	email := normalizeEmail(req.Email)
+	username := normalizeUsername(req.Username)
+
+	if username != "" {
+		if !isValidUsername(username) {
+			return nil, apperror.ErrBadRequest
+		}
+	}
 
 	_, err := s.userRepo.FindByEmail(ctx, email)
 	if err == nil {
@@ -114,6 +121,18 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 	}
 	if err != apperror.ErrNotFound {
 		return nil, err
+	}
+
+	// Username diperiksa terpisah karena kolomnya bisa kosong: baris tanpa
+	// username tidak boleh dianggap bentrok satu sama lain.
+	if username != "" {
+		_, err := s.userRepo.FindByUsername(ctx, username)
+		if err == nil {
+			return nil, apperror.ErrAlreadyExists
+		}
+		if err != apperror.ErrNotFound {
+			return nil, err
+		}
 	}
 
 	hash, err := utils.HashPassword(req.Password)
@@ -124,6 +143,8 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 	now := s.now()
 	user := &model.User{
 		Name:          strings.TrimSpace(req.Name),
+		Username:      username,
+		Phone:         normalizePhone(req.Phone),
 		Email:         email,
 		PasswordHash:  hash,
 		Role:          string(config.RoleUser),
@@ -158,11 +179,11 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Log
 
 // LoginWithDevice mencatat sesi perangkat baru agar bisa dilihat dan dicabut.
 func (s *authService) LoginWithDevice(ctx context.Context, req dto.LoginRequest, device LoginContext) (*dto.LoginResponse, error) {
-	user, err := s.userRepo.FindByEmail(ctx, normalizeEmail(req.Email))
+	user, err := s.userRepo.FindByIdentifier(ctx, normalizeIdentifier(req.Identifier))
 	if err != nil {
 		if err == apperror.ErrNotFound {
 			// Pesan sengaja sama dengan password salah agar tidak membocorkan
-			// email mana yang terdaftar.
+			// akun mana yang terdaftar.
 			return nil, apperror.ErrUnauthorized
 		}
 		return nil, err
@@ -333,11 +354,62 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+// normalizeIdentifier menyiapkan email atau username untuk pencarian.
+// Keduanya disimpan huruf kecil, jadi satu bentuk normal berlaku untuk dua.
+func normalizeIdentifier(identifier string) string {
+	return strings.ToLower(strings.TrimSpace(identifier))
+}
+
+// normalizeUsername membuang pengubah yang sering terketik saat menyalin.
+func normalizeUsername(username string) string {
+	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(username), "@")))
+}
+
+// isValidUsername membatasi ke huruf, angka, titik, garis bawah, dan strip.
+// Spasi dan simbol bebas ditolak karena akan membingungkan saat masuk.
+func isValidUsername(username string) bool {
+	if len(username) < 3 || len(username) > 32 {
+		return false
+	}
+	for _, r := range username {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		case r == '.' || r == '_' || r == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// normalizePhone menyisakan angka dan tanda + di depan. Nomor tidak dipakai
+// untuk verifikasi, hanya untuk dihubungi admin, jadi format bebas diterima.
+func normalizePhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	for i, r := range phone {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '+' && i == 0:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func toUserResponse(user *model.User) *dto.UserResponse {
 	return &dto.UserResponse{
 		ID:          user.ID,
 		Name:        user.Name,
+		Username:    user.Username,
 		Email:       user.Email,
+		Phone:       user.Phone,
 		Role:        user.Role,
 		Tier:        user.Tier,
 		IdleWarning: user.IdleWarning,

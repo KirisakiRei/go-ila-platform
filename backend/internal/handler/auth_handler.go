@@ -86,7 +86,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	key := c.ClientIP() + "|" + req.Email
+	key := c.ClientIP() + "|" + strings.ToLower(req.Identifier)
 	if h.limiter != nil && h.limiter.Blocked(key) {
 		c.Error(apperror.ErrTooManyRequests)
 		return

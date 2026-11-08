@@ -84,7 +84,7 @@ func NewAdminAuthService(deps AdminAuthDeps) AdminAuthService {
 
 // Login memverifikasi password admin lalu menerbitkan token ber-scope admin.
 func (s *adminAuthService) Login(ctx context.Context, req dto.LoginRequest, device LoginContext) (*dto.AdminLoginResponse, error) {
-	user, err := s.users.FindByEmail(ctx, normalizeEmail(req.Email))
+	user, err := s.users.FindByIdentifier(ctx, normalizeIdentifier(req.Identifier))
 	if err != nil {
 		if errors.Is(err, apperror.ErrNotFound) {
 			return nil, apperror.ErrUnauthorized

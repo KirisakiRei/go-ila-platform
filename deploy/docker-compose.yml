@@ -29,6 +29,21 @@ services:
       postgres:
         condition: service_healthy
 
+  # Sekali jalan untuk membuat akun superadmin pertama. Container lain tidak
+  # menunggu layanan ini; jalankan manual dengan `make seed-admin` setelah
+  # migrate selesai, lalu hapus variabel SEED_ADMIN_PASSWORD dari .env.
+  seed-superadmin:
+    build: *backend-build
+    entrypoint: ["/app/seed-superadmin"]
+    profiles: ["seed"]
+    env_file: ../.env
+    environment:
+      DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend-api:
     build: *backend-build
     restart: unless-stopped

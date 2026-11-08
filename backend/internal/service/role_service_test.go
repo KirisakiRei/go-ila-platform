@@ -159,6 +159,19 @@ func (f *fakeRoleUsers) FindByEmail(_ context.Context, email string) (*model.Use
 	return nil, apperror.ErrNotFound
 }
 
+func (f *fakeRoleUsers) FindByUsername(context.Context, string) (*model.User, error) {
+	return nil, apperror.ErrNotFound
+}
+
+func (f *fakeRoleUsers) FindByIdentifier(_ context.Context, identifier string) (*model.User, error) {
+	for _, user := range f.users {
+		if user.Email == identifier || (user.Username != "" && user.Username == identifier) {
+			return user, nil
+		}
+	}
+	return nil, apperror.ErrNotFound
+}
+
 func (f *fakeRoleUsers) FindByTelegramChatID(context.Context, string) (*model.User, error) {
 	return nil, apperror.ErrNotFound
 }

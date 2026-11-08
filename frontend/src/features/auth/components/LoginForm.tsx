@@ -21,7 +21,7 @@ export function LoginForm() {
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { identifier: '', password: '' },
   })
 
   const onSubmit = handleSubmit((values) => {
@@ -92,25 +92,28 @@ export function LoginForm() {
     <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold tracking-tight">Masuk</h1>
-        <p className="text-[13px] text-muted-foreground">Gunakan akun ILA Bot Anda.</p>
+        <p className="text-[13px] text-muted-foreground">Masuk dengan email atau username Anda.</p>
       </header>
 
       {logoutNotice && <Alert>{logoutNotice}</Alert>}
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="identifier">Email atau username</Label>
         <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          placeholder="nama@email.com"
-          hasError={Boolean(errors.email)}
-          aria-describedby={errors.email ? 'email-error' : undefined}
-          {...register('email')}
+          id="identifier"
+          type="text"
+          autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="nama@email.com atau nama"
+          hasError={Boolean(errors.identifier)}
+          aria-describedby={errors.identifier ? 'identifier-error' : undefined}
+          {...register('identifier')}
         />
-        {errors.email && (
-          <p id="email-error" className="text-xs text-destructive">
-            {errors.email.message}
+        {errors.identifier && (
+          <p id="identifier-error" className="text-xs text-destructive">
+            {errors.identifier.message}
           </p>
         )}
       </div>

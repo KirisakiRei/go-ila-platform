@@ -1,19 +1,28 @@
 package dto
 
 // RegisterRequest adalah payload pendaftaran akun.
+//
+// Username dan Phone tidak wajib agar klien lama tetap berjalan; bila
+// dikirim, keduanya divalidasi keunikan dan formatnya (plans/09 §3).
 type RegisterRequest struct {
 	Name     string `json:"name" binding:"required,min=3,max=100"`
+	Username string `json:"username" binding:"omitempty,min=3,max=32,alphanum"`
 	Email    string `json:"email" binding:"required,email,max=150"`
+	Phone    string `json:"phone" binding:"omitempty,max=24"`
 	Password string `json:"password" binding:"required,min=10,max=72"`
 	// AcceptTerms menandai centang Syarat & Ketentuan + Kebijakan Privasi.
 	// Registrasi tanpa centang ditolak (plans/09 §3).
 	AcceptTerms bool `json:"accept_terms"`
 }
 
-// LoginRequest adalah payload masuk akun.
+// LoginRequest menerima email ATAU username pada kolom yang sama.
+//
+// Satu kolom dipakai supaya pengguna tidak perlu memilih jenis identitas,
+// dan pesan galatnya tetap seragam sehingga tidak membocorkan akun mana
+// yang terdaftar.
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Identifier string `json:"identifier" binding:"required,min=3,max=150"`
+	Password   string `json:"password" binding:"required"`
 }
 
 // ChangePasswordRequest meminta verifikasi password lama sebelum berganti.
@@ -25,11 +34,13 @@ type ChangePasswordRequest struct {
 
 // UserResponse adalah representasi akun yang aman dikirim ke klien.
 type UserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
-	Tier  string `json:"tier"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Role     string `json:"role"`
+	Tier     string `json:"tier"`
 	// IdleWarning memutuskan apakah modal "masih di sini?" ditampilkan.
 	// Batas diam di server tidak terpengaruh nilai ini (plans/23 §5).
 	IdleWarning bool   `json:"idle_warning"`

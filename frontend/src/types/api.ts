@@ -39,6 +39,8 @@ export type TimePair = {
 export type User = {
   id: string
   name: string
+  username: string
+  phone: string
   email: string
   role: Role
   tier: Tier
@@ -49,14 +51,18 @@ export type User = {
   updated_at: string
 }
 
+/** identifier menerima email atau username dalam satu kolom. */
 export type LoginPayload = {
-  email: string
+  identifier: string
   password: string
 }
 
 export type RegisterPayload = {
   name: string
+  /** Wajib diisi backend hari ini; lihat plans/09 untuk aturan final. */
+  username: string
   email: string
+  phone: string
   password: string
   /** Wajib true: backend menolak pendaftaran tanpa persetujuan. */
   accept_terms: boolean
