@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import LandingPage from '@/pages/public/LandingPage'
@@ -119,6 +119,17 @@ describe('LandingPage & PublicLayout', () => {
     expect(hrefs).toContain('/legal/fair_use')
     expect(hrefs).toContain('/app/register')
     expect(hrefs).toContain('/app/login')
+
+    // Header pada posisi atas landing page menyatu transparan tanpa border bawah,
+    // lalu berubah menjadi latar putih saat di-scroll ke bagian terang.
+    const header = container.querySelector('header')
+    expect(header?.className).toContain('border-transparent')
+    expect(header?.className).toContain('bg-transparent')
+
+    Object.defineProperty(window, 'scrollY', { value: 640, configurable: true })
+    fireEvent.scroll(window)
+    expect(header?.className).toContain('bg-white/95')
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   })
 
   it('menampilkan banner pemeliharaan saat mode sistem bukan normal', async () => {
