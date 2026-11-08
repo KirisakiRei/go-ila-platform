@@ -15,8 +15,9 @@ const TrialDuration = 7 * 24 * time.Hour
 
 // TrialService mengaktifkan uji coba 7 hari untuk user.
 //
-// Trial setara Plus tetapi seluruh eksekusinya simulasi: uji coba hanya
-// menilai kualitas sinyal, bukan menaruh modal (plans/14 par 5.5.2).
+// Trial memberi paket Basic selama 7 hari, dibatasi satu akun broker, dan
+// seluruh eksekusinya simulasi: uji coba hanya menilai kualitas sinyal, bukan
+// menaruh modal (plans/14 par 5.5.2).
 type TrialService interface {
 	Start(ctx context.Context, userID string) (*dto.TrialResponse, error)
 	Status(ctx context.Context, userID string) (*dto.TrialResponse, error)
@@ -107,6 +108,8 @@ func toTrialResponse(user *model.User, now time.Time) *dto.TrialResponse {
 		TrialStartedAt: user.TrialStartedAt,
 		TrialExpiresAt: user.TrialExpiresAt,
 		DryRunOnly:     true,
+		Tier:           model.TierTrial,
+		AccountLimit:   model.MaxAccountsDuringTrial,
 	}
 	if out.Active && user.TrialExpiresAt != nil {
 		// Sisa hari dibulatkan ke atas: 6 hari 3 jam dihitung 7 hari.

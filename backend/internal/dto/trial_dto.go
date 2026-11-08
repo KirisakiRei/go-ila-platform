@@ -12,4 +12,8 @@ type TrialResponse struct {
 	DryRunOnly     bool       `json:"dry_run_only"`
 	TrialStartedAt *time.Time `json:"trial_started_at,omitempty"`
 	TrialExpiresAt *time.Time `json:"trial_expires_at,omitempty"`
+	// Tier selama trial selalu Basic; ditampilkan agar user tahu batasnya.
+	Tier string `json:"tier"`
+	// AccountLimit adalah jumlah akun broker yang boleh dihubungkan.
+	AccountLimit int `json:"account_limit"`
 }

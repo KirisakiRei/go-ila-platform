@@ -185,7 +185,7 @@ func TestTrialSekaliPerAkun(t *testing.T) {
 	}
 }
 
-func TestTrialSetaraPlus(t *testing.T) {
+func TestTrialSetaraBasic(t *testing.T) {
 	users := newFakeUserRepo()
 	user := newTestUser("free")
 	users.users[user.Email] = user
@@ -196,8 +196,11 @@ func TestTrialSetaraPlus(t *testing.T) {
 	}
 
 	updated := users.users[user.Email]
-	if tier := effectiveTier(updated, time.Now().UTC()); tier != "plus" {
-		t.Fatalf("tier saat trial = %q, ingin plus", tier)
+	if tier := effectiveTier(updated, time.Now().UTC()); tier != "basic" {
+		t.Fatalf("tier saat trial = %q, ingin basic", tier)
+	}
+	if result := toTrialResponse(updated, time.Now().UTC()); result.AccountLimit != 1 {
+		t.Fatalf("batas akun trial = %d, ingin 1", result.AccountLimit)
 	}
 }
 

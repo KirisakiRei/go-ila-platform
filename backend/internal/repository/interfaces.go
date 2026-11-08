@@ -21,6 +21,8 @@ type UserRepository interface {
 	UpdateLastLogin(ctx context.Context, id string, at time.Time) error
 	Update(ctx context.Context, user *model.User) error
 	CountByTier(ctx context.Context, tier string) (int64, error)
+	// ListTrials membaca pengguna yang memakai atau pernah memakai uji coba.
+	ListTrials(ctx context.Context, status string, limit int) ([]model.User, error)
 
 	// FindSessionUser membaca kolom minimal untuk validasi sesi tiap request.
 	FindSessionUser(ctx context.Context, id string) (*authstate.User, error)

@@ -146,11 +146,20 @@ Layanan `backup` di `deploy/docker-compose.yml` menjalankan
 
 | Variabel | Isi |
 |---|---|
-| `BACKUP_REMOTE_DIR` | direktori host tujuan salinan luar VPS (mis. hasil mount object storage). Kosong berarti salinan hanya di volume `backup_data` |
+| `BACKUP_REMOTE_DIR` | direktori di VPS yang sama untuk salinan kedua (default `./backups-remote`). Kosong berarti salinan hanya di volume `backup_data` |
 
 Retensi: 7 salinan harian + 4 salinan mingguan (dibuat setiap Minggu UTC).
-Salinan yang hanya ada di VPS yang sama tidak melindungi dari kerusakan VPS,
-jadi `BACKUP_REMOTE_DIR` sebaiknya diisi saat produksi.
+
+Penyimpanan luar belum dipakai: salinan kedua ditulis ke direktori lain di VPS
+yang sama. Ini melindungi dari kerusakan volume Docker, tetapi **tidak**
+melindungi dari kerusakan VPS itu sendiri. Unduh berkala ke komputer pribadi:
+
+```bash
+scp ubuntu@<vps>:/var/lib/docker/volumes/ila-platform_backup_data/_data/ila-*.dump .
+```
+
+Bila nanti dibutuhkan, `BACKUP_REMOTE_DIR` bisa diarahkan ke hasil mount
+object storage tanpa mengubah skrip.
 
 Uji pemulihan minimal sekali sebelum ada pengguna sungguhan:
 

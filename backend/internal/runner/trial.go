@@ -30,3 +30,10 @@ func (s *Service) mustDryRun(ctx context.Context, session *userSession, account 
 	}
 	return InTrial(session.User, s.opts.Clock())
 }
+
+// MustDryRunForTest membuka pagar simulasi untuk pengujian.
+// Dipakai tes paket luar agar aturan uang diuji langsung, bukan lewat alur
+// yang lebih dulu tertahan aturan lain.
+var MustDryRunForTest = func(s *Service, user *model.User, account *model.BrokerAccount) bool {
+	return s.mustDryRun(context.Background(), &userSession{User: user}, account)
+}

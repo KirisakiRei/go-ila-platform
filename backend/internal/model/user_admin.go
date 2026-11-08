@@ -18,6 +18,16 @@ const (
 	TierPlus  = "plus"
 )
 
+// TierTrial adalah paket yang berlaku selama uji coba 7 hari.
+// Trial memberi Basic, bukan Plus: uji coba menilai kualitas sinyal, dan
+// fitur eksekusi otomatis memang sudah dimatikan selama trial.
+const TierTrial = TierBasic
+
+// MaxAccountsDuringTrial membatasi akun broker selama trial menjadi satu.
+// Trial adalah gerbang pertama penyalahgunaan: satu akun cukup untuk menilai
+// produk, dan penambahan akun menjadi alasan beralih ke paket berbayar.
+const MaxAccountsDuringTrial = 1
+
 // UserAdminNote adalah catatan internal yang hanya terlihat staf.
 // Dipisah dari user agar setiap catatan punya penulis dan waktu.
 type UserAdminNote struct {

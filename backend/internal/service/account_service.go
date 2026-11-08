@@ -190,6 +190,10 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 
 	tier := effectiveTier(user, s.clock())
 	limit := s.tierAccountLimit(ctx, tier)
+	// Selama trial hanya satu akun, berapa pun paket aslinya.
+	if InTrialPeriod(user, s.clock()) && limit > model.MaxAccountsDuringTrial {
+		limit = model.MaxAccountsDuringTrial
+	}
 	if limit == 0 {
 		return nil, fmt.Errorf("%w: tier %s tidak dapat menghubungkan akun broker", apperror.ErrForbidden, tier)
 	}
@@ -718,10 +722,10 @@ func defaultAccountLimit(tier string) int {
 	}
 }
 
-// effectiveTier menghitung tier yang berlaku: trial berjalan setara Plus.
+// effectiveTier menghitung tier yang berlaku: trial berjalan setara Basic.
 func effectiveTier(user *model.User, now time.Time) string {
 	if user.TrialExpiresAt != nil && now.Before(*user.TrialExpiresAt) {
-		return "plus"
+		return model.TierTrial
 	}
 	if user.TierExpiresAt != nil && now.After(*user.TierExpiresAt) {
 		return "free"

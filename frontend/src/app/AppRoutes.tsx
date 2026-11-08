@@ -30,6 +30,7 @@ import SecuritySettingsPage from '@/pages/SecuritySettingsPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
 import AdminCreditCodesPage from '@/pages/admin/AdminCreditCodesPage'
 import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage'
+import AdminTrialsPage from '@/pages/admin/AdminTrialsPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
@@ -276,6 +277,16 @@ export function AppRoutes() {
           <RequireAuth>
             <AdminPage>
               <AdminInvoicesPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/trial"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminTrialsPage />
             </AdminPage>
           </RequireAuth>
         }

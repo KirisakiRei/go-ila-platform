@@ -293,10 +293,10 @@ func CalculateLot(req LotRequest) (LotCalculation, error) {
 }
 
 // EffectiveTier mengembalikan tier yang berlaku saat ini.
-// Trial yang masih berjalan diperlakukan setara Plus.
+// Trial yang masih berjalan diperlakukan setara Basic.
 func EffectiveTier(tier string, trialExpiresAt, tierExpiresAt *time.Time, now time.Time) string {
 	if trialExpiresAt != nil && now.Before(*trialExpiresAt) {
-		return "plus"
+		return model.TierTrial
 	}
 	if tierExpiresAt != nil && now.After(*tierExpiresAt) {
 		return "free"

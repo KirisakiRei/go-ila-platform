@@ -45,6 +45,8 @@ var harapanAksiAudit = map[string]audit.Action{
 	"POST /api/v1/admin/credit-codes/:id/disable": audit.CreditAdjust,
 	"POST /api/v1/admin/invoices/:id/mark-paid":   audit.InvoiceMarkPaid,
 	"POST /api/v1/admin/invoices/:id/refund":      audit.RefundCreate,
+	"POST /api/v1/admin/trials/:id/extend":        audit.UserTierChange,
+	"POST /api/v1/admin/trials/:id/end":           audit.UserTierChange,
 
 	// Konten dan RBAC sudah mencatat sendiri lewat recordAudit di service-nya.
 	"POST /api/v1/admin/legal":               audit.LegalPublish,

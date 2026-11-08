@@ -255,6 +255,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	billingRepo := repository.NewBillingStore(db)
 	billingService := service.NewBillingService(userRepo, billingRepo, pricingService, billingRepo, gateway, adminAudit, billingRepo)
 	adminBillingService := service.NewAdminBillingService(billingRepo, adminAudit, billingService)
+	adminTrialService := service.NewAdminTrialService(userRepo, adminAudit)
+	adminTrialHandler := handler.NewAdminTrialHandler(adminTrialService)
 	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
 	billingHandler := handler.NewBillingHandler(billingService)
 	legalHandler := handler.NewLegalHandler(legalService)
@@ -399,7 +401,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, adminTrialHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -453,6 +455,7 @@ func registerAdmin(
 	reportHandler *handler.AdminReportHandler,
 	systemHandler *handler.AdminSystemHandler,
 	cmsHandler *handler.CMSHandler,
+	adminTrialHandler *handler.AdminTrialHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -529,6 +532,7 @@ func registerAdmin(
 	userHandler.Register(admin.Group(""), guard)
 	auditHandler.Register(admin.Group(""), guard)
 	billingHandler.Register(admin.Group(""), guard)
+	adminTrialHandler.Register(admin.Group(""), guard)
 	reportHandler.Register(admin.Group(""), guard)
 	systemHandler.Register(admin.Group(""), guard)
 	cmsHandler.Register(admin.Group(""), guard)

@@ -48,12 +48,12 @@ type Invoice struct {
 	Number      string     `gorm:"type:varchar(30);uniqueIndex;not null" json:"number"`
 	UserID      string     `gorm:"type:varchar(36);index;not null" json:"user_id"`
 	PlanCode    string     `gorm:"type:varchar(20);not null" json:"plan_code"`
-	AmountIDR   int64      `gorm:"not null" json:"amount_idr"`
-	DiscountIDR int64      `gorm:"not null;default:0" json:"discount_idr"`
-	CreditIDR   int64      `gorm:"not null;default:0" json:"credit_idr"`
+	AmountIDR   int64      `gorm:"not null;column:amount_idr" json:"amount_idr"`
+	DiscountIDR int64      `gorm:"not null;default:0;column:discount_idr" json:"discount_idr"`
+	CreditIDR   int64      `gorm:"not null;default:0;column:credit_idr" json:"credit_idr"`
 	TaxRate     float64    `gorm:"type:numeric(5,2);not null;default:0" json:"tax_rate"`
-	TaxIDR      int64      `gorm:"not null;default:0" json:"tax_idr"`
-	TotalIDR    int64      `gorm:"not null" json:"total_idr"`
+	TaxIDR      int64      `gorm:"not null;default:0;column:tax_idr" json:"tax_idr"`
+	TotalIDR    int64      `gorm:"not null;column:total_idr" json:"total_idr"`
 	Status      string     `gorm:"type:varchar(20);index;not null" json:"status"`
 	CouponCode  string     `gorm:"type:varchar(40)" json:"coupon_code"`
 	PeriodStart time.Time  `json:"period_start"`
@@ -77,12 +77,14 @@ func (Invoice) TableName() string {
 // Unik (gateway, gateway_txn_id) adalah inti idempotensi: webhook yang sama
 // tidak boleh menambah periode dua kali (plans/12 §5.10).
 type Payment struct {
-	ID             string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	InvoiceID      string    `gorm:"type:varchar(36);index;not null" json:"invoice_id"`
-	Gateway        string    `gorm:"type:varchar(30);not null" json:"gateway"`
+	ID        string `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	InvoiceID string `gorm:"type:varchar(36);index;not null" json:"invoice_id"`
+	Gateway   string `gorm:"type:varchar(30);not null;uniqueIndex:uq_payment_txn" json:"gateway"`
+	// Idempotensi webhook bergantung pada indeks gabungan ini: ON CONFLICT
+	// (gateway, gateway_txn_id) menolak pencatatan ganda dari gateway yang sama.
 	GatewayTxnID   string    `gorm:"type:varchar(120);not null;uniqueIndex:uq_payment_txn" json:"gateway_txn_id"`
-	AmountIDR      int64     `gorm:"not null" json:"amount_idr"`
-	FeeIDR         int64     `gorm:"not null;default:0" json:"fee_idr"`
+	AmountIDR      int64     `gorm:"not null;column:amount_idr" json:"amount_idr"`
+	FeeIDR         int64     `gorm:"not null;default:0;column:fee_idr" json:"fee_idr"`
 	Status         string    `gorm:"type:varchar(20);not null" json:"status"`
 	SignatureValid bool      `gorm:"not null;default:false" json:"signature_valid"`
 	RawPayload     string    `gorm:"type:text" json:"-"`
@@ -98,7 +100,7 @@ func (Payment) TableName() string {
 type Refund struct {
 	ID         string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	PaymentID  string    `gorm:"type:varchar(36);index;not null" json:"payment_id"`
-	AmountIDR  int64     `gorm:"not null" json:"amount_idr"`
+	AmountIDR  int64     `gorm:"not null;column:amount_idr" json:"amount_idr"`
 	Reason     string    `gorm:"type:varchar(500);not null" json:"reason"`
 	ActorID    string    `gorm:"type:varchar(36);not null" json:"actor_id"`
 	GatewayRef string    `gorm:"type:varchar(120);not null;default:''" json:"gateway_ref"`

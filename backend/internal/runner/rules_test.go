@@ -236,8 +236,12 @@ func TestEffectiveTier(t *testing.T) {
 	future := now.Add(24 * time.Hour)
 	past := now.Add(-24 * time.Hour)
 
-	if got := EffectiveTier("free", &future, nil, now); got != "plus" {
-		t.Fatalf("trial aktif = %q, ingin plus", got)
+	if got := EffectiveTier("free", &future, nil, now); got != "basic" {
+		t.Fatalf("trial aktif = %q, ingin basic", got)
+	}
+	// Trial memberi Basic, bukan Plus: mode auto tetap tidak boleh dipakai.
+	if ModeAllowed(EffectiveTier("plus", &future, nil, now), "auto") {
+		t.Fatal("trial tidak boleh mendapat mode eksekusi otomatis")
 	}
 	if got := EffectiveTier("basic", &past, nil, now); got != "basic" {
 		t.Fatalf("trial habis = %q, ingin basic", got)

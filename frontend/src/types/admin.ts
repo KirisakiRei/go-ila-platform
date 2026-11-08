@@ -142,6 +142,21 @@ export type AdminInvoiceItem = {
   expires_at: TimePair
 }
 
+/** AdminTrialItem adalah satu baris halaman uji coba admin. */
+export type AdminTrialItem = {
+  user_id: string
+  email: string
+  name: string
+  tier: string
+  trial_used: boolean
+  status: 'active' | 'ended' | 'never'
+  started_at?: TimePair
+  expires_at?: TimePair
+  days_remaining: number
+  tier_during_trial: string
+  account_limit: number
+}
+
 /** CreditCodeItem adalah voucher saldo yang bisa ditukar pengguna. */
 export type CreditCodeItem = {
   id: string

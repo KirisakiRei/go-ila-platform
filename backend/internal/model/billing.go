@@ -7,7 +7,7 @@ import "time"
 type Plan struct {
 	Code        string    `gorm:"primaryKey;type:varchar(20)" json:"code"`
 	Name        string    `gorm:"type:varchar(80);not null" json:"name"`
-	PriceIDR    int64     `gorm:"not null;default:0" json:"price_idr"`
+	PriceIDR    int64     `gorm:"not null;default:0;column:price_idr" json:"price_idr"`
 	Interval    string    `gorm:"type:varchar(20);not null;default:monthly" json:"interval"`
 	IsActive    bool      `gorm:"not null;default:true" json:"is_active"`
 	SortOrder   int       `gorm:"not null;default:0" json:"sort_order"`
@@ -50,7 +50,7 @@ const (
 type PriceOverride struct {
 	Base
 	PlanCode  string    `gorm:"type:varchar(20);index;not null" json:"plan_code"`
-	PriceIDR  int64     `gorm:"not null" json:"price_idr"`
+	PriceIDR  int64     `gorm:"not null;column:price_idr" json:"price_idr"`
 	StartsAt  time.Time `json:"starts_at"`
 	EndsAt    time.Time `json:"ends_at"`
 	IsActive  bool      `gorm:"not null;default:true" json:"is_active"`
@@ -68,7 +68,7 @@ func (PriceOverride) TableName() string {
 // tidak menjual Plus seharga Rp 1 (plans/14 §6).
 type PricingGuard struct {
 	PlanCode    string    `gorm:"primaryKey;type:varchar(20)" json:"plan_code"`
-	MinPriceIDR int64     `gorm:"not null" json:"min_price_idr"`
+	MinPriceIDR int64     `gorm:"not null;column:min_price_idr" json:"min_price_idr"`
 	UpdatedBy   string    `gorm:"type:varchar(36);not null" json:"updated_by"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -91,8 +91,8 @@ type Coupon struct {
 	Description       string    `gorm:"type:varchar(255);not null;default:''" json:"description"`
 	DiscountType      string    `gorm:"type:varchar(10);not null" json:"discount_type"`
 	DiscountValue     int64     `gorm:"not null" json:"discount_value"`
-	MaxDiscountIDR    *int64    `json:"max_discount_idr"`
-	MinAmountIDR      int64     `gorm:"not null;default:0" json:"min_amount_idr"`
+	MaxDiscountIDR    *int64    `gorm:"column:max_discount_idr" json:"max_discount_idr"`
+	MinAmountIDR      int64     `gorm:"not null;default:0;column:min_amount_idr" json:"min_amount_idr"`
 	AppliesToPlans    string    `gorm:"type:varchar(120);not null;default:''" json:"applies_to_plans"`
 	FirstPurchaseOnly bool      `gorm:"not null;default:false" json:"first_purchase_only"`
 	StartsAt          time.Time `json:"starts_at"`
@@ -119,7 +119,7 @@ type CouponRedemption struct {
 	CouponID    string    `gorm:"type:varchar(36);not null;uniqueIndex:uq_coupon_user" json:"coupon_id"`
 	UserID      string    `gorm:"type:varchar(36);not null;uniqueIndex:uq_coupon_user" json:"user_id"`
 	InvoiceID   string    `gorm:"type:varchar(36);index;not null" json:"invoice_id"`
-	DiscountIDR int64     `gorm:"not null" json:"discount_idr"`
+	DiscountIDR int64     `gorm:"not null;column:discount_idr" json:"discount_idr"`
 	RedeemedAt  time.Time `json:"redeemed_at"`
 }
 
@@ -131,7 +131,7 @@ func (CouponRedemption) TableName() string {
 // CreditBalance adalah saldo kredit pengguna. Nilainya tidak boleh negatif.
 type CreditBalance struct {
 	UserID     string    `gorm:"primaryKey;type:varchar(36)" json:"user_id"`
-	BalanceIDR int64     `gorm:"not null;default:0" json:"balance_idr"`
+	BalanceIDR int64     `gorm:"not null;default:0;column:balance_idr" json:"balance_idr"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
@@ -153,7 +153,7 @@ const (
 type CreditCode struct {
 	Base
 	Code           string    `gorm:"type:varchar(40);uniqueIndex;not null" json:"code"`
-	AmountIDR      int64     `gorm:"not null" json:"amount_idr"`
+	AmountIDR      int64     `gorm:"not null;column:amount_idr" json:"amount_idr"`
 	MaxRedemptions int       `gorm:"not null;default:1" json:"max_redemptions"`
 	MaxPerUser     int       `gorm:"not null;default:1" json:"max_per_user"`
 	StartsAt       time.Time `json:"starts_at"`
@@ -174,7 +174,7 @@ type CreditRedemption struct {
 	ID         string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	CodeID     string    `gorm:"type:varchar(36);uniqueIndex:uq_credit_redeem;not null" json:"code_id"`
 	UserID     string    `gorm:"type:varchar(36);uniqueIndex:uq_credit_redeem;not null" json:"user_id"`
-	AmountIDR  int64     `gorm:"not null" json:"amount_idr"`
+	AmountIDR  int64     `gorm:"not null;column:amount_idr" json:"amount_idr"`
 	RedeemedAt time.Time `json:"redeemed_at"`
 }
 
@@ -188,7 +188,7 @@ func (CreditRedemption) TableName() string {
 type CreditTransaction struct {
 	ID           string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	UserID       string    `gorm:"type:varchar(36);index;not null" json:"user_id"`
-	DeltaIDR     int64     `gorm:"not null" json:"delta_idr"`
+	DeltaIDR     int64     `gorm:"not null;column:delta_idr" json:"delta_idr"`
 	BalanceAfter int64     `gorm:"not null" json:"balance_after"`
 	Kind         string    `gorm:"type:varchar(20);not null" json:"kind"`
 	InvoiceID    *string   `gorm:"type:varchar(36)" json:"invoice_id"`

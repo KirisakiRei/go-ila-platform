@@ -1,41 +1,34 @@
 package model
 
-import (
-	"github.com/google/uuid"
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
-// idHook mengisi ID untuk model yang tidak memakai Base.
-// Tanpa ini, insert gagal karena kolom id NOT NULL (ditemukan saat uji integrasi).
+// Berkas ini adalah satu-satunya rumah hook pengisian ID.
+//
+// Entitas berkunci alami (credit_balance memakai user_id, broker_account_state
+// memakai broker_account_id, email_outbox/email_token punya hook sendiri)
+// sengaja tidak didaftarkan di sini.
+//
+// Entitas yang memakai Base sudah mendapat ID lewat Base.BeforeCreate. Entitas
+// lain yang primary key-nya UUID string wajib punya hook sendiri: PostgreSQL
+// menolak id kosong sementara SQLite diam-diam menerimanya, jadi kelalaian ini
+// baru terlihat saat pindah ke database sungguhan.
 
-// BeforeCreate mengisi ID AuditLog bila kosong.
-func (a *AuditLog) BeforeCreate(_ *gorm.DB) error {
-	if a.ID == "" {
-		a.ID = uuid.NewString()
-	}
-	return nil
-}
-
-// BeforeCreate mengisi ID NotificationLog bila kosong.
-func (n *NotificationLog) BeforeCreate(_ *gorm.DB) error {
-	if n.ID == "" {
-		n.ID = uuid.NewString()
-	}
-	return nil
-}
-
-// BeforeCreate mengisi ID SignalEvent bila kosong.
-func (e *SignalEvent) BeforeCreate(_ *gorm.DB) error {
-	if e.ID == "" {
-		e.ID = uuid.NewString()
-	}
-	return nil
-}
-
-// BeforeCreate mengisi ID ExecutionRecord bila kosong.
-func (e *ExecutionRecord) BeforeCreate(_ *gorm.DB) error {
-	if e.ID == "" {
-		e.ID = uuid.NewString()
-	}
-	return nil
-}
+func (m *AuditLog) BeforeCreate(_ *gorm.DB) error           { return ensureID(&m.ID) }
+func (m *ApprovalToken) BeforeCreate(_ *gorm.DB) error      { return ensureID(&m.ID) }
+func (m *NotificationLog) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *CouponRedemption) BeforeCreate(_ *gorm.DB) error   { return ensureID(&m.ID) }
+func (m *CreditRedemption) BeforeCreate(_ *gorm.DB) error   { return ensureID(&m.ID) }
+func (m *CreditTransaction) BeforeCreate(_ *gorm.DB) error  { return ensureID(&m.ID) }
+func (m *LegalDocument) BeforeCreate(_ *gorm.DB) error      { return ensureID(&m.ID) }
+func (m *LegalAcceptance) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *Role) BeforeCreate(_ *gorm.DB) error               { return ensureID(&m.ID) }
+func (m *SignalEvent) BeforeCreate(_ *gorm.DB) error        { return ensureID(&m.ID) }
+func (m *ExecutionRecord) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *Session) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
+func (m *SubscriptionRecord) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }
+func (m *Invoice) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
+func (m *Payment) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
+func (m *Refund) BeforeCreate(_ *gorm.DB) error             { return ensureID(&m.ID) }
+func (m *TwoFactor) BeforeCreate(_ *gorm.DB) error          { return ensureID(&m.ID) }
+func (m *RecoveryCode) BeforeCreate(_ *gorm.DB) error       { return ensureID(&m.ID) }
+func (m *TwoFactorChallenge) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }

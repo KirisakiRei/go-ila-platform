@@ -56,6 +56,28 @@ func (r *userRepository) findOne(ctx context.Context, query string, args ...any)
 	return &user, nil
 }
 
+// ListTrials membaca pengguna yang memakai atau pernah memakai uji coba.
+// status: active (masih berjalan), ended (sudah lewat), kosong berarti semua.
+func (r *userRepository) ListTrials(ctx context.Context, status string, limit int) ([]model.User, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	query := r.db.WithContext(ctx).Model(&model.User{}).Where("trial_used = ?", true)
+	now := time.Now().UTC()
+	switch status {
+	case "active":
+		query = query.Where("trial_expires_at > ?", now)
+	case "ended":
+		query = query.Where("trial_expires_at <= ?", now)
+	}
+
+	var rows []model.User
+	if err := query.Order("trial_expires_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("membaca daftar trial: %w", err)
+	}
+	return rows, nil
+}
+
 func (r *userRepository) UpdateLastLogin(ctx context.Context, id string, at time.Time) error {
 	err := r.db.WithContext(ctx).Model(&model.User{}).
 		Where("id = ?", id).

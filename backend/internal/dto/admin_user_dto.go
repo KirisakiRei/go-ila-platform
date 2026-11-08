@@ -137,3 +137,25 @@ type UserNoteRequest struct {
 type AccountFreezeRequest struct {
 	Reason string `json:"reason" binding:"required,max=500"`
 }
+
+// AdminTrialExtendRequest menambah hari uji coba yang masih berjalan.
+type AdminTrialExtendRequest struct {
+	Days   int    `json:"days" binding:"required,min=1,max=30"`
+	Reason string `json:"reason" binding:"required,max=255"`
+}
+
+// AdminTrialItem adalah satu baris halaman uji coba admin.
+type AdminTrialItem struct {
+	UserID        string    `json:"user_id"`
+	Email         string    `json:"email"`
+	Name          string    `json:"name"`
+	Tier          string    `json:"tier"`
+	TrialUsed     bool      `json:"trial_used"`
+	Status        string    `json:"status"`
+	StartedAt     *TimePair `json:"started_at,omitempty"`
+	ExpiresAt     *TimePair `json:"expires_at,omitempty"`
+	DaysRemaining int       `json:"days_remaining"`
+	// TrialSelalu memberi Basic dan satu akun; dikirim agar panel tidak menebak.
+	TierDuringTrial string `json:"tier_during_trial"`
+	AccountLimit    int    `json:"account_limit"`
+}

@@ -4,6 +4,7 @@ import type { PublicPlan } from '@/types/admin'
 import type {
   AdminAccountItem,
   AdminInvoiceItem,
+  AdminTrialItem,
   CreditCodeItem,
   AdminLegalItem,
   AdminNoteItem,
@@ -115,6 +116,18 @@ export const adminCreditCodeApi = {
     request<CreditCodeItem>(`${ADMIN}/credit-codes`, { method: 'POST', body: payload }),
   disable: (id: string, reason: string) =>
     request<void>(`${ADMIN}/credit-codes/${id}/disable`, { method: 'POST', body: { reason } }),
+}
+
+export const adminTrialApi = {
+  list: (query?: Record<string, string | undefined>) =>
+    request<AdminTrialItem[]>(`${ADMIN}/trials`, { query }),
+  extend: (id: string, payload: { days: number; reason: string }) =>
+    request<AdminTrialItem>(`${ADMIN}/trials/${id}/extend`, { method: 'POST', body: payload }),
+  end: (id: string, reason: string) =>
+    request<void>(`${ADMIN}/trials/${id}/end`, {
+      method: 'POST',
+      body: { reason, category: 'other' },
+    }),
 }
 
 export const adminReportApi = {

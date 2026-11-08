@@ -14,8 +14,31 @@ import (
 func TestTrialDipaksaSimulasi(t *testing.T) {
 	store := newFakeStore()
 	pub := &fakePublisher{}
-
 	addUser(store, "u1", "plus", "auto", false)
+
+	expiresAt := time.Now().UTC().Add(48 * time.Hour)
+	store.users["u1"].TrialExpiresAt = &expiresAt
+
+	svc := newServiceWithSettings(store, pub, runner.NewSettings(runner.ILA3Off))
+
+	account := store.accounts["acct-u1"]
+	if !runner.MustDryRunForTest(svc, store.users["u1"], account) {
+		t.Fatal("user trial wajib disimulasikan walau akunnya bukan dry-run")
+	}
+
+	// Setelah trial berakhir dan akunnya bukan dry-run, pagar simulasi lepas.
+	past := time.Now().UTC().Add(-time.Hour)
+	store.users["u1"].TrialExpiresAt = &past
+	if runner.MustDryRunForTest(svc, store.users["u1"], account) {
+		t.Fatal("setelah trial berakhir, akun nyata tidak lagi dipaksa simulasi")
+	}
+}
+
+// Trial berjalan Basic, jadi mode auto tidak boleh dipakai.
+func TestTrialTidakDapatModeAuto(t *testing.T) {
+	store := newFakeStore()
+	pub := &fakePublisher{}
+	addUser(store, "u1", "plus", "auto", true)
 
 	expiresAt := time.Now().UTC().Add(48 * time.Hour)
 	store.users["u1"].TrialExpiresAt = &expiresAt
@@ -24,11 +47,8 @@ func TestTrialDipaksaSimulasi(t *testing.T) {
 	svc.HandleSignal(context.Background(), readySignal("XAUUSD", time.Hour))
 
 	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
-	if len(positions) != 1 {
-		t.Fatalf("posisi tidak tercatat: %d", len(positions))
-	}
-	if !positions[0].IsDryRun {
-		t.Fatal("posisi dari user trial wajib ditandai simulasi")
+	if len(positions) != 0 {
+		t.Fatalf("trial dengan mode auto tidak boleh eksekusi, dapat %d posisi", len(positions))
 	}
 }
 

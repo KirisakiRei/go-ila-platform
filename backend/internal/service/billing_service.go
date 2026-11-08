@@ -138,7 +138,14 @@ func (s *billingService) Checkout(ctx context.Context, userID string, req dto.Ch
 	} else {
 		txn, err := s.gateway.CreateTransaction(ctx, number, quote.Total)
 		if err != nil {
-			return nil, errors.Join(apperror.ErrServiceUnavailable, errors.New("gateway pembayaran sedang tidak tersedia"))
+			// Pesan ke pengguna tetap umum, tetapi penyebabnya harus ikut
+			// terbawa: tanpa itu kegagalan gateway tidak bisa ditelusuri
+			// dari log (bentuk balasan gateway bisa berubah).
+			return nil, errors.Join(
+				apperror.ErrServiceUnavailable,
+				errors.New("gateway pembayaran sedang tidak tersedia"),
+				err,
+			)
 		}
 		invoice.GatewayRef = txn.Reference
 		invoice.ExpiresAt = txn.ExpiresAt

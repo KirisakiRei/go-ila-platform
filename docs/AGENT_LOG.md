@@ -35,6 +35,78 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-14 (lanjutan) — Trial Basic, halaman admin trial, dan tiga bug yang hanya muncul di PostgreSQL
+
+**Pelaku:** Claude
+**Tipe:** Fitur + perbaikan bug berat
+**Ringkasan:**
+Trial diubah menjadi paket Basic dengan satu akun broker, halaman admin trial
+ditambahkan, dan migrasi diuji ke PostgreSQL sungguhan (Docker). Uji itu
+memunculkan tiga bug yang selama ini tidak terlihat karena semua tes memakai
+SQLite.
+
+**File terdampak:**
+- `backend/internal/model/user_admin.go` (`TierTrial`, `MaxAccountsDuringTrial`)
+- `backend/internal/model/hooks.go` (ditulis ulang, satu rumah hook ID)
+- `backend/internal/model/id_guard.go` (baru)
+- `backend/internal/model/subscription.go`, `billing.go` (kolom eksplisit, indeks gabungan)
+- `backend/internal/service/admin_trial_service.go` (baru)
+- `backend/internal/handler/admin_trial_handler.go` (baru)
+- `backend/internal/service/account_service.go`, `trial_service.go`
+- `backend/internal/runner/rules.go`, `trial.go`
+- `backend/internal/repository/user_repository.go`, `interfaces.go`
+- `backend/internal/dto/trial_dto.go`, `admin_user_dto.go`
+- `backend/internal/service/billing_service.go` (penyebab gateway ikut terbawa)
+- `frontend/src/pages/admin/AdminTrialsPage.tsx` (baru)
+- `backend/internal/model/column_name_test.go` (baru, tes regresi)
+
+**Yang dikerjakan:**
+
+1. **Trial = Basic, satu akun.** Sebelumnya trial diperlakukan setara Plus.
+   Sekarang `model.TierTrial = TierBasic` dan `MaxAccountsDuringTrial = 1`.
+   Batas akun ditegakkan di `account_service` saat menghubungkan akun broker.
+   Konsekuensi yang benar: mode eksekusi `auto` **tidak** berlaku selama trial,
+   karena mode itu memang milik Plus.
+2. **Halaman admin trial** (`/admin/trial`): daftar berjalan/berakhir,
+   perpanjangan 1–30 hari beralasan, dan penghentian lebih awal. Trial tetap
+   sekali per akun; admin tidak bisa membuka trial baru.
+3. **Backup tetap di VPS.** Belum pakai object storage; salinan kedua ditulis ke
+   direktori lain di VPS yang sama. Batasannya dicatat di `deploy/ENV-SETUP.md`.
+
+**Tiga bug yang hanya muncul di PostgreSQL:**
+
+| Bug | Kenapa lolos selama ini | Perbaikan |
+|---|---|---|
+| Semua kolom `*IDR` menjadi `*_id_r` (`amount_id_r`) | SQLite mengabaikan beda nama kolom | tag `column:` eksplisit 18 kolom + tes regresi |
+| ID kosong pada tabel non-`Base` (role, invoice, sesi, …) | SQLite menerima string kosong sebagai PK | `hooks.go` jadi satu rumah `BeforeCreate`; migrasi gagal total sebelumnya |
+| Indeks unik `(gateway, gateway_txn_id)` tidak terbentuk | GORM hanya membuat indeks kolom terakhir | kedua kolom diberi `uniqueIndex:uq_payment_txn`; `ON CONFLICT` kembali bekerja |
+
+Bug ketiga membuat **pencatatan pembayaran gagal** di PostgreSQL
+(`42P10 no unique or exclusion constraint`). Di SQLite tidak pernah muncul
+karena ON CONFLICT diabaikan.
+
+**Bukti uji di PostgreSQL 16 (Docker, database baru):**
+- `cmd/migrate` sukses (47 tabel), dijalankan ulang tetap sukses (idempoten)
+- register → login → checkout (gateway tiruan) → tagihan terbit
+- admin catat pembayaran manual → tier naik ke `basic`, berakhir +1 bulan
+- catat ulang → ditolak `invoice sudah lunas`
+- refund penuh → invoice `refunded`, tier **tidak** turun (sesuai keputusan)
+- kode kredit: buat → tukar (saldo 50.000) → tukar ulang ditolak
+- trial: mulai → perpanjang 3 hari → hentikan
+- ekspor posisi CSV: 200, header WIB+NY lengkap
+
+**Catatan untuk Hermes:**
+Tidak ada perubahan kontrak engine → Runner. Aturan harian, pengecekan
+slippage, dan status sinyal tetap. Trial hanya menurunkan hak tier pengguna.
+
+**Belum dikerjakan:**
+- Salinan backup ke luar VPS (object storage) — sengaja ditunda.
+- Migrasi ke PostgreSQL di VPS 2 belum dijalankan; yang diuji baru di lokal.
+
+**Status:** SELESAI
+
+---
+
 ### 2026-11-14 — Kredit, tagihan manual, refund, ekspor riwayat, backup terjadwal
 
 **Pelaku:** Claude
