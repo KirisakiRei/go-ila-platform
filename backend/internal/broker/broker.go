@@ -76,6 +76,9 @@ type PositionState struct {
 	StopLoss   float64
 	TakeProfit float64
 	Profit     float64
+	// Comment adalah komentar order di broker. Runner menaruh id sinyal di sini
+	// untuk mengenali order yang sudah terkirim sebelum koneksi terputus.
+	Comment string
 }
 
 // CloseReason menjelaskan bagaimana posisi berakhir.

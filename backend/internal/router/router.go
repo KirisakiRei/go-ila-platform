@@ -124,6 +124,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		Strategies:    runner.LoadSettings(),
 		Revoker:       runnerAPI,
 		Legal:         legalService,
+		// Kunci sidik jari sederajat rahasia server: dipakai mengenali token
+		// yang dipakai dua akun sekaligus.
+		FingerprintSecret: cfg.InternalSecret,
 	})
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
 	systemService := service.NewSystemService(service.SystemServiceDeps{

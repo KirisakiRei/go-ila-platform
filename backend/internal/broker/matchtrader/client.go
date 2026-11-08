@@ -170,10 +170,11 @@ func (c *Client) OpenPosition(ctx context.Context, req broker.OpenRequest) (brok
 	}
 
 	body := openPositionRequest{
-		Symbol:  info.Symbol,
-		Side:    normalizeSide(req.Side),
-		Volume:  roundToStep(req.Lots, info.VolumeStep, info.VolumePrecision),
-		Comment: truncateComment(req.Comment),
+		Symbol:   info.Symbol,
+		Side:     normalizeSide(req.Side),
+		Volume:   roundToStep(req.Lots, info.VolumeStep, info.VolumePrecision),
+		Comment:  truncateComment(req.Comment),
+		ClientId: clientIDOf(req),
 	}
 
 	if req.StopLoss > 0 {
@@ -233,6 +234,7 @@ func (c *Client) ListPositions(ctx context.Context) ([]broker.PositionState, err
 			StopLoss:   deref(p.SLPrice),
 			TakeProfit: deref(p.TPPrice),
 			Profit:     profitOf(p.Profit, p.NetProfit),
+			Comment:    p.Comment,
 		})
 	}
 	return list, nil
@@ -425,6 +427,21 @@ func truncateComment(s string) string {
 		return string(r[:maxLen])
 	}
 	return string(r)
+}
+
+// maxClientIDLen menjaga clientId tetap dalam batas broker.
+const maxClientIDLen = 35
+
+// clientIDOf memilih kunci idempotensi untuk order.
+func clientIDOf(req broker.OpenRequest) string {
+	id := strings.TrimSpace(req.ClientID)
+	if id == "" {
+		return ""
+	}
+	if len(id) > maxClientIDLen {
+		return id[:maxClientIDLen]
+	}
+	return id
 }
 
 // FormatLot membantu log tanpa membocorkan kredensial.

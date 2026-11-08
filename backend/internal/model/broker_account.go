@@ -29,14 +29,17 @@ func (BrokerAccount) TableName() string {
 // Plaintext hanya hidup sesaat di memori Runner.
 type Credential struct {
 	Base
-	BrokerAccountID string    `gorm:"type:varchar(36);uniqueIndex;not null" json:"broker_account_id"`
-	UserID          string    `gorm:"type:varchar(36);index;not null" json:"user_id"`
-	UserKeyWrapped  []byte    `gorm:"type:bytea;not null" json:"-"`
-	UserKeyNonce    []byte    `gorm:"type:bytea;not null" json:"-"`
-	Ciphertext      []byte    `gorm:"type:bytea;not null" json:"-"`
-	Nonce           []byte    `gorm:"type:bytea;not null" json:"-"`
-	KeyVersion      int       `gorm:"not null;default:1" json:"key_version"`
-	RotatedAt       time.Time `json:"rotated_at"`
+	BrokerAccountID string `gorm:"type:varchar(36);uniqueIndex;not null" json:"broker_account_id"`
+	UserID          string `gorm:"type:varchar(36);index;not null" json:"user_id"`
+	UserKeyWrapped  []byte `gorm:"type:bytea;not null" json:"-"`
+	UserKeyNonce    []byte `gorm:"type:bytea;not null" json:"-"`
+	Ciphertext      []byte `gorm:"type:bytea;not null" json:"-"`
+	Nonce           []byte `gorm:"type:bytea;not null" json:"-"`
+	KeyVersion      int    `gorm:"not null;default:1" json:"key_version"`
+	// TokenFingerprint adalah SHA-256 bertanda kunci dari token broker.
+	// Dipakai mendeteksi dua akun yang memakai token sama, bukan untuk login.
+	TokenFingerprint string    `gorm:"type:varchar(64);index" json:"-"`
+	RotatedAt        time.Time `json:"rotated_at"`
 }
 
 // TableName menetapkan nama tabel.

@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `3fb6b0b`
+> **Commit terakhir saat log ini ditulis:** `e40b461`
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,60 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-13 (lanjutan 3) — Token akun fleksibel tanpa risiko eksekusi ganda
+
+**Pelaku:** Claude
+**Tipe:** `SELESAI`
+**Status:** Semua selesai dan teruji.
+
+**Konteks dari pemilik**
+
+Token broker harus bisa diganti kapan saja oleh user, tetapi **satu token = satu
+akun broker**. Bila token yang sama dipakai dua entri akun, sinyal yang sama akan
+dieksekusi dua kali ke akun yang sama — risiko user menjadi dua kali lipat dari
+yang ia niatkan.
+
+**Yang diubah**
+
+| Bagian | Perubahan |
+|---|---|
+| Ganti token | `PATCH /accounts/:id` menerima `token` + `base_url`. Token baru dienkripsi, lalu sesi lama di Runner diputus supaya login berikutnya memakai token terbaru. |
+| Deteksi token kembar (backend) | `Credential.TokenFingerprint` (SHA-256 bertanda `INTERNAL_SECRET`) disimpan saat token ditulis. Pendaftaran **dan** rotasi menolak token yang sudah dipakai akun lain milik user yang sama. |
+| Deteksi akun kembar (Runner) | `executableAccounts` membuang entri dengan `broker_type + external_account_id` sama, jadi satu sinyal tetap satu order. |
+| Idempotensi ke broker | Order Match-Trader kini mengirim `clientId`. Bila pengiriman gagal di tengah (timeout), Runner memeriksa posisi terbuka dengan komentar = id sinyal sebelum menyimpulkan gagal. |
+| UI | Kartu akun punya tombol **Ganti token**; token dikirim sekali lalu dibuang dari state. |
+
+**Sikap fail-closed**
+
+Bila `INTERNAL_SECRET` kosong, pemeriksaan duplikat **menolak** pendaftaran akun
+alih-alih melewatkannya. Tanpa kunci, duplikat tidak bisa dibuktikan, dan
+membiarkannya berarti risiko eksekusi ganda yang tak terdeteksi.
+
+**Batas yang perlu diketahui Hermes**
+
+- `clientId` dan pembacaan `comment` posisi bergantung pada dukungan Match-Trader.
+  Bila broker mengabaikannya, lapisan yang masih melindungi adalah klaim eksekusi
+  (`IdempotencyKey`) dan penyaringan akun kembar di Runner.
+- Token kembar **antar user berbeda** tidak diblokir; pemeriksaan berjalan per user.
+  Bila ingin lintas user, perlu keputusan bisnis tersendiri.
+
+**Verifikasi**
+
+`gofmt`/`go vet` bersih, **21 paket tes backend lulus**. Tes baru:
+`TestTokenSamaDitolak`, `TestRotasiTokenMemutusSesiLama`,
+`TestUpdateTanpaTokenTidakMenyentuhKredensial`, `TestAkunKembarHanyaSekali`,
+`TestHeartbeatTanpaSesiDitolak`, `TestHeartbeatMemperpanjangCookie`.
+Frontend: `tsc`/`eslint` bersih, **38 tes vitest lulus** (4 tes baru untuk idle admin).
+
+**File terdampak (utama)**
+
+`backend/internal/{service/account_service,service/credential_fingerprint,broker/matchtrader/{client,types},broker/broker,runner/service,model/broker_account,handler/account_handler,repository/broker_repository,router/router}.go`,
+`backend/internal/{service,runner,handler,model}/*_test.go`,
+`frontend/src/{types/api,pages,features/accounts/components/AccountCard}.*`,
+`frontend/src/test/admin-idle-timer.test.ts`
+
+---
 
 ### 2026-11-13 (lanjutan 2) — Enam celah keamanan & konsistensi ditutup
 

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 
 	"ila/backend/internal/dto"
@@ -39,6 +41,10 @@ func (h *AccountHandler) Create(c *gin.Context) {
 
 	result, err := h.accounts.Create(c.Request.Context(), middleware.CurrentUserID(c), req)
 	if err != nil {
+		if errors.Is(err, service.ErrDuplicateCredential) {
+			c.Error(httpx.WrapValidation("token ini sudah dipakai akun broker lain; setiap akun memakai token berbeda"))
+			return
+		}
 		c.Error(err)
 		return
 	}
@@ -55,6 +61,10 @@ func (h *AccountHandler) Update(c *gin.Context) {
 
 	result, err := h.accounts.Update(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id"), req)
 	if err != nil {
+		if errors.Is(err, service.ErrDuplicateCredential) {
+			c.Error(httpx.WrapValidation("token ini sudah dipakai akun broker lain; setiap akun memakai token berbeda"))
+			return
+		}
 		c.Error(err)
 		return
 	}

@@ -97,6 +97,7 @@ func (r *credentialRepository) Upsert(ctx context.Context, credential *model.Cre
 		existing.Ciphertext = credential.Ciphertext
 		existing.Nonce = credential.Nonce
 		existing.KeyVersion = credential.KeyVersion
+		existing.TokenFingerprint = credential.TokenFingerprint
 		existing.RotatedAt = credential.RotatedAt
 		return tx.Save(&existing).Error
 	})

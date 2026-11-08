@@ -101,6 +101,9 @@ type openPositionRequest struct {
 	SLPrice *float64 `json:"slPrice,omitempty"`
 	TPPrice *float64 `json:"tpPrice,omitempty"`
 	Comment string   `json:"comment,omitempty"`
+	// ClientId membuat order idempoten: kiriman ulang dengan id sama tidak
+	// membuka posisi kedua (plans/12 §4.4).
+	ClientId string `json:"clientId,omitempty"`
 }
 
 // apiError adalah amplop error standar broker.

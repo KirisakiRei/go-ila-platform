@@ -113,6 +113,9 @@ export type UpdateAccountPayload = {
   risk_percent?: number
   is_active?: boolean
   is_dry_run?: boolean
+  /** Diisi hanya saat token broker diganti; kosong berarti token lama dipakai. */
+  token?: string
+  base_url?: string
 }
 
 export type StrategyVersion = 'ila-2.0' | 'ila-3.0'

@@ -173,9 +173,14 @@ func newTestAccountService(t *testing.T, user *model.User, strat *fakeStrategies
 		Audit:         &fakeAuditRepo{},
 		Sealer:        testKeyring(t),
 		Strategies:    strat,
+		// Sidik jari token wajib agar pemeriksaan duplikat berjalan.
+		FingerprintSecret: fingerprintTestSecret,
 	})
 	return svc, accounts, creds
 }
+
+// fingerprintTestSecret dipakai tes untuk mengenali token kembar.
+const fingerprintTestSecret = "rahasia-sidik-jari-uji"
 
 const sampleToken = "eyJhbGciOiJIUzI1NiJ9.sample.token.value.for.testing"
 
@@ -216,15 +221,16 @@ func TestPlusMaksimalDuaAkun(t *testing.T) {
 	svc, _, _ := newTestAccountService(t, user, &fakeStrategies{ila3: "general"})
 
 	for i := 0; i < 2; i++ {
+		// Dua akun nyata memakai token berbeda: satu token = satu akun.
 		if _, err := svc.Create(context.Background(), userIDTest, dto.CreateAccountRequest{
-			BrokerType: "matchtrader", Token: sampleToken,
+			BrokerType: "matchtrader", Token: sampleToken + "-akun-" + string(rune('1'+i)),
 		}); err != nil {
 			t.Fatalf("akun ke-%d gagal: %v", i+1, err)
 		}
 	}
 
 	if _, err := svc.Create(context.Background(), userIDTest, dto.CreateAccountRequest{
-		BrokerType: "matchtrader", Token: sampleToken,
+		BrokerType: "matchtrader", Token: sampleToken + "-akun-3",
 	}); err == nil {
 		t.Fatal("akun ketiga seharusnya ditolak")
 	}

@@ -59,13 +59,22 @@ type accountService struct {
 	// legal memastikan disclaimer risiko disetujui sebelum akun broker nyata
 	// dihubungkan (plans/09 §2.2).
 	legal AccountLinkGuard
-	clock func() time.Time
+	// secret mengunci sidik jari token agar tidak bisa dibalik dari database.
+	secret string
+	clock  func() time.Time
 }
 
 // AccountLinkGuard memeriksa syarat sebelum akun broker dihubungkan.
 type AccountLinkGuard interface {
 	RequireAccountLink(ctx context.Context, userID string) error
 }
+
+// ErrDuplicateCredential menandai token yang sudah dipakai akun broker lain.
+//
+// Satu token adalah satu akun broker. Bila token yang sama didaftarkan dua
+// kali, Runner mengeksekusi sinyal yang sama dua kali ke akun yang sama,
+// sehingga risiko user menjadi dua kali lipat (plans/12 §3.4).
+var ErrDuplicateCredential = errors.New("token ini sudah dipakai akun broker lain")
 
 // CredentialRevoker meminta Runner memutus sesi broker setelah kredensial
 // dihapus, agar token lama tidak tetap hidup di memori (plans/12 par 3.4).
@@ -85,7 +94,10 @@ type AccountServiceDeps struct {
 	Strategies    StrategyCatalog
 	Revoker       CredentialRevoker
 	Legal         AccountLinkGuard
-	Clock         func() time.Time
+	// FingerprintSecret mengunci sidik jari token. Disarankan sama dengan
+	// kunci internal; kosong membuat pemeriksaan duplikat dimatikan.
+	FingerprintSecret string
+	Clock             func() time.Time
 }
 
 // StrategyCatalog melaporkan ketersediaan strategi bagi user.
@@ -111,6 +123,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		strategies: deps.Strategies,
 		revoker:    deps.Revoker,
 		legal:      deps.Legal,
+		secret:     deps.FingerprintSecret,
 		clock:      clock,
 	}
 }
@@ -178,6 +191,17 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 	brokerType := strings.ToLower(strings.TrimSpace(req.BrokerType))
 	if err := validateCredential(brokerType, req); err != nil {
 		return nil, err
+	}
+
+	// Token yang sudah dipakai akun lain (termasuk akun simulasi) ditolak.
+	if token := strings.TrimSpace(req.Token); token != "" {
+		taken, err := s.tokenTaken(ctx, userID, token, "")
+		if err != nil {
+			return nil, err
+		}
+		if taken {
+			return nil, ErrDuplicateCredential
+		}
 	}
 
 	mode := req.Mode
@@ -277,6 +301,13 @@ func (s *accountService) Update(ctx context.Context, userID, accountID string, r
 		}
 		if err := validateCredential(account.BrokerType, rotate); err != nil {
 			return nil, err
+		}
+		taken, err := s.tokenTaken(ctx, userID, rotate.Token, account.ID)
+		if err != nil {
+			return nil, err
+		}
+		if taken {
+			return nil, ErrDuplicateCredential
 		}
 		if err := s.storeCredential(ctx, userID, account.ID, account.BrokerType, rotate); err != nil {
 			return nil, err
@@ -474,6 +505,37 @@ func (s *accountService) Strategies(ctx context.Context, userID string) ([]dto.S
 // Bantuan internal
 // ---------------------------------------------------------------------------
 
+func (s *accountService) tokenTaken(ctx context.Context, userID, token, exceptAccountID string) (bool, error) {
+	if s.secret == "" {
+		// Tanpa kunci sidik jari, duplikat tidak bisa dibuktikan. Menolak lebih
+		// aman daripada membiarkan dua akun mengeksekusi sinyal yang sama.
+		return false, fmt.Errorf("%w: pemeriksaan token belum dikonfigurasi", apperror.ErrForbidden)
+	}
+
+	wanted := tokenFingerprint(s.secret, token)
+	accounts, err := s.accounts.ListByUser(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+
+	for _, account := range accounts {
+		if account.ID == exceptAccountID {
+			continue
+		}
+		blob, findErr := s.creds.FindByAccount(ctx, account.ID)
+		if findErr != nil {
+			if errors.Is(findErr, apperror.ErrNotFound) {
+				continue
+			}
+			return false, findErr
+		}
+		if blob.TokenFingerprint == wanted && wanted != "" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *accountService) storeCredential(ctx context.Context, userID, accountID, brokerType string, req dto.CreateAccountRequest) error {
 	if s.sealer == nil {
 		return errors.New("enkripsi kredensial belum disiapkan")
@@ -498,15 +560,23 @@ func (s *accountService) storeCredential(ctx context.Context, userID, accountID,
 		return fmt.Errorf("mengenkripsi kredensial: %w", err)
 	}
 
+	// Sidik jari disimpan terpisah dari ciphertext agar duplikat bisa dikenali
+	// tanpa membuka enkripsi setiap akun.
+	fingerprint := ""
+	if s.secret != "" && creds.Token != "" {
+		fingerprint = tokenFingerprint(s.secret, creds.Token)
+	}
+
 	return s.creds.Upsert(ctx, &model.Credential{
-		BrokerAccountID: accountID,
-		UserID:          userID,
-		UserKeyWrapped:  envelope.UserKeyWrapped,
-		UserKeyNonce:    envelope.UserKeyNonce,
-		Ciphertext:      envelope.Ciphertext,
-		Nonce:           envelope.Nonce,
-		KeyVersion:      envelope.KeyVersion,
-		RotatedAt:       s.clock(),
+		BrokerAccountID:  accountID,
+		UserID:           userID,
+		UserKeyWrapped:   envelope.UserKeyWrapped,
+		UserKeyNonce:     envelope.UserKeyNonce,
+		Ciphertext:       envelope.Ciphertext,
+		Nonce:            envelope.Nonce,
+		KeyVersion:       envelope.KeyVersion,
+		TokenFingerprint: fingerprint,
+		RotatedAt:        s.clock(),
 	})
 }
 

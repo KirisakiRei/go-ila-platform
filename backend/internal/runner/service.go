@@ -372,10 +372,22 @@ func (s *Service) executableAccounts(ctx context.Context, user *model.User, tier
 		limit = maxAccountsPerUser
 	}
 
+	// Dua entri yang menunjuk akun broker sama akan mengeksekusi sinyal yang
+	// sama dua kali. Entri kembar dibuang di sini (plans/12 §3.4).
+	seen := make(map[string]struct{}, limit)
+
 	out := make([]model.BrokerAccount, 0, limit)
 	for _, account := range accounts {
 		if !account.IsActive || account.IsFrozen {
 			continue
+		}
+		if key := accountIdentity(account); key != "" {
+			if _, dup := seen[key]; dup {
+				s.logger.Warn("akun broker kembar diabaikan",
+					"user_id", user.ID, "account_id", account.ID, "identity", key)
+				continue
+			}
+			seen[key] = struct{}{}
 		}
 		if len(out) >= limit {
 			break
@@ -383,6 +395,14 @@ func (s *Service) executableAccounts(ctx context.Context, user *model.User, tier
 		out = append(out, account)
 	}
 	return out, nil
+}
+
+// accountIdentity mengembalikan penanda unik akun di sisi broker.
+func accountIdentity(account model.BrokerAccount) string {
+	if account.ExternalAccountID == "" {
+		return ""
+	}
+	return account.BrokerType + ":" + account.ExternalAccountID
 }
 
 // evaluate menjalankan pemeriksaan 3-5 (plans/14 §5.2) pada satu akun.
@@ -574,15 +594,35 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 			s.logger.Error("order ditolak broker",
 				"signal_id", signal.SignalID, "account_id", account.ID,
 				"error", openErr.Error())
-			return s.reject(ctx, user.ID, signal.SignalID, RejectAccountFrozen)
-		}
 
-		position.TicketNumber = result.Ticket
-		if result.ExecutedPrice > 0 {
-			position.OpenPrice = result.ExecutedPrice
-		}
-		if result.Lots > 0 {
-			position.LotSize = result.Lots
+			// Timeout tidak berarti order tidak masuk. Periksa dulu: tanpa ini,
+			// sinyal berikutnya bisa membuka posisi kedua di akun yang sama.
+			if recovered, recErr := s.findOpenOrder(ctx, client, signal.SignalID); recErr == nil && recovered != nil {
+				position.TicketNumber = recovered.Ticket
+				if recovered.OpenPrice > 0 {
+					position.OpenPrice = recovered.OpenPrice
+				}
+				if recovered.Lots > 0 {
+					position.LotSize = recovered.Lots
+				}
+				s.logger.Warn("order ternyata sudah masuk saat koneksi terputus",
+					"signal_id", signal.SignalID, "account_id", account.ID,
+					"ticket", recovered.Ticket)
+			} else if recErr != nil {
+				s.logger.Error("gagal memeriksa order yang mungkin sudah masuk",
+					"signal_id", signal.SignalID, "error", recErr.Error())
+				return s.reject(ctx, user.ID, signal.SignalID, RejectAccountFrozen)
+			} else {
+				return s.reject(ctx, user.ID, signal.SignalID, RejectAccountFrozen)
+			}
+		} else {
+			position.TicketNumber = result.Ticket
+			if result.ExecutedPrice > 0 {
+				position.OpenPrice = result.ExecutedPrice
+			}
+			if result.Lots > 0 {
+				position.LotSize = result.Lots
+			}
 		}
 	}
 
@@ -618,6 +658,22 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 	s.pub.PublishSignal(ctx, user.ID, signal.SignalID, SignalConsumed, "")
 	s.pub.PublishTelemetry(ctx, account.ID)
 	return nil
+}
+
+// findOpenOrder mencari posisi yang sudah terbuka dengan komentar sinyal tertentu.
+// Dipakai saat pengiriman order gagal di tengah jalan: timeout bukan bukti
+// bahwa broker tidak menerima order, dan menebak bisa menghasilkan dua posisi.
+func (s *Service) findOpenOrder(ctx context.Context, client broker.Client, signalID string) (*broker.PositionState, error) {
+	positions, err := client.ListPositions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range positions {
+		if positions[i].Comment == signalID {
+			return &positions[i], nil
+		}
+	}
+	return nil, nil
 }
 
 // calculateLot mengambil equity dan spesifikasi simbol dari broker.

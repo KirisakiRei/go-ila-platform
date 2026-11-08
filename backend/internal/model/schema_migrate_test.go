@@ -84,6 +84,9 @@ func TestTabelBaruPunyaKolomWajib(t *testing.T) {
 		{&model.SupportNote{}, "Channel"},
 		{&model.User{}, "EmailVerifiedAt"},
 		{&model.User{}, "OnboardingStep"},
+		{&model.User{}, "RunnerDirtyAt"},
+		// Sidik jari token mencegah dua akun berbagi kredensial yang sama.
+		{&model.Credential{}, "TokenFingerprint"},
 	}
 
 	for _, item := range expectations {

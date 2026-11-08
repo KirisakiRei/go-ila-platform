@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Badge, Button, StatusDot } from '@/components/ui'
+import { Badge, Button, Input, Label, StatusDot } from '@/components/ui'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { useDeleteAccount, useUpdateAccount } from '@/lib/queries'
 import type { BrokerAccount } from '@/types/api'
@@ -18,6 +18,22 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
   const update = useUpdateAccount()
   const remove = useDeleteAccount()
   const [konfirmasiHapus, setKonfirmasiHapus] = useState(false)
+  const [gantiToken, setGantiToken] = useState(false)
+  const [token, setToken] = useState('')
+
+  const simpanToken = () => {
+    if (!token.trim()) return
+    update.mutate(
+      { id: account.id, payload: { token: token.trim() } },
+      {
+        onSuccess: () => {
+          // Token hanya dikirim sekali; jangan disimpan di state lebih lama.
+          setToken('')
+          setGantiToken(false)
+        },
+      },
+    )
+  }
 
   const status = account.connected ? 'online' : account.last_error ? 'offline' : 'idle'
   const statusText = account.connected
@@ -60,7 +76,43 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
           <p className="border-l-2 border-foreground pl-2.5 text-[12px]">{account.last_error}</p>
         )}
 
+        {gantiToken && (
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <Label htmlFor={`token-${account.id}`}>Access token baru</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Tempel token dari aplikasi Match-Trader. Sesi lama langsung diganti setelah disimpan.
+              Setiap akun memakai token berbeda. Jangan tampilkan token di luar panel ini.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                id={`token-${account.id}`}
+                type="password"
+                autoComplete="off"
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                className="max-w-md font-mono"
+              />
+              <Button size="sm" isLoading={update.isPending} onClick={simpanToken}>
+                Simpan token
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setToken('')
+                  setGantiToken(false)
+                }}
+              >
+                Batal
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <Button size="sm" variant="outline" onClick={() => setGantiToken(!gantiToken)}>
+            {gantiToken ? 'Tutup ganti token' : 'Ganti token'}
+          </Button>
           <Button
             size="sm"
             variant="outline"
