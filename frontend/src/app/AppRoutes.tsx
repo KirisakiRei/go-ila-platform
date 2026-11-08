@@ -19,6 +19,7 @@ import LegalCenterPage from '@/pages/public/legal/LegalCenterPage'
 import AdminAuditPage from '@/pages/admin/AdminAuditPage'
 import AdminCmsPage from '@/pages/admin/AdminCmsPage'
 import AdminPageContentPage from '@/pages/admin/AdminPageContentPage'
+import AdminLegalPage from '@/pages/admin/AdminLegalPage'
 import AdminBrokerHealthPage from '@/pages/admin/AdminBrokerHealthPage'
 import AdminEnginePage from '@/pages/admin/AdminEnginePage'
 import AdminHealthPage from '@/pages/admin/AdminHealthPage'
@@ -402,6 +403,16 @@ export function AppRoutes() {
             <RequireAuth>
               <AdminPage>
                 <AdminCmsPage />
+              </AdminPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/konten/legal"
+          element={
+            <RequireAuth>
+              <AdminPage>
+                <AdminLegalPage />
               </AdminPage>
             </RequireAuth>
           }

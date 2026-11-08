@@ -36,6 +36,7 @@ const NAV = [
   { to: '/admin/dukungan', label: 'Dukungan', icon: LifeBuoy, end: false },
   { to: '/admin/konten', label: 'Konten', icon: FileText, end: true },
   { to: '/admin/konten/halaman', label: 'Halaman Publik', icon: FileText, end: false },
+  { to: '/admin/konten/legal', label: 'Dokumen Legal', icon: ShieldCheck, end: false },
   { to: '/admin/engine', label: 'Engine', icon: Radio, end: false },
   { to: '/admin/runner', label: 'Runner', icon: Cpu, end: false },
   { to: '/admin/kesehatan-broker', label: 'Kesehatan Broker', icon: Activity, end: false },
