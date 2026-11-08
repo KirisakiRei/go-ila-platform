@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -172,16 +173,28 @@ func (r *billingRepository) UpsertSubscription(ctx context.Context, sub *model.S
 }
 
 // ExtendTier menaikkan tier pengguna dan menandai Runner agar memuat ulang.
+// Tanggal berakhir hanya boleh memanjang: hak yang sudah dibayar tidak boleh
+// terpotong oleh pencatatan berikutnya.
 func (r *billingRepository) ExtendTier(ctx context.Context, userID, planCode string, start, end time.Time) error {
-	err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
-		Updates(map[string]any{
-			"tier":            planCode,
-			"tier_started_at": start,
-			"tier_expires_at": end,
-			"grace_until":     nil,
-			"runner_dirty_at": time.Now().UTC(),
-		}).Error
-	if err != nil {
+	currentEnd := time.Time{}
+	var row model.User
+	if err := r.db.WithContext(ctx).Select("tier_expires_at").Where("id = ?", userID).Limit(1).Find(&row).Error; err != nil {
+		return fmt.Errorf("membaca masa berlaku tier: %w", err)
+	}
+	if row.TierExpiresAt != nil {
+		currentEnd = *row.TierExpiresAt
+	}
+
+	updates := map[string]any{
+		"tier":            planCode,
+		"tier_started_at": start,
+		"grace_until":     nil,
+		"runner_dirty_at": time.Now().UTC(),
+	}
+	if end.After(currentEnd) {
+		updates["tier_expires_at"] = end
+	}
+	if err := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
 		return fmt.Errorf("memperpanjang tier: %w", err)
 	}
 	return nil
@@ -285,6 +298,40 @@ func (r *billingRepository) FindCouponByCode(ctx context.Context, code string) (
 		return nil, fmt.Errorf("membaca kupon: %w", err)
 	}
 	return &row, nil
+}
+
+// ListInvoicesByStatus membaca tagihan lintas pengguna untuk panel admin.
+// q mencocokkan nomor invoice atau id pengguna.
+func (r *billingRepository) ListInvoicesByStatus(ctx context.Context, status, q string, limit int) ([]model.Invoice, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	query := r.db.WithContext(ctx).Model(&model.Invoice{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if q = strings.TrimSpace(q); q != "" {
+		like := "%" + q + "%"
+		query = query.Where("number LIKE ? OR user_id = ?", like, q)
+	}
+
+	var rows []model.Invoice
+	if err := query.Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("membaca daftar invoice: %w", err)
+	}
+	return rows, nil
+}
+
+// RefundedAmount menjumlahkan refund yang sudah tercatat untuk satu pembayaran.
+func (r *billingRepository) RefundedAmount(ctx context.Context, paymentID string) (int64, error) {
+	var total struct{ Sum int64 }
+	err := r.db.WithContext(ctx).Model(&model.Refund{}).
+		Select("COALESCE(SUM(amount_idr), 0) AS sum").
+		Where("payment_id = ?", paymentID).Scan(&total).Error
+	if err != nil {
+		return 0, fmt.Errorf("menghitung refund: %w", err)
+	}
+	return total.Sum, nil
 }
 
 func (r *billingRepository) AddRefund(ctx context.Context, row *model.Refund) error {

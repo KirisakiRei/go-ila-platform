@@ -52,6 +52,7 @@ const (
 	InvoicePaid        Action = "invoice.paid"
 	InvoiceVoid        Action = "invoice.void"
 	PaymentReceived    Action = "payment.received"
+	InvoiceMarkPaid    Action = "invoice.paid.manual"
 	PaymentFailed      Action = "payment.failed"
 	RefundCreate       Action = "refund.create"
 	CreditIssue        Action = "credit.issue"
@@ -120,6 +121,7 @@ var Catalog = []Entry{
 	{InvoicePaid, "Uang", "Invoice lunas", false},
 	{InvoiceVoid, "Uang", "Invoice dibatalkan", true},
 	{PaymentReceived, "Uang", "Pembayaran diterima", false},
+	{InvoiceMarkPaid, "Uang", "Pembayaran manual dicatat", true},
 	{PaymentFailed, "Uang", "Pembayaran gagal", false},
 	{RefundCreate, "Uang", "Refund dicatat", true},
 	{CreditIssue, "Uang", "Kredit diberikan", true},

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
 import { useSignOut } from '@/features/auth/hooks/use-auth'
 import { UserBanners } from '@/components/layout/UserBanners'
+import { LegalReconsentGate } from '@/features/auth/components/LegalReconsentGate'
 import type { Tier, User } from '@/types/api'
 
 const TIER_LABEL: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
@@ -47,6 +48,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
+      <LegalReconsentGate />
       <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:border-b-0 lg:border-r">
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
           <span className="text-sm font-bold tracking-tight">ILA</span>

@@ -139,6 +139,28 @@ tertulis di chat atau berkas sementara dianggap sudah bocor.
 
 ---
 
+## 7b. Backup Terjadwal
+
+Layanan `backup` di `deploy/docker-compose.yml` menjalankan
+`scripts/backup.sh` setiap hari pukul 18:00 UTC (01:00 WIB).
+
+| Variabel | Isi |
+|---|---|
+| `BACKUP_REMOTE_DIR` | direktori host tujuan salinan luar VPS (mis. hasil mount object storage). Kosong berarti salinan hanya di volume `backup_data` |
+
+Retensi: 7 salinan harian + 4 salinan mingguan (dibuat setiap Minggu UTC).
+Salinan yang hanya ada di VPS yang sama tidak melindungi dari kerusakan VPS,
+jadi `BACKUP_REMOTE_DIR` sebaiknya diisi saat produksi.
+
+Uji pemulihan minimal sekali sebelum ada pengguna sungguhan:
+
+```bash
+docker compose -f deploy/docker-compose.yml exec backup /scripts/backup.sh
+TARGET_DSN=... DUMP_FILE=... scripts/restore.sh
+```
+
+---
+
 ## 8. Telegram (Opsional)
 
 Notifikasi Telegram tidak aktif bila `TELEGRAM_BOT_TOKEN` kosong; fitur lain

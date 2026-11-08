@@ -62,6 +62,9 @@ func main() {
 	// Flag & mode dibaca ulang tiap evaluasi dengan cache 10 detik, sehingga
 	// rem darurat dari panel admin berlaku tanpa restart (plans/11 I2).
 	flags := settings.NewService(repository.NewSettingsRepository(db), envFlagReader(cfg))
+	// Ketersediaan ILA 3.0 dibaca dari katalog paket, bukan env, agar panel
+	// admin dan Runner menampilkan tahap yang sama (plans/15 §6.1).
+	features := repository.NewTierFeatureReader(db)
 	modeSource := runnerModeSource{store: repository.NewSystemRepository(db)}
 
 	// --- Kanal notifikasi -----------------------------------------------------
@@ -165,14 +168,15 @@ func main() {
 	}()
 
 	// Koneksi engine: setiap strategi punya proses sendiri (plans/15 par.1.1).
-	for _, target := range engineTargets(cfg) {
+	targets := engineTargets(cfg, features)
+	for _, target := range targets {
 		wg.Add(1)
 		go func(target engineTarget) {
 			defer wg.Done()
 			runEngineLoop(ctx, target, svc, store, logger)
 		}(target)
 	}
-	if len(engineTargets(cfg)) == 0 {
+	if len(targets) == 0 {
 		logger.Warn("tidak ada alamat engine; runner berjalan tanpa sinyal")
 	}
 
@@ -204,6 +208,14 @@ func main() {
 	svc.CloseClients()
 
 	logger.Info("runner berhenti")
+}
+
+// ila3Running memutuskan apakah proses engine ILA 3.0 boleh dijalankan.
+// Nilai env hanya cadangan bila katalog paket belum punya barisnya.
+func ila3Running(cfg *config.Config, features runner.ILA3StatusReader) bool {
+	stage := runner.NewSettings(cfg.ILA3Availability)
+	stage.Reload(context.Background(), features)
+	return stage.ILA3Running()
 }
 
 // runTelemetry memperbarui saldo akun broker secara berkala.
@@ -251,7 +263,7 @@ type engineTarget struct {
 
 // engineTargets menyusun daftar engine yang aktif.
 // ILA 3.0 hanya ikut bila tahapnya mengizinkan engine berjalan.
-func engineTargets(cfg *config.Config) []engineTarget {
+func engineTargets(cfg *config.Config, features runner.ILA3StatusReader) []engineTarget {
 	out := make([]engineTarget, 0, 2)
 
 	if cfg.EngineGRPCAddr != "" {
@@ -265,8 +277,7 @@ func engineTargets(cfg *config.Config) []engineTarget {
 		})
 	}
 
-	ila3 := runner.NewSettings(cfg.ILA3Availability)
-	if cfg.Engine3GRPCAddr != "" && ila3.ILA3Running() {
+	if cfg.Engine3GRPCAddr != "" && ila3Running(cfg, features) {
 		out = append(out, engineTarget{
 			Strategy:           "ila-3.0",
 			Addr:               cfg.Engine3GRPCAddr,

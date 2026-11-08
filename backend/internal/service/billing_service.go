@@ -26,6 +26,9 @@ type BillingService interface {
 	Subscription(ctx context.Context, userID string) (*dto.SubscriptionItem, error)
 	RunGraceSweep(ctx context.Context) (int, error)
 	RedeemCredit(ctx context.Context, userID string, code string) (*dto.CreditSummary, error)
+	// ActivatePlan dipakai admin saat mencatat pembayaran manual: hak paket
+	// diberikan lewat jalur yang sama dengan webhook agar periodenya konsisten.
+	ActivatePlan(ctx context.Context, userID, planCode string, periodStart, periodEnd time.Time) error
 }
 
 // BillingStore adalah data yang dibutuhkan billing.
@@ -303,6 +306,29 @@ func (s *billingService) RedeemCredit(ctx context.Context, userID string, code s
 		return nil, err
 	}
 	return &dto.CreditSummary{UserID: userID, Balance: balance}, nil
+}
+
+// ActivatePlan memberi hak paket untuk periode yang sudah ditentukan.
+// Dipakai admin setelah pembayaran manual dicatat; tidak ada pembayaran palsu
+// yang dibuat, hanya rekaman langganan yang sama bentuknya dengan jalur webhook.
+func (s *billingService) ActivatePlan(ctx context.Context, userID, planCode string, periodStart, periodEnd time.Time) error {
+	start := periodStart
+	if start.IsZero() {
+		start = s.now()
+	}
+	end := periodEnd
+	if !end.After(start) {
+		end = start.AddDate(0, 1, 0)
+	}
+	if err := s.store.ExtendTier(ctx, userID, planCode, start, end); err != nil {
+		return err
+	}
+	now := s.now()
+	return s.store.UpsertSubscription(ctx, &model.SubscriptionRecord{
+		UserID: userID, PlanCode: planCode, Status: model.SubStatusActive,
+		CurrentPeriodStart: start, CurrentPeriodEnd: end,
+		CreatedAt: now, UpdatedAt: now,
+	})
 }
 
 // Invoices menampilkan tagihan milik pengguna.

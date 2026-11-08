@@ -64,4 +64,14 @@ export const accountFlowApi = {
   saveOnboarding: (step: number, done = false) =>
     request<OnboardingState>('/me/onboarding', { method: 'PUT', body: { step, done } }),
   banner: () => request<SubscriptionBanner>('/me/subscription-banner'),
+  legal: () => request<LegalStatus>('/me/legal'),
+  acceptLegal: (slug: string, version: number) =>
+    request<LegalStatus>(`/me/legal/${slug}/accept`, { method: 'POST', body: { version } }),
+}
+
+/** LegalStatus adalah keadaan persetujuan dokumen untuk satu akun. */
+export type LegalStatus = {
+  documents: { slug: string; title: string; version: number; accepted: boolean }[]
+  pending: { slug: string; title: string; current_version: number; required: boolean }[]
+  blocked: boolean
 }

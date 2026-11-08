@@ -141,6 +141,34 @@ services:
       frontend:
         condition: service_healthy
 
+  # Backup harian terjadwal. Tanpa ini scripts/backup.sh hanya alat manual
+  # yang mudah terlupa sampai dibutuhkan (docs/RUNBOOK.md §6).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache tzdata >/dev/null 2>&1 || true
+        echo "0 18 * * * /scripts/backup.sh >> /var/backups/ila/backup.log 2>&1" > /etc/crontabs/root
+        crond -f -l 2
+    env_file: ../.env
+    environment:
+      DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
+      BACKUP_DIR: /var/backups/ila
+      DAILY_KEEP: "7"
+      WEEKLY_KEEP: "4"
+    mem_limit: 64m
+    logging: *default-logging
+    volumes:
+      - ../scripts:/scripts:ro
+      - backup_data:/var/backups/ila
+      - ${BACKUP_REMOTE_DIR:-./backups-remote}:/remote
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -175,5 +203,6 @@ networks:
 
 volumes:
   pgdata:
+  backup_data:
   caddy_data:
   caddy_config:

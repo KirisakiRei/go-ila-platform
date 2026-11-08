@@ -1,9 +1,12 @@
 package runner
 
 import (
+	"context"
 	"os"
 	"strings"
 	"sync/atomic"
+
+	"ila/backend/internal/model"
 )
 
 // Settings adalah pengaturan platform yang dibaca dari environment.
@@ -88,4 +91,64 @@ func NewSettings(ila3 string) *Settings {
 		s.ila3.Store(ila3)
 	}
 	return s
+}
+
+// ILA3StatusReader membaca tahap ILA 3.0 dari katalog paket.
+// Katalog adalah sumber kebenaran yang juga dibaca panel admin dan
+// dashboard, sehingga tiga tempat itu tidak bisa berbeda nilai.
+type ILA3StatusReader interface {
+	Feature(ctx context.Context, tier, key, fallback string) string
+}
+
+// Reload menurunkan tahap ILA 3.0 dari katalog paket.
+// Semua paket yang menawarkan strategi ini harus menyetujui tahap yang sama;
+// bila berbeda, tahap paling konservatif dipakai agar tidak ada paket yang
+// mendapat fitur lebih cepat dari yang lain.
+func (s *Settings) Reload(ctx context.Context, reader ILA3StatusReader) {
+	if s == nil || reader == nil {
+		return
+	}
+
+	stage := ""
+	for _, tier := range []string{model.TierFree, model.TierBasic, model.TierPlus} {
+		value := normalizeStage(reader.Feature(ctx, tier, model.FeatureILA3Status, ""))
+		if value == "" {
+			continue
+		}
+		if stage == "" || stageRank(value) < stageRank(stage) {
+			stage = value
+		}
+	}
+	if stage == "" {
+		return
+	}
+	s.ila3.Store(stage)
+}
+
+// normalizeStage menerjemahkan nilai katalog paket ke tahap internal.
+func normalizeStage(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case ILA3Off, ILA3Internal, ILA3Beta, ILA3General:
+		return strings.ToLower(strings.TrimSpace(value))
+	case "coming_soon", "disabled", "":
+		return ILA3Off
+	default:
+		return ILA3Off
+	}
+}
+
+// stageRank mengurutkan tahap dari paling konservatif.
+func stageRank(stage string) int {
+	switch stage {
+	case ILA3Off:
+		return 0
+	case ILA3Internal:
+		return 1
+	case ILA3Beta:
+		return 2
+	case ILA3General:
+		return 3
+	default:
+		return 0
+	}
 }

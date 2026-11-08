@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import {
   Badge,
+  Button,
   EmptyState,
   PageHeader,
   Skeleton,
@@ -11,8 +13,12 @@ import {
   TableHeader,
   TableRow,
   Alert,
+  Card,
+  Input,
+  Label,
 } from '@/components/ui'
 import { usePositions } from '@/lib/queries'
+import { downloadFile } from '@/lib/http'
 import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
 import type { PositionStatus } from '@/types/api'
 
@@ -32,8 +38,30 @@ const TONE: Record<PositionStatus, 'solid' | 'outline' | 'neutral' | 'muted'> = 
   UNTRACKED: 'muted',
 }
 
+/**
+ * PositionsPage menampilkan posisi dan menyediakan unduhan riwayat.
+ * Cetak biru CSV memuat waktu WIB dan NY sekaligus agar tidak ambigu saat
+ * dibuka di luar Indonesia.
+ */
 export default function PositionsPage() {
   const { data, isLoading, isError, error } = usePositions()
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [downloading, setDownloading] = useState(false)
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null)
+
+  const download = async () => {
+    setDownloading(true)
+    setDownloadNotice(null)
+    try {
+      const name = await downloadFile('/positions/export', { from, to })
+      setDownloadNotice(`Berkas ${name} disiapkan.`)
+    } catch (cause) {
+      setDownloadNotice(cause instanceof Error ? cause.message : 'Gagal mengunduh riwayat.')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <>
@@ -41,6 +69,28 @@ export default function PositionsPage() {
         title="Posisi"
         description="Posisi dikelola broker melalui stop loss dan take profit. Penutupan dilakukan di aplikasi broker Anda."
       />
+
+      <Card className="p-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="export-from">Dari tanggal</Label>
+            <Input id="export-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="export-to">Sampai tanggal</Label>
+            <Input id="export-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+          </div>
+          <div className="flex items-end">
+            <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
+              {downloading ? 'Menyiapkan…' : 'Unduh riwayat (CSV)'}
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Tanggal mengikuti hari akuntansi WIB; di dalam berkas tersedia kolom waktu WIB dan NY.
+        </p>
+        {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
+      </Card>
 
       {isLoading && <Skeleton className="h-56 w-full" />}
       {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}

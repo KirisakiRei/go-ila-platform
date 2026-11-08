@@ -133,6 +133,43 @@ async function requestEnvelope<T>(
 }
 
 /**
+ * downloadFile mengambil berkas (CSV) lalu menyimpannya lewat tautan sementara.
+ * Nama berkas diambil dari header agar server tetap yang menentukan.
+ */
+export async function downloadFile(
+  path: string,
+  query?: Record<string, string | undefined>,
+): Promise<string> {
+  const response = await fetch(buildUrl(path, query), {
+    method: 'GET',
+    headers: { Accept: 'text/csv' },
+    credentials: 'same-origin',
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) unauthorizedHandler?.()
+    throw new ApiError(messageForStatus(response.status), response.status, 'DOWNLOAD_FAILED')
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename="([^"]+)"/.exec(disposition)
+  const filename = match?.[1] ?? 'unduhan.csv'
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  // Objek URL harus dilepas agar memori tab tidak menumpuk.
+  URL.revokeObjectURL(url)
+
+  return filename
+}
+
+/**
  * messageForStatus memberi pesan yang bisa ditindaklanjuti. Pesan mentah
  * backend dipakai bila ada; status khusus punya penjelasan sendiri.
  */

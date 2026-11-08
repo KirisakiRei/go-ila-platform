@@ -40,6 +40,12 @@ var harapanAksiAudit = map[string]audit.Action{
 
 	"POST /api/v1/admin/users/:id/credit": audit.CreditAdjust,
 
+	// Voucher saldo dan uang masuk/keluar selalu meninggalkan jejak.
+	"POST /api/v1/admin/credit-codes":             audit.CreditAdjust,
+	"POST /api/v1/admin/credit-codes/:id/disable": audit.CreditAdjust,
+	"POST /api/v1/admin/invoices/:id/mark-paid":   audit.InvoiceMarkPaid,
+	"POST /api/v1/admin/invoices/:id/refund":      audit.RefundCreate,
+
 	// Konten dan RBAC sudah mencatat sendiri lewat recordAudit di service-nya.
 	"POST /api/v1/admin/legal":               audit.LegalPublish,
 	"PATCH /api/v1/admin/legal/:id":          audit.LegalPublish,

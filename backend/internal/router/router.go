@@ -173,7 +173,6 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	pricingRepo := repository.NewPricingRepository(db)
 	pricingService := service.NewPricingService(pricingRepo)
-	adminBillingService := service.NewAdminBillingService(pricingRepo, adminAudit)
 	adminReportService := service.NewAdminReportService(repository.NewReportRepository(db))
 
 	// Flag operasional: nilai database menimpa env, dengan cache 10 detik agar
@@ -244,7 +243,6 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
-	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
 	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
 	adminSystemHandler := handler.NewAdminSystemHandler(adminSystemService, systemOpsService, systemOpsService)
 	publicStatusHandler := handler.NewPublicStatusHandler(systemOpsService)
@@ -254,8 +252,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
 	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
-	billingRepo := repository.NewBillingRepository(db)
-	billingService := service.NewBillingService(userRepo, billingRepo, pricingService, billingRepo, gateway, adminAudit, repository.NewCreditCodeRepository(db))
+	billingRepo := repository.NewBillingStore(db)
+	billingService := service.NewBillingService(userRepo, billingRepo, pricingService, billingRepo, gateway, adminAudit, billingRepo)
+	adminBillingService := service.NewAdminBillingService(billingRepo, adminAudit, billingService)
+	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
 	billingHandler := handler.NewBillingHandler(billingService)
 	legalHandler := handler.NewLegalHandler(legalService)
 
@@ -382,6 +382,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Riwayat untuk dashboard.
 		me.GET("/signals", tradingHandler.Signals)
 		me.GET("/positions", tradingHandler.Positions)
+		me.GET("/positions/export", tradingHandler.ExportPositions)
 
 		// Persetujuan dokumen legal. `blocked` pada balasan berarti eksekusi
 		// dan pembayaran ditahan sampai dokumen wajib disetujui.

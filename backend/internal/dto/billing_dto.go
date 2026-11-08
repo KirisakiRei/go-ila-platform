@@ -119,6 +119,22 @@ type CreditCodeRequest struct {
 	MaxPerUser     int    `json:"max_per_user" binding:"omitempty,min=1"`
 	StartsAt       string `json:"starts_at" binding:"required"`
 	EndsAt         string `json:"ends_at" binding:"required"`
+	Reason         string `json:"reason" binding:"max=500"`
+}
+
+// CreditCodeItem adalah satu baris daftar kode kredit beserta pemakaiannya.
+type CreditCodeItem struct {
+	ID             string   `json:"id"`
+	Code           string   `json:"code"`
+	AmountIDR      int64    `json:"amount_idr"`
+	MaxRedemptions int      `json:"max_redemptions"`
+	MaxPerUser     int      `json:"max_per_user"`
+	StartsAt       TimePair `json:"starts_at"`
+	EndsAt         TimePair `json:"ends_at"`
+	IsActive       bool     `json:"is_active"`
+	Redeemed       int64    `json:"redeemed"`
+	// Status dihitung server agar tampilan tidak menebak.
+	Status string `json:"status"`
 }
 
 // RedeemCreditRequest menukar kode kredit.

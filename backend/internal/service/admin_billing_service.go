@@ -23,6 +23,16 @@ type AdminBillingService interface {
 	DisableCoupon(ctx context.Context, actor AdminActor, id, reason string) error
 	CreditSummary(ctx context.Context, actor AdminActor, userID string) (*dto.CreditSummary, error)
 	AdjustCredit(ctx context.Context, actor AdminActor, userID string, req dto.CreditRequest) (*dto.CreditSummary, error)
+
+	// Kode kredit: voucher saldo yang ditukar pengguna sendiri.
+	CreditCodes(ctx context.Context, status, q string) ([]dto.CreditCodeItem, error)
+	CreateCreditCode(ctx context.Context, actor AdminActor, req dto.CreditCodeRequest) (*dto.CreditCodeItem, error)
+	DisableCreditCode(ctx context.Context, actor AdminActor, id, reason string) error
+
+	// Invoice: pencatatan pembayaran manual dan refund manual.
+	Invoices(ctx context.Context, status, q string, limit int) ([]dto.AdminInvoiceItem, error)
+	MarkInvoicePaid(ctx context.Context, actor AdminActor, id string, req dto.ManualPaymentRequest) error
+	RefundPayment(ctx context.Context, actor AdminActor, id string, req dto.RefundRequest) error
 }
 
 // billingStore adalah kebutuhan kelola uang di sisi admin.
@@ -44,18 +54,40 @@ type billingStore interface {
 	CreditBalance(ctx context.Context, userID string) (int64, error)
 	ApplyCredit(ctx context.Context, input *repository.ApplyCreditInput) (int64, error)
 	CreditHistory(ctx context.Context, userID string, limit int) ([]model.CreditTransaction, error)
+
+	// Voucher saldo.
+	ListCreditCodes(ctx context.Context, status, q string, limit int) ([]model.CreditCode, error)
+	FindCreditCodeByID(ctx context.Context, id string) (*model.CreditCode, error)
+	CreateCreditCode(ctx context.Context, code *model.CreditCode) error
+	CountCreditRedemptions(ctx context.Context, codeID string) (int64, error)
+	SetCreditCodeActive(ctx context.Context, id string, active bool) error
+
+	// Invoice admin.
+	ListInvoicesByStatus(ctx context.Context, status, q string, limit int) ([]model.Invoice, error)
+	FindInvoiceByID(ctx context.Context, id string) (*model.Invoice, error)
+	UpdateInvoice(ctx context.Context, invoice *model.Invoice) error
+	SavePayment(ctx context.Context, payment *model.Payment) (bool, error)
+	AddRefund(ctx context.Context, refund *model.Refund) error
+	RefundedAmount(ctx context.Context, paymentID string) (int64, error)
 }
 
 type adminBillingService struct {
-	store billingStore
-	audit AdminAudit
-	now   func() time.Time
+	store    billingStore
+	audit    AdminAudit
+	subsaver SubscriptionExtender
+	now      func() time.Time
+}
+
+// SubscriptionExtender memberi hak paket setelah pembayaran sah.
+// Dipisah dari store agar jalur uang tunggal tetap di BillingService.
+type SubscriptionExtender interface {
+	ActivatePlan(ctx context.Context, userID, planCode string, periodStart, periodEnd time.Time) error
 }
 
 // NewAdminBillingService merangkai kelola uang.
-func NewAdminBillingService(store billingStore, recorder AdminAudit) AdminBillingService {
+func NewAdminBillingService(store billingStore, recorder AdminAudit, subs SubscriptionExtender) AdminBillingService {
 	return &adminBillingService{
-		store: store, audit: recorder,
+		store: store, audit: recorder, subsaver: subs,
 		now: func() time.Time { return time.Now().UTC() },
 	}
 }

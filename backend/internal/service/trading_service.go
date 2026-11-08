@@ -39,6 +39,8 @@ type UserSignalReader interface {
 type TradingService interface {
 	Signals(ctx context.Context, userID string, limit int) ([]dto.SignalResponse, error)
 	Positions(ctx context.Context, userID string, limit int) ([]dto.PositionResponse, error)
+	// ExportPositions menyiapkan riwayat posisi sebagai CSV.
+	ExportPositions(ctx context.Context, userID string, from, to time.Time) (*PositionExport, error)
 }
 
 type tradingService struct {

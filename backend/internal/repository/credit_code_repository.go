@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,7 +31,7 @@ func (r *creditCodeRepository) Redeem(ctx context.Context, userID, code string, 
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var row model.CreditCode
-		err := tx.Where("code = ?", code).Limit(1).Find(&row).Error
+		err := tx.Where("code = ? AND deleted_at IS NULL", code).Limit(1).Find(&row).Error
 		if err != nil {
 			return fmt.Errorf("membaca kode kredit: %w", err)
 		}
@@ -84,6 +85,64 @@ func (r *creditCodeRepository) Redeem(ctx context.Context, userID, code string, 
 		return 0, err
 	}
 	return balance, nil
+}
+
+// ListCreditCodes membaca kode kredit terbaru. status kosong berarti semua.
+func (r *creditCodeRepository) ListCreditCodes(ctx context.Context, status, q string, limit int) ([]model.CreditCode, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	query := r.db.WithContext(ctx).Model(&model.CreditCode{})
+	switch status {
+	case "active":
+		query = query.Where("is_active = ?", true)
+	case "disabled":
+		query = query.Where("is_active = ?", false)
+	}
+	if q = strings.TrimSpace(q); q != "" {
+		query = query.Where("code LIKE ?", "%"+strings.ToUpper(q)+"%")
+	}
+
+	var rows []model.CreditCode
+	if err := query.Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("membaca daftar kode kredit: %w", err)
+	}
+	return rows, nil
+}
+
+// FindByID membaca satu kode kredit.
+func (r *creditCodeRepository) FindByID(ctx context.Context, id string) (*model.CreditCode, error) {
+	var row model.CreditCode
+	if err := r.db.WithContext(ctx).Where("id = ?", id).Limit(1).Find(&row).Error; err != nil {
+		return nil, fmt.Errorf("membaca kode kredit: %w", err)
+	}
+	if row.ID == "" {
+		return nil, apperror.ErrNotFound
+	}
+	return &row, nil
+}
+
+// CountRedemptions menghitung berapa kali kode dipakai.
+func (r *creditCodeRepository) CountRedemptions(ctx context.Context, codeID string) (int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&model.CreditRedemption{}).
+		Where("code_id = ?", codeID).Count(&total).Error; err != nil {
+		return 0, fmt.Errorf("menghitung pemakaian kode kredit: %w", err)
+	}
+	return total, nil
+}
+
+// SetActive menghentikan atau mengaktifkan kode tanpa menghapus riwayat.
+func (r *creditCodeRepository) SetActive(ctx context.Context, id string, active bool) error {
+	res := r.db.WithContext(ctx).Model(&model.CreditCode{}).
+		Where("id = ?", id).Update("is_active", active)
+	if res.Error != nil {
+		return fmt.Errorf("mengubah status kode kredit: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return apperror.ErrNotFound
+	}
+	return nil
 }
 
 // Create menyimpan kode kredit baru.

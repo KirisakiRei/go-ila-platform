@@ -42,6 +42,14 @@ func (h *AdminBillingHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 
 	g.GET("/users/:id/credit", guard(http.MethodGet, "/users/:id/credit", authz.BillingView), h.Credit)
 	g.POST("/users/:id/credit", guard(http.MethodPost, "/users/:id/credit", authz.BillingVoucher), h.AdjustCredit)
+
+	g.GET("/credit-codes", guard(http.MethodGet, "/credit-codes", authz.BillingView), h.CreditCodes)
+	g.POST("/credit-codes", guard(http.MethodPost, "/credit-codes", authz.BillingVoucher), h.CreateCreditCode)
+	g.POST("/credit-codes/:id/disable", guard(http.MethodPost, "/credit-codes/:id/disable", authz.BillingVoucher), h.DisableCreditCode)
+
+	g.GET("/invoices", guard(http.MethodGet, "/invoices", authz.BillingView), h.Invoices)
+	g.POST("/invoices/:id/mark-paid", guard(http.MethodPost, "/invoices/:id/mark-paid", authz.BillingManual), h.MarkPaid)
+	g.POST("/invoices/:id/refund", guard(http.MethodPost, "/invoices/:id/refund", authz.BillingRefund), h.Refund)
 }
 
 // Plans menangani GET /api/v1/admin/plans.
@@ -157,4 +165,80 @@ func (h *AdminBillingHandler) AdjustCredit(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Kredit disesuaikan", summary)
+}
+
+// CreditCodes menangani GET /api/v1/admin/credit-codes.
+func (h *AdminBillingHandler) CreditCodes(c *gin.Context) {
+	items, err := h.billing.CreditCodes(c.Request.Context(), c.Query("status"), c.Query("q"))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Daftar kode kredit", items)
+}
+
+// CreateCreditCode menangani POST /api/v1/admin/credit-codes.
+func (h *AdminBillingHandler) CreateCreditCode(c *gin.Context) {
+	var req dto.CreditCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	item, err := h.billing.CreateCreditCode(c.Request.Context(), h.actor(c), req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.Created(c, "Kode kredit dibuat", item)
+}
+
+// DisableCreditCode menangani POST /api/v1/admin/credit-codes/:id/disable.
+func (h *AdminBillingHandler) DisableCreditCode(c *gin.Context) {
+	var req struct {
+		Reason string `json:"reason" binding:"max=500"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	if err := h.billing.DisableCreditCode(c.Request.Context(), h.actor(c), c.Param("id"), req.Reason); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Kode kredit dihentikan", nil)
+}
+
+// Invoices menangani GET /api/v1/admin/invoices.
+func (h *AdminBillingHandler) Invoices(c *gin.Context) {
+	items, err := h.billing.Invoices(c.Request.Context(), c.Query("status"), c.Query("q"), 100)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Daftar invoice", items)
+}
+
+// MarkPaid menangani POST /api/v1/admin/invoices/:id/mark-paid.
+func (h *AdminBillingHandler) MarkPaid(c *gin.Context) {
+	var req dto.ManualPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	if err := h.billing.MarkInvoicePaid(c.Request.Context(), h.actor(c), c.Param("id"), req); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Pembayaran manual dicatat", nil)
+}
+
+// Refund menangani POST /api/v1/admin/invoices/:id/refund.
+func (h *AdminBillingHandler) Refund(c *gin.Context) {
+	var req dto.RefundRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	if err := h.billing.RefundPayment(c.Request.Context(), h.actor(c), c.Param("id"), req); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Refund dicatat", nil)
 }

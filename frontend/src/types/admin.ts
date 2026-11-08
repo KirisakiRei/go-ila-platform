@@ -121,6 +121,41 @@ export type PublicPlan = {
   active: boolean
 }
 
+/** AdminInvoiceItem adalah tagihan lintas pengguna di panel admin. */
+export type AdminInvoiceItem = {
+  id: string
+  number: string
+  user_id: string
+  user_email: string
+  plan_code: string
+  amount_idr: number
+  discount_idr: number
+  credit_idr: number
+  total_idr: number
+  status: 'pending' | 'paid' | 'expired' | 'cancelled' | 'refunded'
+  coupon_code?: string
+  gateway?: string
+  period_start: TimePair
+  period_end: TimePair
+  created_at: TimePair
+  paid_at?: TimePair
+  expires_at: TimePair
+}
+
+/** CreditCodeItem adalah voucher saldo yang bisa ditukar pengguna. */
+export type CreditCodeItem = {
+  id: string
+  code: string
+  amount_idr: number
+  max_redemptions: number
+  max_per_user: number
+  starts_at: TimePair
+  ends_at: TimePair
+  is_active: boolean
+  redeemed: number
+  status: 'active' | 'scheduled' | 'expired' | 'exhausted' | 'disabled'
+}
+
 export type CouponItem = {
   id: string
   code: string

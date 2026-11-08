@@ -28,6 +28,8 @@ import AdminSupportPage from '@/pages/admin/AdminSupportPage'
 import OnboardingPage from '@/pages/OnboardingPage'
 import SecuritySettingsPage from '@/pages/SecuritySettingsPage'
 import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
+import AdminCreditCodesPage from '@/pages/admin/AdminCreditCodesPage'
+import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage'
 import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
@@ -264,6 +266,26 @@ export function AppRoutes() {
           <RequireAuth>
             <AdminPage>
               <AdminCouponsPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/tagihan"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminInvoicesPage />
+            </AdminPage>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/kode-kredit"
+        element={
+          <RequireAuth>
+            <AdminPage>
+              <AdminCreditCodesPage />
             </AdminPage>
           </RequireAuth>
         }

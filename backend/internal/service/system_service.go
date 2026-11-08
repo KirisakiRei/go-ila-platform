@@ -9,9 +9,9 @@ import (
 	"ila/backend/internal/runner"
 )
 
-// Sesi pasar mengikuti NY/UTC; hanya hari akuntansi yang memakai WIB.
-// Zona diambil dari runner agar dua bagian sistem tidak berbeda.
-var wib = runner.WIB
+// Sesi pasar mengikuti NY/UTC; hanya hari akuntansi yang memakai zona lokal.
+// Zona dibaca saat dipakai, bukan disalin saat init, agar DAILY_TZ yang
+// diterapkan sebelum router dibuat benar-benar berlaku.
 
 // Batas kuota harian yang ditampilkan bila tidak ada konfigurasi lain.
 const defaultMaxDailyTrades = 2
@@ -93,7 +93,7 @@ func (s *systemService) Status(ctx context.Context, userID string) (*dto.SystemS
 	status := &dto.SystemStatus{
 		ServerTime:     now,
 		ServerTimePair: dto.NewTimePair(now),
-		DailyTimezone:  "Asia/Jakarta",
+		DailyTimezone:  runner.WIB.String(),
 		Market:         dto.MarketStatus{State: "UNKNOWN", Label: "Tidak diketahui"},
 		Engines:        make([]dto.EngineStatus, 0, len(engines)),
 	}
@@ -176,7 +176,7 @@ func (s *systemService) brokerStatus(ctx context.Context, userID string) (dto.Br
 
 // dailyStatus menyusun kuota hari ini dalam WIB.
 func (s *systemService) dailyStatus(ctx context.Context, userID string, now time.Time) (dto.DailyResponse, error) {
-	day := now.In(wib).Format("2006-01-02")
+	day := runner.DayKey(now)
 	// Tengah malam hari akuntansi, disajikan dalam WIB dan NY.
 	dayStart := runner.DayStart(now)
 

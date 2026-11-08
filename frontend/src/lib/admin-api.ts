@@ -3,6 +3,8 @@ import type { TimePair } from '@/types/api'
 import type { PublicPlan } from '@/types/admin'
 import type {
   AdminAccountItem,
+  AdminInvoiceItem,
+  CreditCodeItem,
   AdminLegalItem,
   AdminNoteItem,
   AdminPositionItem,
@@ -93,6 +95,26 @@ export const adminCouponApi = {
     request<void>(`${ADMIN}/coupons/${id}`, { method: 'PATCH', body: payload }),
   disable: (id: string, reason: string) =>
     request<void>(`${ADMIN}/coupons/${id}/disable`, { method: 'POST', body: { reason } }),
+}
+
+export const adminInvoiceApi = {
+  list: (query?: Record<string, string | undefined>) =>
+    request<AdminInvoiceItem[]>(`${ADMIN}/invoices`, { query }),
+  markPaid: (id: string, payload: { amount_idr: number; note: string }) =>
+    request<void>(`${ADMIN}/invoices/${id}/mark-paid`, { method: 'POST', body: payload }),
+  refund: (
+    id: string,
+    payload: { payment_id: string; amount_idr: number; reason: string; gateway_ref?: string },
+  ) => request<void>(`${ADMIN}/invoices/${id}/refund`, { method: 'POST', body: payload }),
+}
+
+export const adminCreditCodeApi = {
+  list: (query?: Record<string, string | undefined>) =>
+    request<CreditCodeItem[]>(`${ADMIN}/credit-codes`, { query }),
+  create: (payload: Record<string, unknown>) =>
+    request<CreditCodeItem>(`${ADMIN}/credit-codes`, { method: 'POST', body: payload }),
+  disable: (id: string, reason: string) =>
+    request<void>(`${ADMIN}/credit-codes/${id}/disable`, { method: 'POST', body: { reason } }),
 }
 
 export const adminReportApi = {

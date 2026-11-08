@@ -1,11 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { request } from '@/lib/http'
 import { publicPlanApi } from '@/lib/admin-api'
 import { formatIDR, formatInvoice } from '@/features/admin/lib/format'
 import {
+  Alert,
   Badge,
   Button,
+  Input,
+  Label,
   Card,
   CardContent,
   CardDescription,
@@ -48,6 +52,7 @@ const STATUS_TEXT: Record<string, string> = {
  * webhook pembayaran bertanda tangan sah diterima server.
  */
 export default function BillingPage() {
+  const queryClient = useQueryClient()
   const plans = useQuery({ queryKey: ['public', 'plans'], queryFn: publicPlanApi.list })
   const invoices = useQuery({
     queryKey: ['billing', 'invoices'],
@@ -105,6 +110,8 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
+      <RedeemCreditCard onRedeemed={() => void queryClient.invalidateQueries({ queryKey: ['billing'] })} />
+
       <Card>
         <CardHeader>
           <CardTitle>Riwayat tagihan</CardTitle>
@@ -146,5 +153,59 @@ export default function BillingPage() {
         </CardContent>
       </Card>
     </>
+  )
+}
+
+/**
+ * RedeemCreditCard menukar kode kredit menjadi saldo.
+ * Saldo hanya bisa dipakai memotong tagihan berikutnya, tidak bisa dicairkan.
+ */
+function RedeemCreditCard({ onRedeemed }: { onRedeemed: () => void }) {
+  const [code, setCode] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const redeem = useMutation({
+    mutationFn: () =>
+      request<{ balance_idr: number }>('/billing/credit/redeem', {
+        method: 'POST',
+        body: { code: code.trim().toUpperCase() },
+      }),
+    onSuccess: (data) => {
+      setNotice(`Kode berhasil ditukar. Saldo Anda ${formatIDR(data.balance_idr)}.`)
+      setCode('')
+      onRedeemed()
+    },
+    onError: (error) =>
+      setNotice(error instanceof Error ? error.message : 'Kode tidak dapat ditukar.'),
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tukar kode kredit</CardTitle>
+        <CardDescription>Saldo dipakai otomatis memotong tagihan paket berikutnya.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-1 flex-col gap-1">
+            <Label htmlFor="credit-code-input">Kode</Label>
+            <Input
+              id="credit-code-input"
+              value={code}
+              placeholder="ILA-XXXX"
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={code.trim() === '' || redeem.isPending}
+            onClick={() => redeem.mutate()}
+          >
+            {redeem.isPending ? 'Menukar…' : 'Tukar kode'}
+          </Button>
+        </div>
+        {notice && <Alert className="mt-2">{notice}</Alert>}
+      </CardContent>
+    </Card>
   )
 }

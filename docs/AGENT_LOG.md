@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `e40b461`
+> **Commit terakhir saat log ini ditulis:** `833b455` + entri terbaru di bawah
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,99 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-14 — Kredit, tagihan manual, refund, ekspor riwayat, backup terjadwal
+
+**Pelaku:** Claude
+**Tipe:** Fitur + perbaikan celah
+**Ringkasan:**
+Menutup empat hal yang sebelumnya hanya setengah jadi, plus dua sumber
+kebenaran ganda yang bisa membuat panel dan Runner berbeda angka.
+
+**File terdampak:**
+- `backend/internal/repository/billing_store.go` (baru — satu data uang)
+- `backend/internal/repository/credit_code_repository.go`
+- `backend/internal/repository/billing_repository.go`
+- `backend/internal/service/admin_billing_service.go`
+- `backend/internal/service/admin_billing_money_service.go` (baru)
+- `backend/internal/service/billing_service.go`
+- `backend/internal/service/trading_export.go` (baru)
+- `backend/internal/service/system_service.go`
+- `backend/internal/handler/admin_billing_handler.go`
+- `backend/internal/handler/trading_handler.go`
+- `backend/internal/dto/billing_dto.go`, `billing_flow_dto.go`
+- `backend/internal/runner/settings.go`
+- `backend/internal/audit/catalog.go`
+- `backend/cmd/runner/main.go`
+- `backend/internal/router/router.go`, `audit_route_test.go`
+- `frontend/src/pages/admin/AdminInvoicesPage.tsx` (baru)
+- `frontend/src/pages/admin/AdminCreditCodesPage.tsx` (baru)
+- `frontend/src/features/auth/components/LegalReconsentGate.tsx` (baru)
+- `frontend/src/pages/BillingPage.tsx`, `PositionsPage.tsx`
+- `frontend/src/lib/http.ts` (`downloadFile`), `admin-api.ts`, `auth-api.ts`
+- `frontend/src/components/layout/AppShell.tsx`
+- `deploy/docker-compose.yml`, `deploy/ENV-SETUP.md`
+- `scripts/backup.sh`, `scripts/restore.sh`
+
+**Yang dikerjakan:**
+
+1. **Refund + catat pembayaran manual.** Sebelumnya `AddRefund` ada tetapi
+   tidak pernah dipanggil, dan `RequestRefund` hanya stub kosong. Sekarang ada
+   `POST /admin/invoices/:id/mark-paid` dan `POST /admin/invoices/:id/refund`.
+   Mark-paid menolak nominal di bawah total tagihan dan memberi hak paket lewat
+   jalur yang sama dengan webhook (`BillingService.ActivatePlan`). Refund
+   menolak total melebihi nilai pembayaran; refund **tidak** menurunkan tier
+   otomatis karena mencabut akses adalah keputusan bisnis terpisah.
+2. **Ekspor riwayat posisi user.** `GET /api/v1/positions/export` dengan filter
+   `from`/`to` pada zona hari akuntansi WIB, kolom waktu WIB dan NY, batas
+   10.000 baris, PnL kosong bila belum terbaca broker.
+3. **Kode kredit.** Tabel, service, dan `Redeem` sudah ada tetapi admin tidak
+   punya cara membuat kode. Sekarang ada daftar, buat, dan hentikan
+   (`/admin/credit-codes`), plus form tukar kode di halaman Langganan user.
+   Kode tidak dihapus, hanya dihentikan, agar riwayat penukaran utuh.
+4. **`ila3_status` dibaca dari `plan_feature`.** Sebelumnya Runner membaca
+   `ILA3_AVAILABILITY` dari env sementara panel membaca katalog paket: dua
+   sumber untuk satu kebenaran. Sekarang `Settings.Reload` menurunkan tahap dari
+   katalog paket dan env hanya cadangan bila baris kosong.
+5. **Zona hari akuntansi.** `system_service.go` menyalin `runner.WIB` saat
+   init, sebelum `SetDailyTimezone` dipanggil, dan `daily_timezone` di DTO
+   hardcode. Sekarang dibaca saat dipakai.
+6. **Modal setuju ulang dokumen.** `pending` dari `/me/legal` kini muncul
+   sebagai dialog wajib di dashboard user; selama belum disetujui, eksekusi dan
+   pembayaran memang ditahan server.
+7. **Backup terjadwal.** Layanan `backup` di compose menjalankan backup tiap
+   hari 18:00 UTC, retensi 7 harian + 4 mingguan, salinan luar VPS lewat
+   `BACKUP_REMOTE_DIR`. `restore.sh` tidak lagi memakai `--clean --if-exists`
+   (bertentangan dengan RUNBOOK §5) dan menolak target yang sudah berisi tabel
+   inti.
+8. **`ExtendTier` tidak memotong periode.** Tanggal berakhir hanya boleh
+   memanjang, sehingga pencatatan berikutnya tidak memakan hak yang sudah dibayar.
+
+**Bug kecil yang ikut diperbaiki:**
+- `adminBillingService` sebelumnya hanya memegang `pricingRepo`, sehingga
+  invoice,pembayaran, dan voucher tidak bisa dijangkau dari satu tempat.
+  Sekarang satu `repository.BillingStore` menaungi semuanya.
+- Tes `TestSetiapMutasiAdminPunyaAksiAudit` diperluas untuk route uang baru;
+  ini yang menangkap route tanpa jejak audit.
+
+**Catatan untuk Hermes:** tidak ada perubahan pada kontrak engine → Runner.
+Sinyal, aturan harian, dan pengecekan slippage tetap. Yang berubah hanya sisi
+platform (uang dan tampilan).
+
+**Verifikasi:**
+- `gofmt -l .` kosong, `go vet ./...` bersih
+- `go test ./...` → 21 paket lulus
+- `tsc --noEmit`, `eslint --max-warnings 0`, `vitest` 39 tes, `vite build` sukses
+
+**Belum dikerjakan:**
+- Refund belum otomatis menurunkan tier (sengaja, keputusan bisnis).
+- Migrasi PostgreSQL sungguhan masih menunggu VPS 2; semua tes skema via SQLite.
+- Pengaturan panggilan salinan luar VPS masih lewat variabel mount; integrasi
+  object storage (rclone/S3) belum ada.
+
+**Status:** SELESAI
+
+---
 
 ### 2026-11-13 (lanjutan 4) — Audit menyeluruh Fase A–P dan perbaikan temuan berat
 

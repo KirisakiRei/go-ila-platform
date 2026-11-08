@@ -49,7 +49,30 @@ type ManualPaymentRequest struct {
 
 // RefundRequest mencatat refund manual.
 type RefundRequest struct {
-	PaymentID string `json:"payment_id" binding:"required,max=36"`
+	PaymentID string `json:"payment_id" binding:"max=36"`
 	AmountIDR int64  `json:"amount_idr" binding:"required,min=1"`
 	Reason    string `json:"reason" binding:"required,max=500"`
+	// GatewayRef adalah nomor bukti transfer balik dari gateway/bank.
+	GatewayRef string `json:"gateway_ref" binding:"max=120"`
+}
+
+// AdminInvoiceItem adalah tagihan sebagaimana dilihat admin.
+type AdminInvoiceItem struct {
+	ID          string    `json:"id"`
+	Number      string    `json:"number"`
+	UserID      string    `json:"user_id"`
+	UserEmail   string    `json:"user_email"`
+	PlanCode    string    `json:"plan_code"`
+	AmountIDR   int64     `json:"amount_idr"`
+	DiscountIDR int64     `json:"discount_idr"`
+	CreditIDR   int64     `json:"credit_idr"`
+	TotalIDR    int64     `json:"total_idr"`
+	Status      string    `json:"status"`
+	CouponCode  string    `json:"coupon_code,omitempty"`
+	Gateway     string    `json:"gateway,omitempty"`
+	PeriodStart TimePair  `json:"period_start"`
+	PeriodEnd   TimePair  `json:"period_end"`
+	CreatedAt   TimePair  `json:"created_at"`
+	PaidAt      *TimePair `json:"paid_at,omitempty"`
+	ExpiresAt   TimePair  `json:"expires_at"`
 }
