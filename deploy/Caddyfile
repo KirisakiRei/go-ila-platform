@@ -32,11 +32,16 @@
 	}
 }
 
-{$SITE_ADDRESS:localhost} {
-	# Sertifikat Let's Encrypt untuk domain sungguhan. Email ACME wajib diisi di
-	# produksi; bila kosong, nilai cadangan dipakai agar Caddy tetap start saat
-	# pengembangan. localhost dan alamat IP memakai sertifikat internal.
-	tls {$ACME_EMAIL:admin@example.com}
+{$SITE_ADDRESS:localhost}, www.{$SITE_ADDRESS} {
+	# www ikut didaftarkan di alamat situs, bukan hanya di `redir`: TLS handshake
+	# terjadi sebelum aturan redirect, jadi tanpa nama itu sertifikat untuk www
+	# tidak pernah diterbitkan dan browser menolak koneksi.
+	#
+	# `tls` cukup menuliskan email ACME. Bila ACME_EMAIL kosong (pengembangan),
+	# Caddy memakai sertifikat internal dan tidak menunggu penerbitan.
+	# Blok kondisional tidak dipakai karena nilai default kosong `{$VAR:}`
+	# diteruskan mentah oleh Caddy dan membuat berkas ini gagal di-parse.
+	tls {$ACME_EMAIL:internal}
 
 	# www diarahkan permanen ke domain utama agar cookie sesi tidak terbagi
 	# ke dua host dan tautan yang dibagikan selalu satu bentuk.
