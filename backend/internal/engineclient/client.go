@@ -57,6 +57,8 @@ func NewConnection(cfg Config) (*grpc.ClientConn, error) {
 	}
 
 	options := []grpc.DialOption{
+		grpc.WithChainUnaryInterceptor(traceInterceptor()),
+		grpc.WithChainStreamInterceptor(traceStreamInterceptor()),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                30 * time.Second,
 			Timeout:             10 * time.Second,

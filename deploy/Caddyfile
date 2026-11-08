@@ -11,6 +11,27 @@
 # menolak nilai kosong dan membuat Caddy gagal start. Setel lewat variabel
 # environment CADDY_AGENT_EMAIL di produksi bila ingin akun ACME tertentu.
 
+# ---------------------------------------------------------------------------
+# Log akses HTTP.
+#
+# Akses ditulis di Caddy, bukan di backend-api: proxy adalah satu-satunya yang
+# melihat semua permintaan, termasuk yang tidak sampai ke aplikasi.
+# Format JSON agar bisa di-query dengan jq seperti log layanan lain.
+#
+# Berkas dikelompokkan ke folder tanggal oleh Caddy sendiri
+# (output file dengan roll_*), sehingga akses HTTP tetap terbaca per hari.
+# ---------------------------------------------------------------------------
+{
+	log default {
+		output file /var/log/ila/caddy.log {
+			roll_size 10mb
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format json
+	}
+}
+
 {$SITE_ADDRESS:localhost} {
 	# Kompresi untuk aset teks.
 	encode zstd gzip
@@ -44,6 +65,19 @@
 		Permissions-Policy "geolocation=(), microphone=(), camera=()"
 		# Versi server tidak perlu dibocorkan.
 		-Server
+	}
+
+	# Versi:
+	# - Cookie, Authorization, dan Set-Cookie disamarkan sebelum ditulis.
+	#   Tanpa ini, siapa pun yang bisa membaca berkas log dapat membajak sesi.
+	# - X-Request-ID dibiarkan agar log Caddy bisa disambung ke log backend-api.
+	log {
+		format filter {
+			wrap json
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+			response>headers>Set-Cookie delete
+		}
 	}
 
 	# Ukuran badan permintaan dibatasi agar tidak ada unggahan tak terduga.

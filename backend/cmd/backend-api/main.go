@@ -15,6 +15,7 @@ import (
 	"ila/backend/internal/alert"
 	"ila/backend/internal/config"
 	"ila/backend/internal/email"
+	"ila/backend/internal/logkit"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/router"
 	"ila/backend/internal/runner"
@@ -25,8 +26,23 @@ import (
 func main() {
 	_ = godotenv.Load()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	hasilLog := logkit.Buat(logkit.Opsi{
+		Dir:        os.Getenv("LOG_DIR"),
+		Layanan:    "backend-api",
+		Level:      slogLevel(os.Getenv("LOG_LEVEL")),
+		JugaStdout: true,
+		HariSimpan: envInt("LOG_HARI", 30),
+		BatasBytes: int64(envInt("LOG_BATAS_MB", 1024)) * 1024 * 1024,
+	})
+	defer hasilLog.Tutup()
+
+	logger := hasilLog.Logger
 	slog.SetDefault(logger)
+	if hasilLog.Rawat != nil {
+		if err := hasilLog.Rawat(); err != nil {
+			logger.Warn("perawatan log gagal", "evt", "log.rawat.gagal", "error", err.Error())
+		}
+	}
 
 	cfg, err := config.Load("backend-api")
 	if err != nil {

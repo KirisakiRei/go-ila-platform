@@ -40,7 +40,10 @@ services:
       # DSN disusun dari DB_USER/DB_PASSWORD/DB_NAME agar password hanya
       # hidup di satu tempat dan tidak pernah berbeda antar layanan.
       DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
-    mem_limit: 128m
+      LOG_DIR: /var/log/ila
+      LOG_HARI: "30"
+      LOG_BATAS_MB: "1024"
+    mem_limit: 160m
     cpus: "0.8"
     pids_limit: 200
     logging: *default-logging
@@ -49,6 +52,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - log_data:/var/log/ila
     networks: [platform]
     # Hanya Caddy yang berbicara dengan backend-api.
     expose:
@@ -71,7 +76,18 @@ services:
       DB_MAX_OPEN_CONNS: "15"
       DB_MAX_IDLE_CONNS: "4"
       DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
-    mem_limit: 128m
+      # Log harian JSONL. Engine dan Runner memakai format yang sama sehingga
+      # satu insiden bisa ditelusuri di kedua VPS dengan nomor trace yang sama.
+      LOG_DIR: /var/log/ila
+      LOG_HARI: "30"
+      LOG_BATAS_MB: "1024"
+      # Penerima log dari Engine (VPS 1). Engine yang menyambung ke sini,
+      # sehingga VPS Engine tidak perlu bisa menjangkau VPS platform.
+      LOG_GRPC_ADDR: :9090
+      LOG_MTLS_CERT: /certs/log-server.crt
+      LOG_MTLS_KEY: /certs/log-server.key
+      LOG_MTLS_CA: /certs/ca.crt
+    mem_limit: 160m
     cpus: "0.8"
     pids_limit: 200
     logging: *default-logging
@@ -82,11 +98,17 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./certs:/certs:ro
+      - log_data:/var/log/ila
     networks: [platform]
     # Runner tidak pernah menerima koneksi dari luar. Port internal 8081 hanya
     # dijangkau backend-api lewat jaringan compose.
     expose:
       - "8081"
+      - "9090"
+    # Port penerima log dibuka ke host agar Engine di VPS 1 bisa menyambung.
+    # Hanya port ini yang perlu dijangkau dari luar, dan wajib mTLS.
+    ports:
+      - "${LOG_GRPC_PORT:-9090}:9090"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health"]
       interval: 30s
@@ -134,6 +156,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      # Log akses HTTP ikut ke folder yang sama dengan log layanan.
+      - log_data:/var/log/ila
     networks: [platform]
     depends_on:
       backend-api:
@@ -202,6 +226,9 @@ networks:
     driver: bridge
 
 volumes:
+  # Log dua VPS berkumpul di sini. Caddy, Runner, dan Engine menulis ke
+  # subfolder berbeda di dalamnya.
+  log_data:
   pgdata:
   backup_data:
   caddy_data:

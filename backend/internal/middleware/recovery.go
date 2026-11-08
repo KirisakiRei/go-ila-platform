@@ -40,6 +40,7 @@ func ErrorHandler(logger *slog.Logger) gin.HandlerFunc {
 		err := c.Errors.Last().Err
 		if httpx.IsInternal(err) {
 			logger.Error("kesalahan internal",
+				"evt", "http.internal",
 				"path", c.Request.URL.Path,
 				"method", c.Request.Method,
 				"error", err.Error(),

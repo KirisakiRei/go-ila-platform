@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -22,6 +23,7 @@ import (
 	"ila/backend/internal/broker/matchtrader"
 	"ila/backend/internal/config"
 	"ila/backend/internal/engineclient"
+	"ila/backend/internal/logkit"
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
@@ -45,8 +47,23 @@ const (
 func main() {
 	_ = godotenv.Load()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel()}))
+	hasilLog := logkit.Buat(logkit.Opsi{
+		Dir:        os.Getenv("LOG_DIR"),
+		Layanan:    "runner",
+		Level:      slogLevel(),
+		JugaStdout: true,
+		HariSimpan: envInt("LOG_HARI", 30),
+		BatasBytes: int64(envInt("LOG_BATAS_MB", 1024)) * 1024 * 1024,
+	})
+	defer hasilLog.Tutup()
+
+	logger := hasilLog.Logger
 	slog.SetDefault(logger)
+	if hasilLog.Rawat != nil {
+		if err := hasilLog.Rawat(); err != nil {
+			logger.Warn("perawatan log gagal", "evt", "log.rawat.gagal", "error", err.Error())
+		}
+	}
 
 	cfg, err := config.Load("runner")
 	if err != nil {
@@ -186,6 +203,20 @@ func main() {
 		logger.Warn("tidak ada alamat engine; runner berjalan tanpa sinyal")
 	}
 
+	// Penerima log Engine: satu tempat untuk membaca log dua VPS.
+	logSrv, err := jalankanPenerimaLog(
+		os.Getenv("LOG_GRPC_ADDR"),
+		os.Getenv("LOG_DIR"),
+		os.Getenv("LOG_MTLS_CERT"),
+		os.Getenv("LOG_MTLS_KEY"),
+		os.Getenv("LOG_MTLS_CA"),
+		logger,
+	)
+	if err != nil {
+		logger.Error("penerima log gagal disiapkan", "evt", "log.server.gagal", "error", err.Error())
+		os.Exit(1)
+	}
+
 	// Server internal: hanya backend-api yang memanggilnya.
 	internalSrv := newInternalServer(svc, cfg.InternalSecret, logger)
 	wg.Add(1)
@@ -207,6 +238,10 @@ func main() {
 	defer shutdownCancel()
 	if err := internalSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("gagal menghentikan server internal", "error", err.Error())
+	}
+
+	if logSrv != nil {
+		logSrv.GracefulStop()
 	}
 
 	cancel()
@@ -369,7 +404,10 @@ func streamOnce(
 
 	subscriberID := subscriberFor(target.Strategy)
 
-	return engineclient.Run(ctx, conn,
+	// Trace khusus stream: satu koneksi = satu rangkaian log yang bisa dicari.
+	streamCtx := engineclient.DenganTrace(ctx, logkit.Trace())
+
+	return engineclient.Run(streamCtx, conn,
 		&enginev1.SubscribeRequest{
 			SubscriberId:      subscriberID,
 			Symbols:           subscribedSymbols(ctx, target, svc),
@@ -416,6 +454,7 @@ func symbolSync(client enginev1.EngineServiceClient, subscriberID string) runner
 	return func(ctx context.Context, add, remove []string) error {
 		syncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
+		syncCtx = engineclient.DenganTrace(syncCtx, logkit.Trace())
 
 		if len(add) > 0 {
 			resp, err := client.Subscribe(syncCtx, &enginev1.SubscribeRequest{
@@ -585,6 +624,14 @@ func errorText(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func envInt(key string, fallback int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
 }
 
 func slogLevel() slog.Level {

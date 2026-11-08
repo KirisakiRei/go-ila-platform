@@ -254,17 +254,20 @@ func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
 	if existing, err := s.store.FindSignal(ctx, signal.SignalID); err == nil && IsTerminal(existing.Status) {
 		// Sinyal terminal tidak boleh dihidupkan kembali oleh kiriman ulang.
 		s.logger.Info("sinyal sudah final, dilewati",
+			"evt", "signal.skip.final",
 			"signal_id", signal.SignalID, "status", existing.Status)
 		return
 	}
 
 	if err := s.store.UpsertSignal(ctx, signal); err != nil {
 		s.logger.Error("gagal menyimpan sinyal",
+			"evt", "signal.simpan.gagal",
 			"signal_id", signal.SignalID, "error", err.Error())
 		return
 	}
 
 	s.logger.Info("sinyal diterima",
+		"evt", "signal.terima",
 		"signal_id", signal.SignalID,
 		"symbol", signal.Symbol,
 		"status", signal.Status,
@@ -279,7 +282,8 @@ func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
 
 	if err := s.ackSignal(ctx, signal.SignalID); err != nil {
 		// ACK gagal bukan alasan membuang sinyal: engine boleh mengulang.
-		s.logger.Warn("ACK sinyal gagal", "signal_id", signal.SignalID, "error", err.Error())
+		s.logger.Warn("ACK sinyal gagal", "evt", "signal.ack.gagal",
+			"signal_id", signal.SignalID, "error", err.Error())
 	}
 
 	s.fanOutReady(ctx, signal)

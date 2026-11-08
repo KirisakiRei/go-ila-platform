@@ -29,11 +29,12 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 		c.Next()
 
 		attrs := []any{
+			"evt", "http.selesai",
 			"method", c.Request.Method,
 			"path", safePath(c.Request.URL.Path),
 			"status", c.Writer.Status(),
 			"latency_ms", time.Since(start).Milliseconds(),
-			"request_id", c.GetString(ContextRequestID),
+			"trace", c.GetString(ContextRequestID),
 		}
 		if userID, ok := c.Get(ContextUserID); ok {
 			attrs = append(attrs, "user_id", userID)
@@ -41,9 +42,10 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 
 		switch {
 		case c.Writer.Status() >= 500:
-			logger.Error("permintaan selesai", attrs...)
+			logger.Error("permintaan gagal", attrs...)
 		case c.Writer.Status() >= 400:
-			logger.Warn("permintaan selesai", attrs...)
+			// 4xx adalah kesalahan pemakaian, bukan kerusakan sistem.
+			logger.Warn("permintaan ditolak", attrs...)
 		default:
 			logger.Info("permintaan selesai", attrs...)
 		}
