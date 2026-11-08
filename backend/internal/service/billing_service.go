@@ -48,6 +48,7 @@ type BillingStore interface {
 	UpsertSubscription(ctx context.Context, sub *model.SubscriptionRecord) error
 	ExtendTier(ctx context.Context, userID, planCode string, start, end time.Time) error
 	DowngradeExpired(ctx context.Context, at time.Time) ([]string, error)
+	ExpireOverdue(ctx context.Context, at time.Time) (int64, error)
 	StartGrace(ctx context.Context, at time.Time) ([]string, error)
 	AddRefund(ctx context.Context, refund *model.Refund) error
 }
@@ -233,7 +234,14 @@ func (s *billingService) HandleWebhook(ctx context.Context, header map[string]st
 	}
 
 	// 5. Status yang tidak dikenal tidak pernah dianggap lunas.
-	if event.Status != payment.StatusPaid {
+	// Status mati (kedaluwarsa/batal) dicerminkan ke invoice agar daftar
+	// tagihan tidak bertentangan dengan kenyataan di gateway.
+	switch event.Status {
+	case payment.StatusPaid:
+		// lanjut ke pemeriksaan nominal
+	case payment.StatusExpired, payment.StatusCancelled:
+		return s.closeInvoice(ctx, invoice, event.Status)
+	default:
 		return nil
 	}
 
@@ -244,6 +252,30 @@ func (s *billingService) HandleWebhook(ctx context.Context, header map[string]st
 
 	// 7. Tandai lunas dan aktifkan langganan dalam satu alur.
 	return s.activate(ctx, invoice, s.now())
+}
+
+// closeInvoice mencatat invoice yang mati di sisi gateway.
+// Hanya invoice pending yang berubah: invoice lunas tidak boleh dibatalkan
+// oleh webhook yang datang terlambat.
+func (s *billingService) closeInvoice(ctx context.Context, invoice *model.Invoice, status string) error {
+	if invoice.Status != model.InvoicePending {
+		return nil
+	}
+	target := model.InvoiceCancelled
+	if status == payment.StatusExpired {
+		target = model.InvoiceExpired
+	}
+	invoice.Status = target
+	invoice.UpdatedAt = s.now()
+	if err := s.store.UpdateInvoice(ctx, invoice); err != nil {
+		return err
+	}
+	return s.audit.Record(ctx, AuditEntry{
+		ActorType: "system", Action: audit.InvoiceVoid,
+		Reason:     "gateway melaporkan tagihan " + status,
+		TargetType: "invoice", TargetID: invoice.ID,
+		After: map[string]any{"number": invoice.Number, "status": target},
+	})
 }
 
 // activate menandai invoice lunas dan memperpanjang langganan.
@@ -366,10 +398,17 @@ func (s *billingService) Subscription(ctx context.Context, userID string) (*dto.
 	}, nil
 }
 
-// RunGraceSweep menjalankan pekerjaan harian masa tenggang.
+// RunGraceSweep menjalankan pekerjaan harian uang: tagihan lewat tenggat
+// ditutup lebih dulu, lalu langganan masuk masa tenggang dan yang habis
+// diturunkan. Tagihan kedaluwarsa tidak mengubah hak paket.
 // Posisi berjalan TIDAK disentuh: yang berubah hanya akses entry baru.
 func (s *billingService) RunGraceSweep(ctx context.Context) (int, error) {
 	now := s.now()
+
+	expired, err := s.store.ExpireOverdue(ctx, now)
+	if err != nil {
+		return 0, err
+	}
 	started, err := s.store.StartGrace(ctx, now)
 	if err != nil {
 		return 0, err
@@ -378,7 +417,7 @@ func (s *billingService) RunGraceSweep(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return len(started) + len(downgraded), nil
+	return int(expired) + len(started) + len(downgraded), nil
 }
 
 func toInvoiceItem(row model.Invoice) dto.InvoiceItem {

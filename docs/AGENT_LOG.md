@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `833b455` + entri terbaru di bawah
+> **Commit terakhir saat log ini ditulis:** entri teratas di bawah (gateway pembayaran)
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +34,73 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-14 (lanjutan) — Gateway pembayaran bisa ditukar, siklus tagihan ditutup
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan arsitektur + bug uang
+**Ringkasan:**
+Alur uang diaudit dari checkout sampai tier naik. Penyedia pembayaran kini
+berada di balik satu antarmuka sehingga mengganti penyedia cukup dengan satu
+nilai env. Empat lubang siklus tagihan ditutup, dan satu bug ditemukan justru
+oleh tes yang ditulis untuk menguji perbaikan itu.
+
+**File terdampak:**
+- `backend/internal/payment/registry.go` (baru), `registry_test.go` (baru)
+- `backend/internal/payment/manual.go` (baru)
+- `backend/internal/config/config.go` (`PaymentProvider`, default `pakasir`)
+- `backend/internal/router/router.go` (dua pemanggilan diganti `payment.NewFromConfig`)
+- `backend/internal/repository/billing_repository.go`, `billing_store.go` (`ExpireOverdue`)
+- `backend/internal/service/billing_service.go` (`closeInvoice`, `RunGraceSweep`)
+- `backend/internal/service/admin_billing_service.go` (`RefundGateway`)
+- `backend/internal/service/admin_billing_money_service.go` (tolak tagihan mati)
+- `backend/internal/service/billing_invoice_test.go` (baru)
+- `backend/docs/AUDIT-BILLING.md` (baru)
+- `.env.example` (`PAYMENT_PROVIDER`, kredensial pakasir)
+
+**Yang dikerjakan:**
+
+1. **Penyedia bisa ditukar.** `PAYMENT_PROVIDER=pakasir|manual`. Provider tak
+   dikenal jatuh ke `manual` dan dicatat di log — sistem tetap hidup, tidak
+   crash. Menambah penyedia baru = tambah satu file di `internal/payment`,
+   daftarkan namanya, isi env. Service billing dan halaman tidak tersentuh.
+2. **Adapter `manual`.** Untuk keadaan penyedia berhenti: tagihan tetap terbit,
+   lalu ditutup admin lewat catat pembayaran manual. Checkout membalas
+   `503` dengan pesan "gunakan catat pembayaran manual" — bukan `500` yang
+   membuat pengguna mengira sistemnya rusak.
+3. **Tagihan mati ditutup.** Invoice `pending` yang lewat tenggat menjadi
+   `expired` di penyapu per jam. Webhook `expired`/`cancelled` ikut menutup
+   invoice, tetapi invoice **lunas tidak pernah** dibatalkan webhook terlambat.
+4. **Penolakan tagihan mati.** Catat bayar manual pada invoice `expired` atau
+   lewat tenggat ditolak `409`, karena periode di tagihan lama sudah tidak
+   berlaku. Solusinya terbit tagihan baru.
+5. **Refund diteruskan.** `RequestRefund` kini benar-benar dipanggil ke penyedia
+   sebelum refund dicatat. Bila penyedia menolak, seluruh refund dibatalkan —
+   tidak ada catatan setengah jadi.
+
+**Bug yang ditemukan saat menguji perbaikan:**
+
+`closeInvoice` mencatat audit tanpa `Reason`. Pencatatan audit menolak alasan
+kosong, sehingga setiap webhook `expired`/`cancelled` membalas galat dan
+invoice tertahan `pending` selamanya. Perbaikannya: alasan diisi
+("gateway melaporkan tagihan <status>"), dikunci oleh
+`TestWebhookBatalMenutupInvoicePending`.
+
+**Bukti uji:**
+- `go build`, `go vet`, `gofmt` bersih.
+- **21 paket tes lulus.**
+- PostgreSQL 16 sungguhan: checkout+`manual` → `503`, tanpa invoice yatim;
+  webhook tanda tangan palsu → `401`, tabel `payment` tetap kosong; penyapu
+  mengubah `pending`→`expired`; catat bayar pada invoice `expired` → `409`.
+- Tes baru dibuktikan menangkap regresi: kondisi penolakan dihapus sementara,
+  tes gagal, lalu kode dipulihkan.
+
+**Belum dikerjakan:**
+- Penyedia pengganti Pakasir belum dipilih; adapter baru menunggu keputusan.
+- Halaman admin belum menampilkan penyedia mana yang aktif.
+- Refund tetap tidak menurunkan tier secara otomatis (keputusan bisnis).
+
+**Status:** selesai, siap dipakai; bergantung pada pemilihan penyedia baru.
 
 ### 2026-11-14 (lanjutan) — Trial Basic, halaman admin trial, dan tiga bug yang hanya muncul di PostgreSQL
 

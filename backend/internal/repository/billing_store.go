@@ -28,6 +28,7 @@ type BillingStore interface {
 	UpsertSubscription(ctx context.Context, sub *model.SubscriptionRecord) error
 	ExtendTier(ctx context.Context, userID, planCode string, start, end time.Time) error
 	DowngradeExpired(ctx context.Context, at time.Time) ([]string, error)
+	ExpireOverdue(ctx context.Context, at time.Time) (int64, error)
 	StartGrace(ctx context.Context, at time.Time) ([]string, error)
 	AddRefund(ctx context.Context, refund *model.Refund) error
 	FindCouponByCode(ctx context.Context, code string) (*model.Coupon, error)

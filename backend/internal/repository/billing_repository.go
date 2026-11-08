@@ -334,6 +334,18 @@ func (r *billingRepository) RefundedAmount(ctx context.Context, paymentID string
 	return total.Sum, nil
 }
 
+// ExpireOverdue menandai invoice pending yang sudah lewat tenggat.
+// Tanpa ini daftar tagihan menumpuk dan laporan menghitung tagihan yang mati.
+func (r *billingRepository) ExpireOverdue(ctx context.Context, at time.Time) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&model.Invoice{}).
+		Where("status = ? AND expires_at <= ?", model.InvoicePending, at).
+		Update("status", model.InvoiceExpired)
+	if res.Error != nil {
+		return 0, fmt.Errorf("menandai invoice kedaluwarsa: %w", res.Error)
+	}
+	return res.RowsAffected, nil
+}
+
 func (r *billingRepository) AddRefund(ctx context.Context, row *model.Refund) error {
 	if row.ID == "" {
 		row.ID = uuid.NewString()

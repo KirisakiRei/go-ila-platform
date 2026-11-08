@@ -32,7 +32,11 @@ const adminPrefix = "/api/v1/admin"
 func Billing(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.BillingService {
 	userRepo := repository.NewUserRepository(db)
 	billingRepo := repository.NewBillingRepository(db)
-	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
+	gateway, err := payment.NewFromConfig(cfg)
+	if err != nil {
+		logger.Error("gateway pembayaran tidak dikenal; pembayaran daring dimatikan", "error", err.Error())
+		gateway = payment.NewManual()
+	}
 	pricing := service.NewPricingService(repository.NewPricingRepository(db))
 	adminAudit := service.NewAuditRecorder(repository.NewAuditRepository(db))
 	return service.NewBillingService(userRepo, billingRepo, pricing, billingRepo, gateway, adminAudit, repository.NewCreditCodeRepository(db))
@@ -251,10 +255,17 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	pricingHandler := handler.NewPricingHandler(pricingService)
 
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
-	gateway := payment.NewPakasir(cfg.PakasirBaseURL, cfg.PakasirSlug, cfg.PakasirAPIKey, cfg.PakasirWebhookKey)
+	// Penyedia dipilih lewat PAYMENT_PROVIDER agar penggantian gateway tidak
+	// menyentuh service billing (plans/08 §6).
+	gateway, gatewayErr := payment.NewFromConfig(cfg)
+	if gatewayErr != nil {
+		logger.Error("gateway pembayaran tidak dikenal; pembayaran daring dimatikan", "error", gatewayErr.Error())
+		gateway = payment.NewManual()
+	}
+	logger.Info("gateway pembayaran", "provider", gateway.Name())
 	billingRepo := repository.NewBillingStore(db)
 	billingService := service.NewBillingService(userRepo, billingRepo, pricingService, billingRepo, gateway, adminAudit, billingRepo)
-	adminBillingService := service.NewAdminBillingService(billingRepo, adminAudit, billingService)
+	adminBillingService := service.NewAdminBillingService(billingRepo, adminAudit, billingService, gateway)
 	adminTrialService := service.NewAdminTrialService(userRepo, adminAudit)
 	adminTrialHandler := handler.NewAdminTrialHandler(adminTrialService)
 	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)

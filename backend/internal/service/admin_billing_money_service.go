@@ -145,11 +145,17 @@ func (s *adminBillingService) MarkInvoicePaid(ctx context.Context, actor AdminAc
 	if err != nil {
 		return err
 	}
+	now := s.now()
 	if invoice.Status == model.InvoicePaid {
 		return errors.Join(apperror.ErrConflict, errors.New("invoice sudah lunas"))
 	}
 	if invoice.Status == model.InvoiceRefunded || invoice.Status == model.InvoiceCancelled {
 		return errors.Join(apperror.ErrConflict, errors.New("invoice tidak dapat dilunasi pada status ini"))
+	}
+	// Tagihan yang sudah lewat tenggat diterbitkan ulang, bukan dilunasi:
+	// periode yang tercatat di invoice lama sudah tidak berlaku.
+	if invoice.Status == model.InvoiceExpired || (!invoice.ExpiresAt.IsZero() && now.After(invoice.ExpiresAt)) {
+		return errors.Join(apperror.ErrConflict, errors.New("invoice sudah kedaluwarsa; terbitkan tagihan baru"))
 	}
 	// Nominal manual tidak boleh kurang dari tagihan: kekurangan bayar tetap
 	// ditolak seperti pada webhook.
@@ -157,7 +163,6 @@ func (s *adminBillingService) MarkInvoicePaid(ctx context.Context, actor AdminAc
 		return validation("nominal pembayaran kurang dari total tagihan")
 	}
 
-	now := s.now()
 	txnID := "manual-" + invoice.Number
 	if _, err := s.store.SavePayment(ctx, &model.Payment{
 		InvoiceID: invoice.ID, Gateway: "manual",
@@ -236,6 +241,16 @@ func (s *adminBillingService) RefundPayment(ctx context.Context, actor AdminActo
 		ActorID: actor.ID, GatewayRef: strings.TrimSpace(req.GatewayRef),
 		Status: "pending", CreatedAt: s.now(),
 	}
+
+	// Penyedia yang punya API refund dijalankan lebih dulu. Bila gagal, tidak
+	// ada catatan refund sama sekali sehingga laporan tidak mengklaim dana
+	// kembali padahal tidak.
+	if s.gateway != nil {
+		if err := s.gateway.RequestRefund(ctx, paymentID, req.AmountIDR, req.Reason); err != nil {
+			return errors.Join(apperror.ErrServiceUnavailable, errors.New("gateway menolak refund: "), err)
+		}
+	}
+
 	if err := s.store.AddRefund(ctx, refund); err != nil {
 		return err
 	}

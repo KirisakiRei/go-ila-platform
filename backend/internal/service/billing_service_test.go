@@ -42,6 +42,14 @@ func newFakeBillingStore() *fakeBillingStore {
 	}
 }
 
+// newFakeBillingService menyusun layanan dengan jam tetap dan audit tiruan.
+func newFakeBillingService(store *fakeBillingStore) *billingService {
+	return &billingService{
+		store: store, audit: &fakeAdminAudit{},
+		now: func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) },
+	}
+}
+
 func (f *fakeBillingStore) FindPlan(ctx context.Context, code string) (*model.Plan, error) {
 	return &model.Plan{Code: code, Name: code, PriceIDR: 666000, IsActive: true}, nil
 }
@@ -131,6 +139,17 @@ func (f *fakeBillingStore) DowngradeExpired(ctx context.Context, at time.Time) (
 }
 
 func (f *fakeBillingStore) AddRefund(ctx context.Context, r *model.Refund) error { return nil }
+
+func (f *fakeBillingStore) ExpireOverdue(ctx context.Context, at time.Time) (int64, error) {
+	var n int64
+	for _, inv := range f.invoices {
+		if inv.Status == model.InvoicePending && !inv.ExpiresAt.IsZero() && !at.Before(inv.ExpiresAt) {
+			inv.Status = model.InvoiceExpired
+			n++
+		}
+	}
+	return n, nil
+}
 
 // fakeCouponLookup selalu menemukan kupon yang diminta.
 type fakeCouponLookup struct{}

@@ -75,7 +75,16 @@ type adminBillingService struct {
 	store    billingStore
 	audit    AdminAudit
 	subsaver SubscriptionExtender
+	gateway  RefundGateway
 	now      func() time.Time
+}
+
+// RefundGateway meneruskan pengajuan refund ke penyedia pembayaran.
+// Penyedia tanpa API refund hanya mencatat; penyedia yang punya API bisa
+// benar-benar mengembalikan dana tanpa mengubah pemanggilnya.
+type RefundGateway interface {
+	Name() string
+	RequestRefund(ctx context.Context, transactionID string, amountIDR int64, reason string) error
 }
 
 // SubscriptionExtender memberi hak paket setelah pembayaran sah.
@@ -85,9 +94,9 @@ type SubscriptionExtender interface {
 }
 
 // NewAdminBillingService merangkai kelola uang.
-func NewAdminBillingService(store billingStore, recorder AdminAudit, subs SubscriptionExtender) AdminBillingService {
+func NewAdminBillingService(store billingStore, recorder AdminAudit, subs SubscriptionExtender, gateway RefundGateway) AdminBillingService {
 	return &adminBillingService{
-		store: store, audit: recorder, subsaver: subs,
+		store: store, audit: recorder, subsaver: subs, gateway: gateway,
 		now: func() time.Time { return time.Now().UTC() },
 	}
 }

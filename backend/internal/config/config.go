@@ -95,6 +95,8 @@ type Config struct {
 
 	// Gateway pembayaran. Kunci tidak pernah dikirim ke klien; hanya dipakai
 	// server untuk membuat tagihan dan memeriksa tanda tangan webhook.
+	// PaymentProvider memilih adapter gateway pembayaran (pakasir/manual).
+	PaymentProvider   string
 	PakasirBaseURL    string
 	PakasirSlug       string
 	PakasirAPIKey     string
@@ -171,6 +173,7 @@ func Load(service string) (*Config, error) {
 		MasterKey:             env("MASTER_KEY", ""),
 		MasterKeyVersion:      envInt("MASTER_KEY_VERSION", 1),
 		MasterKeysLegacy:      env("MASTER_KEYS_LEGACY", ""),
+		PaymentProvider:       env("PAYMENT_PROVIDER", "pakasir"),
 		PakasirBaseURL:        env("PAKASIR_BASE_URL", "https://pakasir.com"),
 		PakasirSlug:           env("PAKASIR_SLUG", ""),
 		PakasirAPIKey:         env("PAKASIR_API_KEY", ""),

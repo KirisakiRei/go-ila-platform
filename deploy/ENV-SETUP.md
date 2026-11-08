@@ -44,9 +44,28 @@ Mulai dari `cp .env.example .env`, lalu ubah:
 | `MASTER_KEY` | hasil `openssl rand -base64 32` |
 | `INTERNAL_SECRET` | hasil `openssl rand -hex 32` |
 | `COOKIE_SECURE` | `true` |
+| `PAYMENT_PROVIDER` | `pakasir` (atau `manual`) |
 
 `DB_DSN` **dibiarkan kosong** — compose menyusunnya dari
 `DB_USER`, `DB_PASSWORD`, dan `DB_NAME`.
+
+## Mengganti penyedia pembayaran
+
+Seluruh alur uang bersandar pada satu antarmuka, jadi berganti penyedia tidak
+menyentuh service billing maupun halaman.
+
+| Nilai | Arti |
+|---|---|
+| `pakasir` | Tagihan daring lewat Pakasir; webhook memakai `PAYASIR_SLUG` + `PAYASIR_API_KEY` |
+| `manual` | Tanpa penyedia daring. Tagihan tetap terbit, lalu admin menutupnya lewat **catat pembayaran manual** |
+
+Bila penyedia berhenti mendadak, set `PAYMENT_PROVIDER=manual` dan mulai
+ulang layanan backend. Checkout akan membalas `503` dengan pesan yang
+mengarahkan ke pembayaran manual — sengaja bukan `500`, agar tidak terlihat
+seperti kerusakan sistem. Tidak perlu deploy ulang.
+
+Nilai yang tidak dikenali otomatis jatuh ke `manual` dan dicatat di log.
+
 
 ---
 
