@@ -29,5 +29,18 @@ chown -R "$UID_APP:$GID_APP" "$FOLDER"
 chmod 2775 "$FOLDER"
 
 echo "Folder log siap: $FOLDER (pemilik $UID_APP:$GID_APP, mode 2775)"
+
+# Sertifikat mTLS ikut disiapkan di sini karena masalahnya sama: berkas dibuat
+# oleh user sudo (UID 1000) dengan mode 600, lalu container UID 1001 tidak bisa
+# membacanya dan penerima log berputar-putar restart.
+CERTS="$(dirname "$0")/../deploy/certs"
+if [ -d "$CERTS" ]; then
+	chown root:$GID_APP "$CERTS"/*.key
+	chmod 640 "$CERTS"/*.key
+	echo "Kunci sertifikat siap: $CERTS (pemilik root:$GID_APP, mode 640)"
+else
+	echo "Lewati sertifikat: $CERTS belum ada" >&2
+fi
+
 echo "Isi:"
 ls -la "$FOLDER" | head -5

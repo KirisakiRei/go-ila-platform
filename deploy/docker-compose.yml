@@ -17,6 +17,9 @@ services:
     build: *backend-build
     entrypoint: ["/app/migrate"]
     env_file: ../.env
+    # Pesan galat hanya ke stderr. Tanpa ini log berwarna `log/slog`
+    # terbungkus JSON Docker dan sulit dibaca saat migrasi gagal.
+    logging: *default-logging
     environment:
       DB_AUTO_MIGRATE: "false"
       DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
