@@ -50,7 +50,13 @@ const SAMPLE_PLANS: PublicPlan[] = [
     description: 'Simulasi dasar',
     price_idr: 0,
     interval: 'month',
-    features: { Strategi: 'ILA 2.0' },
+    features: {
+      account_limit: '1',
+      auto_execute: 'false',
+      max_symbols: '1',
+      signal_delay_minutes: '15',
+      strategies: 'ila-2.0',
+    },
     ila3_coming_soon: false,
     active: true,
   },
@@ -60,7 +66,14 @@ const SAMPLE_PLANS: PublicPlan[] = [
     description: 'Otomatis penuh',
     price_idr: 299000,
     interval: 'month',
-    features: { Strategi: 'ILA 2.0 + 3.0' },
+    features: {
+      account_limit: '2',
+      auto_execute: 'true',
+      max_symbols: '8',
+      reason_ai: 'true',
+      signal_delay_minutes: '0',
+      strategies: 'ila-2.0',
+    },
     ila3_coming_soon: true,
     active: true,
   },
@@ -87,9 +100,15 @@ describe('LandingPage & PublicLayout', () => {
     expect(screen.queryByText(/profit pasti/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/win rate/i)).not.toBeInTheDocument()
 
-    // Paket dimuat dari API dan harga diformat rupiah.
+    // Paket dimuat dari API, harga diformat rupiah, dan benefit tidak mentah.
     expect(await screen.findByText('Plus')).toBeInTheDocument()
     expect(screen.getByText(/Rp\s?299\.000/)).toBeInTheDocument()
+    expect(screen.getByText(/Eksekusi otomatis & konfirmasi manual/i)).toBeInTheDocument()
+    expect(screen.getByText(/Sinyal real-time tanpa jeda/i)).toBeInTheDocument()
+    expect(screen.queryByText(/auto_execute/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/signal_delay_minutes/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/AES-256/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/mTLS/i)).not.toBeInTheDocument()
 
     // Footer memakai slug legal resmi backend.
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))

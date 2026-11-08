@@ -5,9 +5,7 @@ type ArtworkProps = {
 }
 
 /**
- * BrandMark adalah lambang geometris Imaginary Liquidity pada header dan footer.
- * Bentuk segi enam terbelah merepresentasikan sapuan likuiditas dan pemisahan
- * antara lapisan analisis dengan akun broker pengguna.
+ * BrandMark adalah lambang geometris monokrom Imaginary Liquidity pada header.
  */
 export function BrandMark({ className = 'h-7 w-7' }: ArtworkProps) {
   const uid = useId().replace(/:/g, '')
@@ -22,20 +20,20 @@ export function BrandMark({ className = 'h-7 w-7' }: ArtworkProps) {
           y2="30"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stopColor="#6d28d9" />
-          <stop offset="55%" stopColor="#4c1d95" />
-          <stop offset="100%" stopColor="#1e0948" />
+          <stop offset="0%" stopColor="#27272a" />
+          <stop offset="55%" stopColor="#09090b" />
+          <stop offset="100%" stopColor="#050507" />
         </linearGradient>
         <linearGradient
           id={`${uid}-stroke`}
-          x1="6"
-          y1="6"
-          x2="26"
-          y2="26"
+          x1="4"
+          y1="4"
+          x2="28"
+          y2="28"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stopColor="#e9d5ff" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.45" />
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.65" />
+          <stop offset="100%" stopColor="#71717a" stopOpacity="0.3" />
         </linearGradient>
       </defs>
       <rect x="2" y="2" width="28" height="28" rx="8" fill={`url(#${uid}-bg)`} />
@@ -50,20 +48,20 @@ export function BrandMark({ className = 'h-7 w-7' }: ArtworkProps) {
       />
       <path
         d="M9.5 11.5L16 8L22.5 11.5M9.5 20.5L16 24L22.5 20.5"
-        stroke="#f5f3ff"
+        stroke="#ffffff"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path d="M11 16H21" stroke="#c4b5fd" strokeWidth="2" strokeLinecap="round" />
+      <path d="M11 16H21" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" />
       <circle cx="16" cy="16" r="2.2" fill="#ffffff" />
     </svg>
   )
 }
 
 /**
- * HeroObsidianRings merender tiga cakram kaca obsidian mengambang dengan bias
- * cahaya dark purple sebagai latar tengah bagian hero.
+ * HeroObsidianRings merender cakram kaca obsidian mengambang dengan kilau perak
+ * di belakang judul utama hero.
  */
 export function HeroObsidianRings({ className = '' }: ArtworkProps) {
   const uid = useId().replace(/:/g, '')
@@ -76,33 +74,33 @@ export function HeroObsidianRings({ className = '' }: ArtworkProps) {
       focusable="false"
     >
       <defs>
-        <radialGradient id={`${uid}-aura`} cx="50%" cy="52%" r="50%">
-          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.38" />
-          <stop offset="45%" stopColor="#4c1d95" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#06040b" stopOpacity="0" />
+        <radialGradient id={`${uid}-aura`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.12" />
+          <stop offset="48%" stopColor="#a1a1aa" stopOpacity="0.06" />
+          <stop offset="100%" stopColor="#050507" stopOpacity="0" />
         </radialGradient>
         <linearGradient id={`${uid}-disc-dark`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#1b1130" stopOpacity="0.92" />
-          <stop offset="50%" stopColor="#090612" stopOpacity="0.96" />
-          <stop offset="100%" stopColor="#2e1065" stopOpacity="0.72" />
+          <stop offset="0%" stopColor="#27272a" stopOpacity="0.88" />
+          <stop offset="50%" stopColor="#09090b" stopOpacity="0.96" />
+          <stop offset="100%" stopColor="#18181b" stopOpacity="0.82" />
         </linearGradient>
-        <linearGradient id={`${uid}-rim-bright`} x1="15%" y1="5%" x2="85%" y2="95%">
-          <stop offset="0%" stopColor="#e9d5ff" stopOpacity="0.65" />
-          <stop offset="35%" stopColor="#8b5cf6" stopOpacity="0.45" />
-          <stop offset="70%" stopColor="#3b0764" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#c4b5fd" stopOpacity="0.55" />
+        <linearGradient id={`${uid}-rim-bright`} x1="12%" y1="4%" x2="88%" y2="96%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.72" />
+          <stop offset="35%" stopColor="#a1a1aa" stopOpacity="0.32" />
+          <stop offset="70%" stopColor="#3f3f46" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#e4e4e7" stopOpacity="0.58" />
         </linearGradient>
         <linearGradient id={`${uid}-rim-soft`} x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#6d28d9" stopOpacity="0.55" />
-          <stop offset="50%" stopColor="#ffffff" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.5" />
+          <stop offset="0%" stopColor="#71717a" stopOpacity="0.48" />
+          <stop offset="50%" stopColor="#ffffff" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#d4d4d8" stopOpacity="0.45" />
         </linearGradient>
       </defs>
 
-      <ellipse cx="480" cy="325" rx="430" ry="260" fill={`url(#${uid}-aura)`} />
+      <ellipse cx="480" cy="315" rx="430" ry="255" fill={`url(#${uid}-aura)`} />
 
-      {/* Cakram kiri belakang */}
-      <g transform="translate(275 305) rotate(-18)">
+      {/* Cakram kiri */}
+      <g transform="translate(260 300) rotate(-18)">
         <ellipse
           cx="0"
           cy="0"
@@ -117,16 +115,16 @@ export function HeroObsidianRings({ className = '' }: ArtworkProps) {
           cy="0"
           rx="105"
           ry="66"
-          fill="#06040b"
-          fillOpacity="0.88"
-          stroke="#7c3aed"
-          strokeOpacity="0.35"
-          strokeWidth="1.5"
+          fill="#050507"
+          fillOpacity="0.9"
+          stroke="#ffffff"
+          strokeOpacity="0.22"
+          strokeWidth="1.4"
         />
       </g>
 
-      {/* Cakram kanan belakang */}
-      <g transform="translate(685 265) rotate(22)">
+      {/* Cakram kanan */}
+      <g transform="translate(690 258) rotate(22)">
         <ellipse
           cx="0"
           cy="0"
@@ -141,24 +139,24 @@ export function HeroObsidianRings({ className = '' }: ArtworkProps) {
           cy="0"
           rx="96"
           ry="60"
-          fill="#06040b"
-          fillOpacity="0.9"
-          stroke="#a855f7"
-          strokeOpacity="0.35"
-          strokeWidth="1.5"
+          fill="#050507"
+          fillOpacity="0.92"
+          stroke="#e4e4e7"
+          strokeOpacity="0.24"
+          strokeWidth="1.4"
         />
       </g>
 
       {/* Cakram utama tengah */}
-      <g transform="translate(480 310) rotate(-8)">
+      <g transform="translate(478 308) rotate(-8)">
         <ellipse
           cx="0"
           cy="0"
-          rx="235"
+          rx="236"
           ry="148"
           fill={`url(#${uid}-disc-dark)`}
           stroke={`url(#${uid}-rim-bright)`}
-          strokeWidth="2.4"
+          strokeWidth="2.2"
         />
         <ellipse
           cx="0"
@@ -166,7 +164,7 @@ export function HeroObsidianRings({ className = '' }: ArtworkProps) {
           rx="212"
           ry="132"
           stroke="#ffffff"
-          strokeOpacity="0.08"
+          strokeOpacity="0.09"
           strokeWidth="1"
         />
         <ellipse
@@ -174,24 +172,22 @@ export function HeroObsidianRings({ className = '' }: ArtworkProps) {
           cy="0"
           rx="132"
           ry="82"
-          fill="#06040b"
-          fillOpacity="0.92"
+          fill="#050507"
+          fillOpacity="0.94"
           stroke={`url(#${uid}-rim-bright)`}
-          strokeWidth="1.8"
+          strokeWidth="1.6"
         />
       </g>
 
-      {/* Partikel bias halus */}
-      <circle cx="218" cy="182" r="2.2" fill="#d8b4fe" fillOpacity="0.6" />
-      <circle cx="752" cy="154" r="2" fill="#c4b5fd" fillOpacity="0.55" />
-      <circle cx="645" cy="458" r="2.5" fill="#a855f7" fillOpacity="0.5" />
+      <circle cx="215" cy="180" r="2" fill="#ffffff" fillOpacity="0.55" />
+      <circle cx="755" cy="154" r="1.8" fill="#d4d4d8" fillOpacity="0.5" />
+      <circle cx="640" cy="452" r="2" fill="#a1a1aa" fillOpacity="0.45" />
     </svg>
   )
 }
 
 /**
- * HeroFinsPreview adalah kartu pratinjau kaca mini di sudut kanan atas hero
- * dengan motif bilah radial ungu gelap.
+ * HeroFinsPreview adalah kartu pratinjau kaca monokrom di sudut kanan atas hero.
  */
 export function HeroFinsPreview({ className = '' }: ArtworkProps) {
   const uid = useId().replace(/:/g, '')
@@ -205,14 +201,14 @@ export function HeroFinsPreview({ className = '' }: ArtworkProps) {
     >
       <defs>
         <radialGradient id={`${uid}-core`} cx="50%" cy="60%" r="65%">
-          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.65" />
-          <stop offset="55%" stopColor="#3b0764" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#090514" stopOpacity="0.95" />
+          <stop offset="0%" stopColor="#52525b" stopOpacity="0.55" />
+          <stop offset="55%" stopColor="#18181b" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#050507" stopOpacity="0.98" />
         </radialGradient>
         <linearGradient id={`${uid}-fin`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#e9d5ff" stopOpacity="0.7" />
-          <stop offset="50%" stopColor="#7c3aed" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#1e0948" stopOpacity="0.2" />
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.65" />
+          <stop offset="50%" stopColor="#a1a1aa" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#27272a" stopOpacity="0.2" />
         </linearGradient>
       </defs>
       <rect width="220" height="132" rx="10" fill={`url(#${uid}-core)`} />
@@ -224,8 +220,8 @@ export function HeroFinsPreview({ className = '' }: ArtworkProps) {
           rx="74"
           ry="22"
           transform={`rotate(${angle} 110 78)`}
-          fill="#1b0b38"
-          fillOpacity="0.42"
+          fill="#09090b"
+          fillOpacity="0.55"
           stroke={`url(#${uid}-fin)`}
           strokeWidth="1"
         />
@@ -234,32 +230,35 @@ export function HeroFinsPreview({ className = '' }: ArtworkProps) {
         cx="110"
         cy="78"
         r="14"
-        fill="#090514"
-        stroke="#c4b5fd"
+        fill="#050507"
+        stroke="#e4e4e7"
         strokeOpacity="0.65"
         strokeWidth="1.2"
       />
-      <circle cx="110" cy="78" r="4" fill="#e9d5ff" />
+      <circle cx="110" cy="78" r="3.8" fill="#ffffff" />
     </svg>
   )
 }
 
 /**
- * MetricsCurveSvg menggambar lintasan kurva menanjak dengan 4 titik node ungu
- * untuk section metrik faktual di atas kanvas #f3f3f6.
+ * MetricsCurveSvg menggambar kurva kuadratik halus menanjak ke kanan-atas
+ * (M 0 212 Q 600 212 1200 18) beserta 4 titik node dan garis vertikal `|`
+ * yang turun sejajar ke masing-masing metrik.
  */
 export function MetricsCurveSvg({ className = '' }: ArtworkProps) {
   const uid = useId().replace(/:/g, '')
+  // Untuk Bezier kuadratik dengan P0.x=0, P1.x=600, P2.x=1200, posisi x linear terhadap t:
+  // t = x / 1200 dan y(t) = 212*(1 - t^2) + 18*(t^2).
   const nodes = [
-    { x: 110, y: 204 },
-    { x: 370, y: 158 },
-    { x: 650, y: 110 },
-    { x: 960, y: 50 },
+    { x: 96, y: 211, stemBottom: 324 },
+    { x: 396, y: 191, stemBottom: 304 },
+    { x: 696, y: 147, stemBottom: 260 },
+    { x: 996, y: 78, stemBottom: 192 },
   ]
 
   return (
     <svg
-      viewBox="0 0 1120 260"
+      viewBox="0 0 1200 350"
       fill="none"
       className={className}
       aria-hidden="true"
@@ -267,32 +266,30 @@ export function MetricsCurveSvg({ className = '' }: ArtworkProps) {
     >
       <defs>
         <linearGradient id={`${uid}-curve`} x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#c4b5fd" stopOpacity="0.35" />
-          <stop offset="38%" stopColor="#7c3aed" stopOpacity="0.7" />
-          <stop offset="100%" stopColor="#4c1d95" stopOpacity="0.95" />
-        </linearGradient>
-        <linearGradient id={`${uid}-area`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.11" />
-          <stop offset="100%" stopColor="#f3f3f6" stopOpacity="0" />
+          <stop offset="0%" stopColor="#d4d4d8" stopOpacity="0.55" />
+          <stop offset="45%" stopColor="#71717a" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#09090b" stopOpacity="0.95" />
         </linearGradient>
       </defs>
 
       <path
-        d="M 16 226 C 210 212, 340 164, 520 132 C 700 100, 860 72, 1104 26 L 1104 256 L 16 256 Z"
-        fill={`url(#${uid}-area)`}
-      />
-
-      <path
-        d="M 16 226 C 210 212, 340 164, 520 132 C 700 100, 860 72, 1104 26"
+        d="M 0 212 Q 600 212 1200 18"
         stroke={`url(#${uid}-curve)`}
-        strokeWidth="2.5"
+        strokeWidth="1.6"
         strokeLinecap="round"
       />
 
       {nodes.map((node) => (
         <g key={node.x}>
-          <circle cx={node.x} cy={node.y} r="13" fill="#ede9fe" />
-          <circle cx={node.x} cy={node.y} r="7" fill="#5b21b6" stroke="#ffffff" strokeWidth="2.5" />
+          <line
+            x1={node.x}
+            y1={node.y + 6}
+            x2={node.x}
+            y2={node.stemBottom}
+            stroke="#d4d4d8"
+            strokeWidth="1.2"
+          />
+          <circle cx={node.x} cy={node.y} r="5.5" fill="#f5f5f7" stroke="#09090b" strokeWidth="2" />
         </g>
       ))}
     </svg>
@@ -300,140 +297,72 @@ export function MetricsCurveSvg({ className = '' }: ArtworkProps) {
 }
 
 /**
- * SecurityChainArtwork adalah ilustrasi rantai metalik krom & violet gelap
- * yang diagonal mengilap untuk spotlight keamanan di kanvas putih.
+ * ExecutionPreviewArtwork adalah ilustrasi antarmuka monokrom abstrak untuk
+ * memperlihatkan alur pemantauan dan persetujuan sinyal tanpa jargon teknis.
  */
-export function SecurityChainArtwork({ className = '' }: ArtworkProps) {
-  const uid = useId().replace(/:/g, '')
+export function ExecutionPreviewArtwork({ className = '' }: ArtworkProps) {
   return (
     <svg
-      viewBox="0 0 640 420"
+      viewBox="0 0 560 360"
       fill="none"
       className={className}
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <radialGradient id={`${uid}-shadow`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#4c1d95" stopOpacity="0.16" />
-          <stop offset="65%" stopColor="#6d28d9" stopOpacity="0.06" />
-          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`${uid}-chrome`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="32%" stopColor="#cbd5e1" />
-          <stop offset="68%" stopColor="#475569" />
-          <stop offset="100%" stopColor="#0f172a" />
-        </linearGradient>
-        <linearGradient id={`${uid}-violet-metal`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#e9d5ff" />
-          <stop offset="28%" stopColor="#8b5cf6" />
-          <stop offset="65%" stopColor="#4c1d95" />
-          <stop offset="100%" stopColor="#1e0948" />
-        </linearGradient>
-        <linearGradient id={`${uid}-obsidian-metal`} x1="15%" y1="0%" x2="85%" y2="100%">
-          <stop offset="0%" stopColor="#64748b" />
-          <stop offset="40%" stopColor="#1e1b4b" />
-          <stop offset="100%" stopColor="#06040b" />
-        </linearGradient>
-      </defs>
+      <rect width="560" height="360" rx="20" fill="#f5f5f7" />
+      <rect x="0.5" y="0.5" width="559" height="359" rx="19.5" stroke="#e4e4e7" />
 
-      <ellipse cx="325" cy="230" rx="260" ry="135" fill={`url(#${uid}-shadow)`} />
+      {/* Kartu belakang */}
+      <rect x="64" y="42" width="432" height="252" rx="16" fill="#ffffff" stroke="#e4e4e7" />
 
-      {/* Mata rantai 1 (kiri atas) */}
-      <g transform="translate(150 115) rotate(-32)">
-        <rect
-          x="-95"
-          y="-52"
-          width="190"
-          height="104"
-          rx="52"
-          stroke={`url(#${uid}-chrome)`}
-          strokeWidth="30"
-        />
-        <rect
-          x="-95"
-          y="-52"
-          width="190"
-          height="104"
-          rx="52"
-          stroke="#ffffff"
-          strokeOpacity="0.55"
-          strokeWidth="2"
-        />
-      </g>
+      {/* Header mini bar */}
+      <circle cx="92" cy="70" r="5" fill="#09090b" />
+      <rect x="108" y="66" width="112" height="8" rx="4" fill="#18181b" />
+      <rect x="412" y="62" width="60" height="16" rx="8" fill="#f4f4f5" stroke="#d4d4d8" />
 
-      {/* Mata rantai 2 (tengah ungu metalik) */}
-      <g transform="translate(275 190) rotate(24)">
-        <rect
-          x="-105"
-          y="-56"
-          width="210"
-          height="112"
-          rx="56"
-          stroke={`url(#${uid}-violet-metal)`}
-          strokeWidth="32"
-        />
-        <rect
-          x="-105"
-          y="-56"
-          width="210"
-          height="112"
-          rx="56"
-          stroke="#f5f3ff"
-          strokeOpacity="0.45"
-          strokeWidth="1.5"
-        />
-      </g>
+      <line x1="84" y1="94" x2="476" y2="94" stroke="#f4f4f5" strokeWidth="1.5" />
 
-      {/* Mata rantai 3 (kanan tengah obsidian) */}
-      <g transform="translate(405 260) rotate(-30)">
-        <rect
-          x="-100"
-          y="-54"
-          width="200"
-          height="108"
-          rx="54"
-          stroke={`url(#${uid}-obsidian-metal)`}
-          strokeWidth="30"
-        />
-        <rect
-          x="-100"
-          y="-54"
-          width="200"
-          height="108"
-          rx="54"
-          stroke="#a855f7"
-          strokeOpacity="0.5"
-          strokeWidth="1.8"
-        />
-      </g>
+      {/* Mini garis struktur harga */}
+      <path
+        d="M 88 214 L 146 184 L 194 202 L 266 138 L 324 166 L 398 118 L 468 134"
+        stroke="#09090b"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="88"
+        y1="158"
+        x2="468"
+        y2="158"
+        stroke="#a1a1aa"
+        strokeDasharray="4 4"
+        strokeWidth="1.2"
+      />
+      <circle cx="324" cy="166" r="5" fill="#ffffff" stroke="#09090b" strokeWidth="2" />
 
-      {/* Simpul pengunci kanan bawah */}
-      <g transform="translate(505 320) rotate(20)">
-        <rect
-          x="-72"
-          y="-42"
-          width="144"
-          height="84"
-          rx="42"
-          stroke={`url(#${uid}-violet-metal)`}
-          strokeWidth="24"
-        />
-      </g>
+      {/* Kartu aksi depan melayang */}
+      <rect x="116" y="224" width="344" height="96" rx="14" fill="#09090b" stroke="#27272a" />
+      <rect x="140" y="248" width="96" height="9" rx="4.5" fill="#ffffff" />
+      <rect x="140" y="266" width="154" height="7" rx="3.5" fill="#71717a" />
+      <rect x="140" y="284" width="112" height="7" rx="3.5" fill="#52525b" />
+
+      {/* Tombol aksi monokrom */}
+      <rect x="336" y="256" width="100" height="32" rx="8" fill="#ffffff" />
+      <rect x="358" y="269" width="56" height="6" rx="3" fill="#09090b" />
     </svg>
   )
 }
 
 /**
- * PurpleSilkWaves adalah karya abstrak gelombang sutra ungu gelap untuk kolom
- * tengah Asymmetric Showcase.
+ * MonochromeLiquidityWaves adalah karya abstrak gelombang perak & obsidian
+ * untuk bagian perbandingan ILA 2.0 & ILA 3.0.
  */
-export function PurpleSilkWaves({ className = '' }: ArtworkProps) {
+export function MonochromeLiquidityWaves({ className = '' }: ArtworkProps) {
   const uid = useId().replace(/:/g, '')
   return (
     <svg
-      viewBox="0 0 420 560"
+      viewBox="0 0 420 520"
       fill="none"
       preserveAspectRatio="xMidYMid slice"
       className={className}
@@ -442,57 +371,56 @@ export function PurpleSilkWaves({ className = '' }: ArtworkProps) {
     >
       <defs>
         <linearGradient id={`${uid}-base`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#120726" />
-          <stop offset="50%" stopColor="#2e1065" />
-          <stop offset="100%" stopColor="#090414" />
+          <stop offset="0%" stopColor="#18181b" />
+          <stop offset="50%" stopColor="#09090b" />
+          <stop offset="100%" stopColor="#050507" />
         </linearGradient>
         <linearGradient id={`${uid}-ribbon-a`} x1="0%" y1="10%" x2="100%" y2="90%">
-          <stop offset="0%" stopColor="#a855f7" stopOpacity="0.82" />
-          <stop offset="48%" stopColor="#5b21b6" stopOpacity="0.92" />
-          <stop offset="100%" stopColor="#1e0948" stopOpacity="0.7" />
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+          <stop offset="48%" stopColor="#52525b" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="#09090b" stopOpacity="0.85" />
         </linearGradient>
         <linearGradient id={`${uid}-ribbon-b`} x1="100%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#e9d5ff" stopOpacity="0.65" />
-          <stop offset="45%" stopColor="#7c3aed" stopOpacity="0.85" />
-          <stop offset="100%" stopColor="#3b0764" stopOpacity="0.9" />
+          <stop offset="0%" stopColor="#f4f4f5" stopOpacity="0.28" />
+          <stop offset="45%" stopColor="#3f3f46" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#18181b" stopOpacity="0.9" />
         </linearGradient>
       </defs>
 
-      <rect width="420" height="560" fill={`url(#${uid}-base)`} />
+      <rect width="420" height="520" fill={`url(#${uid}-base)`} />
 
       <path
-        d="M -40 160 C 80 60, 220 260, 460 110 L 460 290 C 240 410, 100 220, -40 340 Z"
+        d="M -40 150 C 80 50, 220 245, 460 100 L 460 275 C 240 390, 100 205, -40 325 Z"
         fill={`url(#${uid}-ribbon-a)`}
       />
       <path
-        d="M -40 320 C 120 180, 260 400, 460 250 L 460 450 C 260 560, 100 370, -40 490 Z"
+        d="M -40 305 C 120 170, 260 380, 460 235 L 460 425 C 260 530, 100 350, -40 465 Z"
         fill={`url(#${uid}-ribbon-b)`}
-        fillOpacity="0.85"
       />
       <path
-        d="M -20 230 C 110 120, 240 330, 440 185"
-        stroke="#f3e8ff"
-        strokeOpacity="0.48"
-        strokeWidth="1.6"
+        d="M -20 218 C 110 112, 240 315, 440 175"
+        stroke="#ffffff"
+        strokeOpacity="0.45"
+        strokeWidth="1.4"
       />
       <path
-        d="M -20 390 C 130 270, 260 460, 440 325"
-        stroke="#c4b5fd"
-        strokeOpacity="0.38"
-        strokeWidth="1.3"
+        d="M -20 372 C 130 255, 260 438, 440 308"
+        stroke="#d4d4d8"
+        strokeOpacity="0.32"
+        strokeWidth="1.2"
       />
     </svg>
   )
 }
 
 /**
- * PurpleRibbonTile adalah ubin lanskap mini bergelombang ungu gelap.
+ * MonochromeHorizonTile adalah ubin lanskap mini bergelombang monokrom.
  */
-export function PurpleRibbonTile({ className = '' }: ArtworkProps) {
+export function MonochromeHorizonTile({ className = '' }: ArtworkProps) {
   const uid = useId().replace(/:/g, '')
   return (
     <svg
-      viewBox="0 0 320 160"
+      viewBox="0 0 320 150"
       fill="none"
       preserveAspectRatio="xMidYMid slice"
       className={className}
@@ -501,172 +429,27 @@ export function PurpleRibbonTile({ className = '' }: ArtworkProps) {
     >
       <defs>
         <linearGradient id={`${uid}-bg`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#1e0948" />
-          <stop offset="100%" stopColor="#090414" />
+          <stop offset="0%" stopColor="#18181b" />
+          <stop offset="100%" stopColor="#050507" />
         </linearGradient>
         <linearGradient id={`${uid}-wave`} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#4c1d95" />
-          <stop offset="55%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#c4b5fd" />
+          <stop offset="0%" stopColor="#27272a" />
+          <stop offset="55%" stopColor="#52525b" />
+          <stop offset="100%" stopColor="#d4d4d8" />
         </linearGradient>
       </defs>
-      <rect width="320" height="160" fill={`url(#${uid}-bg)`} />
+      <rect width="320" height="150" fill={`url(#${uid}-bg)`} />
       <path
-        d="M -10 120 C 70 40, 180 150, 330 45 L 330 170 L -10 170 Z"
+        d="M -10 112 C 75 36, 185 140, 330 42 L 330 160 L -10 160 Z"
         fill={`url(#${uid}-wave)`}
-        fillOpacity="0.72"
+        fillOpacity="0.58"
       />
       <path
-        d="M -10 88 C 80 28, 195 126, 330 32"
-        stroke="#e9d5ff"
-        strokeOpacity="0.55"
-        strokeWidth="1.5"
-      />
-    </svg>
-  )
-}
-
-/**
- * PurpleOrbTile adalah grafik pusaran orbital ungu gelap untuk kartu kiri Bento Grid.
- */
-export function PurpleOrbTile({ className = '' }: ArtworkProps) {
-  const uid = useId().replace(/:/g, '')
-  return (
-    <svg
-      viewBox="0 0 320 180"
-      fill="none"
-      preserveAspectRatio="xMidYMid slice"
-      className={className}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <radialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="55%">
-          <stop offset="0%" stopColor="#9333ea" stopOpacity="0.75" />
-          <stop offset="55%" stopColor="#4c1d95" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#0d051a" stopOpacity="1" />
-        </radialGradient>
-      </defs>
-      <rect width="320" height="180" fill={`url(#${uid}-glow)`} />
-      {[84, 64, 44, 26].map((r, idx) => (
-        <ellipse
-          key={r}
-          cx="160"
-          cy="90"
-          rx={r * 1.45}
-          ry={r * 0.72}
-          transform={`rotate(${idx % 2 === 0 ? -14 : 12} 160 90)`}
-          stroke="#e9d5ff"
-          strokeOpacity={0.18 + idx * 0.14}
-          strokeWidth="1.4"
-        />
-      ))}
-      <circle cx="160" cy="90" r="10" fill="#f5f3ff" fillOpacity="0.92" />
-    </svg>
-  )
-}
-
-/**
- * CtaPrismArtwork adalah prisma/kubus kaca 3D dark-purple pada sisi kanan
- * banner CTA penutup yang gelap.
- */
-export function CtaPrismArtwork({ className = '' }: ArtworkProps) {
-  const uid = useId().replace(/:/g, '')
-  return (
-    <svg
-      viewBox="0 0 420 340"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <radialGradient id={`${uid}-aura`} cx="52%" cy="50%" r="48%">
-          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.55" />
-          <stop offset="55%" stopColor="#4c1d95" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#06040b" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`${uid}-top`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#e9d5ff" stopOpacity="0.38" />
-          <stop offset="100%" stopColor="#6d28d9" stopOpacity="0.24" />
-        </linearGradient>
-        <linearGradient id={`${uid}-left`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#5b21b6" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#1e0948" stopOpacity="0.85" />
-        </linearGradient>
-        <linearGradient id={`${uid}-right`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#0f071f" stopOpacity="0.92" />
-        </linearGradient>
-      </defs>
-
-      <circle cx="215" cy="165" r="155" fill={`url(#${uid}-aura)`} />
-
-      {/* Kubus dalam */}
-      <polygon points="210,104 276,142 210,180 144,142" fill="#8b5cf6" fillOpacity="0.28" />
-      <polygon points="144,142 210,180 210,250 144,212" fill="#3b0764" fillOpacity="0.65" />
-      <polygon points="276,142 210,180 210,250 276,212" fill="#4c1d95" fillOpacity="0.55" />
-
-      {/* Kubus kaca luar */}
-      <polygon
-        points="210,58 320,122 210,186 100,122"
-        fill={`url(#${uid}-top)`}
-        stroke="#e9d5ff"
-        strokeOpacity="0.55"
-        strokeWidth="1.5"
-      />
-      <polygon
-        points="100,122 210,186 210,302 100,238"
-        fill={`url(#${uid}-left)`}
-        stroke="#a855f7"
-        strokeOpacity="0.45"
-        strokeWidth="1.5"
-      />
-      <polygon
-        points="320,122 210,186 210,302 320,238"
-        fill={`url(#${uid}-right)`}
-        stroke="#c4b5fd"
+        d="M -10 82 C 80 26, 195 118, 330 30"
+        stroke="#ffffff"
         strokeOpacity="0.5"
-        strokeWidth="1.5"
+        strokeWidth="1.4"
       />
-
-      {/* Kilau tepi */}
-      <line
-        x1="210"
-        y1="186"
-        x2="210"
-        y2="302"
-        stroke="#f5f3ff"
-        strokeOpacity="0.7"
-        strokeWidth="1.8"
-      />
-      <circle cx="210" cy="186" r="4" fill="#ffffff" />
-    </svg>
-  )
-}
-
-/**
- * CtaInsetPreview adalah mini grafik alur sinyal/pipeline untuk kartu kaca kecil
- * di sudut kanan bawah banner CTA gelap.
- */
-export function CtaInsetPreview({ className = '' }: ArtworkProps) {
-  return (
-    <svg
-      viewBox="0 0 180 64"
-      fill="none"
-      className={className}
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M 10 44 C 42 44, 54 18, 90 18 C 126 18, 136 40, 170 22"
-        stroke="#a855f7"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="10" cy="44" r="3.5" fill="#c4b5fd" />
-      <circle cx="90" cy="18" r="4" fill="#ffffff" stroke="#7c3aed" strokeWidth="2" />
-      <circle cx="170" cy="22" r="3.5" fill="#c4b5fd" />
     </svg>
   )
 }
