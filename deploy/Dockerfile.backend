@@ -8,14 +8,24 @@ WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 
 COPY backend/go.mod backend/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 COPY backend/ ./
 
 # Dua binary dari satu modul: backend-api (HTTP), runner (eksekusi), migrate.
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/backend-api ./cmd/backend-api \
- && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runner ./cmd/runner \
- && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+#
+# -p=1 membatasi one compile task at a time. Di VPS 2 vCPU / RAM 909 MB,
+# kompilasi paralel menghabiskan RAM sampai swap dan justru jauh lebih lambat.
+# Cache mount dipakai agar unduhan modul tidak diulang tiap build.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOFLAGS=-p=1 \
+    go build -trimpath -ldflags="-s -w" -o /out/backend-api ./cmd/backend-api \
+ && CGO_ENABLED=0 GOOS=linux GOFLAGS=-p=1 \
+    go build -trimpath -ldflags="-s -w" -o /out/runner ./cmd/runner \
+ && CGO_ENABLED=0 GOOS=linux GOFLAGS=-p=1 \
+    go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
 # Runtime stage
 FROM alpine:3.20
