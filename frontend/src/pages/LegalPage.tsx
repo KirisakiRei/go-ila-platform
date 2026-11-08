@@ -33,12 +33,25 @@ export default function LegalPage() {
   })
 
   if (slug) {
-    if (doc.isLoading) return <Skeleton className="h-64 w-full" />
+    if (doc.isLoading) {
+      return (
+        <div className="mx-auto w-full max-w-4xl px-4 py-12">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      )
+    }
     if (doc.isError || !doc.data) {
-      return <EmptyState title="Dokumen tidak ditemukan" description="Dokumen mungkin sudah diganti versi baru." />
+      return (
+        <div className="mx-auto w-full max-w-4xl px-4 py-12">
+          <EmptyState
+            title="Dokumen tidak ditemukan"
+            description="Dokumen mungkin sudah diganti versi baru."
+          />
+        </div>
+      )
     }
     return (
-      <>
+      <div className="mx-auto w-full max-w-4xl px-4 py-12">
         <PageHeader
           title={doc.data.title}
           description={`Versi ${doc.data.version}`}
@@ -53,15 +66,24 @@ export default function LegalPage() {
             {doc.data.body_md}
           </CardContent>
         </Card>
-      </>
+      </div>
     )
   }
 
-  if (list.isLoading) return <Skeleton className="h-40 w-full" />
+  if (list.isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-4xl px-4 py-12">
+        <Skeleton className="h-40 w-full" />
+      </div>
+    )
+  }
 
   return (
-    <>
-      <PageHeader title="Dokumen" description="Ketentuan dan kebijakan yang berlaku di Imaginary Liquidity." />
+    <div className="mx-auto w-full max-w-4xl px-4 py-12">
+      <PageHeader
+        title="Dokumen"
+        description="Ketentuan dan kebijakan yang berlaku di Imaginary Liquidity."
+      />
       <div className="grid gap-3 sm:grid-cols-2">
         {(list.data ?? []).map((item) => (
           <Link key={item.slug} to={`/legal/${item.slug}`}>
@@ -74,9 +96,12 @@ export default function LegalPage() {
           </Link>
         ))}
         {list.data && list.data.length === 0 && (
-          <EmptyState title="Belum ada dokumen" description="Dokumen akan tampil setelah diterbitkan." />
+          <EmptyState
+            title="Belum ada dokumen"
+            description="Dokumen akan tampil setelah diterbitkan."
+          />
         )}
       </div>
-    </>
+    </div>
   )
 }

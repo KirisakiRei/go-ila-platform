@@ -54,6 +54,10 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   html,
   body,
   #root {
