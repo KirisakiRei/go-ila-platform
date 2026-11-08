@@ -59,7 +59,10 @@ type Subscription struct {
 	// sehingga langganan yang dicabut bisa hidup lagi. Pencabutan ditandai
 	// is_active=false dan harus bisa tersimpan apa adanya.
 	IsActive        bool    `gorm:"not null" json:"is_active"`
-	BrokerAccountID *string `gorm:"type:varchar(36)" json:"broker_account_id"`
+	BrokerAccountID *string `gorm:"type:varchar(36);index" json:"broker_account_id"`
+	// PairID menautkan langganan ke master pair. Kosong untuk data lama yang
+	// dibuat sebelum katalog pair ada; Symbol tetap menjadi kunci eksekusi.
+	PairID *string `gorm:"type:varchar(36);index" json:"pair_id"`
 }
 
 // TableName menetapkan nama tabel.

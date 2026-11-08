@@ -113,6 +113,53 @@ func (f *fakeSubRepo) Deactivate(_ context.Context, id, userID string) error {
 	return errors.New("tidak ditemukan")
 }
 
+// ListActiveByAccount meniru aturan repository: langganan tanpa akun berlaku
+// untuk semua akun; yang punya akun hanya untuk akun tersebut.
+func (f *fakeSubRepo) ListActiveByAccount(_ context.Context, userID, accountID string) ([]model.Subscription, error) {
+	var out []model.Subscription
+	for _, s := range f.subs {
+		if s.UserID != userID || !s.IsActive {
+			continue
+		}
+		if s.BrokerAccountID == nil || *s.BrokerAccountID == accountID {
+			out = append(out, *s)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSubRepo) ReplaceAccountPairs(_ context.Context, userID, accountID string, symbols []string) error {
+	wanted := make(map[string]bool, len(symbols))
+	for _, s := range symbols {
+		wanted[s] = true
+	}
+	for _, s := range f.subs {
+		if s.UserID == userID && s.BrokerAccountID != nil && *s.BrokerAccountID == accountID {
+			if !wanted[s.Symbol] {
+				s.IsActive = false
+			}
+		}
+	}
+	for _, sym := range symbols {
+		found := false
+		for _, s := range f.subs {
+			if s.UserID == userID && s.Symbol == sym && s.BrokerAccountID != nil && *s.BrokerAccountID == accountID {
+				s.IsActive = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			acc := accountID
+			f.subs = append(f.subs, &model.Subscription{
+				UserID: userID, Symbol: sym, Strategy: "ila-2.0",
+				IsActive: true, BrokerAccountID: &acc,
+			})
+		}
+	}
+	return nil
+}
+
 type fakeStrategies struct{ ila3 string }
 
 func (f *fakeStrategies) StrategyStatus(strategy string) string {

@@ -50,6 +50,10 @@ type AccountService interface {
 	// cTrader OAuth
 	GetCTraderAuthURL(ctx context.Context) (dto.CTraderAuthURLResponse, error)
 	ConnectCTrader(ctx context.Context, userID string, req dto.CTraderCallbackRequest) (*dto.CTraderCallbackResponse, error)
+
+	// Checklist pair per akun (katalog dikelola admin).
+	AccountPairs(ctx context.Context, userID, accountID string) (*dto.AccountPairSelectionResponse, error)
+	UpdateAccountPairs(ctx context.Context, userID, accountID string, req dto.UpdateAccountPairsRequest) (*dto.AccountPairSelectionResponse, error)
 }
 
 type accountService struct {
@@ -71,6 +75,8 @@ type accountService struct {
 	secret  string
 	clock   func() time.Time
 	ctrader CTraderOAuthClient
+	// catalog menyajikan katalog pair aktif dan memvalidasi simbol pilihan user.
+	catalog PairCatalogService
 }
 
 // CTraderOAuthClient mendefinisikan kontrak komunikasi ke REST API cTrader Spotware.
@@ -125,6 +131,9 @@ type AccountServiceDeps struct {
 	FingerprintSecret string
 	Clock             func() time.Time
 	CTrader           CTraderOAuthClient
+	// Catalog dipakai memvalidasi pilihan pair per akun. Bila nil, seluruh
+	// simbol yang lolos normalisasi diterima (kompatibel dengan pemasangan lama).
+	Catalog PairCatalogService
 }
 
 // StrategyCatalog melaporkan ketersediaan strategi bagi user.
@@ -154,6 +163,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		secret:     deps.FingerprintSecret,
 		clock:      clock,
 		ctrader:    deps.CTrader,
+		catalog:    deps.Catalog,
 	}
 }
 
@@ -245,8 +255,17 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 		return nil, fmt.Errorf("%w: eksekusi otomatis hanya untuk tier Plus", apperror.ErrForbidden)
 	}
 
-	riskPercent, err := clampRisk(req.RiskPercent)
+	riskPercent, err := s.validateRiskForTier(ctx, tier, req.RiskPercent)
 	if err != nil {
+		return nil, err
+	}
+
+	// Total risiko seluruh akun aktif tidak boleh melewati batas tier.
+	existing, err := s.accounts.ListByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.validateTotalRisk(ctx, tier, existing, riskPercent, ""); err != nil {
 		return nil, err
 	}
 
@@ -308,11 +327,23 @@ func (s *accountService) Update(ctx context.Context, userID, accountID string, r
 		account.Label = strings.TrimSpace(*req.Label)
 	}
 	if req.RiskPercent != nil {
-		riskPercent, riskErr := clampRisk(*req.RiskPercent)
+		riskPercent, riskErr := s.validateRiskForTier(ctx, tier, *req.RiskPercent)
 		if riskErr != nil {
 			return nil, riskErr
 		}
-		account.RiskPercent = riskPercent
+		if riskPercent < account.RiskPercent {
+			// Menurunkan risiko tidak pernah melewati batas total.
+			account.RiskPercent = riskPercent
+		} else {
+			siblings, listErr := s.accounts.ListByUser(ctx, userID)
+			if listErr != nil {
+				return nil, listErr
+			}
+			if totalErr := s.validateTotalRisk(ctx, tier, siblings, riskPercent, account.ID); totalErr != nil {
+				return nil, totalErr
+			}
+			account.RiskPercent = riskPercent
+		}
 	}
 	if req.IsActive != nil {
 		account.IsActive = *req.IsActive
@@ -424,6 +455,13 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 	if symbol == "" {
 		return nil, fmt.Errorf("%w: simbol tidak sah", apperror.ErrBadRequest)
 	}
+	// Bila katalog terpasang, simbol wajib terdaftar dan aktif. Ini mencegah
+	// user memilih pair yang tidak dikenal engine.
+	resolved, resolveErr := s.validateSymbolAgainstCatalog(ctx, symbol)
+	if resolveErr != nil {
+		return nil, resolveErr
+	}
+	symbol = resolved
 
 	strategy := req.Strategy
 	if strategy == "" {
@@ -866,7 +904,7 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 		return nil, fmt.Errorf("%w: eksekusi otomatis hanya untuk tier Plus", apperror.ErrForbidden)
 	}
 
-	riskPercent, err := clampRisk(req.RiskPercent)
+	riskPercent, err := s.validateRiskForTier(ctx, tier, req.RiskPercent)
 	if err != nil {
 		return nil, err
 	}
@@ -939,6 +977,16 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 			break
 		}
 
+		// Akumulasi risiko dicek per akun yang akan ditambahkan, sehingga
+		// menghubungkan banyak akun sekaligus tidak melewati batas total.
+		currentAccounts, listErr := s.accounts.ListByUser(ctx, userID)
+		if listErr != nil {
+			return nil, listErr
+		}
+		if totalErr := s.validateTotalRisk(ctx, tier, currentAccounts, riskPercent, ""); totalErr != nil {
+			return nil, totalErr
+		}
+
 		newAcc := &model.BrokerAccount{
 			UserID:            userID,
 			BrokerType:        "ctrader",
@@ -1006,4 +1054,114 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 		TotalConnected: len(connectedResponses),
 		Accounts:       connectedResponses,
 	}, nil
+}
+
+// catalogSnapshot mengambil katalog pair aktif. Bila layanan katalog tidak
+// terpasang (pemasangan lama atau pengujian tanpa katalog), hasilnya kosong dan
+// validasi simbol jatuh ke perilaku lama.
+func (s *accountService) catalogSnapshot(ctx context.Context) (dto.PairCatalogResponse, error) {
+	if s.catalog == nil {
+		return dto.PairCatalogResponse{}, nil
+	}
+	return s.catalog.Catalog(ctx)
+}
+
+// validateSymbolAgainstCatalog memastikan simbol benar-benar ada di katalog dan
+// aktif. Simbol yang tidak dikenal ditolak agar user tidak memilih pair asal.
+func (s *accountService) validateSymbolAgainstCatalog(ctx context.Context, raw string) (string, error) {
+	symbol := normalizeSymbol(raw)
+	if symbol == "" {
+		return "", fmt.Errorf("%w: simbol tidak sah", apperror.ErrBadRequest)
+	}
+	if s.catalog == nil {
+		return symbol, nil
+	}
+	canonical, err := s.catalog.ResolveSymbol(ctx, symbol)
+	if err != nil {
+		return "", err
+	}
+	return canonical, nil
+}
+
+// AccountPairs menampilkan checklist pair satu akun beserta katalog aktif.
+func (s *accountService) AccountPairs(ctx context.Context, userID, accountID string) (*dto.AccountPairSelectionResponse, error) {
+	account, err := s.accounts.FindByID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if account.UserID != userID {
+		return nil, apperror.ErrNotFound
+	}
+
+	subs, err := s.subs.ListActiveByAccount(ctx, userID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	selected := make([]string, 0, len(subs))
+	seen := make(map[string]bool, len(subs))
+	for _, sub := range subs {
+		if seen[sub.Symbol] {
+			continue
+		}
+		seen[sub.Symbol] = true
+		selected = append(selected, sub.Symbol)
+	}
+
+	catalog, err := s.catalogSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.AccountPairSelectionResponse{
+		AccountID:   account.ID,
+		RiskPercent: account.RiskPercent,
+		Selected:    selected,
+		Catalog:     catalog,
+	}, nil
+}
+
+// UpdateAccountPairs mengganti seluruh pilihan pair satu akun.
+//
+// Seluruh simbol divalidasi lebih dulu terhadap katalog; bila satu saja tidak
+// sah, tidak ada perubahan yang disimpan (all-or-nothing).
+func (s *accountService) UpdateAccountPairs(ctx context.Context, userID, accountID string, req dto.UpdateAccountPairsRequest) (*dto.AccountPairSelectionResponse, error) {
+	account, err := s.accounts.FindByID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if account.UserID != userID {
+		return nil, apperror.ErrNotFound
+	}
+
+	user, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	tier := effectiveTier(user, s.clock())
+	limit := s.tierSymbolLimit(ctx, tier)
+
+	canonical := make([]string, 0, len(req.Symbols))
+	seen := make(map[string]bool, len(req.Symbols))
+	for _, raw := range req.Symbols {
+		symbol, err := s.validateSymbolAgainstCatalog(ctx, raw)
+		if err != nil {
+			return nil, err
+		}
+		if seen[symbol] {
+			continue
+		}
+		seen[symbol] = true
+		canonical = append(canonical, symbol)
+	}
+
+	if len(canonical) > limit {
+		return nil, fmt.Errorf("%w: tier %s maksimal %d simbol per akun", apperror.ErrForbidden, tier, limit)
+	}
+
+	if err := s.subs.ReplaceAccountPairs(ctx, userID, accountID, canonical); err != nil {
+		return nil, err
+	}
+
+	s.recordStrategyAudit(ctx, userID, "", "subscription.account.update", accountID)
+	return s.AccountPairs(ctx, userID, accountID)
 }

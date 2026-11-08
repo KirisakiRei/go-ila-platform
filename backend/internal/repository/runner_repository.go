@@ -65,6 +65,13 @@ type RunnerRepository interface {
 	// Subscription: kebutuhan engine per (symbol, strategy).
 	ListActiveSubscriptions(ctx context.Context) ([]model.Subscription, error)
 	ListUsersBySymbol(ctx context.Context, symbol string) ([]model.User, error)
+	// ListAccountsBySymbol mengembalikan akun aktif yang berhak menerima sinyal
+	// satu simbol. Satu user dapat menyumbang lebih dari satu akun, karena
+	// pilihan pair kini berada di level akun.
+	ListAccountsBySymbol(ctx context.Context, symbol string) ([]model.SubscriptionAccount, error)
+	// EnabledPairSymbols mengembalikan simbol kanonik yang masih diaktifkan
+	// admin. Symbol lain tidak boleh diminta ke engine.
+	EnabledPairSymbols(ctx context.Context) ([]string, error)
 
 	// Status engine.
 	UpsertEngineState(ctx context.Context, state *model.EngineState) error
@@ -554,6 +561,94 @@ func (r *runnerRepository) ListUsersBySymbol(ctx context.Context, symbol string)
 		return nil, fmt.Errorf("membaca user pemantau simbol: %w", err)
 	}
 	return users, nil
+}
+
+// ListAccountsBySymbol mengembalikan pasangan user+akun yang berhak menerima
+// sinyal satu simbol.
+//
+// Logika pemilihan akun:
+//   - Langganan tanpa broker_account_id berlaku untuk semua akun aktif user
+//     (kompatibel dengan data sebelum katalog pair).
+//   - Langganan dengan broker_account_id hanya untuk akun itu.
+//   - User nonaktif atau terhapus tidak pernah diikutkan.
+//   - Akunnya sendiri harus aktif.
+func (r *runnerRepository) ListAccountsBySymbol(ctx context.Context, symbol string) ([]model.SubscriptionAccount, error) {
+	type row struct {
+		AccountID     string
+		AccountUserID string
+	}
+
+	var rows []row
+	err := r.db.WithContext(ctx).
+		Table("subscription AS s").
+		Select("ba.id AS account_id, ba.user_id AS account_user_id").
+		Joins(`JOIN "user" u ON u.id = s.user_id`).
+		Joins("JOIN broker_account ba ON ba.user_id = s.user_id AND ba.is_active = ?", true).
+		Where("s.is_active = ? AND s.symbol = ? AND s.deleted_at IS NULL", true, symbol).
+		Where("u.deleted_at IS NULL AND (u.status = '' OR u.status = ?)", "active").
+		Where("s.broker_account_id IS NULL OR s.broker_account_id = ba.id").
+		Group("ba.id, ba.user_id").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca akun pemantau simbol: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	accountIDs := make([]string, 0, len(rows))
+	userIDs := make([]string, 0, len(rows))
+	seenUser := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		accountIDs = append(accountIDs, row.AccountID)
+		if !seenUser[row.AccountUserID] {
+			seenUser[row.AccountUserID] = true
+			userIDs = append(userIDs, row.AccountUserID)
+		}
+	}
+
+	var accounts []model.BrokerAccount
+	if err := r.db.WithContext(ctx).Where("id IN ?", accountIDs).Find(&accounts).Error; err != nil {
+		return nil, fmt.Errorf("membaca akun broker: %w", err)
+	}
+	var users []model.User
+	if err := r.db.WithContext(ctx).Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+		return nil, fmt.Errorf("membaca pemilik akun: %w", err)
+	}
+
+	userByID := make(map[string]model.User, len(users))
+	for _, u := range users {
+		userByID[u.ID] = u
+	}
+
+	out := make([]model.SubscriptionAccount, 0, len(accounts))
+	for _, acc := range accounts {
+		owner, ok := userByID[acc.UserID]
+		if !ok {
+			continue
+		}
+		out = append(out, model.SubscriptionAccount{User: owner, Account: acc})
+	}
+	return out, nil
+}
+
+// EnabledPairSymbols membaca simbol kanonik yang masih diaktifkan admin.
+// Kategori atau grup yang dinonaktifkan ikut mematikan pair di dalamnya.
+func (r *runnerRepository) EnabledPairSymbols(ctx context.Context) ([]string, error) {
+	var symbols []string
+	err := r.db.WithContext(ctx).
+		Table("trading_pair AS p").
+		Select("p.symbol").
+		Joins("JOIN pair_category c ON c.id = p.category_id AND c.is_enabled = ?", true).
+		Joins("LEFT JOIN pair_group g ON g.id = p.group_id").
+		Where("p.is_enabled = ?", true).
+		Where("g.id IS NULL OR g.is_enabled = ?", true).
+		Order("p.symbol ASC").
+		Pluck("p.symbol", &symbols).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca pair aktif: %w", err)
+	}
+	return symbols, nil
 }
 
 func (r *runnerRepository) UpsertEngineState(ctx context.Context, state *model.EngineState) error {

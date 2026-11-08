@@ -167,12 +167,46 @@ Balasan `201`: objek `Account`.
 |---|---|---|
 | Akun per tier | Free 0, Basic 1, Plus 2 | 403 |
 | `mode: auto` | hanya Plus | 403 |
-| `risk_percent` | 0,10–1,00 (0 = default 0,5) | 400 |
-| `token` Match-Trader | wajib, minimal 20 karakter | 400 |
-| `ctrader` | belum tersedia | 400 |
+| `risk_percent` | 0,10–1,00% per trade (default 0,5%) | 400 |
+| Total risiko seluruh akun | Basic maks 1,0%, Plus maks 2,0% | 403 |
+| `token` Match-Trader | wajib untuk matchtrader, minimal 20 karakter | 400 |
+| `ctrader` | tersedia via alur OAuth `/accounts/ctrader/*` | 400 bila token manual |
 
 > Token **tidak pernah** dikembalikan. Respons hanya memuat
 > `has_credential: true`.
+>
+> **Pagar Risiko:** User **hanya** dapat mengatur `risk_percent` per akun
+> (0,10%–1,00%). Besaran lot, Stop Loss, Take Profit, dan rasio Risk:Reward
+> **tidak pernah** dapat diubah user; seluruhnya dihitung otomatis oleh Runner
+> dan sinyal engine untuk menjaga integritas manajemen risiko.
+
+### GET `/accounts/ctrader/auth-url` 🔒
+
+Mengambil tautan OAuth cTrader Open API untuk menghubungkan akun cTrader.
+
+Balasan `200`:
+```json
+{
+  "auth_url": "https://openapi.ctrader.com/apps/auth?client_id=...&redirect_uri=...&scope=trading"
+}
+```
+
+### POST `/accounts/ctrader/callback` 🔒
+
+Menukarkan kode otorisasi cTrader OAuth menjadi akun broker terdaftar.
+
+```json
+{
+  "code": "auth-code-dari-ctrader",
+  "label": "cTrader Utama",
+  "mode": "manual",
+  "risk_percent": 0.5,
+  "is_dry_run": false
+}
+```
+
+Balasan `201`: objek `Account`. Kredensial disimpan terenkripsi dengan keyring internal,
+dan token diperbarui otomatis di latar belakang saat kedaluwarsa.
 
 ### PATCH `/accounts/:id` 🔒
 
@@ -211,7 +245,113 @@ Balasan `200` tanpa `data`.
 
 ---
 
-## 4. Langganan Simbol
+## 4. Katalog Pair & Pilihan Simbol per Akun
+
+Katalog pair dikelola terpusat oleh admin (dictionary berstruktur: Kategori → Sub-kategori → Pair) agar pengguna tidak mengetik simbol secara manual dan terhindar dari salah ketik.
+
+Pilihan pair kini disimpan per akun broker, sehingga tiap akun bisa memantau pair yang berbeda dan dieksekusi secara independen oleh Runner.
+
+### GET `/pairs` 🔒
+
+Membaca seluruh katalog pair yang aktif untuk checklist di frontend.
+
+Balasan `200`:
+```json
+{
+  "categories": [
+    {
+      "key": "forex",
+      "label": "Forex",
+      "groups": [
+        {
+          "key": "usd",
+          "label": "USD Quote",
+          "pairs": [
+            { "symbol": "EURUSD", "name": "Euro / US Dollar", "aliases": "" }
+          ]
+        },
+        {
+          "key": "umum",
+          "label": "Umum",
+          "pairs": [
+            { "symbol": "XAUUSD", "name": "Gold / US Dollar", "aliases": "GOLD" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "indices",
+      "label": "Indices",
+      "groups": [
+        {
+          "key": "umum",
+          "label": "Umum",
+          "pairs": [
+            { "symbol": "USTEC", "name": "US Tech 100", "aliases": "NAS100,US100,NDX" }
+          ]
+        }
+      ]
+    }
+  ],
+  "symbols": ["EURUSD", "USTEC", "XAUUSD"]
+}
+```
+
+### GET `/accounts/:id/pairs` 🔒
+
+Membaca status checklist simbol yang sedang aktif pada satu akun beserta snapshot katalog.
+
+Balasan `200`:
+```json
+{
+  "account_id": "acc-123",
+  "risk_percent": 0.5,
+  "selected": ["EURUSD", "XAUUSD"],
+  "catalog": { ... }
+}
+```
+
+### PUT `/accounts/:id/pairs` 🔒
+
+Memperbarui seluruh checklist pair yang aktif pada satu akun (all-or-nothing).
+
+```json
+{
+  "symbols": ["EURUSD", "USTEC", "gold"]
+}
+```
+
+Balasan `200`: objek balasan yang sama dengan `GET /accounts/:id/pairs`.
+
+**Aturan yang ditegakkan:**
+- Semua simbol divalidasi terhadap katalog aktif. Alias (mis. `gold` untuk `XAUUSD`, `nas100` untuk `USTEC`) otomatis dipetakan ke simbol kanonik engine.
+- Bila ada satu simbol tidak sah atau dinonaktifkan admin, seluruh permintaan ditolak `400 BAD_REQUEST` dan tidak ada perubahan disimpan.
+- Jumlah simbol terpilih dibatasi oleh tier paket pengguna (Basic maks 8, Plus maks 8).
+- Posisi terbuka yang sudah berjalan di broker tetap dikelola Runner sampai ditutup walau simbolnya di-uncheck.
+
+---
+
+## 4.1. Manajemen Katalog Pair (Admin Only 🛡️)
+
+Endpoint khusus admin (permission `subscription.edit`):
+
+| Endpoint | Method | Keterangan |
+|---|---|---|
+| `/admin/pairs` | GET | Membaca katalog lengkap admin (termasuk yang nonaktif & jumlah subscribers) |
+| `/admin/pair-categories` | POST | Membuat kategori baru (`key`, `label`, `sort_order`, `is_enabled`) |
+| `/admin/pair-categories/:id` | PATCH / DELETE | Mengubah atau menghapus kategori (hapus diblokir bila masih punya pair) |
+| `/admin/pair-groups` | POST | Membuat sub-kategori baru (`category_id`, `key`, `label`, dll.) |
+| `/admin/pair-groups/:id` | PATCH / DELETE | Mengubah atau menghapus sub-kategori (hapus diblokir bila masih punya pair) |
+| `/admin/pairs` | POST | Mendaftarkan simbol baru (`symbol`, `category_id`, `group_id`, `aliases`, dll.) |
+| `/admin/pairs/:id` | PATCH / DELETE | Mengubah atau menghapus simbol (hapus diblokir bila ada subscriber aktif) |
+
+Seluruh mutasi tercatat otomatis pada log audit admin (`pair.category.change`, `pair.group.change`, `pair.change`).
+
+---
+
+## 5. Langganan Simbol (Kompatibilitas Global)
+
+Endpoint warisan untuk memantau simbol secara global (berlaku untuk semua akun aktif pengguna bila `broker_account_id` dikosongkan):
 
 ### GET `/subscriptions` 🔒
 
@@ -514,3 +654,4 @@ Token dihapus setelah dipakai, apa pun hasilnya.
 | Menganggap `message` sebagai kode | Pakai `error` untuk logika |
 | Menampilkan ILA 3.0 aktif bila `available: false` | Selalu patuhi `available && allowed` |
 | Memanggil `POST /telegram/webhook` | Bukan untuk klien |
+| Menyediakan input lot, RR, atau SL/TP | Hanya `risk_percent` (0,10–1,00%) yang boleh diatur user per akun; lot & SL/TP dihitung otomatis oleh Runner & engine |

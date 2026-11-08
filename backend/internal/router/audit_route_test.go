@@ -76,6 +76,17 @@ var harapanAksiAudit = map[string]audit.Action{
 	"PATCH /api/v1/admin/announcements/:id":  audit.CMSAnnouncement,
 	"DELETE /api/v1/admin/announcements/:id": audit.CMSAnnouncement,
 	"PUT /api/v1/admin/pages/:slug":          audit.CMSPageChange,
+
+	// Katalog pair: menentukan simbol yang boleh dipilih pengguna.
+	"POST /api/v1/admin/pair-categories":       audit.PairCategoryChange,
+	"PATCH /api/v1/admin/pair-categories/:id":  audit.PairCategoryChange,
+	"DELETE /api/v1/admin/pair-categories/:id": audit.PairCategoryChange,
+	"POST /api/v1/admin/pair-groups":           audit.PairGroupChange,
+	"PATCH /api/v1/admin/pair-groups/:id":      audit.PairGroupChange,
+	"DELETE /api/v1/admin/pair-groups/:id":     audit.PairGroupChange,
+	"POST /api/v1/admin/pairs":                 audit.PairChange,
+	"PATCH /api/v1/admin/pairs/:id":            audit.PairChange,
+	"DELETE /api/v1/admin/pairs/:id":           audit.PairChange,
 }
 
 // Setiap route mutasi admin harus punya kode aksi audit yang terdaftar.

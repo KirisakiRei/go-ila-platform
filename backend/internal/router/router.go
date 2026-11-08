@@ -131,6 +131,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		logger.Error("master key tidak sah; endpoint akun dinonaktifkan", "error", err.Error())
 	}
 
+	// Katalog pair: sumber kebenaran simbol yang boleh dipilih user.
+	pairRepo := repository.NewPairRepository(db)
+	pairCatalogService := service.NewPairCatalogService(pairRepo)
+
 	accountService := service.NewAccountService(service.AccountServiceDeps{
 		Users:         userRepo,
 		Accounts:      accountRepo,
@@ -148,6 +152,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// yang dipakai dua akun sekaligus.
 		FingerprintSecret: cfg.InternalSecret,
 		CTrader:           ctraderapi.NewClient(cfg.CTraderClientID, cfg.CTraderClientSecret, cfg.CTraderRedirectURI),
+		// Katalog pair dikelola admin; user hanya memilih dari daftar itu.
+		Catalog: pairCatalogService,
 	})
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
 	systemService := service.NewSystemService(service.SystemServiceDeps{
@@ -241,6 +247,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	approveHandler := handler.NewApproveHandler(approveService)
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
 	accountHandler := handler.NewAccountHandler(accountService)
+	pairHandler := handler.NewPairHandler(pairCatalogService, accountService)
+	adminPairHandler := handler.NewAdminPairHandler(service.NewPairAdminService(pairRepo, auditRepo))
 	tradingHandler := handler.NewTradingHandler(tradingService)
 	systemHandler := handler.NewSystemHandler(systemService)
 	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret)
@@ -390,6 +398,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		me.DELETE("/subscriptions/:id", accountHandler.Unsubscribe)
 		me.GET("/strategies", accountHandler.Strategies)
 
+		// Katalog pair & checklist per akun. Simbol hanya dipilih dari katalog
+		// yang dikelola admin, tidak pernah diketik bebas oleh user.
+		pairHandler.Register(me)
+
 		// Penghubungan Telegram.
 		me.POST("/telegram/link", telegramHandler.CreateLink)
 		me.DELETE("/telegram/link", telegramHandler.Disconnect)
@@ -425,7 +437,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -481,6 +493,7 @@ func registerAdmin(
 	cmsHandler *handler.CMSHandler,
 	pageHandler *handler.PageHandler,
 	adminTrialHandler *handler.AdminTrialHandler,
+	adminPairHandler *handler.AdminPairHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -561,6 +574,7 @@ func registerAdmin(
 	reportHandler.Register(admin.Group(""), guard)
 	systemHandler.Register(admin.Group(""), guard)
 	cmsHandler.Register(admin.Group(""), guard)
+	adminPairHandler.Register(admin.Group(""), guard)
 	pageHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")

@@ -344,6 +344,55 @@ func (s *fakeStore) ListUsersBySymbol(_ context.Context, symbol string) ([]model
 	return out, nil
 }
 
+// ListAccountsBySymbol meniru kueri per akun: langganan tanpa akun berlaku
+// untuk semua akun aktif user; yang punya akun hanya untuk akun itu.
+func (s *fakeStore) ListAccountsBySymbol(_ context.Context, symbol string) ([]model.SubscriptionAccount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var out []model.SubscriptionAccount
+	seen := make(map[string]bool)
+	for _, sub := range s.subs {
+		if !sub.IsActive || sub.Symbol != symbol {
+			continue
+		}
+		user, ok := s.users[sub.UserID]
+		if !ok {
+			continue
+		}
+		for _, acc := range s.accounts {
+			if acc.UserID != sub.UserID || !acc.IsActive {
+				continue
+			}
+			if sub.BrokerAccountID != nil && *sub.BrokerAccountID != acc.ID {
+				continue
+			}
+			if seen[acc.ID] {
+				continue
+			}
+			seen[acc.ID] = true
+			out = append(out, model.SubscriptionAccount{User: *user, Account: *acc})
+		}
+	}
+	return out, nil
+}
+
+// EnabledPairSymbols mengembalikan seluruh simbol yang dikenal; fake store
+// tidak punya katalog, jadi semua simbol dianggap aktif.
+func (s *fakeStore) EnabledPairSymbols(_ context.Context) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	seen := make(map[string]bool)
+	var out []string
+	for _, sub := range s.subs {
+		if !seen[sub.Symbol] {
+			seen[sub.Symbol] = true
+			out = append(out, sub.Symbol)
+		}
+	}
+	return out, nil
+}
+
 func (s *fakeStore) UpsertEngineState(_ context.Context, _ *model.EngineState) error { return nil }
 
 func (s *fakeStore) ListEngines(_ context.Context) ([]model.EngineState, error) { return nil, nil }

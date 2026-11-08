@@ -43,6 +43,10 @@ const (
 	FeatureStrategies   = "strategies"
 	FeatureILA3Status   = "ila3_status"
 	FeatureReasonAI     = "reason_ai"
+	// FeatureMaxTotalRisk membatasi jumlah risiko seluruh akun aktif user,
+	// dalam persen. Mencegah user memecah risiko ke banyak akun hingga melewati
+	// kendali platform.
+	FeatureMaxTotalRisk = "max_total_risk"
 )
 
 // PriceOverride adalah harga kampanye untuk satu paket.

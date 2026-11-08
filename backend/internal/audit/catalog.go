@@ -79,6 +79,13 @@ const (
 	RolePermChange   Action = "role.permission.change"
 )
 
+// Katalog pair yang dikelola admin.
+const (
+	PairCategoryChange Action = "pair.category.change"
+	PairGroupChange    Action = "pair.group.change"
+	PairChange         Action = "pair.change"
+)
+
 // Catalog memetakan kode aksi ke keterangan dan penanda sensitif.
 type Entry struct {
 	Action    Action
@@ -140,6 +147,10 @@ var Catalog = []Entry{
 	{CMSFaqChange, "Konten", "FAQ diubah", false},
 	{CMSAnnouncement, "Konten", "Pengumuman diubah", false},
 	{CMSPageChange, "Konten", "Isi halaman publik diubah", false},
+	{PairCategoryChange, "Katalog Pair", "Kategori pair diubah", false},
+	{PairGroupChange, "Katalog Pair", "Sub-kategori pair diubah", false},
+	{PairChange, "Katalog Pair", "Pair diubah", false},
+
 	{RoleCreate, "Tata Kelola", "Role dibuat", false},
 	{RoleUpdate, "Tata Kelola", "Role diubah", true},
 	{RoleDelete, "Tata Kelola", "Role dihapus", true},

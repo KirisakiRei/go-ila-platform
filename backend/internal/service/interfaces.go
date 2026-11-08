@@ -46,6 +46,10 @@ type SubscriptionRepository interface {
 	ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	ListByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	Deactivate(ctx context.Context, id, userID string) error
+	// ListActiveByAccount membaca langganan aktif yang berlaku untuk satu akun.
+	ListActiveByAccount(ctx context.Context, userID, accountID string) ([]model.Subscription, error)
+	// ReplaceAccountPairs mengganti seluruh pilihan simbol satu akun secara atomik.
+	ReplaceAccountPairs(ctx context.Context, userID, accountID string, symbols []string) error
 }
 
 // CredentialRepository menyimpan blob kredensial terenkripsi.

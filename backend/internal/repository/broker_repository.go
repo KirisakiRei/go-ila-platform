@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -201,3 +202,84 @@ func (r *subscriptionRepository) Deactivate(ctx context.Context, id, userID stri
 	}
 	return nil
 }
+
+// ListActiveByAccount membaca langganan aktif yang berlaku untuk satu akun.
+//
+// Aturan transisi: langganan lama tanpa broker_account_id dianggap berlaku
+// untuk semua akun user. Ini menjaga data sebelum katalog pair tetap
+// dieksekusi tanpa perlu backfill paksa.
+func (r *subscriptionRepository) ListActiveByAccount(ctx context.Context, userID, accountID string) ([]model.Subscription, error) {
+	var subs []model.Subscription
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND is_active = ? AND (broker_account_id IS NULL OR broker_account_id = ?)", userID, true, accountID).
+		Order("symbol ASC, strategy ASC").
+		Find(&subs).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca subscription akun: %w", err)
+	}
+	return subs, nil
+}
+
+// ReplaceAccountPairs mengganti seluruh pilihan simbol satu akun secara atomik.
+//
+// Langganan lama yang tidak dipilih lagi dinonaktifkan (bukan dihapus) agar
+// jejak historis tetap ada. Baris yang sudah ada diaktifkan kembali sehingga
+// pencabutan tidak menghapus data. Strategi dipertahankan bila simbol sama.
+func (r *subscriptionRepository) ReplaceAccountPairs(ctx context.Context, userID, accountID string, symbols []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		wanted := make(map[string]bool, len(symbols))
+		for _, s := range symbols {
+			wanted[s] = true
+		}
+
+		// Nonaktifkan langganan akun ini yang tidak lagi dipilih.
+		var existing []model.Subscription
+		if err := tx.Where("user_id = ? AND broker_account_id = ?", userID, accountID).Find(&existing).Error; err != nil {
+			return fmt.Errorf("membaca subscription akun: %w", err)
+		}
+
+		byPairKey := make(map[string]*model.Subscription, len(existing))
+		for i := range existing {
+			byPairKey[strings.ToUpper(existing[i].Symbol)] = &existing[i]
+		}
+
+		for i := range existing {
+			key := strings.ToUpper(existing[i].Symbol)
+			if !wanted[key] && existing[i].IsActive {
+				if err := tx.Model(&model.Subscription{}).Where("id = ?", existing[i].ID).Update("is_active", false).Error; err != nil {
+					return fmt.Errorf("menonaktifkan subscription: %w", err)
+				}
+			}
+		}
+
+		// Aktifkan atau buat baris untuk simbol yang dipilih.
+		for _, raw := range symbols {
+			canonical := strings.ToUpper(raw)
+			if row, ok := byPairKey[canonical]; ok {
+				if row.IsActive {
+					continue
+				}
+				if err := tx.Model(&model.Subscription{}).Where("id = ?", row.ID).Update("is_active", true).Error; err != nil {
+					return fmt.Errorf("mengaktifkan subscription: %w", err)
+				}
+				continue
+			}
+
+			sub := &model.Subscription{
+				UserID:          userID,
+				Symbol:          canonical,
+				Strategy:        "ila-2.0",
+				IsActive:        true,
+				BrokerAccountID: strPtr(accountID),
+			}
+			if err := tx.Create(sub).Error; err != nil {
+				return fmt.Errorf("membuat subscription: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+// strPtr adalah pembantu kecil untuk kolom nullable.
+func strPtr(v string) *string { return &v }

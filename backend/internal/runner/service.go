@@ -90,6 +90,17 @@ type Options struct {
 	// OnMarketAnomaly melaporkan status pasar yang tidak sesuai jadwal, mis.
 	// engine mengaku buka pada Sabtu. Bila nil, temuan hanya dicatat di log.
 	OnMarketAnomaly func(anomalies []MarketScheduleAnomaly)
+	// PairGate menyaring simbol yang masih diaktifkan admin. Bila nil, semua
+	// simbol dianggap aktif sehingga pemasangan lama tetap berjalan.
+	PairGate PairGate
+}
+
+// PairGate memberi tahu Runner simbol mana yang masih boleh diminta ke engine.
+// Implementasi disarankan menyimpan cache agar tidak memukul basis data pada
+// setiap perubahan kebutuhan simbol.
+type PairGate interface {
+	// EnabledSymbols mengembalikan himpunan simbol kanonik yang masih aktif.
+	EnabledSymbols(ctx context.Context) (map[string]bool, error)
 }
 
 // Service adalah inti Runner. Aman dipakai dari beberapa goroutine.
@@ -303,18 +314,83 @@ func (s *Service) fanOutIntermediate(ctx context.Context, signal *model.Signal) 
 }
 
 func (s *Service) fanOutReady(ctx context.Context, signal *model.Signal) {
-	users, err := s.store.ListUsersBySymbol(ctx, signal.Symbol)
-	if err != nil {
-		s.logger.Error("gagal membaca pemantau simbol", "error", err.Error())
+	// Sinyal disebar ke setiap akun yang mencentang simbol ini. Satu user dapat
+	// menyumbang lebih dari satu akun karena pilihan pair kini per akun.
+	pairs, err := s.store.ListAccountsBySymbol(ctx, signal.Symbol)
+	if err == nil {
+		for i := range pairs {
+			user := pairs[i].User
+			account := pairs[i].Account
+			if procErr := s.processSignalForAccount(ctx, &user, &account, signal); procErr != nil {
+				s.logger.Error("gagal memproses sinyal untuk akun",
+					"user_id", user.ID, "account_id", account.ID,
+					"signal_id", signal.SignalID, "error", procErr.Error())
+			}
+		}
 		return
 	}
 
+	// Jalur cadangan: bila kueri per akun gagal, pakai jalur per user yang lama
+	// agar sinyal tetap tersebar dan tidak hilang saat basis data bermasalah.
+	s.logger.Warn("membaca akun per simbol gagal; memakai jalur per user", "error", err.Error())
+	users, userErr := s.store.ListUsersBySymbol(ctx, signal.Symbol)
+	if userErr != nil {
+		s.logger.Error("gagal membaca pemantau simbol", "error", userErr.Error())
+		return
+	}
 	for _, user := range users {
-		if err := s.processSignalForUser(ctx, &user, signal); err != nil {
+		if procErr := s.processSignalForUser(ctx, &user, signal); procErr != nil {
 			s.logger.Error("gagal memproses sinyal untuk user",
-				"user_id", user.ID, "signal_id", signal.SignalID, "error", err.Error())
+				"user_id", user.ID, "signal_id", signal.SignalID, "error", procErr.Error())
 		}
 	}
+}
+
+// processSignalForAccount menjalankan urutan pemeriksaan untuk SATU akun.
+//
+// Ini jalur utama fan-out: setiap akun yang mencentang simbol menerima
+// evaluasinya sendiri, tanpa terpengaruh akun lain milik user yang sama.
+func (s *Service) processSignalForAccount(ctx context.Context, user *model.User, account *model.BrokerAccount, signal *model.Signal) error {
+	now := s.opts.Clock()
+	tier := EffectiveTier(user.Tier, user.TrialExpiresAt, user.TierExpiresAt, now)
+
+	// [1] Sinyal sah?
+	if reason := s.validateSignal(ctx, signal, now); reason != RejectNone {
+		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, reason)
+	}
+
+	// [2] User berhak atas strategi ini?
+	if !StrategyAllowed(tier, signal.StrategyVersion) {
+		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectStrategyTier)
+	}
+	if signal.StrategyVersion == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
+		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectStrategyTier)
+	}
+
+	// [3] Akun ini sendiri boleh menerima order?
+	if !account.IsActive || account.IsFrozen {
+		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectAccountFrozen)
+	}
+
+	reason, evalErr := s.evaluate(ctx, user, account, signal, tier, now)
+	if evalErr != nil {
+		return evalErr
+	}
+	if reason != RejectNone {
+		s.logger.Info("sinyal tertahan",
+			"user_id", user.ID, "signal_id", signal.SignalID,
+			"account_id", account.ID, "reason", string(reason))
+		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, reason)
+	}
+
+	if account.Mode == "auto" && s.autoExecute(ctx) {
+		return s.execute(ctx, user, account, signal)
+	}
+
+	// Mode manual: catat siap dengan akun ini sebagai kandidat konfirmasi.
+	s.recordUserSignal(ctx, user.ID, signal.SignalID, SignalReady, "", &account.ID)
+	s.pub.PublishSignal(ctx, user.ID, signal.SignalID, SignalReady, "")
+	return nil
 }
 
 // processSignalForUser menjalankan seluruh urutan pemeriksaan plans/14 §5.2
@@ -509,12 +585,22 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 		return RejectNone, err
 	}
 
+	// Posisi terbuka dihitung per akun: satu akun tidak boleh membuka posisi baru
+	// bila akun itu sendiri masih memiliki posisi terbuka. Akun lain milik user
+	// yang sama (pada tier Plus) berhak mengeksekusi sinyal secara independen.
+	openCount := 0
+	for _, p := range openPositions {
+		if p.BrokerAccountID == "" || p.BrokerAccountID == account.ID {
+			openCount++
+		}
+	}
+
 	daily := DailyStatus{
 		Day:         summary.Day,
 		WinCount:    summary.WinCount,
 		LossCount:   summary.LossCount,
 		TotalTrades: summary.TotalTrades,
-		OpenCount:   len(openPositions),
+		OpenCount:   openCount,
 	}
 	if reason := EvaluateDaily(daily, s.policy(ctx)); reason != RejectNone {
 		return reason, nil
@@ -1078,6 +1164,17 @@ func (s *Service) reject(ctx context.Context, userID, signalID string, reason Re
 
 	s.logger.Info("sinyal ditahan",
 		"user_id", userID, "signal_id", signalID, "reason", string(reason))
+	return nil
+}
+
+// rejectAccount mencatat penolakan untuk satu akun tertentu sehingga dashboard
+// dapat menjelaskan akun mana yang tertahan dan alasannya.
+func (s *Service) rejectAccount(ctx context.Context, userID, accountID, signalID string, reason RejectReason) error {
+	s.recordUserSignal(ctx, userID, signalID, SignalRejected, string(reason), &accountID)
+	s.pub.PublishSignal(ctx, userID, signalID, SignalRejected, string(reason))
+
+	s.logger.Info("sinyal ditahan untuk akun",
+		"user_id", userID, "account_id", accountID, "signal_id", signalID, "reason", string(reason))
 	return nil
 }
 

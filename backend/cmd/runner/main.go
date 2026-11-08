@@ -149,6 +149,9 @@ func main() {
 			}
 			alerts.Fire(ctx, alert.MarketScheduleAnomaly, strings.Join(details, "; "))
 		},
+		// PairGate memastikan simbol yang dinonaktifkan admin tidak pernah
+		// diminta ke engine, tanpa memutus posisi yang sudah terbuka.
+		PairGate: runner.NewCachedPairGate(store, time.Minute),
 	}
 
 	svc := runner.NewService(store, registry, publisher, logger, opts)

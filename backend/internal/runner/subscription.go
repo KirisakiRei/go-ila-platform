@@ -32,6 +32,19 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 	now := s.opts.Clock()
 	byStrategy := make(map[string]map[string]bool)
 
+	// PairGate memastikan simbol yang dinonaktifkan admin tidak pernah diminta
+	// ke engine. Kegagalan membaca gate tidak boleh mematikan trading: simbol
+	// tetap dianggap aktif agar tidak ada posisi yang kehilangan pengawasan.
+	var enabled map[string]bool
+	if s.opts.PairGate != nil {
+		gate, gateErr := s.opts.PairGate.EnabledSymbols(ctx)
+		if gateErr != nil {
+			s.logger.Warn("gagal membaca katalog pair aktif", "error", gateErr.Error())
+		} else {
+			enabled = gate
+		}
+	}
+
 	for _, sub := range subs {
 		if !sub.IsActive {
 			continue
@@ -56,6 +69,11 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 
 		if byStrategy[sub.Strategy] == nil {
 			byStrategy[sub.Strategy] = make(map[string]bool)
+		}
+		if enabled != nil && !enabled[sub.Symbol] {
+			// Simbol dinonaktifkan admin: tidak diminta ke engine. Posisi yang
+			// sudah terbuka tetap dikelola lewat pemantauan posisi.
+			continue
 		}
 		byStrategy[sub.Strategy][sub.Symbol] = true
 	}

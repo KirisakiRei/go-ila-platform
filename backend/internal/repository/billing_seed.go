@@ -47,6 +47,8 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 			model.FeatureStrategies:  "ila-2.0",
 			model.FeatureILA3Status:  "coming_soon",
 			model.FeatureReasonAI:    "false",
+			// Free tidak auto-execute, jadi tidak ada total risiko untuk dibatasi.
+			model.FeatureMaxTotalRisk: "0",
 		},
 		model.TierBasic: {
 			model.FeatureAccountLimit: "1",
@@ -56,6 +58,7 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 			model.FeatureStrategies:   "ila-2.0",
 			model.FeatureILA3Status:   "coming_soon",
 			model.FeatureReasonAI:     "false",
+			model.FeatureMaxTotalRisk: "1",
 		},
 		model.TierPlus: {
 			model.FeatureAccountLimit: "2",
@@ -66,6 +69,8 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 			// ILA 3.0 masih penelitian: tampil di daftar tapi belum bisa dipilih.
 			model.FeatureILA3Status: "coming_soon",
 			model.FeatureReasonAI:   "true",
+			// Batas total risiko seluruh akun aktif milik satu pengguna (persen).
+			model.FeatureMaxTotalRisk: "2",
 		},
 	}
 

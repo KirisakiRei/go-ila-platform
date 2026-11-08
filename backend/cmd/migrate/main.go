@@ -89,6 +89,9 @@ func main() {
 		&model.PageItem{},
 		&model.EmailOutbox{},
 		&model.EmailToken{},
+		&model.PairCategory{},
+		&model.PairGroup{},
+		&model.TradingPair{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
@@ -112,6 +115,13 @@ func main() {
 	// disesuaikan admin tidak ditimpa (plans/12 §9.2).
 	if err := repository.SeedPlans(ctx, db); err != nil {
 		logger.Error("paket bawaan gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
+	// Katalog pair awal diisi sekali; perubahan admin tidak pernah tertimpa.
+	pairsSeeded, err := repository.SeedPairs(ctx, db, time.Now().UTC())
+	if err != nil {
+		logger.Error("katalog pair awal gagal disiapkan", "error", err.Error())
 		os.Exit(1)
 	}
 
@@ -149,5 +159,6 @@ func main() {
 		"admin_dilengkapi", filled,
 		"dokumen_legal_diterbitkan", seeded,
 		"halaman_disiapkan", pagesSeeded,
+		"pair_disiapkan", pairsSeeded,
 	)
 }

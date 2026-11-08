@@ -58,6 +58,38 @@ type SubscriptionRepository interface {
 	ListByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	FindActive(ctx context.Context, userID, symbol, strategy string) (*model.Subscription, error)
 	Deactivate(ctx context.Context, id, userID string) error
+
+	// ListActiveByAccount membaca langganan aktif yang berlaku untuk satu akun.
+	// Langganan lama tanpa broker_account_id (NULL) ikut dianggap berlaku,
+	// sehingga data sebelum katalog pair tetap dieksekusi.
+	ListActiveByAccount(ctx context.Context, userID, accountID string) ([]model.Subscription, error)
+	// ReplaceAccountPairs mengganti seluruh daftar simbol satu akun dalam satu
+	// transaksi: simbol lama dinonaktifkan, simbol baru diaktifkan.
+	ReplaceAccountPairs(ctx context.Context, userID, accountID string, symbols []string) error
+}
+
+// PairRepository menyimpan katalog kategori, grup, dan pair yang dipilih user.
+type PairRepository interface {
+	CreateCategory(ctx context.Context, category *model.PairCategory) error
+	FindCategoryByID(ctx context.Context, id string) (*model.PairCategory, error)
+	FindCategoryByKey(ctx context.Context, key string) (*model.PairCategory, error)
+	ListCategories(ctx context.Context, onlyEnabled bool) ([]model.PairCategory, error)
+	UpdateCategory(ctx context.Context, category *model.PairCategory) error
+	DeleteCategory(ctx context.Context, id string) error
+
+	CreateGroup(ctx context.Context, group *model.PairGroup) error
+	FindGroupByID(ctx context.Context, id string) (*model.PairGroup, error)
+	ListGroups(ctx context.Context, categoryID string, onlyEnabled bool) ([]model.PairGroup, error)
+	UpdateGroup(ctx context.Context, group *model.PairGroup) error
+	DeleteGroup(ctx context.Context, id string) error
+
+	CreatePair(ctx context.Context, pair *model.TradingPair) error
+	FindPairByID(ctx context.Context, id string) (*model.TradingPair, error)
+	FindPairBySymbol(ctx context.Context, symbol string) (*model.TradingPair, error)
+	ListPairs(ctx context.Context, filter PairFilter) ([]model.TradingPair, error)
+	UpdatePair(ctx context.Context, pair *model.TradingPair) error
+	DeletePair(ctx context.Context, id string) error
+	CountActiveSubscriptionsBySymbol(ctx context.Context, symbol string) (int64, error)
 }
 
 // BrokerAccountStateRepository menyimpan telemetry akun yang ditulis Runner.
