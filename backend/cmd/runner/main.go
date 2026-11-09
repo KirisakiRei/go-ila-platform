@@ -429,6 +429,12 @@ func streamOnce(
 			OnConnected: func(client enginev1.EngineServiceClient, connCtx context.Context) {
 				logger.Info("terhubung ke engine",
 					"strategy", target.Strategy, "addr", target.Addr)
+				// Catat SEBELUM apa pun yang bisa gagal: dashboard harus tahu
+				// engine hidup sejak koneksi terbuka, bukan baru setelah
+				// stream berakhir. Sebelumnya status hanya ditulis saat putus,
+				// sehingga yang tersimpan selalu "tidak terhubung" padahal
+				// engine sedang berjalan.
+				recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, nil, logger)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
 				svc.SetAckSender(ackSender(client, subscriberID))
 				svc.SetSymbolSync(symbolSync(client, subscriberID, target, svc, logger))
