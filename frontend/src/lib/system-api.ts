@@ -13,6 +13,7 @@ import type {
   SupportNoteItem,
   SystemOverview,
 } from '@/types/system'
+import type { PublicSignalPreview } from '@/types/public-signal'
 
 /** Lampiran sesi admin memakai cookie sendiri, jadi path berbeda dari sesi user. */
 const ADMIN = '/admin'
@@ -76,6 +77,18 @@ export const publicContentApi = {
   status: () => request<PublicStatus>('/status'),
   /** Isi halaman publik dikelola admin; halaman menampilkan keadaan kosong bila belum ada. */
   page: (slug: string) => request<PageContent>(`/pages/${slug}`),
+  /**
+   * Ringkasan arah sinyal terakhir untuk halaman depan.
+   *
+   * Hanya memuat arah dan waktu; harga masuk, batas kerugian, dan target tidak
+   * pernah ikut pada endpoint publik ini.
+   */
+  signalPreview: (symbols?: string[]) =>
+    request<PublicSignalPreview>(
+      symbols && symbols.length > 0
+        ? `/signals/preview?symbols=${encodeURIComponent(symbols.join(','))}`
+        : '/signals/preview',
+    ),
 }
 
 export type {

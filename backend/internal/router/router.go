@@ -295,6 +295,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminSignalHandler := handler.NewAdminSignalHandler(adminSignalService)
 	adminSystemHandler := handler.NewAdminSystemHandler(adminSystemService, systemOpsService, systemOpsService)
 	publicStatusHandler := handler.NewPublicStatusHandler(systemOpsService)
+	// Ringkasan arah sinyal untuk halaman depan. Membaca jadwal pasar dari
+	// layanan status yang sama, sehingga buka/tutup pasar dihitung di satu
+	// tempat dan tidak pernah berbeda antar halaman.
+	publicSignalHandler := handler.NewPublicSignalHandler(
+		service.NewPublicSignalService(repository.NewPublicSignalStore(db), systemOpsService),
+	)
 	cmsHandler := handler.NewCMSHandler(cmsService)
 	pageHandler := handler.NewPageHandler(pageService)
 	emailAccountHandler := handler.NewEmailAccountHandler(emailAccountService)
@@ -372,6 +378,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	publicStatus.Use(middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
 	{
 		publicStatus.GET("/status", publicStatusHandler.Status)
+		// Halaman depan memakai ringkasan arah sinyal tanpa login. Letaknya di
+		// grup yang dibatasi per alamat IP, sama seperti status layanan.
+		publicStatus.GET("/signals/preview", publicSignalHandler.Preview)
 		cmsHandler.PublicRegister(publicStatus.Group(""))
 		pageHandler.PublicRegister(publicStatus.Group(""))
 	}

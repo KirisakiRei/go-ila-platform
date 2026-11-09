@@ -39,3 +39,37 @@ export function formatDate(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return '—'
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(date)
 }
+
+/**
+ * Jarak waktu lampau dalam bahasa sehari-hari, mis. "12 menit lalu".
+ *
+ * Dipakai halaman publik untuk menuliskan kapan sesuatu terakhir terjadi tanpa
+ * menampilkan tanggal penuh. Hasilnya selalu satu satuan, karena dua satuan
+ * ("1 hari 3 jam lalu") membuat kartu tidak rata dan sulit dipindai.
+ *
+ * Waktu yang belum lewat (selisih negatif, mis. jam server sedikit di depan)
+ * diperlakukan sebagai "baru saja", bukan tanggal masa depan.
+ */
+export function formatRelativeTime(value: string | null | undefined, now?: Date): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  const acuan = now ?? new Date()
+  const detik = Math.floor((acuan.getTime() - date.getTime()) / 1000)
+  if (detik < 60) return 'baru saja'
+
+  const menit = Math.floor(detik / 60)
+  if (menit < 60) return `${menit} menit lalu`
+
+  const jam = Math.floor(menit / 60)
+  if (jam < 24) return `${jam} jam lalu`
+
+  const hari = Math.floor(jam / 24)
+  if (hari < 30) return `${hari} hari lalu`
+
+  const bulan = Math.floor(hari / 30)
+  if (bulan < 12) return `${bulan} bulan lalu`
+
+  return `${Math.floor(bulan / 12)} tahun lalu`
+}

@@ -6,12 +6,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatIDR } from '@/features/admin/lib/format'
 import { publicPlanApi } from '@/lib/admin-api'
 import {
-  ExecutionPreviewArtwork,
   HeroTradingGeometry,
   MetricsCurveSvg,
   MonochromeHorizonTile,
   MonochromeLiquidityWaves,
 } from './components/LandingArtwork'
+import { SignalOverviewGrid } from './components/SignalOverviewGrid'
 import { formatPlanBenefits, getPlanAudience } from './lib/plan-benefits'
 
 const CURVE_METRICS = [
@@ -273,37 +273,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. OVERVIEW KONTROL TRADER (menggantikan bagian rantai/non-kustodial) */}
+      {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
       <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
-            <div className="space-y-5 lg:col-span-5">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
-                Kendali di Tangan Anda
-              </p>
-              <p className="text-[15px] leading-relaxed text-[#3f3f46]">
+          <div className="max-w-2xl space-y-4">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
+              Pantauan Pasar
+            </p>
+            <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
+              <span className="text-[#09090b]">Arah pasar yang sedang kami amati,</span>{' '}
+              <span className="text-[#52525b]">diperbarui sepanjang sesi</span>
+            </h2>
+            <p className="text-[14px] leading-relaxed text-[#3f3f46]">
+              Tiga instrumen yang paling aktif kami pantau: emas, euro, dan indeks teknologi
+              Amerika. Ringkasan di bawah menunjukkan arah terakhir yang terbaca dari struktur
+              harga — bukan rekomendasi untuk membuka posisi.
+            </p>
+          </div>
+
+          <div className="mt-8">
+            <SignalOverviewGrid />
+          </div>
+
+          <div className="mt-10 grid gap-8 border-t border-zinc-200 pt-8 md:grid-cols-12 md:items-start">
+            <div className="md:col-span-7">
+              <p className="text-[14px] leading-relaxed text-[#3f3f46]">
                 Hubungkan akun broker sekali melalui token akses, atur persentase risiko harian,
                 lalu pantau setiap sinyal yang masuk dari satu tempat. Dana dan posisi terbuka tetap
                 berada sepenuhnya di akun broker Anda.
               </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  to="/harga"
-                  className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
-                >
-                  Lihat Paket &amp; Harga
-                </Link>
-                <Link
-                  to="/tentang"
-                  className="text-[13px] font-medium text-[#18181b] underline underline-offset-4 hover:text-[#52525b]"
-                >
-                  Prinsip kerja kami
-                </Link>
-              </div>
+                <p className="mt-3 text-[12px] leading-relaxed text-[#71717a]">
+                Detail harga masuk, batas kerugian, dan target hanya tersedia untuk pelanggan.
+                Bukan jaminan keuntungan dan bukan nasihat investasi.
+              </p>
             </div>
 
-            <div className="lg:col-span-7">
-              <ExecutionPreviewArtwork className="mx-auto h-auto w-full max-w-xl" />
+            <div className="flex flex-wrap items-center gap-3 md:col-span-5 md:justify-end">
+              <Link
+                to="/harga"
+                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
+              >
+                Lihat Paket &amp; Harga
+              </Link>
+              <Link
+                to="/tentang"
+                className="text-[13px] font-medium text-[#18181b] underline underline-offset-4 hover:text-[#52525b]"
+              >
+                Prinsip kerja kami
+              </Link>
             </div>
           </div>
 
