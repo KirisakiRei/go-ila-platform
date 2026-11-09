@@ -56,26 +56,26 @@ const NAV_GROUPS: NavGroup[] = [
   {
     category: 'Utama',
     items: [
-      { to: '/admin', label: 'Ringkasan', icon: LayoutDashboard, end: true },
-      { to: '/admin/pengguna', label: 'Pengguna', icon: Users, permission: 'user.view' },
-      { to: '/admin/dukungan', label: 'Dukungan', icon: LifeBuoy, permission: 'user.view' },
-      { to: '/admin/sinyal', label: 'Sinyal', icon: Radio, permission: 'signal.view' },
+      { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/admin/pengguna', label: 'Users & Accounts', icon: Users, permission: 'user.view' },
+      { to: '/admin/dukungan', label: 'Customer Support', icon: LifeBuoy, permission: 'user.view' },
+      { to: '/admin/sinyal', label: 'Signals & Monitor', icon: Radio, permission: 'signal.view' },
     ],
   },
   {
     category: 'Katalog & Layanan',
     items: [
-      { to: '/admin/pairs', label: 'Katalog Pair', icon: Coins, permission: 'subscription.edit' },
+      { to: '/admin/pairs', label: 'Pair Catalog', icon: Coins, permission: 'subscription.edit' },
     ],
   },
   {
     category: 'Billing & Monetisasi',
     items: [
-      { to: '/admin/paket', label: 'Paket & Harga', icon: Wallet, permission: 'billing.plan' },
-      { to: '/admin/tagihan', label: 'Tagihan', icon: Receipt, permission: 'billing.view' },
-      { to: '/admin/kupon', label: 'Kupon', icon: Percent, permission: 'billing.voucher' },
-      { to: '/admin/kode-kredit', label: 'Kode Kredit', icon: Ticket, permission: 'billing.voucher' },
-      { to: '/admin/trial', label: 'Uji Coba', icon: Timer, permission: 'user.tier' },
+      { to: '/admin/paket', label: 'Plans & Pricing', icon: Wallet, permission: 'billing.plan' },
+      { to: '/admin/tagihan', label: 'Invoices & Billing', icon: Receipt, permission: 'billing.view' },
+      { to: '/admin/kupon', label: 'Promo Coupons', icon: Percent, permission: 'billing.voucher' },
+      { to: '/admin/kode-kredit', label: 'Credit Vouchers', icon: Ticket, permission: 'billing.voucher' },
+      { to: '/admin/trial', label: 'Free Trials', icon: Timer, permission: 'user.tier' },
     ],
   },
   {
@@ -83,31 +83,31 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         to: '/admin/konten/halaman',
-        label: 'Halaman Publik',
+        label: 'Public Pages',
         icon: FileText,
         permission: 'cms.view',
       },
-      { to: '/admin/konten/legal', label: 'Dokumen Legal', icon: ShieldCheck, permission: 'cms.view' },
-      { to: '/admin/konten', label: 'Template Konten', icon: FileText, end: true, permission: 'cms.view' },
+      { to: '/admin/konten/legal', label: 'Legal Documents', icon: ShieldCheck, permission: 'cms.view' },
+      { to: '/admin/konten', label: 'Content Blocks', icon: FileText, end: true, permission: 'cms.view' },
     ],
   },
   {
     category: 'Sistem & Infrastruktur',
     items: [
-      { to: '/admin/engine', label: 'Engine', icon: Radio, permission: 'system.view' },
-      { to: '/admin/runner', label: 'Runner', icon: Cpu, permission: 'system.view' },
-      { to: '/admin/kesehatan', label: 'Ringkasan Kesehatan', icon: Gauge, permission: 'system.view' },
-      { to: '/admin/kesehatan-broker', label: 'Kesehatan Broker', icon: Activity, permission: 'system.view' },
-      { to: '/admin/pengaturan-sistem', label: 'Flag Sistem', icon: Settings2, permission: 'system.settings' },
-      { to: '/admin/pemeliharaan', label: 'Pemeliharaan', icon: ShieldAlert, permission: 'system.maintenance' },
+      { to: '/admin/engine', label: 'Analysis Engines', icon: Radio, permission: 'system.view' },
+      { to: '/admin/runner', label: 'Execution Runner', icon: Cpu, permission: 'system.view' },
+      { to: '/admin/kesehatan', label: 'System Health', icon: Gauge, permission: 'system.view' },
+      { to: '/admin/kesehatan-broker', label: 'Broker Telemetry', icon: Activity, permission: 'system.view' },
+      { to: '/admin/pengaturan-sistem', label: 'System Flags', icon: Settings2, permission: 'system.settings' },
+      { to: '/admin/pemeliharaan', label: 'Maintenance Mode', icon: ShieldAlert, permission: 'system.maintenance' },
     ],
   },
   {
     category: 'Kepatuhan & Laporan',
     items: [
-      { to: '/admin/laporan', label: 'Laporan', icon: BarChart3, permission: 'billing.view' },
-      { to: '/admin/audit', label: 'Jejak Audit', icon: FileClock, permission: 'audit.view' },
-      { to: '/admin/rbac', label: 'Role & Permission', icon: ShieldCheck, permission: 'role.view' },
+      { to: '/admin/laporan', label: 'Business Reports', icon: BarChart3, permission: 'billing.view' },
+      { to: '/admin/audit', label: 'Audit Trails', icon: FileClock, permission: 'audit.view' },
+      { to: '/admin/rbac', label: 'Roles & Permissions', icon: ShieldCheck, permission: 'role.view' },
     ],
   },
 ]
@@ -190,27 +190,27 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
           ))}
         </nav>
 
-        {email && (
-          <div className="hidden shrink-0 border-t border-border p-3 lg:block">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Masuk sebagai
-                </p>
-                <p className="truncate text-[11px] text-foreground">{email}</p>
-              </div>
-              <button
-                type="button"
-                onClick={signOut}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Keluar dari panel admin"
-              >
-                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                Keluar
-              </button>
+        <div className="hidden shrink-0 border-t border-border p-3 lg:block">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Masuk sebagai
+              </p>
+              <p className="truncate text-[11px] font-medium text-foreground">
+                {email || admin?.name || 'Administrator'}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={signOut}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Keluar dari panel admin"
+            >
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+              Keluar
+            </button>
           </div>
-        )}
+        </div>
       </aside>
 
       <main className="min-w-0 flex-1">

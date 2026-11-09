@@ -46,11 +46,11 @@ describe('Pembatas tampilan admin', () => {
   it('hanya menampilkan menu yang diizinkan dan membuang kelompok kosong', async () => {
     renderSeperti(['user.view'], <p>isi</p>)
 
-    expect(await screen.findByRole('link', { name: /Pengguna/ })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Role & Permission/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Flag Sistem/ })).not.toBeInTheDocument()
-    // Ringkasan tidak butuh permission dan selalu tampil.
-    expect(screen.getByRole('link', { name: /Ringkasan/ })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /Users & Accounts/ })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Roles & Permissions/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /System Flags/ })).not.toBeInTheDocument()
+    // Dashboard tidak butuh permission dan selalu tampil.
+    expect(screen.getByRole('link', { name: /Dashboard/ })).toBeInTheDocument()
     // Kelompok "Kepatuhan & Laporan" seluruhnya tersaring.
     expect(screen.queryByText('Kepatuhan & Laporan')).not.toBeInTheDocument()
   })
@@ -58,7 +58,7 @@ describe('Pembatas tampilan admin', () => {
   it('menampilkan menu RBAC saat role.view dipegang', async () => {
     renderSeperti(['role.view'], <p>isi</p>)
 
-    expect(await screen.findByRole('link', { name: /Role & Permission/ })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /Roles & Permissions/ })).toBeInTheDocument()
   })
 
   it('menampilkan penjelasan saat halaman tidak berhak dibuka', async () => {

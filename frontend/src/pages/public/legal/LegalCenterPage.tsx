@@ -96,11 +96,21 @@ function LegalHubPage() {
   const queryClient = useQueryClient()
   const heading = page.data?.sections.find((section) => section.kind === 'table')
 
-  // Ringkasan kartu diambil dari CMS; bila admin belum mengisi, kartu memakai
-  // judul dokumen saja agar tidak menampilkan kalimat lama yang tidak berlaku.
+  // Listing dokumen awal langsung disiapkan dari katalog lokal agar hub terbuka
+  // dalam 0ms tanpa loading spinner, sementara sinkronisasi server jalan di background.
   const listing = useQuery({
     queryKey: ['legal', 'list'],
     queryFn: () => request<LegalListing>('/legal'),
+    initialData: () =>
+      LEGAL_ORDER.map((key) => {
+        const item = LEGAL_DOCUMENTS[key]
+        return {
+          slug: item.slug,
+          version: 1,
+          title: item.title,
+          effective_at: undefined,
+        }
+      }),
     retry: 0,
     staleTime: 30 * 60_000,
   })
@@ -249,11 +259,20 @@ function LegalHubPage() {
 function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
   const fallback = LEGAL_DOCUMENTS[slug]
 
-  // Dokumen publik boleh dibaca tanpa sesi (plans/09 §10). Kegagalan diambil
-  // sebagai sinyal untuk memakai teks bawaan, bukan sebagai galat halaman.
+  // Dokumen publik boleh dibaca tanpa sesi (plans/09 §10). Menggunakan initialData
+  // dari naskah lokal agar dokumen langsung terbuka seketika (0ms) tanpa loading delay.
   const remote = useQuery({
     queryKey: ['legal', 'doc', slug],
     queryFn: () => request<LegalDocResponse>(`/legal/${slug}`),
+    initialData: () => ({
+      slug,
+      version: 1,
+      title: fallback.title,
+      body_md: fallback.body,
+      require_reaccept: false,
+      published: true,
+      effective_at: undefined,
+    }),
     retry: 0,
     staleTime: 30 * 60_000,
   })

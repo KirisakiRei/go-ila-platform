@@ -98,7 +98,7 @@ export default function AdminSignalsPage() {
     <>
       <PageHeader
         title="Sinyal"
-        description="Sinyal yang diterbitkan engine beserta berapa pelanggan menerima dan benar-benar entry. Menelusuri sinyal tercatat di jejak audit."
+        description="Pemantauan sinyal yang diterbitkan analisis pasar, status distribusi ke pengguna, dan riwayat konfirmasi order."
       />
 
       <Card className="p-3">

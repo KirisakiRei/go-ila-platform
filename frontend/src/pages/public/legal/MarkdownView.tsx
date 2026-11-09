@@ -1,22 +1,26 @@
+import { AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CALLOUT_LABEL, parseMarkdown, slugHeading, type CalloutTone } from './markdown-parse'
 import { renderInlineBlock } from './markdown-inline'
 
-const CALLOUT_STYLE: Record<CalloutTone, { wrapper: string; label: string; dot: string }> = {
+const CALLOUT_CONFIG: Record<
+  CalloutTone,
+  { wrapper: string; label: string; icon: typeof Info }
+> = {
   penting: {
-    wrapper: 'border-[#09090b]/90 bg-[#09090b] text-zinc-200',
-    label: 'text-white',
-    dot: 'bg-white',
+    wrapper: 'border-zinc-800 bg-[#18181b] text-zinc-100 shadow-sm',
+    label: 'text-zinc-300',
+    icon: AlertCircle,
   },
   perhatian: {
-    wrapper: 'border-zinc-300 bg-[#f4f4f5] text-[#27272a]',
-    label: 'text-[#09090b]',
-    dot: 'bg-[#09090b]',
+    wrapper: 'border-amber-500/30 bg-amber-500/[0.06] text-amber-950 dark:text-amber-200',
+    label: 'text-amber-800 dark:text-amber-300',
+    icon: AlertTriangle,
   },
   catatan: {
-    wrapper: 'border-zinc-200 bg-transparent text-[#3f3f46]',
+    wrapper: 'border-zinc-200 bg-[#f7f7f8] text-[#3f3f46]',
     label: 'text-[#09090b]',
-    dot: 'bg-zinc-400',
+    icon: Info,
   },
 }
 
@@ -88,7 +92,7 @@ export function MarkdownView({ source, className }: { source: string; className?
             return (
               <blockquote
                 key={key}
-                className="mt-5 border-l-2 border-zinc-300 pl-4 text-[15px] italic text-[#27272a]"
+                className="mt-5 rounded-r-xl border-l-[3.5px] border-[#09090b] bg-[#f8f8fa] py-3 pr-4 pl-4.5 text-[14.5px] text-[#27272a] shadow-xs"
               >
                 {block.lines.map((line, lineIndex) => (
                   <p key={`${key}-${lineIndex}`} className={lineIndex === 0 ? '' : 'mt-2'}>
@@ -99,24 +103,27 @@ export function MarkdownView({ source, className }: { source: string; className?
             )
 
           case 'callout': {
-            const style = CALLOUT_STYLE[block.tone]
+            const config = CALLOUT_CONFIG[block.tone]
+            const Icon = config.icon
             return (
               <aside
                 key={key}
                 aria-label={CALLOUT_LABEL[block.tone]}
-                className={cn('mt-6 rounded-xl border p-5 sm:p-6', style.wrapper)}
+                className={cn('mt-6 rounded-2xl border p-4.5 sm:p-5.5 transition-shadow', config.wrapper)}
               >
-                <p
-                  className={cn(
-                    'flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]',
-                    style.label,
-                  )}
-                >
-                  <span className={cn('h-1.5 w-1.5 rounded-full', style.dot)} aria-hidden="true" />
-                  {CALLOUT_LABEL[block.tone]}
-                </p>
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <p
+                    className={cn(
+                      'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                      config.label,
+                    )}
+                  >
+                    {CALLOUT_LABEL[block.tone]}
+                  </p>
+                </div>
                 {block.title && block.title !== CALLOUT_LABEL[block.tone] && (
-                  <p className="mt-2 text-[14px] font-semibold">
+                  <p className="mt-2 text-[14.5px] font-semibold">
                     {renderInlineBlock(block.title, `${key}-judul`)}
                   </p>
                 )}
@@ -133,29 +140,29 @@ export function MarkdownView({ source, className }: { source: string; className?
 
           case 'table':
             return (
-              <div key={key} className="mt-6 overflow-x-auto rounded-xl border border-zinc-200">
-                <table className="w-full min-w-[520px] border-collapse text-left text-[14px]">
+              <div key={key} className="mt-6 overflow-x-auto rounded-xl border border-zinc-200/90 bg-white shadow-xs">
+                <table className="w-full min-w-[520px] border-collapse text-left text-[13.5px]">
                   <thead>
-                    <tr className="bg-[#f4f4f5]">
+                    <tr className="border-b border-zinc-200/90 bg-[#f8f8fa]">
                       {block.head.map((cell, cellIndex) => (
                         <th
                           key={`${key}-h-${cellIndex}`}
                           scope="col"
-                          className="border-b border-zinc-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3f3f46]"
+                          className="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3f3f46]"
                         >
                           {renderInlineBlock(cell, `${key}-h-${cellIndex}`)}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-zinc-100">
                     {block.rows.map((row, rowIndex) => (
-                      <tr key={`${key}-r-${rowIndex}`} className="align-top even:bg-[#fafafa]">
+                      <tr key={`${key}-r-${rowIndex}`} className="align-top hover:bg-zinc-50/60 transition-colors">
                         {row.map((cell, cellIndex) => (
                           <td
                             key={`${key}-c-${rowIndex}-${cellIndex}`}
                             className={cn(
-                              'border-b border-zinc-100 px-4 py-3',
+                              'px-4 py-3',
                               cellIndex === 0 && 'font-medium text-[#09090b]',
                             )}
                           >

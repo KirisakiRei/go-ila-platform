@@ -23,7 +23,7 @@ export default function AdminHealthPage() {
     <>
       <PageHeader
         title="Kesehatan Sistem"
-        description="Diperbarui otomatis tiap 30 detik. Basi berarti laporan terakhir lebih lama dari 3 menit."
+        description="Diperbarui otomatis tiap 30 detik. Status Stale menandakan telemetri terakhir lebih dari 3 menit."
       />
 
       {error && <Alert variant="destructive">Gagal memuat kondisi sistem.</Alert>}
@@ -87,14 +87,14 @@ export default function AdminHealthPage() {
                   <div className="flex items-center gap-2">
                     <StatusDot state={engine.connected ? 'online' : 'offline'} label={engine.connected ? 'tersambung' : 'tidak ada laporan'} />
                     <span className="text-[13px] font-medium uppercase">{engine.strategy}</span>
-                    {engine.stale && <Badge variant="default">Basi</Badge>}
+                    {engine.stale && <Badge variant="default">Stale</Badge>}
                     {engine.engine_version && <Badge variant="outline">{engine.engine_version}</Badge>}
                   </div>
                   <div className="text-[12px] text-muted-foreground">
                     Pasar {engine.market_state || '—'} · terakhir {engine.last_seen_at ? formatDateTime(engine.last_seen_at) : 'belum pernah'}
                   </div>
                   {engine.last_error && (
-                    <p className="w-full text-[12px] text-muted-foreground">Galat terakhir: {engine.last_error}</p>
+                    <p className="w-full text-[12px] text-muted-foreground">Error terakhir: {engine.last_error}</p>
                   )}
                 </div>
               ))}

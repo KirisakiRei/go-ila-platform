@@ -67,7 +67,7 @@ export default function AdminSettingsPage() {
     <>
       <PageHeader
         title="Pengaturan Sistem"
-        description="Perubahan berlaku untuk seluruh pelanggan. Nilai dari database menimpa nilai bawaan."
+        description="Perubahan berlaku untuk seluruh pengguna platform. Nilai dari database menimpa konfigurasi bawaan."
       />
 
       {notice && <Alert>{notice}</Alert>}

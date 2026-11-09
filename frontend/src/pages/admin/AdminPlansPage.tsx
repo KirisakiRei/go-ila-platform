@@ -94,7 +94,7 @@ export default function AdminPlansPage() {
               <div className="flex items-center justify-between gap-2">
                 <CardTitle>{plan.name}</CardTitle>
                 <Badge variant={plan.active ? 'solid' : 'default'}>
-                  {plan.active ? 'Dijual' : 'Nonaktif'}
+                  {plan.active ? 'Aktif' : 'Nonaktif'}
                 </Badge>
               </div>
               <CardDescription>{plan.description}</CardDescription>

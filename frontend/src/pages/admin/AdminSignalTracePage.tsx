@@ -39,7 +39,7 @@ export default function AdminSignalTracePage() {
   return (
     <>
       <PageHeader
-        title="Perjalanan sinyal"
+        title="Trace Sinyal"
         description="Penerima, perubahan status, klaim eksekusi, dan posisi yang lahir dari sinyal ini."
         actions={
           <Button asChild variant="outline" size="sm">
@@ -77,9 +77,9 @@ export default function AdminSignalTracePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Ringkasan sinyal</CardTitle>
+              <CardTitle className="text-sm">Ringkasan Sinyal</CardTitle>
               <CardDescription className="text-xs">
-                {data.signal.summary || 'Tanpa ringkasan dari engine.'}
+                {data.signal.summary || 'Tanpa ringkasan analisis.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -102,10 +102,10 @@ export default function AdminSignalTracePage() {
           </Card>
 
           <TraceTable
-            title="Penerima"
-            description="Nasib sinyal pada setiap pelanggan."
-            empty="Belum ada pelanggan yang menerima sinyal ini."
-            head={['Pelanggan', 'Akun', 'Status', 'Alasan / posisi', 'Waktu']}
+            title="Distribusi Pengguna"
+            description="Status distribusi dan eksekusi sinyal pada setiap pengguna."
+            empty="Belum ada pengguna yang menerima sinyal ini."
+            head={['Pengguna', 'Akun Broker', 'Status', 'Alasan / Posisi', 'Waktu']}
             rows={data.recipients.map((row) => [
               <span key="u" className="flex flex-col">
                 <span className="font-medium">{row.user_name || row.user_id}</span>

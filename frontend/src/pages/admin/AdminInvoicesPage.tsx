@@ -24,11 +24,11 @@ import {
 import type { AdminInvoiceItem } from '@/types/admin'
 
 const STATUS_TEXT: Record<string, string> = {
-  pending: 'Menunggu bayar',
+  pending: 'Pending',
   paid: 'Lunas',
   expired: 'Kedaluwarsa',
   cancelled: 'Dibatalkan',
-  refunded: 'Direfund',
+  refunded: 'Refunded',
 }
 
 /**

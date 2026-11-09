@@ -80,10 +80,10 @@ export default function AdminReportsPage() {
 
       {customers.data && (
         <StatGrid>
-          <Stat label="Pelanggan baru" value={customers.data.new_users} />
-          <Stat label="Pelanggan membayar" value={customers.data.paid_users} />
+          <Stat label="Pengguna baru" value={customers.data.new_users} />
+          <Stat label="Pengguna berbayar" value={customers.data.paid_users} />
           <Stat label="Berhenti" value={customers.data.canceled} />
-          <Stat label="Mulai trial" value={customers.data.trial_started} />
+          <Stat label="Uji coba aktif" value={customers.data.trial_started} />
         </StatGrid>
       )}
 

@@ -22,8 +22,8 @@ export default function AdminEnginePage() {
   return (
     <>
       <PageHeader
-        title="Engine"
-        description="Status laporan terakhir setiap engine. Basi berarti tidak ada laporan lebih dari 3 menit."
+        title="Analysis Engines"
+        description="Status laporan telemetri engine. Status Stale menandakan tidak ada heartbeat lebih dari 3 menit."
       />
 
       {engines.isError && <Alert variant="destructive">Gagal memuat status engine.</Alert>}
@@ -48,7 +48,7 @@ export default function AdminEnginePage() {
                   </CardDescription>
                 </div>
                 <Badge variant={engine.connected ? 'solid' : 'outline'}>
-                  {engine.connected ? 'Tersambung' : engine.stale ? 'Basi' : 'Terputus'}
+                  {engine.connected ? 'Online' : engine.stale ? 'Stale' : 'Offline'}
                 </Badge>
               </div>
             </CardHeader>
@@ -71,7 +71,7 @@ export default function AdminEnginePage() {
               </div>
               {engine.last_error && (
                 <p className="rounded-md border border-border p-2 text-[12px] text-muted-foreground">
-                  Galat terakhir: {engine.last_error}
+                  Error terakhir: {engine.last_error}
                 </p>
               )}
             </CardContent>

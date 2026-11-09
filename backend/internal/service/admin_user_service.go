@@ -360,6 +360,9 @@ func (s *adminUserService) Suspend(ctx context.Context, actor AdminActor, userID
 	if guardSelf(actor.ID, userID, "menangguhkan") {
 		return validation("tidak dapat menangguhkan akun sendiri")
 	}
+	if row.Status == model.UserStatusDeleted {
+		return validation("akun yang sudah dihapus tidak dapat ditangguhkan")
+	}
 	if guardAdminTarget(*row) {
 		return validation("akun admin tidak dapat ditangguhkan")
 	}
@@ -414,6 +417,9 @@ func (s *adminUserService) Ban(ctx context.Context, actor AdminActor, userID str
 	}
 	if guardSelf(actor.ID, userID, "memblokir") {
 		return validation("tidak dapat memblokir akun sendiri")
+	}
+	if row.Status == model.UserStatusDeleted {
+		return validation("akun yang sudah dihapus tidak dapat diblokir")
 	}
 	// Blokir hanya untuk pelanggan. Mencabut hak admin dilakukan lewat role,
 	// agar admin biasa tidak bisa mem-boot admin lain.
@@ -480,6 +486,9 @@ func (s *adminUserService) ChangeTier(ctx context.Context, actor AdminActor, use
 	if actor.ID == userID {
 		return validation("tidak dapat mengubah tier akun sendiri")
 	}
+	if row.Status == model.UserStatusDeleted {
+		return validation("tidak dapat mengubah tier akun yang sudah dihapus")
+	}
 
 	now := s.now()
 	var startedAt, expiresAt *time.Time
@@ -517,6 +526,9 @@ func (s *adminUserService) Delete(ctx context.Context, actor AdminActor, userID 
 	}
 	if guardSelf(actor.ID, userID, "menghapus") {
 		return validation("tidak dapat menghapus akun sendiri")
+	}
+	if row.Status == model.UserStatusDeleted {
+		return validation("akun ini sudah dihapus sebelumnya")
 	}
 	if err := confirmEmail(row.Email, req.ConfirmEmail); err != nil {
 		return err

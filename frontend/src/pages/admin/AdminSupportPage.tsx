@@ -35,7 +35,7 @@ export default function AdminSupportPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Pilih pelanggan</CardTitle>
+          <CardTitle className="text-sm">Pilih Pengguna</CardTitle>
           <CardDescription className="text-xs">
             Cari berdasarkan email atau nama, minimal dua karakter.
           </CardDescription>
@@ -45,7 +45,7 @@ export default function AdminSupportPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Cari email atau nama"
-            aria-label="Cari pelanggan"
+            aria-label="Cari pengguna"
           />
 
           {users.isFetching && <Skeleton className="h-10 w-full" />}
@@ -109,7 +109,7 @@ function SupportThread({ userID, label }: { userID: string; label: string }) {
         {notes.isLoading && <Skeleton className="h-20 w-full" />}
 
         {(notes.data ?? []).length === 0 && !notes.isLoading && (
-          <p className="text-[13px] text-muted-foreground">Belum ada catatan untuk pelanggan ini.</p>
+          <p className="text-[13px] text-muted-foreground">Belum ada catatan untuk pengguna ini.</p>
         )}
 
         {(notes.data ?? []).map((note) => (

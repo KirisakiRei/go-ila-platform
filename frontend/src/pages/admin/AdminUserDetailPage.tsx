@@ -159,7 +159,7 @@ export default function AdminUserDetailPage() {
         {accounts.data && accounts.data.length > 0 ? (
           <AccountsTable accounts={accounts.data} onDone={refresh} />
         ) : (
-          <EmptyState title="Belum ada akun broker" description="Pelanggan belum menghubungkan broker." />
+          <EmptyState title="Belum ada akun broker" description="Pengguna belum menghubungkan broker." />
         )}
       </Section>
 
@@ -178,7 +178,7 @@ export default function AdminUserDetailPage() {
         )}
       </Section>
 
-      <Section title="Catatan internal" description="Hanya terlihat staf. Tidak pernah dikirim ke pelanggan.">
+      <Section title="Catatan internal" description="Hanya terlihat staf pengelola platform.">
         <NotesBox userID={id} notes={notes.data ?? []} onDone={refresh} />
       </Section>
 
@@ -238,6 +238,16 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
   const [tier, setTier] = useState<Tier>(user.tier)
   const [notice, setNotice] = useState<string | null>(null)
 
+  if (user.status === 'deleted') {
+    return (
+      <Section title="Tindakan" description="Akun ini telah dihapus.">
+        <div className="rounded-md border border-border bg-muted/40 p-3 text-[13px] text-muted-foreground">
+          Akun ini sudah dihapus dan dianonimkan. Tidak ada tindakan lebih lanjut yang dapat dijalankan.
+        </div>
+      </Section>
+    )
+  }
+
   const mutation = useMutation({
     mutationFn: async (action: string) => {
       const payload: UserActionPayload = { reason, category }
@@ -278,10 +288,11 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
 
   const needsReason = pending !== null
   const needsEmail = pending === 'ban' || pending === 'delete'
+  const emailMatched = confirmEmail.trim().toLowerCase() === user.email.trim().toLowerCase()
   const canSubmit =
     !mutation.isPending &&
     (!needsReason || reason.trim().length >= 10) &&
-    (!needsEmail || confirmEmail.trim() === user.email) &&
+    (!needsEmail || emailMatched) &&
     (pending !== 'delete' || acknowledge)
 
   return (
@@ -388,7 +399,16 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
 
             {needsEmail && (
               <div className="flex flex-col gap-1">
-                <Label htmlFor="confirm-email">Ketik ulang email pelanggan</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="confirm-email">Ketik ulang email pelanggan</Label>
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={() => setConfirmEmail(user.email)}
+                  >
+                    Salin email
+                  </button>
+                </div>
                 <Input
                   id="confirm-email"
                   value={confirmEmail}

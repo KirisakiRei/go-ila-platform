@@ -39,16 +39,16 @@ export default function AdminHomePage() {
       ) : (
         <StatGrid>
           <Stat label="Pendapatan bersih" value={formatIDR(revenue.data?.net_idr ?? 0)} />
-          <Stat label="Pelanggan membayar" value={customers.data?.paid_users ?? 0} />
-          <Stat label="Pelanggan baru" value={customers.data?.new_users ?? 0} />
-          <Stat label="Mulai trial" value={customers.data?.trial_started ?? 0} />
+          <Stat label="Pengguna berbayar" value={customers.data?.paid_users ?? 0} />
+          <Stat label="Pengguna baru" value={customers.data?.new_users ?? 0} />
+          <Stat label="Uji coba aktif" value={customers.data?.trial_started ?? 0} />
         </StatGrid>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Pelanggan terbaru</CardTitle>
+            <CardTitle>Pengguna Terbaru</CardTitle>
             <CardDescription>Lima akun yang paling baru mendaftar.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -66,7 +66,7 @@ export default function AdminHomePage() {
               </Link>
             ))}
             {users.data && users.data.data.length === 0 && (
-              <p className="text-[12px] text-muted-foreground">Belum ada pelanggan.</p>
+              <p className="text-[12px] text-muted-foreground">Belum ada pengguna terdaftar.</p>
             )}
           </CardContent>
         </Card>
@@ -78,7 +78,7 @@ export default function AdminHomePage() {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/admin/pengguna">Cari pelanggan</Link>
+              <Link to="/admin/pengguna">Kelola Pengguna</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link to="/admin/laporan">Buka laporan</Link>
