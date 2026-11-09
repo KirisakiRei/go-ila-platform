@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminPlanApi } from '@/lib/admin-api'
 import { formatIDR } from '@/features/admin/lib/format'
+import { usePermissions } from '@/features/admin/hooks/use-permissions'
 import {
   Alert,
   Badge,
@@ -27,6 +28,7 @@ import {
  */
 export default function AdminPlansPage() {
   const queryClient = useQueryClient()
+  const { can } = usePermissions()
   const { data, isLoading } = useQuery({ queryKey: ['admin', 'plans'], queryFn: adminPlanApi.list })
 
   const [editing, setEditing] = useState<string | null>(null)
@@ -119,19 +121,21 @@ export default function AdminPlansPage() {
                 </div>
               </dl>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => {
-                  setEditing(plan.code)
-                  setPrice(String(plan.price_idr))
-                  setGuard('')
-                  setReason('')
-                }}
-              >
-                Ubah harga
-              </Button>
+              {can('billing.plan') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    setEditing(plan.code)
+                    setPrice(String(plan.price_idr))
+                    setGuard('')
+                    setReason('')
+                  }}
+                >
+                  Ubah harga
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))}

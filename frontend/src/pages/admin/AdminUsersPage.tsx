@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useDebouncedValue } from '@/features/admin/hooks/use-debounce'
 import { formatInvoice } from '@/features/admin/lib/format'
 import { adminUserApi } from '@/lib/admin-api'
+import { Can } from '@/features/admin/components/Can'
 import {
   Badge,
   Button,
@@ -88,9 +89,11 @@ export default function AdminUsersPage() {
         title="Pengguna"
         description="Daftar pelanggan beserta tier dan status. Membuka detail tercatat di jejak audit."
         actions={
-          <Button variant="outline" size="sm" onClick={() => window.open(exportUrl)}>
-            Ekspor CSV
-          </Button>
+          <Can permission="user.export">
+            <Button variant="outline" size="sm" onClick={() => window.open(exportUrl)}>
+              Ekspor CSV
+            </Button>
+          </Can>
         }
       />
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminInvoiceApi } from '@/lib/admin-api'
 import { formatIDR, formatInvoice } from '@/features/admin/lib/format'
+import { usePermissions } from '@/features/admin/hooks/use-permissions'
 import {
   Alert,
   Badge,
@@ -40,6 +41,7 @@ const STATUS_TEXT: Record<string, string> = {
  */
 export default function AdminInvoicesPage() {
   const queryClient = useQueryClient()
+  const { can } = usePermissions()
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
@@ -150,11 +152,11 @@ export default function AdminInvoicesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.status === 'pending' ? (
+                    {row.status === 'pending' && can('billing.manual') ? (
                       <Button size="sm" variant="outline" onClick={() => setSelected(row)}>
                         Catat pembayaran
                       </Button>
-                    ) : row.status === 'paid' ? (
+                    ) : row.status === 'paid' && can('billing.refund') ? (
                       <Button size="sm" variant="outline" onClick={() => setSelected(row)}>
                         Refund
                       </Button>

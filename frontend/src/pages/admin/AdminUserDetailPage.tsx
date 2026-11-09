@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { adminUserApi } from '@/lib/admin-api'
 import { formatIDR, formatInvoice } from '@/features/admin/lib/format'
+import { Can } from '@/features/admin/components/Can'
+import { usePermissions } from '@/features/admin/hooks/use-permissions'
 import {
   Alert,
   Badge,
@@ -54,6 +56,7 @@ const STATUS_TEXT: Record<string, string> = {
 export default function AdminUserDetailPage() {
   const { id = '' } = useParams()
   const queryClient = useQueryClient()
+  const { can, canAny } = usePermissions()
 
   const detail = useQuery({ queryKey: ['admin', 'user', id], queryFn: () => adminUserApi.detail(id) })
   const accounts = useQuery({
@@ -67,11 +70,15 @@ export default function AdminUserDetailPage() {
   const legal = useQuery({
     queryKey: ['admin', 'user', id, 'legal'],
     queryFn: () => adminUserApi.legal(id),
+    // Dokumen persetujuan dijaga permission sendiri; jangan menembak endpoint
+    // yang pasti ditolak 403.
+    enabled: can('user.legal'),
   })
   const credit = useQuery({
     queryKey: ['admin', 'user', id, 'credit'],
     queryFn: () => adminUserApi.credit(id),
     retry: false,
+    enabled: canAny(['billing.view', 'billing.voucher']),
   })
 
   const refresh = () => {
@@ -99,9 +106,16 @@ export default function AdminUserDetailPage() {
         title={user.name}
         description={`${user.email} · terdaftar ${formatInvoice(user.created_at.wib)} WIB`}
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/admin/pengguna">Kembali</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {user.role === 'admin' && can('role.view') && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/admin/rbac?tab=user">Kelola role admin</Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/pengguna">Kembali</Link>
+            </Button>
+          </div>
         }
       />
 
@@ -169,7 +183,11 @@ export default function AdminUserDetailPage() {
       </Section>
 
       <Section title="Persetujuan dokumen">
-        {legal.data && legal.data.length > 0 ? (
+        {!can('user.legal') ? (
+          <p className="text-[12px] text-muted-foreground">
+            Role Anda tidak berwenang melihat bukti persetujuan legal.
+          </p>
+        ) : legal.data && legal.data.length > 0 ? (
           <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -211,6 +229,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 /** UserActions menaungi seluruh aksi berlapis terhadap pelanggan. */
 function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => void }) {
+  const { canAny } = usePermissions()
   const [pending, setPending] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [category, setCategory] = useState('tos')
@@ -270,44 +289,58 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
       {notice && <Alert>{notice}</Alert>}
 
       <div className="flex flex-wrap gap-2">
-        {user.status !== 'suspended' && (
-          <Button variant="outline" size="sm" onClick={() => setPending('suspend')}>
-            Tangguhkan
+        <Can permission="user.suspend">
+          {user.status !== 'suspended' && (
+            <Button variant="outline" size="sm" onClick={() => setPending('suspend')}>
+              Tangguhkan
+            </Button>
+          )}
+          {user.status === 'suspended' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => mutation.mutate('unsuspend')}
+              disabled={mutation.isPending}
+            >
+              Buka penangguhan
+            </Button>
+          )}
+        </Can>
+        <Can permission="user.ban">
+          {/* Admin tidak bisa diblokir dari sini: hak admin dicabut lewat role. */}
+          {user.status !== 'banned' && user.role !== 'admin' && (
+            <Button variant="destructive" size="sm" onClick={() => setPending('ban')}>
+              Blokir
+            </Button>
+          )}
+          {user.status === 'banned' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => mutation.mutate('unban')}
+              disabled={mutation.isPending}
+            >
+              Buka blokir
+            </Button>
+          )}
+        </Can>
+        <Can permission="user.tier">
+          <Button variant="outline" size="sm" onClick={() => setPending('tier')}>
+            Ubah tier
           </Button>
-        )}
-        {user.status === 'suspended' && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => mutation.mutate('unsuspend')}
-            disabled={mutation.isPending}
-          >
-            Buka penangguhan
+        </Can>
+        <Can permission="user.delete">
+          <Button variant="destructive" size="sm" onClick={() => setPending('delete')}>
+            Hapus akun
           </Button>
-        )}
-        {/* Admin tidak bisa diblokir dari sini: hak admin dicabut lewat role. */}
-        {user.status !== 'banned' && user.role !== 'admin' && (
-          <Button variant="destructive" size="sm" onClick={() => setPending('ban')}>
-            Blokir
-          </Button>
-        )}
-        {user.status === 'banned' && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => mutation.mutate('unban')}
-            disabled={mutation.isPending}
-          >
-            Buka blokir
-          </Button>
-        )}
-        <Button variant="outline" size="sm" onClick={() => setPending('tier')}>
-          Ubah tier
-        </Button>
-        <Button variant="destructive" size="sm" onClick={() => setPending('delete')}>
-          Hapus akun
-        </Button>
+        </Can>
       </div>
+
+      {!canAny(['user.suspend', 'user.ban', 'user.tier', 'user.delete']) && (
+        <p className="text-[12px] text-muted-foreground">
+          Role Anda hanya dapat melihat data pelanggan ini; tidak ada tindakan yang dapat dijalankan.
+        </p>
+      )}
 
       {pending && (
         <Card className="p-4">
@@ -394,6 +427,7 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
 }
 
 function AccountsTable({ accounts, onDone }: { accounts: AdminAccountItem[]; onDone: () => void }) {
+  const { can } = usePermissions()
   const freeze = useMutation({
     mutationFn: async ({ id, frozen, reason }: { id: string; frozen: boolean; reason: string }) =>
       frozen ? adminUserApi.freezeAccount(id, reason) : adminUserApi.unfreezeAccount(id),
@@ -422,20 +456,22 @@ function AccountsTable({ accounts, onDone }: { accounts: AdminAccountItem[]; onD
                 {account.is_frozen ? 'Dibekukan' : account.is_active ? 'Aktif' : 'Nonaktif'}
               </TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={freeze.isPending}
-                  onClick={() => {
-                    const reason = account.is_frozen
-                      ? ''
-                      : window.prompt('Alasan pembekuan (minimal 10 karakter):') ?? ''
-                    if (!account.is_frozen && reason.trim().length < 10) return
-                    freeze.mutate({ id: account.id, frozen: !account.is_frozen, reason })
-                  }}
-                >
-                  {account.is_frozen ? 'Buka beku' : 'Bekukan'}
-                </Button>
+                {can('account.freeze') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={freeze.isPending}
+                    onClick={() => {
+                      const reason = account.is_frozen
+                        ? ''
+                        : window.prompt('Alasan pembekuan (minimal 10 karakter):') ?? ''
+                      if (!account.is_frozen && reason.trim().length < 10) return
+                      freeze.mutate({ id: account.id, frozen: !account.is_frozen, reason })
+                    }}
+                  >
+                    {account.is_frozen ? 'Buka beku' : 'Bekukan'}
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           ))}
@@ -447,14 +483,25 @@ function AccountsTable({ accounts, onDone }: { accounts: AdminAccountItem[]; onD
 
 /** PositionsSection dimuat terpisah: membukanya tercatat sebagai baca sensitif. */
 function PositionsSection({ userID }: { userID: string }) {
+  const { can } = usePermissions()
   const [open, setOpen] = useState(false)
   const positions = useQuery({
     queryKey: ['admin', 'user', userID, 'positions'],
     queryFn: () => adminUserApi.positions(userID),
-    enabled: open,
+    enabled: open && can('trade.view'),
   })
 
   const rows: AdminPositionItem[] = positions.data ?? []
+
+  if (!can('trade.view')) {
+    return (
+      <Section title="Riwayat posisi">
+        <p className="text-[12px] text-muted-foreground">
+          Role Anda tidak berwenang melihat riwayat posisi pelanggan.
+        </p>
+      </Section>
+    )
+  }
 
   return (
     <Section

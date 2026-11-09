@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminCreditCodeApi } from '@/lib/admin-api'
 import { formatIDR, formatInvoice } from '@/features/admin/lib/format'
+import { Can } from '@/features/admin/components/Can'
 import {
   Alert,
   Badge,
@@ -66,9 +67,11 @@ export default function AdminCreditCodesPage() {
         title="Kode Kredit"
         description="Voucher saldo untuk kompensasi atau kampanye; pengguna menukarnya sendiri dari dashboard."
         actions={
-          <Button size="sm" onClick={() => setCreating(true)}>
-            Kode baru
-          </Button>
+          <Can permission="billing.voucher">
+            <Button size="sm" onClick={() => setCreating(true)}>
+              Kode baru
+            </Button>
+          </Can>
         }
       />
 
@@ -151,14 +154,16 @@ export default function AdminCreditCodesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={row.status === 'disabled' || disable.isPending}
-                      onClick={() => disable.mutate(row.id)}
-                    >
-                      Hentikan
-                    </Button>
+                    <Can permission="billing.voucher">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={row.status === 'disabled' || disable.isPending}
+                        onClick={() => disable.mutate(row.id)}
+                      >
+                        Hentikan
+                      </Button>
+                    </Can>
                   </TableCell>
                 </TableRow>
               ))}

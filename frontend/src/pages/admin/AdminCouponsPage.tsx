@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminCouponApi } from '@/lib/admin-api'
 import { formatIDR, formatInvoice, formatPercent } from '@/features/admin/lib/format'
+import { Can } from '@/features/admin/components/Can'
 import {
   Alert,
   Badge,
@@ -68,9 +69,11 @@ export default function AdminCouponsPage() {
         title="Kupon"
         description="Potongan hanya berlaku saat checkout; harga lama di invoice tidak berubah."
         actions={
-          <Button size="sm" onClick={() => setCreating(true)}>
-            Kupon baru
-          </Button>
+          <Can permission="billing.voucher">
+            <Button size="sm" onClick={() => setCreating(true)}>
+              Kupon baru
+            </Button>
+          </Can>
         }
       />
 
@@ -158,14 +161,16 @@ export default function AdminCouponsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={row.status === 'disabled' || disable.isPending}
-                      onClick={() => disable.mutate(row.id)}
-                    >
-                      Hentikan
-                    </Button>
+                    <Can permission="billing.voucher">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={row.status === 'disabled' || disable.isPending}
+                        onClick={() => disable.mutate(row.id)}
+                      >
+                        Hentikan
+                      </Button>
+                    </Can>
                   </TableCell>
                 </TableRow>
               ))}

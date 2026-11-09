@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminTrialApi } from '@/lib/admin-api'
 import { formatInvoice } from '@/features/admin/lib/format'
+import { usePermissions } from '@/features/admin/hooks/use-permissions'
 import {
   Alert,
   Badge,
@@ -38,6 +39,7 @@ const STATUS_TEXT: Record<string, string> = {
  */
 export default function AdminTrialsPage() {
   const queryClient = useQueryClient()
+  const { can } = usePermissions()
   const [status, setStatus] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [selected, setSelected] = useState<AdminTrialItem | null>(null)
@@ -126,7 +128,7 @@ export default function AdminTrialsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.status === 'active' ? (
+                    {row.status === 'active' && can('user.tier') ? (
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setSelected(row)}>
                           Perpanjang
