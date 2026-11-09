@@ -127,9 +127,21 @@ var adminPublicRoutes = map[string]struct{}{
 	http.MethodPost + " /api/v1/admin/auth/login":      {},
 	http.MethodPost + " /api/v1/admin/auth/verify-2fa": {},
 	http.MethodPost + " /api/v1/admin/auth/logout":     {},
-	http.MethodPost + " /api/v1/admin/auth/reset-2fa":  {},
 	http.MethodGet + " /api/v1/admin/auth/me":          {},
 	http.MethodGet + " /api/v1/admin/auth/csrf":        {},
+}
+
+// AdminRoutePermissions menyalin peta route admin ke permission-nya.
+// Dipakai pengujian tata kelola agar matriks RBAC tidak melenceng diam-diam.
+func AdminRoutePermissions() map[string]string {
+	adminRoutes.mu.Lock()
+	defer adminRoutes.mu.Unlock()
+
+	out := make(map[string]string, len(adminRoutes.items))
+	for key, permission := range adminRoutes.items {
+		out[key] = permission
+	}
+	return out
 }
 
 // RegisterAdminRoute mencatat pasangan metode+path dengan permission-nya.

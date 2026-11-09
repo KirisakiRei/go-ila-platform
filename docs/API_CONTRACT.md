@@ -139,6 +139,88 @@ Balasan `200`: objek `User`.
 
 ---
 
+## 2.1. RBAC Panel Admin 🛡️
+
+Setiap route `/api/v1/admin/*` dijaga **permission**, bukan sekadar "punya sesi
+admin". Frontend wajib memakai daftar permission dari `/admin/auth/me` untuk
+menyembunyikan menu dan tombol, supaya operator tidak menekan aksi yang pasti
+ditolak `403`.
+
+### GET `/admin/auth/me` 🔒
+
+```json
+{
+  "user": { "id": "...", "name": "Admin", "email": "admin@...", "role": "admin" },
+  "role": { "code": "admin", "name": "Admin", "is_superadmin": false },
+  "permissions": ["user.view", "account.view", "cms.edit", "..."]
+}
+```
+
+Aturan pemakaian di klien:
+
+- `permissions` adalah sumber kebenaran untuk tampil/tidaknya sebuah aksi.
+- `role.is_superadmin` dipakai untuk mengunci aksi milik superadmin.
+- Bila `permissions` kosong, tampilkan panel tanpa aksi tulis sama sekali.
+- Jangan menebak dari `user.role`: role RBAC (`role.code`) bisa berbeda dari
+  kolom `user.role`, dan kewenangan dapat diubah admin lain kapan saja.
+
+### Role bawaan
+
+| Role | Isi kewenangan |
+|---|---|
+| `superadmin` | seluruh permission |
+| `admin` | seluruh permission **kecuali** empat kewenangan terkunci di bawah |
+| `support` | baca pelanggan, akun, trading, sinyal, status sistem |
+| `finance` | billing, harga paket, kupon, kredit, ubah tier |
+
+### Kewenangan yang sengaja dikunci
+
+| Permission | Keterangan |
+|---|---|
+| `user.delete` | hapus akun pelanggan |
+| `system.settings` | lihat & ubah flag sistem |
+| `system.maintenance` | ubah mode platform (normal/read-only/pemeliharaan) |
+| `billing.settings` | ubah kunci gateway pembayaran |
+
+`system.settings` dan `system.maintenance` **hanya** berlaku untuk role
+`superadmin`. Memberikannya lewat role buatan tidak membuat admin biasa bisa
+memakainya. Empat kewenangan inilah yang membuat akun `admin` tidak bisa
+mengubah sebagian pengaturan meski panel menampilkan menunya.
+
+### Permission per area
+
+| Permission | Route admin yang dijaga |
+|---|---|
+| `user.view` | `GET /users`, `/users/:id`, `/users/:id/notes`, `/trials` |
+| `user.edit` | `POST /users/:id/notes`, `/users/:id/support-notes` |
+| `user.suspend` | `POST /users/:id/suspend`, `/unsuspend` |
+| `user.ban` | `POST /users/:id/ban`, `/unban` |
+| `user.delete` | `POST /users/:id/delete` (superadmin) |
+| `user.tier` | `PATCH /users/:id/tier`, `POST /trials/:id/extend`, `/end` |
+| `user.legal` | `GET /users/:id/legal` |
+| `user.export` | `GET /users-export` |
+| `account.view` | `GET /users/:id/accounts` |
+| `account.freeze` | `POST /accounts/:id/freeze`, `/unfreeze` |
+| `subscription.edit` | seluruh route katalog pair (`/pairs`, `/pair-categories`, `/pair-groups`) |
+| `trade.view` | `GET /users/:id/positions` |
+| `billing.view` | invoice, kupon, kredit, paket, laporan |
+| `billing.manual` / `billing.refund` | `POST /invoices/:id/mark-paid` / `/refund` |
+| `billing.plan` | `PATCH /plans/:code`, `PUT /plans/:code/guard` |
+| `billing.voucher` | kupon & kredit (`POST/PATCH /coupons`, `/credit-codes`, `/users/:id/credit`) |
+| `cms.view` / `cms.edit` / `cms.publish` | dokumen legal, FAQ, pengumuman, isi halaman |
+| `role.view` / `role.edit` | `/roles`, `/permissions` |
+| `audit.view` | `GET /audit`, `/audit/:id`, `/audit-catalog` |
+| `system.view` | status engine, runner, broker, laporan operasional |
+| `system.settings` | `/system/settings` (superadmin) |
+| `system.maintenance` | `PUT /system/mode` (superadmin) |
+
+> Permission `account.edit`, `account.balance`, `account.delete`,
+> `signal.view`, `signal.trace`, `trade.export`, `billing.export`,
+> `audit.export`, dan `billing.settings` sudah terdaftar di katalog tetapi
+> **belum punya route**. Jangan menampilkan aksinya sebelum endpoint-nya ada.
+
+---
+
 ## 3. Akun Broker
 
 ### GET `/accounts` 🔒
@@ -665,3 +747,4 @@ Token dihapus setelah dipakai, apa pun hasilnya.
 | Menampilkan ILA 3.0 aktif bila `available: false` | Selalu patuhi `available && allowed` |
 | Memanggil `POST /telegram/webhook` | Bukan untuk klien |
 | Menyediakan input lot, RR, atau SL/TP | Hanya `risk_percent` (0,10–1,00%) yang boleh diatur user per akun; lot & SL/TP dihitung otomatis oleh Runner & engine |
+| Menampilkan aksi admin yang tidak ada di `permissions` | Pengguna hanya akan menerima `403`; sembunyikan menunya sejak awal |
