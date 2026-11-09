@@ -27,6 +27,16 @@ import (
 //
 // Fungsi idempoten dan mengembalikan jumlah baris saklar yang baru dibuat.
 func BackfillAccountPairStrategy(ctx context.Context, db *gorm.DB) (int64, error) {
+	// Setelah tahap 2 dijalankan, kolom sumbernya sudah tidak ada. Tanpa
+	// penjagaan ini, migrasi berikutnya akan gagal sebelum sempat berjalan.
+	ada, err := columnExists(ctx, db, "subscription", "strategy")
+	if err != nil {
+		return 0, err
+	}
+	if !ada {
+		return 0, nil
+	}
+
 	type subRow struct {
 		UserID          string
 		Symbol          string
@@ -35,7 +45,7 @@ func BackfillAccountPairStrategy(ctx context.Context, db *gorm.DB) (int64, error
 	}
 
 	var subs []subRow
-	err := db.WithContext(ctx).
+	err = db.WithContext(ctx).
 		Table("subscription").
 		Select("user_id, symbol, strategy, broker_account_id").
 		Where("is_active = ? AND deleted_at IS NULL", true).
