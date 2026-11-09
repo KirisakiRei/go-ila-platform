@@ -34,6 +34,9 @@ const (
 	UserExport        Action = "user.export"
 	UserNoteAdd       Action = "user.note.add"
 	SupportNoteAdd    Action = "support.note.add"
+	// AdminCreate mencatat pembuatan akun pengelola beserta role awalnya.
+	// Kata sandi tidak pernah ikut tercatat.
+	AdminCreate Action = "admin.create"
 )
 
 // Akun broker.
@@ -123,6 +126,7 @@ var Catalog = []Entry{
 	{UserExport, "Pengguna", "Ekspor data pengguna", true},
 	{UserNoteAdd, "Pengguna", "Catatan internal ditambah", false},
 	{SupportNoteAdd, "Pengguna", "Catatan dukungan ditambah", false},
+	{AdminCreate, "Pengguna", "Akun pengelola dibuat", true},
 
 	{AccountCreate, "Akun Broker", "Akun broker ditambah", false},
 	{AccountUpdate, "Akun Broker", "Akun broker diubah", false},

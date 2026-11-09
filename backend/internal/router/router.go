@@ -589,6 +589,10 @@ func registerAdmin(
 	admin.PATCH("/roles/:id", guard(http.MethodPatch, "/roles/:id", authz.RoleEdit), roleHandler.Update)
 	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleDelete), roleHandler.Delete)
 	admin.PATCH("/users/:id/role", guard(http.MethodPatch, "/users/:id/role", authz.RoleEdit), roleHandler.Assign)
+	// Akun pengelola baru. Dijaga role.edit karena pembuatan akun pengelola pada
+	// dasarnya adalah penugasan role; service tetap menolak role yang memuat
+	// kewenangan di luar milik pelaku.
+	admin.POST("/admins", guard(http.MethodPost, "/admins", authz.RoleEdit), roleHandler.CreateAdmin)
 
 	// Pelanggan: daftar, profil, dan aksi berlapis.
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.

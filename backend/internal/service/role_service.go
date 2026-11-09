@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"ila/backend/internal/audit"
 	"ila/backend/internal/authz"
 	"ila/backend/internal/config"
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
 	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/utils"
 )
 
 // RoleService mengelola role dan penugasannya dengan lima larangan
@@ -23,6 +25,8 @@ type RoleService interface {
 	UpdateRole(ctx context.Context, actorID, roleID string, req dto.UpdateRoleRequest) (*dto.RoleResponse, error)
 	DeleteRole(ctx context.Context, actorID, roleID string) error
 	AssignRole(ctx context.Context, actorID, userID string, req dto.AssignRoleRequest) error
+	// CreateAdmin membuat akun pengelola beserta role awalnya.
+	CreateAdmin(ctx context.Context, actorID string, req dto.CreateAdminRequest) (*dto.UserListItem, error)
 	ListPermissions(ctx context.Context, actorID string) ([]dto.PermissionGroup, error)
 }
 
@@ -337,6 +341,114 @@ func (s *roleService) AssignRole(ctx context.Context, actorID, userID string, re
 
 	s.recordAudit(ctx, actorID, "role.assign", userID, roleCode)
 	return nil
+}
+
+// CreateAdmin membuat akun pengelola beserta role awalnya.
+//
+// Akun pengelola sengaja melewati alur pelanggan: tanpa verifikasi email,
+// tanpa trial, tanpa onboarding. Yang menentukan aksesnya hanya username,
+// kata sandi, dan role RBAC.
+//
+// Pengamanan yang dipegang:
+//   - Permission role tujuan wajib dimiliki pelaku (larangan eskalasi #4).
+//   - Role superadmin hanya boleh diberikan superadmin (larangan #2).
+//   - Kata sandi disimpan sebagai hash; tidak pernah tercatat di audit.
+func (s *roleService) CreateAdmin(ctx context.Context, actorID string, req dto.CreateAdminRequest) (*dto.UserListItem, error) {
+	username := normalizeUsername(req.Username)
+	if !isValidUsername(username) {
+		return nil, validation("username 3-32 karakter, hanya huruf kecil, angka, titik, garis bawah, atau strip")
+	}
+
+	role, err := s.store.FindRoleByID(ctx, strings.TrimSpace(req.RoleID))
+	if err != nil {
+		return nil, err
+	}
+
+	// Larangan #2: role superadmin hanya boleh dipegang superadmin.
+	if role.Code == authz.RoleSuperadmin {
+		actorRole, err := s.store.RoleCodeOfUser(ctx, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if actorRole != authz.RoleSuperadmin {
+			return nil, validation("hanya superadmin dapat memberikan role superadmin")
+		}
+	}
+
+	// Larangan #4: tidak boleh memberi kewenangan yang tidak dimiliki.
+	rolePerms, err := s.store.PermissionsOfRole(ctx, role.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanGrant(ctx, actorID, rolePerms); err != nil {
+		return nil, err
+	}
+
+	// Username dan email harus unik. Pemeriksaan di sini memberi pesan yang
+	// jelas; indeks unik di basis data tetap penjaga terakhir saat balapan.
+	if _, err := s.users.FindByUsername(ctx, username); err == nil {
+		return nil, validation("username sudah dipakai")
+	} else if !errors.Is(err, apperror.ErrNotFound) {
+		return nil, err
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if email == "" {
+		// Kolom email NOT NULL dan unik. Domain .invalid sengaja dipakai agar
+		// alamat ini tidak mungkin dikirimi surat dan jelas bukan alamat nyata.
+		email = username + "@admin.invalid"
+	}
+	if _, err := s.users.FindByEmail(ctx, email); err == nil {
+		return nil, validation("email sudah dipakai")
+	} else if !errors.Is(err, apperror.ErrNotFound) {
+		return nil, err
+	}
+
+	hash, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = username
+	}
+
+	now := s.now()
+	roleID := role.ID
+	user := &model.User{
+		Name:         name,
+		Username:     username,
+		Email:        email,
+		PasswordHash: hash,
+		Role:         string(config.RoleAdmin),
+		RoleID:       &roleID,
+		Tier:         model.TierFree,
+		Status:       model.UserStatusActive,
+		// Akun pengelola tidak memakai fitur pelanggan; penanda ini hanya
+		// memastikan alur onboarding dan trial tidak pernah menahannya.
+		TrialUsed:       true,
+		OnboardingDone:  true,
+		EmailVerifiedAt: &now,
+		NotifyEnabled:   false,
+	}
+	if err := s.users.Create(ctx, user); err != nil {
+		return nil, err
+	}
+
+	// Satu catatan audit per pembuatan akun. Kata sandi tidak ikut.
+	s.recordAudit(ctx, actorID, string(audit.AdminCreate), user.ID,
+		username+" role="+role.Code)
+
+	return &dto.UserListItem{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Status:    user.Status,
+		Role:      user.Role,
+		RoleCode:  role.Code,
+		CreatedAt: dto.NewTimePair(user.CreatedAt),
+	}, nil
 }
 
 // ensureCanGrant memastikan seluruh permission yang diberikan dimiliki pelaku.

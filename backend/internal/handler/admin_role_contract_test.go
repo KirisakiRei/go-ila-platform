@@ -45,6 +45,10 @@ func (s stubRoleService) AssignRole(context.Context, string, string, dto.AssignR
 	return nil
 }
 
+func (s stubRoleService) CreateAdmin(context.Context, string, dto.CreateAdminRequest) (*dto.UserListItem, error) {
+	return nil, nil
+}
+
 func (s stubRoleService) ListPermissions(context.Context, string) ([]dto.PermissionGroup, error) {
 	return nil, nil
 }

@@ -139,6 +139,20 @@ export const adminRoleApi = {
   remove: (id: string) => request<void>(`${ADMIN}/roles/${id}`, { method: 'DELETE' }),
   assign: (userId: string, roleId: string | null) =>
     request<void>(`${ADMIN}/users/${userId}/role`, { method: 'PATCH', body: { role_id: roleId } }),
+  /**
+   * Membuat akun pengelola dari panel RBAC.
+   *
+   * Akun pengelola cukup dibuat dengan username, kata sandi, dan role — tanpa
+   * verifikasi email dan tanpa alur trial/onboarding. Email opsional; bila
+   * kosong server menyusun alamat internal dari username.
+   */
+  createAdmin: (payload: {
+    username: string
+    password: string
+    role_id: string
+    name?: string
+    email?: string
+  }) => request<AdminUserListItem>(`${ADMIN}/admins`, { method: 'POST', body: payload }),
 }
 
 /**

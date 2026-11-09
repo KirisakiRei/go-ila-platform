@@ -95,6 +95,25 @@ func (h *AdminRoleHandler) Assign(c *gin.Context) {
 	httpx.OK(c, "Role akun diperbarui", nil)
 }
 
+// CreateAdmin menangani POST /api/v1/admin/admins.
+//
+// Akun pengelola dibuat dari tab User pada halaman RBAC: cukup username, kata
+// sandi, dan role. Tanpa verifikasi email dan tanpa alur trial/onboarding.
+func (h *AdminRoleHandler) CreateAdmin(c *gin.Context) {
+	var req dto.CreateAdminRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+
+	result, err := h.roles.CreateAdmin(c.Request.Context(), middleware.CurrentUserID(c), req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.Created(c, "Akun pengelola dibuat", result)
+}
+
 // Permissions menangani GET /api/v1/admin/permissions.
 func (h *AdminRoleHandler) Permissions(c *gin.Context) {
 	result, err := h.roles.ListPermissions(c.Request.Context(), middleware.CurrentUserID(c))

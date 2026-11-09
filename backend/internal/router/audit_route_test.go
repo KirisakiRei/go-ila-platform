@@ -63,6 +63,7 @@ var harapanAksiAudit = map[string]audit.Action{
 	"PATCH /api/v1/admin/coupons/:id":        audit.CouponUpdate,
 	"POST /api/v1/admin/coupons/:id/disable": audit.CouponDisable,
 	"PATCH /api/v1/admin/users/:id/role":     audit.UserRoleAssign,
+	"POST /api/v1/admin/admins":              audit.AdminCreate,
 
 	// Flag sistem dan mode platform selalu menyentuh jalur trading.
 	"PUT /api/v1/admin/system/settings/:key":     audit.SystemFlagChange,

@@ -579,6 +579,7 @@ function UserRoleTab() {
   const [page, setPage] = useState(1)
   const [notice, setNotice] = useState<string | null>(null)
   const [assigning, setAssigning] = useState<AdminUserListItem | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const roles = useQuery({ queryKey: ['admin', 'rbac', 'roles'], queryFn: adminRoleApi.list })
 
@@ -609,6 +610,20 @@ function UserRoleTab() {
     onError: (error) => setNotice(error instanceof Error ? error.message : 'Gagal mengubah role.'),
   })
 
+  const createAdmin = useMutation({
+    mutationFn: adminRoleApi.createAdmin,
+    onSuccess: (user) => {
+      setNotice(
+        `Akun pengelola "${user.name}" dibuat. Berikan username dan kata sandi kepada pemiliknya; akun perlu ditugaskan role bila belum.`,
+      )
+      setCreating(false)
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'rbac', 'users'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'rbac', 'roles'] })
+    },
+    onError: (error) =>
+      setNotice(error instanceof Error ? error.message : 'Gagal membuat akun pengelola.'),
+  })
+
   const roleRows = roles.data ?? []
   const rows = users.data?.data ?? []
   const meta = users.data?.meta
@@ -621,7 +636,7 @@ function UserRoleTab() {
       {notice && <Alert>{notice}</Alert>}
 
       <Card className="p-3">
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <div className="min-w-[200px] flex-1">
             <Label htmlFor="rbac-role-filter">Saring menurut role</Label>
             <Select
@@ -641,10 +656,15 @@ function UserRoleTab() {
               ))}
             </Select>
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="max-w-md text-[11px] leading-relaxed text-muted-foreground">
             Yang tampil hanya akun ber-role kasar <code>admin</code>. Pelanggan biasa tidak dapat
             memegang role RBAC.
           </p>
+          {can('role.edit') && (
+            <Button size="sm" onClick={() => setCreating(true)} disabled={roles.isLoading}>
+              Buat akun admin
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -750,6 +770,16 @@ function UserRoleTab() {
           onSubmit={(roleId) => assign.mutate({ userId: assigning.id, roleId })}
         />
       )}
+
+      {creating && (
+        <CreateAdminModal
+          roles={roleRows}
+          owned={mine}
+          pending={createAdmin.isPending}
+          onClose={() => setCreating(false)}
+          onSubmit={(payload) => createAdmin.mutate(payload)}
+        />
+      )}
     </div>
   )
 }
@@ -830,6 +860,187 @@ function AssignRoleModal({
             bisa ditugaskan dari akun Anda.
           </p>
         )}
+      </div>
+    </Modal>
+  )
+}
+
+/**
+ * CreateAdminModal membuat akun pengelola baru.
+ *
+ * Akun pengelola sengaja tidak melewati alur pelanggan: cukup username, kata
+ * sandi, dan role. Tidak ada verifikasi email, trial, maupun onboarding.
+ * Email bersifat opsional; bila dikosongkan server menyusun alamat internal
+ * dari username, sehingga tidak ada verifikasi yang menunggu.
+ */
+function CreateAdminModal({
+  roles,
+  owned,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  roles: AdminRole[]
+  owned: string[]
+  pending: boolean
+  onClose: () => void
+  onSubmit: (payload: {
+    username: string
+    password: string
+    role_id: string
+    name?: string
+    email?: string
+  }) => void
+}) {
+  const [username, setUsername] = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [roleId, setRoleId] = useState('')
+
+  const ownedSet = useMemo(() => new Set(owned), [owned])
+
+  // Username mengikuti aturan server: huruf kecil, angka, titik, garis bawah,
+  // atau strip; panjang 3-32. Diperiksa di sini agar kesalahan ketik terlihat
+  // sebelum dikirim.
+  const usernameSah = /^[a-z0-9._-]{3,32}$/.test(username.trim().toLowerCase())
+  const passwordSah = password.length >= 10 && password.length <= 72
+  const cocok = password === confirm && password.length > 0
+  const emailSah = email.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const roleSah = roleId !== ''
+  const siap = usernameSah && passwordSah && cocok && emailSah && roleSah
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Buat akun admin"
+      description="Akun pengelola tidak memerlukan verifikasi email. Cukup username dan kata sandi, lalu tentukan role-nya."
+      footer={
+        <>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Batal
+          </Button>
+          <Button
+            size="sm"
+            isLoading={pending}
+            disabled={!siap}
+            onClick={() =>
+              onSubmit({
+                username: username.trim().toLowerCase(),
+                password,
+                role_id: roleId,
+                name: name.trim() || undefined,
+                email: email.trim() || undefined,
+              })
+            }
+          >
+            Buat akun
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="admin-username">Username</Label>
+          <Input
+            id="admin-username"
+            className="mt-1"
+            value={username}
+            autoComplete="off"
+            placeholder="mis. budi.admin"
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            3-32 karakter: huruf kecil, angka, titik, garis bawah, atau strip. Dipakai untuk masuk.
+          </p>
+          {username.trim() !== '' && !usernameSah && (
+            <p className="mt-1 text-[11px] text-destructive">Format username belum sesuai.</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="admin-name">Nama tampilan (opsional)</Label>
+          <Input
+            id="admin-name"
+            className="mt-1"
+            value={name}
+            autoComplete="off"
+            placeholder="Kosongkan untuk memakai username"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="admin-password">Kata sandi</Label>
+          <Input
+            id="admin-password"
+            type="password"
+            className="mt-1"
+            value={password}
+            autoComplete="new-password"
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Minimal 10 karakter. {password.length}/10
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="admin-confirm">Ulangi kata sandi</Label>
+          <Input
+            id="admin-confirm"
+            type="password"
+            className="mt-1"
+            value={confirm}
+            autoComplete="new-password"
+            onChange={(event) => setConfirm(event.target.value)}
+          />
+          {confirm !== '' && !cocok && (
+            <p className="mt-1 text-[11px] text-destructive">Kata sandi belum sama.</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="admin-role">Role</Label>
+          <Select
+            id="admin-role"
+            className="mt-1"
+            value={roleId}
+            onChange={(event) => setRoleId(event.target.value)}
+          >
+            <option value="">Pilih role</option>
+            {roles.map((role) => {
+              const blocked = !role.permissions.every((key) => ownedSet.has(key))
+              return (
+                <option key={role.id} value={role.id} disabled={blocked}>
+                  {role.name}
+                  {blocked ? ' — melebihi kewenangan Anda' : ''}
+                </option>
+              )
+            })}
+          </Select>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Role menentukan seluruh kewenangan akun. Tanpa role, akun tidak bisa masuk ke panel.
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="admin-email">Email (opsional)</Label>
+          <Input
+            id="admin-email"
+            type="email"
+            className="mt-1"
+            value={email}
+            autoComplete="off"
+            placeholder="Kosongkan bila tidak perlu"
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Hanya untuk surel. Tidak ada verifikasi email pada akun pengelola.
+          </p>
+        </div>
       </div>
     </Modal>
   )

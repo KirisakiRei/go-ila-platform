@@ -55,3 +55,22 @@ type UpdateRoleRequest struct {
 type AssignRoleRequest struct {
 	RoleID *string `json:"role_id"`
 }
+
+// CreateAdminRequest membuat akun pengelola dari panel RBAC.
+//
+// Yang wajib hanya username, kata sandi, dan role. Akun pengelola tidak
+// melewati alur pelanggan (verifikasi email, trial, onboarding), karena akun
+// itu tidak memakai fitur trading. Email tetap wajib diisi di basis data
+// (kolomnya NOT NULL dan unik), jadi bila tidak diberikan sistem menyusun
+// alamat internal dari username agar tidak ada verifikasi yang ditunggu.
+type CreateAdminRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=32"`
+	// Name opsional; kosong berarti memakai username.
+	Name string `json:"name" binding:"omitempty,max=100"`
+	// Email opsional. Diisi hanya bila akun perlu surel nyata.
+	Email    string `json:"email" binding:"omitempty,email,max=150"`
+	Password string `json:"password" binding:"required,min=10,max=72"`
+	// RoleID wajib: akun pengelola tanpa role tidak punya kewenangan apa pun
+	// dan tidak bisa masuk lewat pintu admin.
+	RoleID string `json:"role_id" binding:"required,uuid"`
+}
