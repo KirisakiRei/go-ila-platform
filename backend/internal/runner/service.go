@@ -383,6 +383,17 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectStrategyDisabled)
 	}
 
+	// [2c] Pasangan timeframe: dieksekusi otomatis, hanya ditampilkan sebagai
+	// peluang, atau tidak relevan bagi akun ini.
+	//
+	// "Peluang" sengaja BUKAN penolakan: user tetap menerima alert dan bisa
+	// memutuskan sendiri lewat tombol eksekusi.
+	tindakanTimeframe := s.putuskanTimeframe(ctx, account.ID, signal.Symbol,
+		signal.StrategyVersion, signal.Htf, signal.Ltf)
+	if tindakanTimeframe == TimeframeAbaikan {
+		return nil
+	}
+
 	// [3] Akun ini sendiri boleh menerima order?
 	if !account.IsActive || account.IsFrozen {
 		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectAccountFrozen)
@@ -397,7 +408,7 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 	//
 	// Kunci hanya dipakai pada mode yang benar-benar mengeksekusi; mode manual
 	// hanya mencatat kandidat sehingga tidak perlu dikunci.
-	otomatis := account.Mode == "auto" && s.autoExecute(ctx)
+	otomatis := account.Mode == "auto" && s.autoExecute(ctx) && tindakanTimeframe != TimeframePeluang
 	if otomatis {
 		release, dikunci, lockErr := s.lockAccount(ctx, account.ID, signal.SignalID, now)
 		if lockErr != nil {
@@ -428,10 +439,35 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 		return s.execute(ctx, user, account, signal)
 	}
 
+	// Peluang: pasangan timeframe ini tidak diizinkan auto, tetapi user tetap
+	// diberi tahu. Dicatat dengan status tersendiri agar tidak tertukar dengan
+	// penolakan, dan agar bisa dieksekusi manual lewat tombol konfirmasi.
+	if tindakanTimeframe == TimeframePeluang {
+		s.recordUserSignal(ctx, user.ID, signal.SignalID, model.SignalStatusOpportunity,
+			pesanPeluang(signal), &account.ID)
+		s.pub.PublishSignal(ctx, user.ID, signal.SignalID, model.SignalStatusOpportunity, pesanPeluang(signal))
+		return nil
+	}
+
 	// Mode manual: catat siap dengan akun ini sebagai kandidat konfirmasi.
 	s.recordUserSignal(ctx, user.ID, signal.SignalID, SignalReady, "", &account.ID)
 	s.pub.PublishSignal(ctx, user.ID, signal.SignalID, SignalReady, "")
 	return nil
+}
+
+// pesanPeluang menjelaskan mengapa sebuah setup tidak dieksekusi otomatis.
+//
+// Pesan ini dibaca user, jadi menyebutkan pasangan timeframe-nya dan langkah
+// berikutnya, bukan sekadar "tidak dieksekusi".
+func pesanPeluang(signal *model.Signal) string {
+	pasangan := signal.Htf
+	if signal.Ltf != "" {
+		pasangan = signal.Htf + "-" + signal.Ltf
+	}
+	if pasangan == "" {
+		return "Setup tersedia untuk dipantau. Eksekusi otomatis tidak aktif untuk akun ini; buka dashboard untuk memutuskan."
+	}
+	return "Setup pasangan " + pasangan + " tersedia untuk dipantau. Eksekusi otomatis tidak aktif untuk akun ini; buka dashboard untuk memutuskan."
 }
 
 // processSignalForUser menjalankan seluruh urutan pemeriksaan plans/14 §5.2

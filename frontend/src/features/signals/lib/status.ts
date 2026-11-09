@@ -5,6 +5,7 @@ export const SIGNAL_LABEL: Record<SignalStatus, string> = {
   READY_TO_ENTRY: 'Siap entry',
   ACKED: 'Diterima',
   REJECTED: 'Tertahan',
+  OPPORTUNITY: 'Peluang entry',
   EXPIRED: 'Kedaluwarsa',
   CANCELLED: 'Dibatalkan',
   SUPERSEDED: 'Digantikan',
@@ -20,6 +21,9 @@ export const SIGNAL_TONE: Record<SignalStatus, 'solid' | 'outline' | 'neutral' |
   READY_TO_ENTRY: 'solid',
   ACKED: 'outline',
   REJECTED: 'outline',
+  // Peluang diberi bobot yang lebih menonjol daripada penolakan: ini setup yang
+  // masih bisa ditindaklanjuti user.
+  OPPORTUNITY: 'solid',
   CONSUMED: 'outline',
   EXPIRED: 'muted',
   CANCELLED: 'muted',

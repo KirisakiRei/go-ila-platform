@@ -41,6 +41,9 @@ type fakeStore struct {
 	switches map[string]map[string]bool
 	// accountLocks meniru kunci eksekusi per akun pada basis data.
 	accountLocks map[string]string
+	// timeframes menyimpan saklar timeframe untuk pengujian, berkunci
+	// "akun|simbol|metode|htf|ltf".
+	timeframes map[string]repository.TimeframeState
 	// staleClaims menandai klaim yang dianggap tertinggal pada pengujian.
 	staleClaims map[string]struct{}
 }
@@ -57,6 +60,7 @@ func newFakeStore() *fakeStore {
 		correlations: map[string][]string{},
 		switches:     map[string]map[string]bool{},
 		accountLocks: map[string]string{},
+		timeframes:   map[string]repository.TimeframeState{},
 	}
 }
 
@@ -439,6 +443,32 @@ func (s *fakeStore) ConfiguredAccounts(_ context.Context, symbol string) (map[st
 		if strings.HasPrefix(key, prefix) {
 			out[strings.TrimPrefix(key, prefix)] = true
 		}
+	}
+	return out, nil
+}
+
+// TimeframeSwitches meniru pembacaan saklar timeframe dari basis data.
+func (s *fakeStore) TimeframeSwitches(_ context.Context, symbol string) (map[string]map[string]map[repository.TimeframeKey]repository.TimeframeState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := map[string]map[string]map[repository.TimeframeKey]repository.TimeframeState{}
+	for key, state := range s.timeframes {
+		parts := strings.Split(key, "|")
+		if len(parts) != 5 {
+			continue
+		}
+		accountID, sym, strategy, htf, ltf := parts[0], parts[1], parts[2], parts[3], parts[4]
+		if sym != symbol {
+			continue
+		}
+		if out[accountID] == nil {
+			out[accountID] = map[string]map[repository.TimeframeKey]repository.TimeframeState{}
+		}
+		if out[accountID][strategy] == nil {
+			out[accountID][strategy] = map[repository.TimeframeKey]repository.TimeframeState{}
+		}
+		out[accountID][strategy][repository.TimeframeKey{Htf: htf, Ltf: ltf}] = state
 	}
 	return out, nil
 }

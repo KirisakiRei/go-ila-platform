@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -421,6 +422,7 @@ func streamOnce(
 		&enginev1.SubscribeRequest{
 			SubscriberId:      subscriberID,
 			Symbols:           subscribedSymbols(ctx, target, svc),
+			Pairs:             timeframePairs(ctx, target, svc, logger),
 			WantStatusUpdates: true,
 		},
 		engineclient.Events{
@@ -467,6 +469,10 @@ func symbolSync(client enginev1.EngineServiceClient, subscriberID string) runner
 		syncCtx = engineclient.DenganTrace(syncCtx, logkit.Trace())
 
 		if len(add) > 0 {
+			// Catatan: Pairs hanya dikirim pada langganan awal. Penambahan
+			// simbol di tengah jalan memakai perilaku lama agar tidak mengubah
+			// arti permintaan ke engine; pasangan timeframe dikirim ulang saat
+			// stream tersambung kembali.
 			resp, err := client.Subscribe(syncCtx, &enginev1.SubscribeRequest{
 				SubscriberId: subscriberID,
 				Symbols:      add,
@@ -588,6 +594,50 @@ func subscribedSymbols(ctx context.Context, target engineTarget, svc *runner.Ser
 		return nil
 	}
 	return reqs[target.Strategy]
+}
+
+// timeframePairs menyusun pasangan timeframe yang perlu dihitung engine untuk
+// satu strategi.
+//
+// Isinya gabungan pasangan yang dipantau siapa pun. Bila fitur timeframe belum
+// dinyalakan atau belum ada yang mengaturnya, hasilnya kosong sehingga engine
+// menerima perilaku lama: hanya daftar simbol.
+func timeframePairs(ctx context.Context, target engineTarget, svc *runner.Service, logger *slog.Logger) []*enginev1.Pair {
+	symbols := subscribedSymbols(ctx, target, svc)
+	if len(symbols) == 0 {
+		return nil
+	}
+
+	unik := make(map[string]*enginev1.Pair)
+	for _, symbol := range symbols {
+		reqs, err := svc.ComputeTimeframeRequirements(ctx, symbol)
+		if err != nil {
+			logger.Warn("gagal menyusun pasangan timeframe",
+				"strategy", target.Strategy, "symbol", symbol, "error", errorText(err))
+			continue
+		}
+		for _, pair := range reqs[target.Strategy] {
+			key := pair.Htf + "|" + pair.Ltf
+			unik[key] = &enginev1.Pair{Htf: pair.Htf, Ltf: pair.Ltf}
+		}
+	}
+	if len(unik) == 0 {
+		return nil
+	}
+
+	// Urutan stabil: permintaan yang sama tidak boleh menghasilkan susunan
+	// berbeda setiap kali stream tersambung.
+	keys := make([]string, 0, len(unik))
+	for key := range unik {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	out := make([]*enginev1.Pair, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, unik[key])
+	}
+	return out
 }
 
 // subscriberFor membentuk identitas langganan per strategi, agar dua engine

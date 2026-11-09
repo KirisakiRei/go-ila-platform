@@ -322,6 +322,11 @@ export type SignalStatus =
   | 'READY_TO_ENTRY'
   | 'ACKED'
   | 'REJECTED'
+  /**
+   * Peluang: setup tidak dieksekusi otomatis, tetapi tetap ditampilkan agar
+   * user bisa memutuskan sendiri. Bukan penolakan.
+   */
+  | 'OPPORTUNITY'
   | 'EXPIRED'
   | 'CANCELLED'
   | 'SUPERSEDED'

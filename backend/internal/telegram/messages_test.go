@@ -122,3 +122,34 @@ func TestFormatThousands(t *testing.T) {
 		}
 	}
 }
+
+// TestFormatOpportunityMessageMenyebutTimeframe memastikan pesan peluang
+// berbeda dari pesan tertahan: ia menyebut pasangan timeframe dan menawarkan
+// langkah berikutnya, bukan sekadar memberi tahu setup tidak dijalankan.
+func TestFormatOpportunityMessageMenyebutTimeframe(t *testing.T) {
+	msg := FormatOpportunityMessage("XAUUSD", "BUY", "ila-2.0", "W1", "H4",
+		4120.5, 4112.3, 4149.2, 2.3, "https://rekavia.com/approve/abc")
+
+	for _, ingin := range []string{"PELUANG ENTRY", "XAUUSD", "W1-H4", "Eksekusi Manual"} {
+		if !strings.Contains(msg.Text, ingin) {
+			t.Errorf("pesan tidak memuat %q:\n%s", ingin, msg.Text)
+		}
+	}
+	if strings.Contains(msg.Text, "Tidak dieksekusi:") {
+		t.Error("pesan peluang tidak boleh memakai kalimat penolakan")
+	}
+}
+
+// TestFormatOpportunityTanpaTimeframe memastikan pesan tetap rapi bila
+// timeframe kosong (engine belum mengirim), tanpa baris kosong menggantung.
+func TestFormatOpportunityTanpaTimeframe(t *testing.T) {
+	msg := FormatOpportunityMessage("XAUUSD", "BUY", "ila-2.0", "", "",
+		4120.5, 4112.3, 4149.2, 2.3, "")
+
+	if strings.Contains(msg.Text, "Timeframe:") {
+		t.Errorf("baris timeframe tidak boleh muncul saat kosong:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "Buka dashboard") {
+		t.Errorf("harus ada arahan tanpa link:\n%s", msg.Text)
+	}
+}

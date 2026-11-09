@@ -89,6 +89,9 @@ type RunnerRepository interface {
 	// ConfiguredAccounts melaporkan akun yang sudah punya baris saklar untuk
 	// simbol tertentu. Akun di luar daftar ini memakai saklar bawaan.
 	ConfiguredAccounts(ctx context.Context, symbol string) (map[string]bool, error)
+	// TimeframeSwitches membaca saklar pasangan timeframe untuk satu simbol,
+	// dipetakan akun -> metode -> pasangan -> saklar.
+	TimeframeSwitches(ctx context.Context, symbol string) (map[string]map[string]map[TimeframeKey]TimeframeState, error)
 	// EnabledPairSymbols mengembalikan simbol kanonik yang masih diaktifkan
 	// admin. Symbol lain tidak boleh diminta ke engine.
 	EnabledPairSymbols(ctx context.Context) ([]string, error)
@@ -743,6 +746,48 @@ func (r *runnerRepository) ConfiguredAccounts(ctx context.Context, symbol string
 	out := make(map[string]bool, len(accountIDs))
 	for _, id := range accountIDs {
 		out[id] = true
+	}
+	return out, nil
+}
+
+// TimeframeKey adalah pasangan timeframe sebagai kunci peta.
+type TimeframeKey struct {
+	Htf string
+	Ltf string
+}
+
+// TimeframeState adalah saklar satu pasangan timeframe untuk satu akun.
+type TimeframeState struct {
+	Watch bool
+	Auto  bool
+}
+
+// TimeframeSwitches membaca saklar pasangan timeframe untuk satu simbol.
+//
+// Hasilnya akun -> metode -> pasangan -> saklar. Hanya akun yang sudah punya
+// baris yang muncul; akun lain berarti belum diatur dan Runner memakai
+// perilaku lama (semua diproses, semuanya boleh dieksekusi).
+func (r *runnerRepository) TimeframeSwitches(ctx context.Context, symbol string) (map[string]map[string]map[TimeframeKey]TimeframeState, error) {
+	var rows []model.AccountPairTimeframe
+	err := r.db.WithContext(ctx).
+		Where("symbol = ? AND deleted_at IS NULL", symbol).
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca saklar timeframe: %w", err)
+	}
+
+	out := make(map[string]map[string]map[TimeframeKey]TimeframeState, len(rows))
+	for _, row := range rows {
+		if out[row.BrokerAccountID] == nil {
+			out[row.BrokerAccountID] = make(map[string]map[TimeframeKey]TimeframeState, 2)
+		}
+		if out[row.BrokerAccountID][row.Strategy] == nil {
+			out[row.BrokerAccountID][row.Strategy] = make(map[TimeframeKey]TimeframeState, 2)
+		}
+		out[row.BrokerAccountID][row.Strategy][TimeframeKey{Htf: row.Htf, Ltf: row.Ltf}] = TimeframeState{
+			Watch: row.IsWatch,
+			Auto:  row.IsAuto,
+		}
 	}
 	return out, nil
 }

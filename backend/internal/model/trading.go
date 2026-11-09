@@ -16,7 +16,16 @@ const (
 	SignalStatusCancelled          = "CANCELLED"
 	SignalStatusSuperseded         = "SUPERSEDED"
 	SignalStatusRejected           = "REJECTED"
-	SignalStatusSkipped            = "SKIPPED"
+	// SignalStatusOpportunity menandai sinyal yang TIDAK dieksekusi otomatis
+	// tetapi tetap ditampilkan sebagai peluang: user memilih untuk mengeksekusi
+	// manual atau melewatinya.
+	//
+	// Sengaja terpisah dari REJECTED. REJECTED berarti sistem memutuskan sinyal
+	// tidak boleh dijalankan (mis. akun dibekukan); OPPORTUNITY berarti sistem
+	// hanya menunggu keputusan user. Mencampur keduanya membuat statistik dan
+	// tampilan menyesatkan.
+	SignalStatusOpportunity = "OPPORTUNITY"
+	SignalStatusSkipped     = "SKIPPED"
 )
 
 // IsTerminalSignal menandai status sinyal yang tidak bisa dieksekusi lagi.

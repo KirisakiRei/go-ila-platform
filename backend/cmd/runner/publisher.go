@@ -35,6 +35,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	// Notifikasi hanya untuk status yang punya arti bagi user.
 	switch status {
 	case model.SignalStatusReadyToEntry, model.SignalStatusRejected,
+		model.SignalStatusOpportunity,
 		model.SignalStatusCancelled, model.SignalStatusExpired,
 		model.SignalStatusSuperseded:
 	default:
@@ -59,6 +60,16 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			return telegram.FormatHeldMessage(
 				signal.Symbol, signal.Direction, signal.StrategyVersion,
 				signal.RiskReward, reason,
+			)
+
+		case model.SignalStatusOpportunity:
+			// Peluang bukan penolakan: pesannya menawarkan langkah berikutnya.
+			dashboardLink := p.approveLink(ctx, userID, signalID)
+			return telegram.FormatOpportunityMessage(
+				signal.Symbol, signal.Direction, signal.StrategyVersion,
+				signal.Htf, signal.Ltf,
+				signal.EntryPrice, signal.StopLoss, signal.TakeProfit,
+				signal.RiskReward, dashboardLink,
 			)
 
 		default:

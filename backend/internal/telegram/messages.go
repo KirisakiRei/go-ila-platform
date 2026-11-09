@@ -77,6 +77,41 @@ func FormatHeldMessage(symbol, side, strategy string, rr float64, reason string)
 	return Message{Text: text}
 }
 
+// FormatOpportunityMessage menyusun pesan untuk setup yang TIDAK dieksekusi
+// otomatis karena pasangan timeframe-nya hanya dipantau.
+//
+// Bedanya dengan FormatHeldMessage: ini bukan penolakan, melainkan pilihan user.
+// Karena itu pesannya menyebut pasangan timeframe-nya dan memberi jalan untuk
+// memutuskan, bukan sekadar memberi tahu bahwa setup tidak dijalankan.
+func FormatOpportunityMessage(symbol, side, strategy, htf, ltf string, entry, sl, tp, rr float64, link string) Message {
+	var b strings.Builder
+
+	b.WriteString("🔔 PELUANG ENTRY — ")
+	b.WriteString(symbol)
+	b.WriteString("\n")
+
+	pasangan := htf
+	if ltf != "" {
+		pasangan = htf + "-" + ltf
+	}
+	if pasangan != "" {
+		fmt.Fprintf(&b, "Timeframe: %s\n", pasangan)
+	}
+
+	fmt.Fprintf(&b, "Arah: %s  |  %s\n", side, strategy)
+	fmt.Fprintf(&b, "Entry: %s\n", formatPrice(entry))
+	fmt.Fprintf(&b, "SL: %s  |  TP: %s  (RR 1:%s)\n\n", formatPrice(sl), formatPrice(tp), formatFrom(rr))
+
+	b.WriteString("Eksekusi otomatis tidak aktif untuk pasangan ini pada akun Anda.\n")
+	if link != "" {
+		fmt.Fprintf(&b, "[ Eksekusi Manual ](%s)\n", link)
+	} else {
+		b.WriteString("Buka dashboard untuk memutuskan.\n")
+	}
+
+	return Message{Text: b.String()}
+}
+
 // FormatFinishedMessage memberi tahu bahwa setup berakhir sebelum entry.
 func FormatFinishedMessage(symbol, reason string) Message {
 	return Message{Text: fmt.Sprintf(
