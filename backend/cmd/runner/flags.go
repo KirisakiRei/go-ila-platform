@@ -30,6 +30,14 @@ func envFlagReader(cfg *config.Config) func(string) string {
 			return "true"
 		case settings.KeyLegalGate:
 			return "true"
+		// Saklar yang bawaannya NYALA di katalog. Tanpa cabang ini nilainya
+		// kembali kosong, ParseBool gagal, dan pemanggil jatuh ke fallback
+		// `false` — akibatnya mengeset variabel lingkungan tetap tidak
+		// berpengaruh, seolah saklarnya rusak.
+		case settings.KeyTimeframeSwitch:
+			return strconv.FormatBool(cfg.TimeframeSwitch)
+		case settings.KeyPairSwitch:
+			return strconv.FormatBool(cfg.PairSwitch)
 		}
 		return ""
 	}
