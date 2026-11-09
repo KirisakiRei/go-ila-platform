@@ -25,7 +25,8 @@ import { usePositions, useSignals, useStrategies, useSubscriptions } from '@/lib
 import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
-import { SignalDetail } from '@/features/signals/components/SignalDetail'
+import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
+import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
 import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
@@ -109,9 +110,6 @@ export default function SignalsPage() {
     return filteredSignals.slice(start, start + historyPerPage)
   }, [filteredSignals, historyPage])
 
-  // Sinyal terbaru dari pair yang dipilih
-  const latestSignal = filteredSignals[0] ?? null
-
   const handleSelectPair = (symbol: string) => {
     setParams({ pair: symbol })
   }
@@ -191,22 +189,21 @@ export default function SignalsPage() {
             </div>
           </div>
 
+          {/* Call Entry Alert Banner (Pinned di Paling Atas saat Ada Sinyal Siap Eksekusi) */}
+          <CallEntryAlertBanner signals={filteredSignals} />
+
           {/* Sinyal Aktif / Terakhir & Histori Setup Langsung di Atas */}
           <div className="grid gap-6 lg:grid-cols-12">
             <div className="lg:col-span-7 space-y-6">
               <Section
-                title="Sinyal Terakhir"
-                description={`Setup paling mutakhir dari analisis ILA untuk ${activePair}.`}
+                title="Radar Analisis Timeframe"
+                description={`Pemantauan matriks timeframe multi-tier untuk ${activePair}.`}
               >
-                {latestSignal ? (
-                  <SignalDetail signal={latestSignal} />
-                ) : (
-                  <Card>
-                    <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                      Belum ada setup sinyal untuk metode ini pada pair {activePair}.
-                    </CardContent>
-                  </Card>
-                )}
+                <TimeframeRadarMatrix
+                  signals={filteredSignals}
+                  strategy={activeStrategyFilter}
+                  symbol={activePair}
+                />
               </Section>
             </div>
 

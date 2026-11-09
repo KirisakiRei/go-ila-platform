@@ -24,7 +24,6 @@ import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, SIGNAL_TONE, getCycleBadge, getIla3Mtf, getIla3Progress } from '../lib/status'
 import { TimeframeBadge } from './TimeframeBadge'
-import { TombolEksekusi } from './TombolEksekusi'
 
 type AnalysisPoint = {
   id: string
@@ -557,13 +556,6 @@ export function SignalDetail({ signal }: { signal: Signal }) {
           <span>Terbit: {formatDualDateTime(signal.published_at)}</span>
           <span>Batas Waktu: {formatDualDateTime(signal.expires_at)}</span>
         </div>
-
-        {/* Tombol Eksekusi jika Status Ready/Opportunity */}
-        {isReady && (
-          <div className="border-t border-border pt-4">
-            <TombolEksekusi signal={signal} />
-          </div>
-        )}
       </CardContent>
     </Card>
   )
