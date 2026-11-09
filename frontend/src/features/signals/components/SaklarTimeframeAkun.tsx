@@ -100,8 +100,21 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                               </span>
                             </td>
                           )}
-                          <td className="px-3.5 py-2.5 font-mono text-[11.5px]">
-                            {pair.htf} · {pair.ltf}
+                          <td className="px-3.5 py-2.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[11.5px] font-medium text-foreground">
+                                {pair.htf} · {pair.ltf}
+                              </span>
+                              {(() => {
+                                const cycle = getCycleBadge(group.strategy, pair.htf, pair.ltf)
+                                if (!cycle) return null
+                                return (
+                                  <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary border border-primary/20">
+                                    {cycle}
+                                  </span>
+                                )
+                              })()}
+                            </div>
                           </td>
                           <td className="px-3.5 py-2.5 text-center">
                             <Saklar
@@ -166,6 +179,17 @@ function kirim(
       : pair,
   )
   ubah.mutate({ accountID: account.account_id, strategy, pairs })
+}
+
+function getCycleBadge(strategy: string, htf: string, ltf: string): string | null {
+  if (strategy !== 'ila-3.0') return null
+  const h = htf.toUpperCase().replace(/\s+/g, '')
+  const l = ltf.toUpperCase().replace(/\s+/g, '')
+  if ((h === '4H' || h === 'H4') && (l === '5M' || l === 'M5')) return 'Daily · New Day'
+  if ((h === 'D' || h === 'D1' || h === '1D') && (l === '15M' || l === 'M15')) return 'Weekly · New Week'
+  if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M · Intraday'
+  if ((h === 'W' || h === 'W1' || h === '1W') && (l === '1H' || l === 'H1')) return 'Monthly · New Month'
+  return null
 }
 
 function Saklar({

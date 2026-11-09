@@ -126,7 +126,7 @@ func siapkanTimeframe(t *testing.T) (*timeframeSwitchService, *fakeTimeframeRepo
 	return svc, tfRepo, strategyRepo
 }
 
-func TestTimeframeMatrix_MenampilkanPasanganDariDataNyata(t *testing.T) {
+func TestTimeframeMatrix_MenampilkanPasanganKatalogDanSinyal(t *testing.T) {
 	svc, _, _ := siapkanTimeframe(t)
 
 	matrix, err := svc.Matrix(context.Background(), "u1", "xauusd")
@@ -142,25 +142,30 @@ func TestTimeframeMatrix_MenampilkanPasanganDariDataNyata(t *testing.T) {
 	}
 
 	daftar := matrix.Tersedia["ila-2.0"]
-	if len(daftar) != 2 {
-		t.Fatalf("pasangan tersedia = %d, ingin 2", len(daftar))
+	if len(daftar) != 4 {
+		t.Fatalf("pasangan tersedia = %d, ingin 4", len(daftar))
 	}
-	if daftar[0].Label != "W1 · H4" {
-		t.Fatalf("label = %q, ingin \"W1 · H4\"", daftar[0].Label)
+	if daftar[0].Label != "W · H4" {
+		t.Fatalf("label = %q, ingin \"W · H4\"", daftar[0].Label)
+	}
+
+	daftar3 := matrix.Tersedia["ila-3.0"]
+	if len(daftar3) != 4 {
+		t.Fatalf("pasangan ILA 3.0 tersedia = %d, ingin 4", len(daftar3))
 	}
 }
 
-func TestTimeframeMatrix_KosongBilaEngineBelumKirim(t *testing.T) {
+func TestTimeframeMatrix_MemakaiKatalogBakuBilaEngineBelumKirim(t *testing.T) {
 	svc, _, _ := siapkanTimeframe(t)
-	// Tidak ada sinyal yang membawa timeframe.
+	// Belum ada sinyal yang membawa timeframe.
 	svc.signals = &fakeTimeframeSignals{known: map[string][]repository.TimeframePairRef{}}
 
 	matrix, err := svc.Matrix(context.Background(), "u1", "XAUUSD")
 	if err != nil {
 		t.Fatalf("Matrix: %v", err)
 	}
-	if len(matrix.Tersedia) != 0 {
-		t.Fatalf("pasangan tersedia = %v, ingin kosong saat belum ada data", matrix.Tersedia)
+	if len(matrix.Tersedia["ila-2.0"]) != 4 || len(matrix.Tersedia["ila-3.0"]) != 4 {
+		t.Fatalf("pasangan katalog baku harus tetap tampil saat belum ada sinyal, dapat: %v", matrix.Tersedia)
 	}
 }
 

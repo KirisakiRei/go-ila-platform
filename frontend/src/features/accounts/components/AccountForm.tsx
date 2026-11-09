@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ExternalLink,
   HelpCircle,
@@ -10,7 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Alert, Button, Input, Label, Select } from '@/components/ui'
-import { accountApi } from '@/lib/api'
+import { accountApi, legalApi } from '@/lib/api'
 import { ApiError } from '@/lib/api-error'
 import { useCreateAccount } from '@/lib/queries'
 import type { Tier } from '@/types/api'
@@ -19,7 +20,7 @@ const matchTraderSchema = z.object({
   label: z.string().min(1, 'Nama akun wajib diisi').max(100, 'Maksimal 100 karakter'),
   token: z.string().min(20, 'Access token minimal 20 karakter'),
   mode: z.enum(['manual', 'auto']),
-  risk_percent: z.coerce.number().min(0.1, 'Minimal 0,10%').max(1, 'Maksimal 1,00%'),
+  risk_percent: z.coerce.number().min(0.1, 'Minimal 0,10%').max(5, 'Maksimal 5,00%'),
   is_dry_run: z.boolean(),
 })
 
@@ -35,6 +36,19 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [ctraderLoading, setCtraderLoading] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
+
+  // Status persetujuan dokumen legal (wajib Disclaimer Risiko sebelum akun broker terhubung)
+  const queryClient = useQueryClient()
+  const legalQuery = useQuery({
+    queryKey: ['me', 'legal'],
+    queryFn: legalApi.me,
+    staleTime: 60_000,
+  })
+
+  const isRiskAccepted = Boolean(
+    legalQuery.data?.documents?.find((doc) => doc.slug === 'risk')?.accepted,
+  )
+  const [acceptRisk, setAcceptRisk] = useState(false)
 
   // Pengaturan default untuk cTrader OAuth
   const [ctraderMode, setCtraderMode] = useState<'manual' | 'auto'>('manual')
@@ -61,8 +75,19 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
   // Alur 1: cTrader OAuth
   const handleConnectCTrader = async () => {
     setSubmitError(null)
+
+    if (!isRiskAccepted && !acceptRisk) {
+      setSubmitError('Harap centang persetujuan Disclaimer Risiko Trading sebelum menghubungkan akun broker.')
+      return
+    }
+
     setCtraderLoading(true)
     try {
+      if (!isRiskAccepted) {
+        await legalApi.accept('risk', 0)
+        queryClient.invalidateQueries({ queryKey: ['me', 'legal'] })
+      }
+
       const res = await accountApi.ctraderAuthUrl()
       if (!res.auth_url) {
         throw new Error('Gagal mendapatkan tautan otorisasi cTrader dari server.')
@@ -88,7 +113,18 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
   // Alur 2: Match-Trader Token
   const onSubmitMatchTrader = handleSubmit(async (values) => {
     setSubmitError(null)
+
+    if (!isRiskAccepted && !acceptRisk) {
+      setSubmitError('Harap centang persetujuan Disclaimer Risiko Trading sebelum menghubungkan akun broker.')
+      return
+    }
+
     try {
+      if (!isRiskAccepted) {
+        await legalApi.accept('risk', 0)
+        queryClient.invalidateQueries({ queryKey: ['me', 'legal'] })
+      }
+
       await createAccount.mutateAsync({
         broker_type: 'matchtrader',
         label: values.label,
@@ -101,6 +137,28 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
       reset()
       onDone?.()
     } catch (error) {
+      // Bila server masih menolak karena risk belum tercatat, coba terima sekali lagi lalu buat akun
+      if (error instanceof ApiError && error.message.toLowerCase().includes('disclaimer risiko')) {
+        try {
+          await legalApi.accept('risk', 0)
+          queryClient.invalidateQueries({ queryKey: ['me', 'legal'] })
+          await createAccount.mutateAsync({
+            broker_type: 'matchtrader',
+            label: values.label,
+            mode: values.mode,
+            risk_percent: Number(values.risk_percent),
+            is_dry_run: Boolean(values.is_dry_run),
+            token: values.token,
+            base_url: '',
+          })
+          reset()
+          onDone?.()
+          return
+        } catch (retryErr) {
+          setSubmitError(retryErr instanceof ApiError ? retryErr.message : 'Gagal menyimpan akun Match-Trader.')
+          return
+        }
+      }
       setSubmitError(error instanceof ApiError ? error.message : 'Gagal menyimpan akun Match-Trader.')
     }
   })
@@ -193,6 +251,41 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
               />
               <p className="text-[11px] text-muted-foreground">Rentang aman: 0,10% – 1,00%.</p>
             </div>
+          </div>
+
+          {/* Kotak Persetujuan Disclaimer Risiko Trading (Wajib sebelum koneksi akun broker) */}
+          <div className="rounded-xl border border-border/80 bg-secondary/15 p-3 space-y-1.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isRiskAccepted || acceptRisk}
+                disabled={isRiskAccepted}
+                onChange={(e) => {
+                  setAcceptRisk(e.target.checked)
+                  if (e.target.checked) setSubmitError(null)
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded accent-foreground"
+              />
+              <span className="text-[11.5px] leading-relaxed text-foreground">
+                Saya memahami risiko perdagangan derivatif dan menyetujui{' '}
+                <a
+                  href="/legal/risk"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline underline-offset-2 hover:text-primary inline-flex items-center gap-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Disclaimer Risiko Trading
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+                .
+                {isRiskAccepted && (
+                  <span className="ml-1 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                    (Sudah disetujui)
+                  </span>
+                )}
+              </span>
+            </label>
           </div>
 
           <div className="pt-2">
@@ -296,6 +389,41 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
             <input type="checkbox" className="h-4 w-4 accent-foreground" {...register('is_dry_run')} />
             <span>Jalankan sebagai simulasi (tidak mengirim order nyata ke broker)</span>
           </label>
+
+          {/* Kotak Persetujuan Disclaimer Risiko Trading (Wajib sebelum koneksi akun broker) */}
+          <div className="rounded-xl border border-border/80 bg-secondary/15 p-3 space-y-1.5">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isRiskAccepted || acceptRisk}
+                disabled={isRiskAccepted}
+                onChange={(e) => {
+                  setAcceptRisk(e.target.checked)
+                  if (e.target.checked) setSubmitError(null)
+                }}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded accent-foreground"
+              />
+              <span className="text-[11.5px] leading-relaxed text-foreground">
+                Saya memahami risiko perdagangan derivatif dan menyetujui{' '}
+                <a
+                  href="/legal/risk"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline underline-offset-2 hover:text-primary inline-flex items-center gap-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Disclaimer Risiko Trading
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+                .
+                {isRiskAccepted && (
+                  <span className="ml-1 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                    (Sudah disetujui)
+                  </span>
+                )}
+              </span>
+            </label>
+          </div>
 
           <Button type="submit" size="lg" className="w-full mt-1" isLoading={isSubmitting}>
             Hubungkan Akun Match-Trader

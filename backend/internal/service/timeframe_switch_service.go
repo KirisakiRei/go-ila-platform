@@ -211,32 +211,90 @@ func (s *timeframeSwitchService) Set(ctx context.Context, userID, accountID, sym
 	return s.Matrix(ctx, userID, symbol)
 }
 
-// pasanganTersedia menurunkan pasangan timeframe dari sinyal yang pernah masuk.
-//
-// Engine belum mengirim katalog resmi, jadi satu-satunya sumber yang jujur
-// adalah data nyata. Peta kosong berarti belum ada bukti — UI menampilkan
-// keadaan "menunggu engine" alih-alih daftar karangan.
-func (s *timeframeSwitchService) pasanganTersedia(ctx context.Context) (map[string][]dto.TimeframePair, error) {
-	if s.signals == nil {
-		return map[string][]dto.TimeframePair{}, nil
+// DefaultTimeframeCatalog menyediakan katalog baku pasangan timeframe untuk setiap strategi.
+// Ini memastikan UI saklar timeframe langsung menampilkan daftar pasangan resmi
+// tanpa menunggu sinyal pertama masuk dari engine.
+var DefaultTimeframeCatalog = map[string][]dto.TimeframePair{
+	"ila-2.0": {
+		{Htf: "W", Ltf: "H4", Label: "W · H4"},
+		{Htf: "D1", Ltf: "H1", Label: "D1 · H1"},
+		{Htf: "H4", Ltf: "M15", Label: "H4 · M15"},
+		{Htf: "H1", Ltf: "M5", Label: "H1 · M5"},
+	},
+	"ila-3.0": {
+		{Htf: "4H", Ltf: "5M", Label: "4H · 5M"},
+		{Htf: "D", Ltf: "15M", Label: "D · 15M"},
+		{Htf: "1H", Ltf: "5M", Label: "1H · 5M"},
+		{Htf: "W", Ltf: "1H", Label: "W · 1H"},
+	},
+}
+
+func normPair(htf, ltf string) string {
+	clean := func(s string) string {
+		s = strings.ToUpper(strings.TrimSpace(s))
+		switch s {
+		case "H4", "4H":
+			return "4H"
+		case "H1", "1H":
+			return "1H"
+		case "M15", "15M":
+			return "15M"
+		case "M5", "5M":
+			return "5M"
+		case "D1", "1D", "D":
+			return "D"
+		case "W1", "1W", "W":
+			return "W"
+		default:
+			return s
+		}
 	}
+	return clean(htf) + "|" + clean(ltf)
+}
+
+// pasanganTersedia mengembalikan pasangan timeframe baku yang digabung dengan
+// pasangan dari sinyal historis yang pernah masuk.
+func (s *timeframeSwitchService) pasanganTersedia(ctx context.Context) (map[string][]dto.TimeframePair, error) {
+	out := make(map[string][]dto.TimeframePair, len(DefaultTimeframeCatalog))
+	seen := make(map[string]map[string]struct{}, len(DefaultTimeframeCatalog))
+
+	for strat, defaultPairs := range DefaultTimeframeCatalog {
+		list := make([]dto.TimeframePair, len(defaultPairs))
+		copy(list, defaultPairs)
+		out[strat] = list
+
+		seen[strat] = make(map[string]struct{}, len(defaultPairs))
+		for _, p := range defaultPairs {
+			seen[strat][normPair(p.Htf, p.Ltf)] = struct{}{}
+		}
+	}
+
+	if s.signals == nil {
+		return out, nil
+	}
+
 	known, err := s.signals.ListKnownTimeframes(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make(map[string][]dto.TimeframePair, len(known))
 	for strategy, pairs := range known {
-		list := make([]dto.TimeframePair, 0, len(pairs))
-		for _, pair := range pairs {
-			list = append(list, dto.TimeframePair{
-				Htf:   pair.Htf,
-				Ltf:   pair.Ltf,
-				Label: pair.Htf + " · " + pair.Ltf,
-			})
+		if _, ok := seen[strategy]; !ok {
+			seen[strategy] = make(map[string]struct{})
 		}
-		out[strategy] = list
+		for _, pair := range pairs {
+			key := normPair(pair.Htf, pair.Ltf)
+			if _, dup := seen[strategy][key]; !dup {
+				seen[strategy][key] = struct{}{}
+				out[strategy] = append(out[strategy], dto.TimeframePair{
+					Htf:   pair.Htf,
+					Ltf:   pair.Ltf,
+					Label: pair.Htf + " · " + pair.Ltf,
+				})
+			}
+		}
 	}
+
 	return out, nil
 }
 

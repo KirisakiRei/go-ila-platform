@@ -114,6 +114,27 @@ export const systemApi = {
   status: () => request<SystemStatus>('/system/status'),
 }
 
+export const legalApi = {
+  me: () =>
+    request<{
+      documents: {
+        slug: string
+        title: string
+        current_version: number
+        accepted_version: number
+        accepted: boolean
+        require_reaccept: boolean
+      }[]
+      pending: { slug: string; title: string; required: boolean }[]
+      blocked: boolean
+    }>('/me/legal'),
+  accept: (slug: string, version = 0) =>
+    request<void>(`/me/legal/${encodeURIComponent(slug)}/accept`, {
+      method: 'POST',
+      body: { version },
+    }),
+}
+
 export const trialApi = {
   get: () => request<Trial>('/trial'),
   start: () => request<Trial>('/trial', { method: 'POST' }),
