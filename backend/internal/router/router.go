@@ -550,9 +550,13 @@ func registerAdmin(
 	}
 
 	// Tata kelola: lihat role dan katalog permission.
-	admin.GET("/roles", guard(http.MethodGet, "/roles", authz.RoleView))
-	admin.GET("/roles/:id", guard(http.MethodGet, "/roles/:id", authz.RoleView))
-	admin.GET("/permissions", guard(http.MethodGet, "/permissions", authz.RoleView))
+	//
+	// Handler wajib disertakan SETELAH guard. Tanpa itu, guard menjadi handler
+	// terakhir dan Gin membalas 200 dengan body kosong — panel menerjemahkannya
+	// sebagai "Balasan server tidak dapat dibaca".
+	admin.GET("/roles", guard(http.MethodGet, "/roles", authz.RoleView), roleHandler.List)
+	admin.GET("/roles/:id", guard(http.MethodGet, "/roles/:id", authz.RoleView), roleHandler.Detail)
+	admin.GET("/permissions", guard(http.MethodGet, "/permissions", authz.RoleView), roleHandler.Permissions)
 
 	// 2FA admin: opsional sebagai tambahan proteksi di atas kata sandi.
 	// Cukup sesi admin — mengatur faktor milik sendiri bukan kewenangan orang
@@ -573,18 +577,18 @@ func registerAdmin(
 
 	// Konten: dokumen legal berversi. Dokumen terbit tidak pernah diubah;
 	// perubahan berarti versi baru (plans/09 §2.1).
-	admin.GET("/legal", guard(http.MethodGet, "/legal", authz.CMSView))
-	admin.POST("/legal", guard(http.MethodPost, "/legal", authz.CMSEdit))
-	admin.PATCH("/legal/:id", guard(http.MethodPatch, "/legal/:id", authz.CMSEdit))
-	admin.POST("/legal/:id/publish", guard(http.MethodPost, "/legal/:id/publish", authz.CMSPublish))
+	admin.GET("/legal", guard(http.MethodGet, "/legal", authz.CMSView), legalHandler.AdminList)
+	admin.POST("/legal", guard(http.MethodPost, "/legal", authz.CMSEdit), legalHandler.AdminCreate)
+	admin.PATCH("/legal/:id", guard(http.MethodPatch, "/legal/:id", authz.CMSEdit), legalHandler.AdminUpdate)
+	admin.POST("/legal/:id/publish", guard(http.MethodPost, "/legal/:id/publish", authz.CMSPublish), legalHandler.AdminPublish)
 
 	// Tata kelola: ubah role dan penugasannya. Buat dan hapus dipisah dari
 	// RoleEdit agar pemberi izin bisa membatasi dampak tanpa mencabut
 	// kemampuan menyunting permission.
-	admin.POST("/roles", guard(http.MethodPost, "/roles", authz.RoleCreate))
-	admin.PATCH("/roles/:id", guard(http.MethodPatch, "/roles/:id", authz.RoleEdit))
-	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleDelete))
-	admin.PATCH("/users/:id/role", guard(http.MethodPatch, "/users/:id/role", authz.RoleEdit))
+	admin.POST("/roles", guard(http.MethodPost, "/roles", authz.RoleCreate), roleHandler.Create)
+	admin.PATCH("/roles/:id", guard(http.MethodPatch, "/roles/:id", authz.RoleEdit), roleHandler.Update)
+	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleDelete), roleHandler.Delete)
+	admin.PATCH("/users/:id/role", guard(http.MethodPatch, "/users/:id/role", authz.RoleEdit), roleHandler.Assign)
 
 	// Pelanggan: daftar, profil, dan aksi berlapis.
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.
