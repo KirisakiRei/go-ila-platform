@@ -105,6 +105,16 @@ services:
       LOG_MTLS_CERT: /certs/log-server.crt
       LOG_MTLS_KEY: /certs/log-server.key
       LOG_MTLS_CA: /certs/ca.crt
+      # Engine ILA 2.0 di VPS 1, dijangkau lewat IP lokal AWS (bukan publik).
+      # Kosong berarti Runner berjalan tanpa sinyal; sengaja dibiarkan bisa
+      # dikosongkan agar pengembangan tanpa engine tetap mungkin.
+      ENGINE_GRPC_ADDR: ${ENGINE_GRPC_ADDR:-}
+      ENGINE_MTLS_CERT: /certs/engine-client.crt
+      ENGINE_MTLS_KEY: /certs/engine-client.key
+      ENGINE_MTLS_CA: /certs/ca.crt
+      # Nama di sertifikat engine, bukan nama host jaringan: Runner menyambung
+      # ke IP, sedangkan sertifikat menyebutkan beberapa IP sekaligus.
+      ENGINE_SERVER_NAME: ""
     mem_limit: 160m
     cpus: "0.8"
     pids_limit: 200
