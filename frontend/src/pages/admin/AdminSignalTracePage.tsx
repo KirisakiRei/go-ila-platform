@@ -55,34 +55,73 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
     const cleanDetail = part.replace(/^[•\s\-_]+/, '').replace(/^💎\s*/, '')
     if (!cleanDetail) continue
 
-    if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl/i.test(cleanDetail)) {
-      points.push({
-        id: `sweep-${i}`,
-        title: strategyVersion === 'ila-3.0' ? 'HTF / MTF Liquidity Sweep' : 'HTF Liquidity Sweep',
-        detail: cleanDetail,
-        iconType: 'sweep',
-      })
-    } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal/i.test(cleanDetail)) {
-      points.push({
-        id: `trigger-${i}`,
-        title: 'LTF Trigger (CISD)',
-        detail: cleanDetail,
-        iconType: 'trigger',
-      })
-    } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
-      points.push({
-        id: `target-${i}`,
-        title: 'Target & DOL (Draw on Liquidity)',
-        detail: cleanDetail,
-        iconType: 'target',
-      })
+    if (strategyVersion === 'ila-3.0') {
+      if (/htf|macro|q1/i.test(cleanDetail)) {
+        points.push({
+          id: `htf-${i}`,
+          title: 'HTF Macro Bias & Key Level',
+          detail: cleanDetail,
+          iconType: 'sweep',
+        })
+      } else if (/mtf|reversal|retrace|internal|smt/i.test(cleanDetail)) {
+        points.push({
+          id: `mtf-${i}`,
+          title: 'MTF Structure & Alignment',
+          detail: cleanDetail,
+          iconType: 'trigger',
+        })
+      } else if (/ltf|cisd|entry\s*1|entry\s*2|trigger|break/i.test(cleanDetail)) {
+        points.push({
+          id: `ltf-${i}`,
+          title: 'LTF Trigger (CISD)',
+          detail: cleanDetail,
+          iconType: 'trigger',
+        })
+      } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+        points.push({
+          id: `target-${i}`,
+          title: 'Target & DOL (Draw on Liquidity)',
+          detail: cleanDetail,
+          iconType: 'target',
+        })
+      } else {
+        points.push({
+          id: `point-${i}`,
+          title: 'Market Structure Context',
+          detail: cleanDetail,
+          iconType: 'context',
+        })
+      }
     } else {
-      points.push({
-        id: `point-${i}`,
-        title: 'Market Structure Context',
-        detail: cleanDetail,
-        iconType: 'context',
-      })
+      if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl|htf/i.test(cleanDetail)) {
+        points.push({
+          id: `sweep-${i}`,
+          title: 'HTF Liquidity Sweep',
+          detail: cleanDetail,
+          iconType: 'sweep',
+        })
+      } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal|ltf/i.test(cleanDetail)) {
+        points.push({
+          id: `trigger-${i}`,
+          title: 'LTF Trigger (CISD)',
+          detail: cleanDetail,
+          iconType: 'trigger',
+        })
+      } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+        points.push({
+          id: `target-${i}`,
+          title: 'Target & DOL (Draw on Liquidity)',
+          detail: cleanDetail,
+          iconType: 'target',
+        })
+      } else {
+        points.push({
+          id: `point-${i}`,
+          title: 'Market Structure Context',
+          detail: cleanDetail,
+          iconType: 'context',
+        })
+      }
     }
   }
 

@@ -22,7 +22,7 @@ import {
 import { formatDualDateTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
-import { SIGNAL_LABEL, SIGNAL_TONE } from '../lib/status'
+import { SIGNAL_LABEL, SIGNAL_TONE, getCycleBadge, getIla3Mtf, getIla3Progress } from '../lib/status'
 import { TimeframeBadge } from './TimeframeBadge'
 import { TombolEksekusi } from './TombolEksekusi'
 
@@ -56,34 +56,73 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
     const cleanDetail = part.replace(/^[•\s\-_]+/, '').replace(/^💎\s*/, '')
     if (!cleanDetail) continue
 
-    if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl/i.test(cleanDetail)) {
-      points.push({
-        id: `sweep-${i}`,
-        title: strategyVersion === 'ila-3.0' ? 'HTF / MTF Liquidity Sweep' : 'HTF Liquidity Sweep',
-        detail: cleanDetail,
-        iconType: 'sweep',
-      })
-    } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal/i.test(cleanDetail)) {
-      points.push({
-        id: `trigger-${i}`,
-        title: 'LTF Trigger (CISD)',
-        detail: cleanDetail,
-        iconType: 'trigger',
-      })
-    } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
-      points.push({
-        id: `target-${i}`,
-        title: 'Target & DOL (Draw on Liquidity)',
-        detail: cleanDetail,
-        iconType: 'target',
-      })
+    if (strategyVersion === 'ila-3.0') {
+      if (/htf|macro|q1/i.test(cleanDetail)) {
+        points.push({
+          id: `htf-${i}`,
+          title: 'HTF Macro Bias & Key Level',
+          detail: cleanDetail,
+          iconType: 'sweep',
+        })
+      } else if (/mtf|reversal|retrace|internal|smt/i.test(cleanDetail)) {
+        points.push({
+          id: `mtf-${i}`,
+          title: 'MTF Structure & Alignment',
+          detail: cleanDetail,
+          iconType: 'trigger',
+        })
+      } else if (/ltf|cisd|entry\s*1|entry\s*2|trigger|break/i.test(cleanDetail)) {
+        points.push({
+          id: `ltf-${i}`,
+          title: 'LTF Trigger (CISD)',
+          detail: cleanDetail,
+          iconType: 'trigger',
+        })
+      } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+        points.push({
+          id: `target-${i}`,
+          title: 'Target & DOL (Draw on Liquidity)',
+          detail: cleanDetail,
+          iconType: 'target',
+        })
+      } else {
+        points.push({
+          id: `point-${i}`,
+          title: 'Market Structure Context',
+          detail: cleanDetail,
+          iconType: 'context',
+        })
+      }
     } else {
-      points.push({
-        id: `point-${i}`,
-        title: 'Market Structure Context',
-        detail: cleanDetail,
-        iconType: 'context',
-      })
+      if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl|htf/i.test(cleanDetail)) {
+        points.push({
+          id: `sweep-${i}`,
+          title: 'HTF Liquidity Sweep',
+          detail: cleanDetail,
+          iconType: 'sweep',
+        })
+      } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal|ltf/i.test(cleanDetail)) {
+        points.push({
+          id: `trigger-${i}`,
+          title: 'LTF Trigger (CISD)',
+          detail: cleanDetail,
+          iconType: 'trigger',
+        })
+      } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+        points.push({
+          id: `target-${i}`,
+          title: 'Target & DOL (Draw on Liquidity)',
+          detail: cleanDetail,
+          iconType: 'target',
+        })
+      } else {
+        points.push({
+          id: `point-${i}`,
+          title: 'Market Structure Context',
+          detail: cleanDetail,
+          iconType: 'context',
+        })
+      }
     }
   }
 
@@ -103,6 +142,11 @@ function Field({ label, value }: { label: string; value: string }) {
  * SignalDetail menampilkan satu sinyal radar dan parameter entry secara lengkap.
  */
 export function SignalDetail({ signal }: { signal: Signal }) {
+  const isILA3 = signal.strategy_version === 'ila-3.0'
+  const ila3Mtf = isILA3 ? getIla3Mtf(signal.htf, signal.ltf) : undefined
+  const cycleName = isILA3 ? getCycleBadge(signal.strategy_version, signal.htf, signal.ltf) : null
+  const ila3Prog = isILA3 ? getIla3Progress(signal.status) : null
+
   const isReady = signal.status === 'READY_TO_ENTRY' || signal.status === 'OPPORTUNITY'
   const isWaitLtf = signal.status === 'WAIT_LTF_CISD'
   const isHtfSweepDone = isWaitLtf || isReady
@@ -136,9 +180,14 @@ export function SignalDetail({ signal }: { signal: Signal }) {
             <Badge variant="outline" className="font-mono text-[10.5px]">
               {signal.strategy_version}
             </Badge>
+            {cycleName && (
+              <Badge variant="outline" className="text-[10px] font-medium border-primary/20 bg-primary/5 text-primary">
+                {cycleName}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
+            <TimeframeBadge htf={signal.htf} mtf={ila3Mtf} ltf={signal.ltf} />
             <StatusPill tone={SIGNAL_TONE[signal.status]}>
               {SIGNAL_LABEL[signal.status]}
             </StatusPill>
@@ -152,111 +201,267 @@ export function SignalDetail({ signal }: { signal: Signal }) {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-5 pt-5">
-        {/* Visual Radar Stepper: HTF vs LTF */}
+        {/* Visual Radar Stepper: HTF vs (MTF) vs LTF */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Progres Radar Analisis
             </span>
             <span className="text-[11px] text-muted-foreground">
-              {isReady ? '2 / 2 Selesai' : isWaitLtf ? '1 / 2 Terkonfirmasi' : '0 / 2 Memantau'}
+              {isILA3
+                ? ila3Prog?.label
+                : isReady
+                  ? '2 / 2 Selesai'
+                  : isWaitLtf
+                    ? '1 / 2 Terkonfirmasi'
+                    : '0 / 2 Memantau'}
             </span>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {/* Step 1: HTF */}
-            <div
-              className={cn(
-                'rounded-xl border p-3.5 transition-all',
-                isHtfSweepDone
-                  ? 'border-emerald-500/40 bg-emerald-500/5'
-                  : 'border-border bg-secondary/15',
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 font-semibold text-xs">
-                  {isHtfSweepDone ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <Clock className="h-4 w-4 text-muted-foreground animate-spin" />
-                  )}
-                  <span>HTF Sweep ({signal.htf || 'HTF'})</span>
+          {isILA3 ? (
+            /* Layout Khusus ILA 3.0: 3 Steppers (HTF, MTF, LTF) */
+            <div className="grid gap-3 sm:grid-cols-3">
+              {/* Step 1: HTF Macro Bias */}
+              <div
+                className={cn(
+                  'rounded-xl border p-3.5 transition-all',
+                  (ila3Prog?.step ?? 0) >= 1
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : 'border-amber-500/50 bg-amber-500/5 shadow-sm',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs">
+                    {(ila3Prog?.step ?? 0) >= 1 ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                    )}
+                    <span>HTF ({signal.htf || 'HTF'})</span>
+                  </div>
+                  <Badge
+                    variant={(ila3Prog?.step ?? 0) >= 1 ? 'solid' : 'outline'}
+                    className={cn(
+                      'text-[10px]',
+                      (ila3Prog?.step ?? 0) >= 1 && 'bg-emerald-600 text-white',
+                      (ila3Prog?.step ?? 0) < 1 && 'border-amber-500 text-amber-600 dark:text-amber-400',
+                    )}
+                  >
+                    {(ila3Prog?.step ?? 0) >= 1 ? 'Valid (Reached)' : 'Monitoring Level'}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={isHtfSweepDone ? 'solid' : 'outline'}
-                  className={cn(
-                    'text-[10px]',
-                    isHtfSweepDone && 'bg-emerald-600 text-white',
-                  )}
-                >
-                  {isHtfSweepDone ? 'Valid (Closed)' : 'Monitoring'}
-                </Badge>
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {(ila3Prog?.step ?? 0) >= 1
+                    ? 'HTF Key Level (ERL/Liquidity) valid disentuh/disapu. Macro bias aktif.'
+                    : 'Menunggu harga berinteraksi dengan Key Level HTF atau kondisi Q1 exception.'}
+                </p>
+                {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
+                    <span className="text-muted-foreground">Target DOL:</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatNumber(signal.htf_sweep.target_dol, 5)}
+                    </span>
+                  </div>
+                )}
               </div>
-              <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-                {isHtfSweepDone
-                  ? 'HTF liquidity sweep terkonfirmasi valid (Candle Closed).'
-                  : 'Menunggu HTF candle sweep & close pada liquidity level / FVG.'}
-              </p>
-              {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
-                <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
-                  <span className="text-muted-foreground">Target DOL:</span>
-                  <span className="font-semibold tabular-nums">
-                    {formatNumber(signal.htf_sweep.target_dol, 5)}
-                  </span>
-                </div>
-              )}
-            </div>
 
-            {/* Step 2: LTF */}
-            <div
-              className={cn(
-                'rounded-xl border p-3.5 transition-all',
-                isReady
-                  ? 'border-emerald-500/40 bg-emerald-500/5'
-                  : isWaitLtf
-                    ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
-                    : 'border-border/60 bg-secondary/10 opacity-75',
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 font-semibold text-xs">
-                  {isReady ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  ) : isWaitLtf ? (
-                    <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
-                  ) : (
-                    <Layers className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span>LTF Trigger ({signal.ltf || 'LTF'})</span>
+              {/* Step 2: MTF Structure Alignment */}
+              <div
+                className={cn(
+                  'rounded-xl border p-3.5 transition-all',
+                  (ila3Prog?.step ?? 0) >= 2
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : (ila3Prog?.step ?? 0) === 1
+                      ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
+                      : 'border-border/60 bg-secondary/10 opacity-75',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs">
+                    {(ila3Prog?.step ?? 0) >= 2 ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (ila3Prog?.step ?? 0) === 1 ? (
+                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                    ) : (
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>MTF ({ila3Mtf})</span>
+                  </div>
+                  <Badge
+                    variant={(ila3Prog?.step ?? 0) >= 2 ? 'solid' : 'outline'}
+                    className={cn(
+                      'text-[10px]',
+                      (ila3Prog?.step ?? 0) >= 2 && 'bg-emerald-600 text-white',
+                      (ila3Prog?.step ?? 0) === 1 && 'border-amber-500 text-amber-600 dark:text-amber-400',
+                    )}
+                  >
+                    {(ila3Prog?.step ?? 0) >= 2
+                      ? 'Valid (Aligned)'
+                      : (ila3Prog?.step ?? 0) === 1
+                        ? 'Waiting Reversal/Retr'
+                        : 'Pending HTF'}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={isReady ? 'solid' : 'outline'}
-                  className={cn(
-                    'text-[10px]',
-                    isReady && 'bg-emerald-600 text-white',
-                    isWaitLtf && 'border-amber-500 text-amber-600 dark:text-amber-400',
-                  )}
-                >
-                  {isReady ? 'Ready Setup' : isWaitLtf ? 'Waiting CISD Close' : 'Pending HTF'}
-                </Badge>
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {(ila3Prog?.step ?? 0) >= 2
+                    ? 'Struktur internal MTF & SMT terkonfirmasi selaras dengan bias HTF.'
+                    : (ila3Prog?.step ?? 0) === 1
+                      ? 'HTF selesai. Menunggu konfirmasi MTF reversal (Entry 1) atau FVG retracement (Entry 2).'
+                      : 'Fase MTF dimulai setelah harga berinteraksi dengan key level HTF.'}
+                </p>
               </div>
-              <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-                {isReady
-                  ? 'LTF CISD terkonfirmasi valid. Setup siap dieksekusi.'
-                  : isWaitLtf
-                    ? 'HTF sweep valid. Menunggu CISD body close pada LTF.'
-                    : 'Fase LTF trigger dimulai setelah HTF liquidity sweep selesai.'}
-              </p>
-              {signal.cisd && signal.cisd.cisd_level > 0 && (
-                <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
-                  <span className="text-muted-foreground">CISD Level:</span>
-                  <span className="font-semibold tabular-nums">
-                    {formatNumber(signal.cisd.cisd_level, 5)}
-                  </span>
+
+              {/* Step 3: LTF Trigger */}
+              <div
+                className={cn(
+                  'rounded-xl border p-3.5 transition-all',
+                  (ila3Prog?.step ?? 0) >= 3
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : (ila3Prog?.step ?? 0) === 2
+                      ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
+                      : 'border-border/60 bg-secondary/10 opacity-75',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs">
+                    {(ila3Prog?.step ?? 0) >= 3 ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (ila3Prog?.step ?? 0) === 2 ? (
+                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                    ) : (
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>LTF ({signal.ltf || 'LTF'})</span>
+                  </div>
+                  <Badge
+                    variant={(ila3Prog?.step ?? 0) >= 3 ? 'solid' : 'outline'}
+                    className={cn(
+                      'text-[10px]',
+                      (ila3Prog?.step ?? 0) >= 3 && 'bg-emerald-600 text-white',
+                      (ila3Prog?.step ?? 0) === 2 && 'border-amber-500 text-amber-600 dark:text-amber-400',
+                    )}
+                  >
+                    {(ila3Prog?.step ?? 0) >= 3
+                      ? 'Setup Ready'
+                      : (ila3Prog?.step ?? 0) === 2
+                        ? 'Waiting CISD Close'
+                        : 'Pending MTF'}
+                  </Badge>
                 </div>
-              )}
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {(ila3Prog?.step ?? 0) >= 3
+                    ? 'Konfirmasi CISD body-break-body pada LTF valid. Setup siap dieksekusi.'
+                    : (ila3Prog?.step ?? 0) === 2
+                      ? 'Struktur HTF & MTF valid. Menunggu candle LTF body close menembus CISD origin.'
+                      : 'Fase trigger LTF dimulai setelah struktur MTF terkonfirmasi.'}
+                </p>
+                {signal.cisd && signal.cisd.cisd_level > 0 && (
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
+                    <span className="text-muted-foreground">CISD Level:</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatNumber(signal.cisd.cisd_level, 5)}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Layout Standar ILA 2.0: 2 Steppers (HTF & LTF) */
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* Step 1: HTF */}
+              <div
+                className={cn(
+                  'rounded-xl border p-3.5 transition-all',
+                  isHtfSweepDone
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : 'border-border bg-secondary/15',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs">
+                    {isHtfSweepDone ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-muted-foreground animate-spin" />
+                    )}
+                    <span>HTF Sweep ({signal.htf || 'HTF'})</span>
+                  </div>
+                  <Badge
+                    variant={isHtfSweepDone ? 'solid' : 'outline'}
+                    className={cn(
+                      'text-[10px]',
+                      isHtfSweepDone && 'bg-emerald-600 text-white',
+                    )}
+                  >
+                    {isHtfSweepDone ? 'Valid (Closed)' : 'Monitoring'}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {isHtfSweepDone
+                    ? 'HTF liquidity sweep terkonfirmasi valid (Candle Closed).'
+                    : 'Menunggu HTF candle sweep & close pada liquidity level / FVG.'}
+                </p>
+                {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
+                    <span className="text-muted-foreground">Target DOL:</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatNumber(signal.htf_sweep.target_dol, 5)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: LTF */}
+              <div
+                className={cn(
+                  'rounded-xl border p-3.5 transition-all',
+                  isReady
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : isWaitLtf
+                      ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
+                      : 'border-border/60 bg-secondary/10 opacity-75',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs">
+                    {isReady ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    ) : isWaitLtf ? (
+                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                    ) : (
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span>LTF Trigger ({signal.ltf || 'LTF'})</span>
+                  </div>
+                  <Badge
+                    variant={isReady ? 'solid' : 'outline'}
+                    className={cn(
+                      'text-[10px]',
+                      isReady && 'bg-emerald-600 text-white',
+                      isWaitLtf && 'border-amber-500 text-amber-600 dark:text-amber-400',
+                    )}
+                  >
+                    {isReady ? 'Ready Setup' : isWaitLtf ? 'Waiting CISD Close' : 'Pending HTF'}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {isReady
+                    ? 'LTF CISD terkonfirmasi valid. Setup siap dieksekusi.'
+                    : isWaitLtf
+                      ? 'HTF sweep valid. Menunggu CISD body close pada LTF.'
+                      : 'Fase LTF trigger dimulai setelah HTF liquidity sweep selesai.'}
+                </p>
+                {signal.cisd && signal.cisd.cisd_level > 0 && (
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
+                    <span className="text-muted-foreground">CISD Level:</span>
+                    <span className="font-semibold tabular-nums">
+                      {formatNumber(signal.cisd.cisd_level, 5)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Parameter Order (Hanya jika harga lengkap atau status siap) */}

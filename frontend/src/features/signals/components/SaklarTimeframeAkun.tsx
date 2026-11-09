@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { Badge, Card, CardContent, Skeleton } from '@/components/ui'
+import { getCycleBadge } from '@/features/signals/lib/status'
 import { useSetTimeframeSwitch, useTimeframeSwitchMatrix } from '@/lib/queries'
 import type { StrategyVersion, TimeframeSwitchItem } from '@/types/api'
 import { cn } from '@/lib/utils'
@@ -181,16 +182,7 @@ function kirim(
   ubah.mutate({ accountID: account.account_id, strategy, pairs })
 }
 
-function getCycleBadge(strategy: string, htf: string, ltf: string): string | null {
-  if (strategy !== 'ila-3.0') return null
-  const h = htf.toUpperCase().replace(/\s+/g, '')
-  const l = ltf.toUpperCase().replace(/\s+/g, '')
-  if ((h === '4H' || h === 'H4') && (l === '5M' || l === 'M5')) return 'Daily · New Day'
-  if ((h === 'D' || h === 'D1' || h === '1D') && (l === '15M' || l === 'M15')) return 'Weekly · New Week'
-  if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M · Intraday'
-  if ((h === 'W' || h === 'W1' || h === '1W') && (l === '1H' || l === 'H1')) return 'Monthly · New Month'
-  return null
-}
+
 
 function Saklar({
   menyala,

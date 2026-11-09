@@ -9,18 +9,19 @@ import { Badge } from '@/components/ui'
  */
 export function TimeframeBadge({
   htf,
+  mtf,
   ltf,
   className,
 }: {
   htf?: string
+  mtf?: string
   ltf?: string
   className?: string
 }) {
-  const atas = (htf ?? '').trim()
-  const bawah = (ltf ?? '').trim()
-  if (!atas && !bawah) return null
+  const tfs = [htf, mtf, ltf].map((t) => (t ?? '').trim()).filter(Boolean)
+  if (tfs.length === 0) return null
 
-  const label = atas && bawah ? `${atas} · ${bawah}` : atas || bawah
+  const label = tfs.join(' · ')
 
   return (
     <Badge variant="muted" className={className ? `text-[10px] ${className}` : 'text-[10px]'}>

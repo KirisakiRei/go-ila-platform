@@ -43,3 +43,49 @@ export const SIGNAL_TONE: Record<SignalStatus, 'solid' | 'outline' | 'neutral' |
 export function isFinal(status: SignalStatus): boolean {
   return ['EXPIRED', 'CANCELLED', 'SUPERSEDED', 'SKIPPED', 'CONSUMED', 'INVALIDATED'].includes(status)
 }
+
+/** Mengembalikan nama siklus ILA 3.0 berdasarkan pasangan HTF & LTF */
+export function getCycleBadge(strategy: string, htf: string, ltf: string): string | null {
+  if (strategy !== 'ila-3.0') return null
+  const h = (htf || '').toUpperCase().replace(/\s+/g, '')
+  const l = (ltf || '').toUpperCase().replace(/\s+/g, '')
+  if ((h === '4H' || h === 'H4') && (l === '5M' || l === 'M5')) return 'Daily · New Day'
+  if ((h === 'D' || h === 'D1' || h === '1D') && (l === '15M' || l === 'M15')) return 'Weekly · New Week'
+  if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M · Intraday'
+  if ((h === 'W' || h === 'W1' || h === '1W') && (l === '1H' || l === 'H1')) return 'Monthly · New Month'
+  return null
+}
+
+/** Menentukan timeframe medium (MTF) dari ILA 3.0 berdasarkan HTF dan LTF */
+export function getIla3Mtf(htf: string, ltf: string): string {
+  const h = (htf || '').toUpperCase().replace(/\s+/g, '')
+  const l = (ltf || '').toUpperCase().replace(/\s+/g, '')
+  if ((h === '4H' || h === 'H4') && (l === '5M' || l === 'M5')) return '1H'
+  if ((h === 'D' || h === 'D1' || h === '1D') && (l === '15M' || l === 'M15')) return '4H'
+  if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '15M'
+  if ((h === 'W' || h === 'W1' || h === '1W') && (l === '1H' || l === 'H1')) return '4H'
+  return 'MTF'
+}
+
+/** Menghitung progres langkah ILA 3.0 dari status sinyal */
+export function getIla3Progress(status: string): { step: number; label: string } {
+  const s = (status || '').toUpperCase()
+  if (
+    s === 'READY_TO_ENTRY' ||
+    s === 'READY_ENTRY_1' ||
+    s === 'READY_ENTRY_2' ||
+    s === 'OPPORTUNITY' ||
+    s === 'CONSUMED' ||
+    s.includes('EXPANSION') ||
+    s.includes('TARGET_REACHED')
+  ) {
+    return { step: 3, label: '3 / 3 Selesai (Setup Ready)' }
+  }
+  if (s.includes('LTF') || s.includes('CISD')) {
+    return { step: 2, label: '2 / 3 Terkonfirmasi (LTF Trigger Phase)' }
+  }
+  if (s.includes('MTF') || s.includes('REVERSAL') || s.includes('RETR')) {
+    return { step: 1, label: '1 / 3 Terkonfirmasi (MTF Alignment Phase)' }
+  }
+  return { step: 0, label: '0 / 3 Memantau (HTF Key Level Phase)' }
+}
