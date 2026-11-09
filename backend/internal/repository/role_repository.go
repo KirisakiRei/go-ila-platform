@@ -73,14 +73,37 @@ func (r *roleRepository) SyncCatalog(ctx context.Context, permissions []authz.Pe
 	})
 }
 
-// SeedDefaultRoles membuat role bawaan bila belum ada. Role yang sudah ada
-// tidak diubah agar kustomisasi admin tidak tertimpa setiap start.
+// SeedDefaultRoles membuat role bawaan bila belum ada, dan menambal
+// permission yang BARU masuk katalog pada role yang sudah ada.
+//
+// Latar: `SyncCatalog` hanya meng-upsert tabel permission, sehingga permission
+// yang ditambahkan ke katalog tidak pernah sampai ke role bawaan yang sudah
+// terlanjur dibuat. Akibatnya role `superadmin` di server tidak memegang
+// seluruh katalog (pernah: 35 dari 37; `role.create`/`role.delete` hilang).
+//
+// Aturan yang tetap dipegang: role yang sudah ada TIDAK diganti isinya, jadi
+// kustomisasi admin tidak tertimpa setiap migrasi. Yang ditambal hanya
+// permission baru — dibatasi pada permission yang belum dimiliki role bawaan
+// mana pun mana pun sebelum migrasi ini. Bila permission itu sudah pernah
+// dipegang role bawaan lain, artinya migrasi sebelumnya sudah memprosesnya,
+// dan pencabutan di role ini adalah keputusan admin yang harus dihormati.
 func (r *roleRepository) SeedDefaultRoles(ctx context.Context, roles []authz.DefaultRole) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		pernahDimiliki, err := permissionsPernahSeed(tx)
+		if err != nil {
+			return err
+		}
+
 		for _, def := range roles {
 			var existing model.Role
 			err := tx.Where("code = ?", def.Code).Take(&existing).Error
 			if err == nil {
+				// Role sudah ada: hanya prefix permission yang benar-benar baru.
+				// Role buatan sendiri tidak masuk daftar bawaan, jadi jalur ini
+				// hanya menyentuh role is_system.
+				if err := backfillRolePermissions(tx, existing.ID, def.Permissions, pernahDimiliki); err != nil {
+					return fmt.Errorf("menambal permission role %s: %w", def.Code, err)
+				}
 				continue
 			}
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -102,6 +125,36 @@ func (r *roleRepository) SeedDefaultRoles(ctx context.Context, roles []authz.Def
 		}
 		return nil
 	})
+}
+
+// permissionsPernahSeed mengumpulkan permission yang sudah dipegang role
+// bawaan mana pun SEBELUM migrasi ini menambal.
+//
+// Himpunan ini dipakai sebagai penanda "permission lama": permission yang ada
+// di sini sudah pernah diproses migrasi, sehingga tidak ada yang perlu ditambal
+// untuknya. Karena seluruh role bawaan di-seed dalam satu transaksi yang sama,
+// permission yang benar-benar baru tidak akan muncul di sini pada jalannya seed
+// pertama, lalu otomatis dianggap lama pada migrasi berikutnya.
+func permissionsPernahSeed(tx *gorm.DB) (map[string]bool, error) {
+	codes := make([]string, 0, len(authz.DefaultRoles()))
+	for _, def := range authz.DefaultRoles() {
+		codes = append(codes, def.Code)
+	}
+
+	var keys []string
+	if err := tx.Model(&model.RolePermission{}).
+		Joins("JOIN role ON role.id = role_permission.role_id").
+		Where("role.code IN ?", codes).
+		Distinct().
+		Pluck("role_permission.permission_id", &keys).Error; err != nil {
+		return nil, fmt.Errorf("membaca permission bawaan yang sudah ada: %w", err)
+	}
+
+	set := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		set[key] = true
+	}
+	return set, nil
 }
 
 func (r *roleRepository) ListPermissions(ctx context.Context) ([]model.Permission, error) {
@@ -246,6 +299,49 @@ func (r *roleRepository) CountActiveAdmins(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("menghitung admin aktif: %w", err)
 	}
 	return total, nil
+}
+
+// backfillRolePermissions menambahkan permission baru katalog yang belum
+// dipegang role ini, tanpa menyentuh yang sudah ada.
+//
+// `pernahDimiliki` berisi permission yang sudah ada sebelum migrasi ini. Key di
+// dalamnya sengaja dilewati walau tidak dipegang role ini: itu tanda migrasi
+// sebelumnya sudah memprosesnya, dan ketiadaannya adalah keputusan admin.
+func backfillRolePermissions(tx *gorm.DB, roleID string, keys []string, pernahDimiliki map[string]bool) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	var owned []string
+	if err := tx.Model(&model.RolePermission{}).
+		Where("role_id = ?", roleID).
+		Pluck("permission_id", &owned).Error; err != nil {
+		return fmt.Errorf("membaca permission role: %w", err)
+	}
+
+	have := make(map[string]struct{}, len(owned))
+	for _, key := range owned {
+		have[key] = struct{}{}
+	}
+
+	missing := make([]model.RolePermission, 0, len(keys))
+	for _, key := range keys {
+		if _, ok := have[key]; ok {
+			continue
+		}
+		if pernahDimiliki[key] {
+			continue
+		}
+		missing = append(missing, model.RolePermission{RoleID: roleID, PermissionID: key})
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	if err := tx.Create(&missing).Error; err != nil {
+		return fmt.Errorf("menambah permission role: %w", err)
+	}
+	return nil
 }
 
 func replaceRolePermissions(tx *gorm.DB, roleID string, keys []string) error {
