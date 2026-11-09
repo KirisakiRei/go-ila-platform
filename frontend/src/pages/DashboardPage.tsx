@@ -10,6 +10,7 @@ import { SystemHealthCard } from './components/SystemHealthCard'
 import { MarketSessionCard } from '@/features/trading/components/MarketSessionCard'
 import { OnboardingCard } from '@/features/onboarding'
 import { AccountStatusCard } from './components/AccountStatusCard'
+import { RadarPantauanCard } from './components/RadarPantauanCard'
 
 function SummaryStats() {
   const { data, isLoading } = useSystemStatus()
@@ -122,6 +123,9 @@ export default function DashboardPage() {
       <OnboardingCard />
 
       <SummaryStats />
+
+      {/* Radar Pair Pantauan Real-Time */}
+      <RadarPantauanCard />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <DailyLimitCard />

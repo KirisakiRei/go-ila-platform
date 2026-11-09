@@ -120,6 +120,23 @@ func FormatFinishedMessage(symbol, reason string) Message {
 	)}
 }
 
+// FormatRadarStepMessage menyusun notifikasi kemajuan radar setup tanpa membocorkan istilah internal.
+func FormatRadarStepMessage(symbol, strategy, htf, ltf, stepName, link string) Message {
+	var b strings.Builder
+	fmt.Fprintf(&b, "⏳ RADAR %s — %s\n", strings.ToUpper(strategy), symbol)
+	if htf != "" && ltf != "" {
+		fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n", htf, ltf)
+	}
+	fmt.Fprintf(&b, "Tahap: %s\n", stepName)
+	b.WriteString("Menunggu konfirmasi penutupan harga.\n\n")
+	if link != "" {
+		fmt.Fprintf(&b, "[ Buka Radar Dashboard ](%s)\n", link)
+	} else {
+		b.WriteString("Pantau perkembangan langsung di dashboard.\n")
+	}
+	return Message{Text: b.String()}
+}
+
 // FormatClosedMessage merangkum posisi yang sudah ditutup.
 func FormatClosedMessage(symbol, result string, entry, exit, pnl, outcomeR float64, dailyNote string) Message {
 	text := fmt.Sprintf(

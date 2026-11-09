@@ -3,6 +3,7 @@ package ingest
 import (
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	enginev1 "ila/backend/gen/engine/v1"
@@ -18,20 +19,40 @@ func ConvertSignal(in *enginev1.Signal) (*model.Signal, bool) {
 		return nil, false
 	}
 
+	status := statusName(in.GetStatus())
+	if status == "" {
+		return nil, false
+	}
+
 	direction := directionName(in.GetDirection())
 	if direction == "" {
-		return nil, false
+		// Sinyal yang siap entry wajib punya arah BUY atau SELL.
+		// Sinyal pantauan / radar (WAIT_*) boleh NEUTRAL bila belum ada bias.
+		if status == model.SignalStatusReadyToEntry {
+			return nil, false
+		}
+		direction = "NEUTRAL"
 	}
 
 	publishedAt := timestampOrZero(in.GetPublishedAt())
 	expiresAt := timestampOrZero(in.GetExpiresAt())
 
-	status := statusName(in.GetStatus())
-
 	// Sinyal tanpa TTL tidak boleh dieksekusi: batas waktu adalah bagian
 	// dari kontrak, bukan pelengkap opsional.
 	if expiresAt.IsZero() {
 		expiresAt = publishedAt
+	}
+
+	var htfSweepJSON, cisdJSON string
+	if in.GetHtfSweep() != nil {
+		if b, err := protojson.Marshal(in.GetHtfSweep()); err == nil {
+			htfSweepJSON = string(b)
+		}
+	}
+	if in.GetCisd() != nil {
+		if b, err := protojson.Marshal(in.GetCisd()); err == nil {
+			cisdJSON = string(b)
+		}
 	}
 
 	return &model.Signal{
@@ -49,6 +70,8 @@ func ConvertSignal(in *enginev1.Signal) (*model.Signal, bool) {
 		Status:          status,
 		Summary:         in.GetSummary(),
 		NextAction:      in.GetNextAction(),
+		HtfSweepJSON:    htfSweepJSON,
+		CisdJSON:        cisdJSON,
 		PublishedAt:     publishedAt,
 		ExpiresAt:       expiresAt,
 	}, true

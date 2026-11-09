@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"ila/backend/internal/dto"
@@ -126,6 +127,19 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 			PublishedAt:     signal.PublishedAt,
 			ExpiresAt:       signal.ExpiresAt,
 			Delayed:         delayed,
+		}
+
+		if signal.HtfSweepJSON != "" {
+			var sweep dto.SignalHtfSweep
+			if err := json.Unmarshal([]byte(signal.HtfSweepJSON), &sweep); err == nil {
+				view.HtfSweep = &sweep
+			}
+		}
+		if signal.CisdJSON != "" {
+			var cisd dto.SignalCISD
+			if err := json.Unmarshal([]byte(signal.CisdJSON), &cisd); err == nil {
+				view.Cisd = &cisd
+			}
 		}
 
 		if us, usErr := s.userSignal.FindUserSignal(ctx, userID, signal.SignalID); usErr == nil && us != nil {

@@ -246,7 +246,7 @@ export function useSignals(limit = 50) {
   return useQuery({
     queryKey: queryKeys.signals(limit),
     queryFn: () => tradingApi.signals(limit),
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   })
 }
 

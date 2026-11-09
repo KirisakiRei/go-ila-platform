@@ -96,6 +96,15 @@ export default function SignalsPage() {
     return pairPositions.filter((p) => p.strategy_version === activeStrategyFilter)
   }, [pairPositions, activeStrategyFilter])
 
+  // Pagination untuk riwayat setup sinyal agar tidak melar panjang ke bawah
+  const [historyPage, setHistoryPage] = useState(1)
+  const historyPerPage = 5
+  const totalHistoryPages = Math.ceil(filteredSignals.length / historyPerPage) || 1
+  const paginatedSignals = useMemo(() => {
+    const start = (historyPage - 1) * historyPerPage
+    return filteredSignals.slice(start, start + historyPerPage)
+  }, [filteredSignals, historyPage])
+
   // Sinyal terbaru dari pair yang dipilih
   const latestSignal = filteredSignals[0] ?? null
 
@@ -162,7 +171,10 @@ export default function SignalsPage() {
                     size="sm"
                     variant={activeStrategyFilter === strat ? 'default' : 'outline'}
                     className="h-8 text-xs font-medium"
-                    onClick={() => setActiveStrategyFilter(strat)}
+                    onClick={() => {
+                      setActiveStrategyFilter(strat)
+                      setHistoryPage(1)
+                    }}
                   >
                     {strat === 'all' ? 'Semua Metode' : strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
                   </Button>
@@ -175,25 +187,7 @@ export default function SignalsPage() {
             </div>
           </div>
 
-          {/* Saklar metode per akun untuk pair ini. Pair dipantau seluruh metode,
-              tetapi tiap akun bebas memilih mana yang dieksekusi. */}
-          <Section
-            title="Metode per Akun"
-            description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Pair tetap dipantau seluruh metode.`}
-          >
-            <SaklarMetodeAkun symbol={activePair} />
-          </Section>
-
-          {/* Pasangan timeframe milik aturan trading ILA. Di sini user memilih
-              mana yang dipantau dan mana yang boleh dieksekusi otomatis. */}
-          <Section
-            title="Timeframe per Akun"
-            description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}. Pasangan mengikuti aturan trading ILA.`}
-          >
-            <SaklarTimeframeAkun symbol={activePair} />
-          </Section>
-
-          {/* Sinyal Aktif / Terakhir */}
+          {/* Sinyal Aktif / Terakhir & Histori Setup Langsung di Atas */}
           <div className="grid gap-6 lg:grid-cols-12">
             <div className="lg:col-span-7 space-y-6">
               <Section
@@ -210,142 +204,237 @@ export default function SignalsPage() {
                   </Card>
                 )}
               </Section>
-
-              {/* Riwayat Posisi / Eksekusi Tiket */}
-              <Section
-                title="Riwayat Eksekusi Tiket"
-                description={`Catatan entry posisi riil broker yang dieksekusi dari sinyal ${activePair}.`}
-              >
-                {loadingPositions ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : filteredPositions.length === 0 ? (
-                  <EmptyState
-                    title="Belum ada riwayat posisi"
-                    description={`Belum ada eksekusi transaksi yang tercatat pada instrumen ${activePair}.`}
-                  />
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-border bg-secondary/50 text-muted-foreground">
-                        <tr>
-                          <th className="px-3.5 py-2.5 font-medium">Tiket / Waktu</th>
-                          <th className="px-3.5 py-2.5 font-medium">Arah</th>
-                          <th className="px-3.5 py-2.5 font-medium">Metode</th>
-                          <th className="px-3.5 py-2.5 font-medium">Lot</th>
-                          <th className="px-3.5 py-2.5 font-medium">Harga Open</th>
-                          <th className="px-3.5 py-2.5 font-medium">Status / PnL</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {filteredPositions.map((pos) => (
-                          <tr key={pos.id} className="hover:bg-secondary/30 transition-colors">
-                            <td className="px-3.5 py-2.5 font-mono">
-                              <p className="font-semibold text-foreground">#{pos.ticket_number || pos.id.slice(0, 8)}</p>
-                              <p className="text-[10.5px] text-muted-foreground">{formatDateTime(pos.opened_at)}</p>
-                            </td>
-                            <td className="px-3.5 py-2.5">
-                              <span
-                                className={cn(
-                                  'inline-flex items-center gap-1 font-semibold',
-                                  pos.direction === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400',
-                                )}
-                              >
-                                {pos.direction === 'BUY' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                {pos.direction}
-                              </span>
-                            </td>
-                            <td className="px-3.5 py-2.5">
-                              <Badge variant="outline" className="text-[10px]">
-                                {pos.strategy_version}
-                              </Badge>
-                            </td>
-                            <td className="px-3.5 py-2.5 tabular-nums font-medium">{pos.lot_size}</td>
-                            <td className="px-3.5 py-2.5 tabular-nums">{formatNumber(pos.open_price, 5)}</td>
-                            <td className="px-3.5 py-2.5">
-                              <div className="space-y-0.5">
-                                <Badge variant={pos.status.startsWith('CLOSED_TP') ? 'solid' : 'outline'} className="text-[10px]">
-                                  {pos.status}
-                                </Badge>
-                                {pos.pnl_known && (
-                                  <p
-                                    className={cn(
-                                      'text-[11px] font-semibold tabular-nums',
-                                      pos.profit_loss >= 0 ? 'text-emerald-600' : 'text-rose-600',
-                                    )}
-                                  >
-                                    {formatMoney(pos.profit_loss)} ({formatR(pos.outcome_r)})
-                                  </p>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </Section>
             </div>
 
-            {/* Riwayat Seluruh Sinyal Pair Ini */}
+            {/* Riwayat Setup Sinyal Pair Ini dengan Pagination */}
             <div className="lg:col-span-5">
               <Section
                 title="Histori Setup Sinyal"
                 description={`${filteredSignals.length} setup terakhir pada ${activePair}`}
               >
-                <div className="space-y-2.5">
-                  {filteredSignals.map((signal) => (
-                    <div
-                      key={signal.signal_id}
-                      className="rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-zinc-300"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              'inline-flex items-center gap-1 font-bold text-xs',
-                              signal.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
-                            )}
+                {filteredSignals.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-6 text-center text-xs text-muted-foreground">
+                      Belum ada riwayat setup pada pair {activePair}.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2.5">
+                    {paginatedSignals.map((signal) => (
+                      <div
+                        key={signal.signal_id}
+                        className="rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-zinc-300"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 font-bold text-xs',
+                                signal.direction === 'BUY'
+                                  ? 'text-emerald-600'
+                                  : signal.direction === 'SELL'
+                                    ? 'text-rose-600'
+                                    : 'text-muted-foreground',
+                              )}
+                            >
+                              {signal.direction === 'BUY' ? (
+                                <TrendingUp className="h-3.5 w-3.5" />
+                              ) : signal.direction === 'SELL' ? (
+                                <TrendingDown className="h-3.5 w-3.5" />
+                              ) : null}
+                              {signal.direction}
+                            </span>
+                            <Badge variant="outline" className="text-[10.5px]">
+                              {signal.strategy_version}
+                            </Badge>
+                            <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
+                          </div>
+                          <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[11px]">
+                            {SIGNAL_LABEL[signal.status]}
+                          </StatusPill>
+                        </div>
+
+                        {signal.entry_price > 0 && (
+                          <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-border pt-2 text-[11.5px]">
+                            <div>
+                              <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
+                              <p className="font-semibold tabular-nums font-mono">
+                                {formatNumber(signal.entry_price, 5)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
+                              <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
+                                {formatNumber(signal.stop_loss, 4)} /{' '}
+                                {formatNumber(signal.take_profit, 4)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] uppercase text-muted-foreground">R:R</p>
+                              <p className="font-semibold tabular-nums font-mono">
+                                1:{formatNumber(signal.risk_reward, 2)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
+                          <span>Terbit: {formatDateTime(signal.published_at)}</span>
+                          {signal.delayed && (
+                            <span className="font-semibold uppercase text-amber-600">Telat</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Pagination Controls */}
+                    {totalHistoryPages > 1 && (
+                      <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5 text-xs">
+                        <span className="text-[11px] text-muted-foreground">
+                          Halaman {historyPage} dari {totalHistoryPages}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2.5 text-xs"
+                            disabled={historyPage <= 1}
+                            onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
                           >
-                            {signal.direction === 'BUY' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                            {signal.direction}
-                          </span>
-                          			<Badge variant="outline" className="text-[10.5px]">
-                            {signal.strategy_version}
-                          </Badge>
-                          <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
-                        </div>
-                        <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[11px]">
-                          {SIGNAL_LABEL[signal.status]}
-                        </StatusPill>
-                      </div>
-
-                      <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-border pt-2 text-[11.5px]">
-                        <div>
-                          <p className="text-[10px] text-muted-foreground uppercase">Entry</p>
-                          <p className="font-semibold tabular-nums">{formatNumber(signal.entry_price, 5)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground uppercase">SL / TP</p>
-                          <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
-                            {formatNumber(signal.stop_loss, 4)} / {formatNumber(signal.take_profit, 4)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-muted-foreground uppercase">R:R</p>
-                          <p className="font-semibold tabular-nums">1:{formatNumber(signal.risk_reward, 2)}</p>
+                            Sebelumnya
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2.5 text-xs"
+                            disabled={historyPage >= totalHistoryPages}
+                            onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                          >
+                            Selanjutnya
+                          </Button>
                         </div>
                       </div>
-
-                      <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
-                        <span>Terbit: {formatDateTime(signal.published_at)}</span>
-                        {signal.delayed && <span className="font-semibold uppercase text-amber-600">Telat</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                )}
               </Section>
             </div>
+          </div>
+
+          {/* Riwayat Posisi / Eksekusi Tiket */}
+          <Section
+            title="Riwayat Eksekusi Tiket"
+            description={`Catatan entry posisi riil broker yang dieksekusi dari sinyal ${activePair}.`}
+          >
+            {loadingPositions ? (
+              <Skeleton className="h-32 w-full" />
+            ) : filteredPositions.length === 0 ? (
+              <EmptyState
+                title="Belum ada riwayat posisi"
+                description={`Belum ada eksekusi transaksi yang tercatat pada instrumen ${activePair}.`}
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-border bg-secondary/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-3.5 py-2.5 font-medium">Tiket / Waktu</th>
+                      <th className="px-3.5 py-2.5 font-medium">Arah</th>
+                      <th className="px-3.5 py-2.5 font-medium">Metode</th>
+                      <th className="px-3.5 py-2.5 font-medium">Lot</th>
+                      <th className="px-3.5 py-2.5 font-medium">Harga Open</th>
+                      <th className="px-3.5 py-2.5 font-medium">Status / PnL</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredPositions.map((pos) => (
+                      <tr key={pos.id} className="hover:bg-secondary/30 transition-colors">
+                        <td className="px-3.5 py-2.5 font-mono">
+                          <p className="font-semibold text-foreground">
+                            #{pos.ticket_number || pos.id.slice(0, 8)}
+                          </p>
+                          <p className="text-[10.5px] text-muted-foreground">
+                            {formatDateTime(pos.opened_at)}
+                          </p>
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 font-semibold',
+                              pos.direction === 'BUY'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-rose-600 dark:text-rose-400',
+                            )}
+                          >
+                            {pos.direction === 'BUY' ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            {pos.direction}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <Badge variant="outline" className="text-[10px]">
+                            {pos.strategy_version}
+                          </Badge>
+                        </td>
+                        <td className="px-3.5 py-2.5 tabular-nums font-medium">{pos.lot_size}</td>
+                        <td className="px-3.5 py-2.5 tabular-nums">
+                          {formatNumber(pos.open_price, 5)}
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <div className="space-y-0.5">
+                            <Badge
+                              variant={pos.status.startsWith('CLOSED_TP') ? 'solid' : 'outline'}
+                              className="text-[10px]"
+                            >
+                              {pos.status}
+                            </Badge>
+                            {pos.pnl_known && (
+                              <p
+                                className={cn(
+                                  'text-[11px] font-semibold tabular-nums',
+                                  pos.profit_loss >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                                )}
+                              >
+                                {formatMoney(pos.profit_loss)} ({formatR(pos.outcome_r)})
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+
+          {/* Konfigurasi Akun untuk Pair Ini */}
+          <div className="space-y-6 border-t border-border/80 pt-6">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                Pengaturan Akun ({activePair})
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Konfigurasi metode dan pasangan timeframe yang diizinkan untuk akun trading Anda.
+              </p>
+            </div>
+
+            <Section
+              title="Metode per Akun"
+              description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Pair tetap dipantau seluruh metode.`}
+            >
+              <SaklarMetodeAkun symbol={activePair} />
+            </Section>
+
+            <Section
+              title="Timeframe per Akun"
+              description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}. Pasangan mengikuti aturan trading ILA.`}
+            >
+              <SaklarTimeframeAkun symbol={activePair} />
+            </Section>
           </div>
         </div>
       ) : (

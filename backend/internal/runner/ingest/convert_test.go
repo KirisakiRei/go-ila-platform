@@ -74,6 +74,29 @@ func TestConvertSignalRejectsIncomplete(t *testing.T) {
 }
 
 // Sinyal tanpa expires_at tidak boleh mendapat TTL tak terbatas.
+func TestConvertSignalWaitStatusAllowsNeutralDirection(t *testing.T) {
+	sig := &enginev1.Signal{
+		SignalId:    "status-EURUSD-H4-M15",
+		Symbol:      "EURUSD",
+		Htf:         "H4",
+		Ltf:         "M15",
+		Status:      enginev1.SignalStatus_WAIT_HTF_SWEEP,
+		Direction:   enginev1.Direction_DIRECTION_UNSPECIFIED,
+		PublishedAt: timestamppb.New(time.Now()),
+	}
+
+	got, ok := ConvertSignal(sig)
+	if !ok {
+		t.Fatal("sinyal status menunggu harus diterima walau direction unspecified")
+	}
+	if got.Direction != "NEUTRAL" {
+		t.Fatalf("direction = %q, ingin NEUTRAL", got.Direction)
+	}
+	if got.Status != "WAIT_HTF_SWEEP" {
+		t.Fatalf("status = %q, ingin WAIT_HTF_SWEEP", got.Status)
+	}
+}
+
 func TestConvertSignalWithoutExpiryBecomesImmediatelyStale(t *testing.T) {
 	input := validSignal()
 	input.ExpiresAt = nil

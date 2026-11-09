@@ -320,6 +320,10 @@ export type Strategy = {
 
 export type SignalStatus =
   | 'READY_TO_ENTRY'
+  | 'WAIT_HTF_SWEEP'
+  | 'WAIT_HTF_CANDLE_CLOSE'
+  | 'WAIT_LTF_CISD'
+  | 'INVALIDATED'
   | 'ACKED'
   | 'REJECTED'
   /**
@@ -333,7 +337,27 @@ export type SignalStatus =
   | 'CONSUMED'
   | 'SKIPPED'
 
-export type TradeDirection = 'BUY' | 'SELL'
+export type TradeDirection = 'BUY' | 'SELL' | 'NEUTRAL' | string
+
+export type SignalHtfSweep = {
+  detected: boolean
+  sweep_in_progress: boolean
+  direction: string
+  stop_loss: number
+  target_dol: number
+  details: string
+  sweep_time?: string
+}
+
+export type SignalCISD = {
+  detected: boolean
+  direction: string
+  cisd_level: number
+  extreme_sl: number
+  entry_price: number
+  details: string
+  break_time?: string
+}
 
 export type Signal = {
   signal_id: string
@@ -356,6 +380,8 @@ export type Signal = {
   summary: string
   next_action: string
   reject_reason: string
+  htf_sweep?: SignalHtfSweep
+  cisd?: SignalCISD
   published_at: string
   expires_at: string
   can_confirm: boolean

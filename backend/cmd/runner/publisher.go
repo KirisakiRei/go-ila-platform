@@ -36,6 +36,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	switch status {
 	case model.SignalStatusReadyToEntry, model.SignalStatusRejected,
 		model.SignalStatusOpportunity,
+		model.SignalStatusWaitLTFCISD,
 		model.SignalStatusCancelled, model.SignalStatusExpired,
 		model.SignalStatusSuperseded:
 	default:
@@ -70,6 +71,15 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 				signal.Htf, signal.Ltf,
 				signal.EntryPrice, signal.StopLoss, signal.TakeProfit,
 				signal.RiskReward, dashboardLink,
+			)
+
+		case model.SignalStatusWaitLTFCISD:
+			dashboardLink := p.baseURL + "/sinyal?pair=" + signal.Symbol
+			return telegram.FormatRadarStepMessage(
+				signal.Symbol, signal.StrategyVersion,
+				signal.Htf, signal.Ltf,
+				"Struktur Timeframe Besar Terkonfirmasi",
+				dashboardLink,
 			)
 
 		default:

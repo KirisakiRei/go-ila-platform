@@ -61,6 +61,8 @@ type Signal struct {
 	Status       string    `gorm:"type:varchar(24);index;not null" json:"status"`
 	Summary      string    `gorm:"type:text" json:"summary"`
 	NextAction   string    `gorm:"type:text" json:"next_action"`
+	HtfSweepJSON string    `gorm:"type:text" json:"htf_sweep_json,omitempty"`
+	CisdJSON     string    `gorm:"type:text" json:"cisd_json,omitempty"`
 	PublishedAt  time.Time `json:"published_at"`
 	ExpiresAt    time.Time `gorm:"index" json:"expires_at"`
 	SupersededBy string    `gorm:"type:varchar(64)" json:"superseded_by"`
