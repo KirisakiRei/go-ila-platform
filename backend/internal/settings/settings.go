@@ -31,6 +31,11 @@ const (
 	// KeyPairSwitch mengaktifkan saklar metode per akun × pair di Runner.
 	// Bawaan mati agar perilaku lama tidak berubah sampai data saklar lengkap.
 	KeyPairSwitch = "PAIR_SWITCH_ENABLED"
+	// KeyTimeframeSwitch mengaktifkan pemilihan pasangan timeframe per akun.
+	// Bawaan mati sampai engine benar-benar mengirim htf/ltf; tanpa data itu
+	// semua sinyal akan dianggap "tidak diketahui" dan penyaringan justru
+	// menyesatkan pengguna.
+	KeyTimeframeSwitch = "TIMEFRAME_SWITCH_ENABLED"
 )
 
 // Kind menjelaskan cara nilai dibaca dan ditampilkan.
@@ -64,6 +69,7 @@ var Catalog = []Definition{
 	{KeyMarketOpenOnly, "Hanya saat pasar buka", "Menolak entry ketika pasar tutup.", KindBool, 0, 0, false},
 	{KeyLegalGate, "Tahan bila dokumen belum disetujui", "Entry baru ditolak sampai dokumen wajib disetujui.", KindBool, 0, 0, false},
 	{KeyPairSwitch, "Saklar metode per akun", "Bila nyala, Runner hanya menjalankan metode yang dinyalakan akun pada pair tersebut.", KindBool, 0, 0, true},
+	{KeyTimeframeSwitch, "Saklar timeframe per akun", "Bila nyala, Runner hanya memproses pasangan timeframe yang dipantau dan hanya mengeksekusi yang diizinkan otomatis. Aktifkan setelah engine mengirim htf/ltf.", KindBool, 0, 0, true},
 }
 
 // Definition mencari flag berdasarkan kunci.

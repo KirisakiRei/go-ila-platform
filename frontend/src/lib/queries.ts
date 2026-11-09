@@ -7,6 +7,7 @@ import {
   sessionApi,
   strategyApi,
   strategySwitchApi,
+  timeframeSwitchApi,
   subscriptionApi,
   systemApi,
   telegramApi,
@@ -16,6 +17,8 @@ import { tradingApi } from '@/lib/api'
 import type {
   CreateAccountPayload,
   CreateSubscriptionPayload,
+  StrategyVersion,
+  TimeframeSwitchItem,
   UpdateAccountPayload,
 } from '@/types/api'
 
@@ -25,6 +28,7 @@ export const queryKeys = {
   subscriptions: ['subscriptions'] as const,
   strategies: ['strategies'] as const,
   strategySwitch: (symbol: string) => ['strategy-switch', symbol] as const,
+  timeframeSwitch: (symbol: string) => ['timeframe-switch', symbol] as const,
   signals: (limit: number) => ['signals', limit] as const,
   positions: (limit: number) => ['positions', limit] as const,
   systemStatus: ['system', 'status'] as const,
@@ -105,6 +109,35 @@ export function usePairCatalog() {
  */
 export function useRiskSimulation() {
   return useMutation({ mutationFn: riskApi.simulate })
+}
+
+/** Matriks saklar pasangan timeframe per akun untuk satu pair. */
+export function useTimeframeSwitchMatrix(symbol: string | null) {
+  return useQuery({
+    queryKey: queryKeys.timeframeSwitch(symbol ?? ''),
+    queryFn: () => timeframeSwitchApi.matrix(symbol ?? ''),
+    enabled: Boolean(symbol),
+  })
+}
+
+/**
+ * useSetTimeframeSwitch mengubah saklar satu akun untuk satu metode.
+ *
+ * Respons server berisi matriks terbaru, jadi cache langsung ditimpa agar
+ * perubahan saklar terasa seketika.
+ */
+export function useSetTimeframeSwitch(symbol: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: {
+      accountID: string
+      strategy: StrategyVersion
+      pairs: TimeframeSwitchItem[]
+    }) => timeframeSwitchApi.set(vars.accountID, symbol, vars.strategy, vars.pairs),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.timeframeSwitch(symbol), data)
+    },
+  })
 }
 
 /** Matriks saklar metode per akun untuk satu pair. */

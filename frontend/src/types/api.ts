@@ -206,6 +206,47 @@ export type StrategySwitchMatrix = {
   accounts: StrategySwitchAccount[]
 }
 
+/** Satu pasangan timeframe yang dikenal dari data sinyal nyata. */
+export type TimeframePair = {
+  htf: string
+  ltf: string
+  label: string
+}
+
+/** Saklar satu akun untuk satu pasangan timeframe. */
+export type TimeframeSwitchItem = {
+  htf: string
+  ltf: string
+  /** Dipantau: sinyalnya diminta ke engine dan ditampilkan. */
+  watch: boolean
+  /** Diizinkan dieksekusi otomatis. Selalu false bila tidak dipantau. */
+  auto: boolean
+}
+
+export type TimeframeSwitchAccount = {
+  account_id: string
+  label: string
+  pairs: TimeframeSwitchItem[]
+}
+
+export type StrategyTimeframeGroup = {
+  strategy: StrategyVersion
+  accounts: TimeframeSwitchAccount[]
+}
+
+/**
+ * Matriks saklar timeframe untuk satu pair.
+ *
+ * `tersedia` kosong berarti engine belum pernah mengirim pasangan timeframe —
+ * bukan berarti tidak ada pilihan.
+ */
+export type TimeframeSwitchMatrix = {
+  symbol: string
+  tersedia: Record<string, TimeframePair[]>
+  auto_allowed: boolean
+  groups: StrategyTimeframeGroup[]
+}
+
 export type PairItem = {
   symbol: string
   name: string

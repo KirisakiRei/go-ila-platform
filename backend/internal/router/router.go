@@ -135,6 +135,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	pairRepo := repository.NewPairRepository(db)
 	pairCatalogService := service.NewPairCatalogService(pairRepo)
 	accountPairStrategyRepo := repository.NewAccountPairStrategyRepository(db)
+	accountPairTimeframeRepo := repository.NewAccountPairTimeframeRepository(db)
 
 	accountService := service.NewAccountService(service.AccountServiceDeps{
 		Users:         userRepo,
@@ -161,6 +162,19 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// dengan pemasangan setter setelah keduanya jadi.
 	strategySwitchService := service.NewStrategySwitchService(accountRepo, accountPairStrategyRepo, pairCatalogService, accountService)
 	service.SetStrategySwitchSeeder(accountService, strategySwitchService)
+
+	// Saklar timeframe: pasangan datang dari data sinyal nyata, sedangkan hak
+	// auto-eksekusi dibaca dari katalog paket (auto_execute), sumber yang sama
+	// dengan pagar eksekusi di Runner.
+	timeframeSwitchService := service.NewTimeframeSwitchService(
+		accountRepo,
+		accountPairStrategyRepo,
+		accountPairTimeframeRepo,
+		signalRepo,
+		accountService,
+		service.TierResolver(userRepo),
+		repository.NewTierFeatureReader(db),
+	)
 	service.SetAccountStrategyLister(accountService, accountPairStrategyRepo)
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
 	systemService := service.NewSystemService(service.SystemServiceDeps{
@@ -260,6 +274,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	pairHandler := handler.NewPairHandler(pairCatalogService, accountService)
 	riskHandler := handler.NewRiskHandler(service.NewRiskSimulator(accountService, pairCatalogService, nil))
 	strategySwitchHandler := handler.NewStrategySwitchHandler(strategySwitchService)
+	timeframeSwitchHandler := handler.NewTimeframeSwitchHandler(timeframeSwitchService)
 	adminPairHandler := handler.NewAdminPairHandler(service.NewPairAdminService(pairRepo, auditRepo))
 	tradingHandler := handler.NewTradingHandler(tradingService)
 	systemHandler := handler.NewSystemHandler(systemService)
@@ -421,6 +436,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Saklar metode per akun × pair. Pair pantauan global; metode dipilih
 		// per akun lewat saklar ini.
 		strategySwitchHandler.Register(me)
+
+		// Saklar pasangan timeframe per akun × pair.
+		timeframeSwitchHandler.Register(me)
 
 		// Penghubungan Telegram.
 		me.POST("/telegram/link", telegramHandler.CreateLink)

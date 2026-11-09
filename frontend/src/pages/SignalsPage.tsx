@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
+import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 
 export default function SignalsPage() {
@@ -181,6 +182,15 @@ export default function SignalsPage() {
             description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Pair tetap dipantau seluruh metode.`}
           >
             <SaklarMetodeAkun symbol={activePair} />
+          </Section>
+
+          {/* Pasangan timeframe milik aturan trading ILA. Di sini user memilih
+              mana yang dipantau dan mana yang boleh dieksekusi otomatis. */}
+          <Section
+            title="Timeframe per Akun"
+            description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}. Pasangan mengikuti aturan trading ILA.`}
+          >
+            <SaklarTimeframeAkun symbol={activePair} />
           </Section>
 
           {/* Sinyal Aktif / Terakhir */}

@@ -94,6 +94,7 @@ func main() {
 		&model.PairGroup{},
 		&model.TradingPair{},
 		&model.AccountPairStrategy{},
+		&model.AccountPairTimeframe{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

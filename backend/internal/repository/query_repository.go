@@ -28,6 +28,48 @@ type UserAccountStateLister interface {
 	ListByUser(ctx context.Context, userID string) ([]model.BrokerAccountState, error)
 }
 
+// TimeframePairRef adalah pasangan timeframe yang pernah terlihat pada sinyal.
+type TimeframePairRef struct {
+	Htf string
+	Ltf string
+	// Jumlah sinyal yang membawa pasangan ini, dipakai mengurutkan pilihan.
+	Jumlah int
+}
+
+// ListKnownTimeframes mengembalikan pasangan timeframe yang pernah muncul pada
+// sinyal, dikelompokkan per metode analisis.
+//
+// Sinyal tanpa htf/ltf (dari engine yang belum mengirimkannya) dilewati, sehingga
+// hasil kosong berarti "belum ada data", bukan "tidak ada pasangan".
+func (r *signalRepository) ListKnownTimeframes(ctx context.Context) (map[string][]TimeframePairRef, error) {
+	type row struct {
+		Strategy string `gorm:"column:strategy_version"`
+		Htf      string
+		Ltf      string
+		Jumlah   int
+	}
+
+	var rows []row
+	err := r.db.WithContext(ctx).
+		Model(&model.Signal{}).
+		Select("strategy_version, htf, ltf, COUNT(*) AS jumlah").
+		Where("htf <> '' AND ltf <> ''").
+		Group("strategy_version, htf, ltf").
+		Order("strategy_version ASC, htf ASC, ltf ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca pasangan timeframe yang dikenal: %w", err)
+	}
+
+	out := make(map[string][]TimeframePairRef, len(rows))
+	for _, item := range rows {
+		out[item.Strategy] = append(out[item.Strategy], TimeframePairRef{
+			Htf: item.Htf, Ltf: item.Ltf, Jumlah: item.Jumlah,
+		})
+	}
+	return out, nil
+}
+
 // ListForUser mengembalikan sinyal pada simbol yang dipantau user.
 func (r *signalRepository) ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error) {
 	var signals []model.Signal

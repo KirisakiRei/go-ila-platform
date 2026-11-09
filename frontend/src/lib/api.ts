@@ -14,9 +14,12 @@ import type {
   Signal,
   Strategy,
   StrategySwitchMatrix,
+  StrategyVersion,
   Subscription,
   SystemStatus,
   TelegramLink,
+  TimeframeSwitchItem,
+  TimeframeSwitchMatrix,
   Trial,
   UpdateAccountPayload,
 } from '@/types/api'
@@ -66,6 +69,27 @@ export const strategySwitchApi = {
     request<StrategySwitchMatrix>(
       `/accounts/${accountID}/pairs/${encodeURIComponent(symbol)}/strategies`,
       { method: 'PUT', body: { strategies } },
+    ),
+}
+
+/**
+ * Saklar pasangan timeframe per akun × pair.
+ *
+ * Pasangan timeframe milik aturan trading ILA (pakem engine); endpoint ini hanya
+ * mencatat mana yang dipantau dan mana yang dieksekusi otomatis.
+ */
+export const timeframeSwitchApi = {
+  matrix: (symbol: string) =>
+    request<TimeframeSwitchMatrix>(`/pairs/${encodeURIComponent(symbol)}/timeframes`),
+  set: (
+    accountID: string,
+    symbol: string,
+    strategy: StrategyVersion,
+    pairs: TimeframeSwitchItem[],
+  ) =>
+    request<TimeframeSwitchMatrix>(
+      `/accounts/${accountID}/pairs/${encodeURIComponent(symbol)}/timeframes`,
+      { method: 'PUT', body: { strategy, pairs } },
     ),
 }
 

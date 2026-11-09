@@ -103,6 +103,13 @@ type SignalRepository interface {
 	FindBySignalID(ctx context.Context, signalID string) (*model.Signal, error)
 	UpdateStatus(ctx context.Context, signalID, status, reason string) error
 	ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error)
+	// ListKnownTimeframes mengembalikan pasangan timeframe yang pernah benar-benar
+	// terlihat pada sinyal, dikelompokkan per metode analisis.
+	//
+	// Ini satu-satunya sumber jujur untuk menampilkan pilihan pasangan sebelum
+	// engine mengirimkan katalog resminya: yang ditampilkan adalah pasangan yang
+	// memang terbukti menghasilkan sinyal, bukan tebakan platform.
+	ListKnownTimeframes(ctx context.Context) (map[string][]TimeframePairRef, error)
 }
 
 // PositionRepository mengelola posisi nyata di broker.
