@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { SignalRow } from '@/features/signals/components/SignalRow'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
+import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 import { formatDateTime, formatNumber, formatR } from '@/lib/format'
 import { SIGNAL_LABEL, isFinal } from '@/features/signals/lib/status'
 import type { Signal } from '@/types/api'
@@ -29,6 +30,8 @@ const signal: Signal = {
   symbol: 'XAUUSD',
   strategy_version: 'ila-2.0',
   engine_version: 'v1.4.2',
+  htf: 'H4',
+  ltf: 'M15',
   direction: 'BUY',
   entry_price: 4120.5,
   stop_loss: 4112.3,
@@ -100,5 +103,22 @@ describe('format', () => {
 
   it('mengembalikan tanda pisah untuk tanggal kosong', () => {
     expect(formatDateTime(null)).toBe('—')
+  })
+})
+
+describe('TimeframeBadge', () => {
+  it('menampilkan pasangan timeframe dari sinyal', () => {
+    renderWithProviders(<TimeframeBadge htf="H4" ltf="M15" />)
+    expect(screen.getByText('H4 · M15')).toBeDefined()
+  })
+
+  it('tidak menampilkan apa pun bila engine belum mengirim timeframe', () => {
+    const { container } = renderWithProviders(<TimeframeBadge htf="" ltf="" />)
+    expect(container.textContent).toBe('')
+  })
+
+  it('tetap tampil bila hanya satu sisi terisi', () => {
+    renderWithProviders(<TimeframeBadge htf="H4" ltf="" />)
+    expect(screen.getByText('H4')).toBeDefined()
   })
 })

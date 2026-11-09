@@ -113,6 +113,8 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 			Symbol:          signal.Symbol,
 			StrategyVersion: signal.StrategyVersion,
 			EngineVersion:   signal.EngineVersion,
+			Htf:             signal.Htf,
+			Ltf:             signal.Ltf,
 			Direction:       signal.Direction,
 			EntryPrice:      signal.EntryPrice,
 			StopLoss:        signal.StopLoss,

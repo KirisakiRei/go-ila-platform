@@ -34,22 +34,28 @@ func IsTerminalSignal(status string) bool {
 // Sinyal bisa dibatalkan, ditolak, atau kedaluwarsa; ini bukan posisi.
 type Signal struct {
 	Base
-	SignalID        string    `gorm:"type:varchar(64);uniqueIndex;not null" json:"signal_id"`
-	Symbol          string    `gorm:"type:varchar(20);index;not null" json:"symbol"`
-	StrategyVersion string    `gorm:"type:varchar(20);not null" json:"strategy_version"`
-	EngineVersion   string    `gorm:"type:varchar(40)" json:"engine_version"`
-	Direction       string    `gorm:"type:varchar(10);not null" json:"direction"`
-	EntryPrice      float64   `json:"entry_price"`
-	StopLoss        float64   `json:"stop_loss"`
-	TakeProfit      float64   `json:"take_profit"`
-	RiskReward      float64   `json:"risk_reward"`
-	Status          string    `gorm:"type:varchar(24);index;not null" json:"status"`
-	Summary         string    `gorm:"type:text" json:"summary"`
-	NextAction      string    `gorm:"type:text" json:"next_action"`
-	PublishedAt     time.Time `json:"published_at"`
-	ExpiresAt       time.Time `gorm:"index" json:"expires_at"`
-	SupersededBy    string    `gorm:"type:varchar(64)" json:"superseded_by"`
-	CancelReason    string    `gorm:"type:varchar(255)" json:"cancel_reason"`
+	SignalID        string `gorm:"type:varchar(64);uniqueIndex;not null" json:"signal_id"`
+	Symbol          string `gorm:"type:varchar(20);index;not null" json:"symbol"`
+	StrategyVersion string `gorm:"type:varchar(20);not null" json:"strategy_version"`
+	EngineVersion   string `gorm:"type:varchar(40)" json:"engine_version"`
+	// Htf dan Ltf adalah pasangan timeframe yang menerbitkan sinyal ini, mis.
+	// H4/M15. Kosong berarti engine belum mengirimkannya (kontrak menyusul),
+	// sehingga konsumen wajib memperlakukannya sebagai tidak diketahui —
+	// bukan menebak.
+	Htf          string    `gorm:"type:varchar(10);not null;default:''" json:"htf"`
+	Ltf          string    `gorm:"type:varchar(10);not null;default:''" json:"ltf"`
+	Direction    string    `gorm:"type:varchar(10);not null" json:"direction"`
+	EntryPrice   float64   `json:"entry_price"`
+	StopLoss     float64   `json:"stop_loss"`
+	TakeProfit   float64   `json:"take_profit"`
+	RiskReward   float64   `json:"risk_reward"`
+	Status       string    `gorm:"type:varchar(24);index;not null" json:"status"`
+	Summary      string    `gorm:"type:text" json:"summary"`
+	NextAction   string    `gorm:"type:text" json:"next_action"`
+	PublishedAt  time.Time `json:"published_at"`
+	ExpiresAt    time.Time `gorm:"index" json:"expires_at"`
+	SupersededBy string    `gorm:"type:varchar(64)" json:"superseded_by"`
+	CancelReason string    `gorm:"type:varchar(255)" json:"cancel_reason"`
 }
 
 // TableName menetapkan nama tabel.

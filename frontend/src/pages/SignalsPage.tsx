@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
+import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 
 export default function SignalsPage() {
   const [params, setParams] = useSearchParams()
@@ -299,9 +300,10 @@ export default function SignalsPage() {
                             {signal.direction === 'BUY' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                             {signal.direction}
                           </span>
-                          <Badge variant="outline" className="text-[10.5px]">
+                          			<Badge variant="outline" className="text-[10.5px]">
                             {signal.strategy_version}
                           </Badge>
+                          <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
                         </div>
                         <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[11px]">
                           {SIGNAL_LABEL[signal.status]}

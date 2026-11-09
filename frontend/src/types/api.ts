@@ -294,6 +294,13 @@ export type Signal = {
   symbol: string
   strategy_version: StrategyVersion
   engine_version: string
+  /**
+   * Pasangan timeframe sumber sinyal, mis. H4/M15.
+   *
+   * String kosong berarti engine belum mengirimkannya — jangan ditampilkan.
+   */
+  htf: string
+  ltf: string
   direction: TradeDirection
   entry_price: number
   stop_loss: number
