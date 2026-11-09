@@ -56,7 +56,7 @@ type SubscriptionRepository interface {
 	Create(ctx context.Context, sub *model.Subscription) error
 	ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	ListByUser(ctx context.Context, userID string) ([]model.Subscription, error)
-	FindActive(ctx context.Context, userID, symbol, strategy string) (*model.Subscription, error)
+	FindActive(ctx context.Context, userID, symbol string) (*model.Subscription, error)
 	Deactivate(ctx context.Context, id, userID string) error
 
 	// ListActiveByAccount membaca langganan aktif yang berlaku untuk satu akun.

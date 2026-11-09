@@ -166,7 +166,7 @@ func (r *subscriptionRepository) ListByUser(ctx context.Context, userID string) 
 	var subs []model.Subscription
 	err := r.db.WithContext(ctx).
 		Where("user_id = ?", userID).
-		Order("symbol ASC, strategy ASC").
+		Order("symbol ASC").
 		Find(&subs).Error
 	if err != nil {
 		return nil, fmt.Errorf("membaca subscription user: %w", err)
@@ -174,11 +174,14 @@ func (r *subscriptionRepository) ListByUser(ctx context.Context, userID string) 
 	return subs, nil
 }
 
-// FindActive mencari langganan aktif untuk satu pasangan (symbol, strategy).
-func (r *subscriptionRepository) FindActive(ctx context.Context, userID, symbol, strategy string) (*model.Subscription, error) {
+// FindActive mencari langganan aktif untuk satu simbol.
+//
+// Metode analisis tidak lagi menjadi kunci: satu pair dipantau seluruh metode,
+// dan pilihan per akun disimpan di account_pair_strategy.
+func (r *subscriptionRepository) FindActive(ctx context.Context, userID, symbol string) (*model.Subscription, error) {
 	var sub model.Subscription
 	err := r.db.WithContext(ctx).
-		Where("user_id = ? AND symbol = ? AND strategy = ? AND is_active = ?", userID, symbol, strategy, true).
+		Where("user_id = ? AND symbol = ? AND is_active = ?", userID, symbol, true).
 		First(&sub).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -212,7 +215,7 @@ func (r *subscriptionRepository) ListActiveByAccount(ctx context.Context, userID
 	var subs []model.Subscription
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND is_active = ? AND (broker_account_id IS NULL OR broker_account_id = ?)", userID, true, accountID).
-		Order("symbol ASC, strategy ASC").
+		Order("symbol ASC").
 		Find(&subs).Error
 	if err != nil {
 		return nil, fmt.Errorf("membaca subscription akun: %w", err)
@@ -224,7 +227,7 @@ func (r *subscriptionRepository) ListActiveByAccount(ctx context.Context, userID
 //
 // Langganan lama yang tidak dipilih lagi dinonaktifkan (bukan dihapus) agar
 // jejak historis tetap ada. Baris yang sudah ada diaktifkan kembali sehingga
-// pencabutan tidak menghapus data. Strategi dipertahankan bila simbol sama.
+// pencabutan tidak menghapus data.
 func (r *subscriptionRepository) ReplaceAccountPairs(ctx context.Context, userID, accountID string, symbols []string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		wanted := make(map[string]bool, len(symbols))
