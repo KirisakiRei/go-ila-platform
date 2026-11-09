@@ -290,3 +290,104 @@ export type AdminPairCategory = {
 export type AdminPairCatalog = {
   categories: AdminPairCategory[]
 }
+
+// --- RBAC -------------------------------------------------------------------
+
+/** Satu role RBAC beserta permission yang dipegangnya. */
+export type AdminRole = {
+  id: string
+  code: string
+  name: string
+  description: string
+  /** Role bawaan sistem tidak dapat diubah atau dihapus. */
+  is_system: boolean
+  editable: boolean
+  permissions: string[]
+  user_count: number
+  created_at: string
+}
+
+/** Satu kewenangan di katalog permission. */
+export type AdminPermission = {
+  key: string
+  group: string
+  label: string
+  risk: 'rendah' | 'sedang' | 'tinggi'
+  /** false berarti pelaku tidak boleh memberikan izin ini. */
+  grantable: boolean
+}
+
+/** Katalog permission yang dikelompokkan untuk tampilan centang bergrup. */
+export type AdminPermissionGroup = {
+  group: string
+  permissions: AdminPermission[]
+}
+
+/** Detail role beserta katalog permission yang bisa dipilih. */
+export type AdminRoleDetail = AdminRole & {
+  available_permissions: AdminPermission[]
+}
+
+// --- Sinyal admin -----------------------------------------------------------
+
+/** Satu sinyal dari sudut pandang admin. */
+export type AdminSignalItem = {
+  signal_id: string
+  symbol: string
+  strategy_version: string
+  engine_version: string
+  direction: string
+  entry_price: number
+  stop_loss: number
+  take_profit: number
+  risk_reward: number
+  status: string
+  summary: string
+  next_action: string
+  published_at: TimePair
+  expires_at: TimePair
+  cancel_reason?: string
+  /** Jumlah user yang menerima sinyal ini. */
+  recipients: number
+  /** Jumlah user yang benar-benar entry. */
+  executed: number
+}
+
+/** Nasib sinyal pada satu user. */
+export type AdminSignalRecipient = {
+  user_id: string
+  user_name: string
+  user_email: string
+  broker_account_id?: string
+  status: string
+  reject_reason?: string
+  position_id?: string
+  decided_at?: TimePair
+  created_at: TimePair
+}
+
+/** Satu perubahan status sinyal. */
+export type AdminSignalEvent = {
+  user_id: string
+  from_status?: string
+  to_status: string
+  reason?: string
+  created_at: TimePair
+}
+
+/** Klaim eksekusi satu sinyal pada satu akun. */
+export type AdminSignalExecution = {
+  user_id: string
+  broker_account_id: string
+  status: string
+  created_at: TimePair
+}
+
+/** Perjalanan lengkap satu sinyal. */
+export type AdminSignalTrace = {
+  signal: AdminSignalItem
+  recipients: AdminSignalRecipient[]
+  events: AdminSignalEvent[]
+  executions: AdminSignalExecution[]
+  positions: AdminPositionItem[]
+}

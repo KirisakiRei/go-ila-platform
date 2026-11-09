@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { AdminShell } from '@/features/admin/components/AdminShell'
 import { AdminIdleGuard } from '@/features/admin/components/AdminIdleGuard'
+import { RequireAdminPermission } from '@/features/admin/components/RequireAdminPermission'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import AdminLoginPage from '@/pages/admin/AdminLoginPage'
@@ -42,6 +43,9 @@ import AdminHomePage from '@/pages/admin/AdminHomePage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
 import AdminPairsPage from '@/pages/admin/AdminPairsPage'
 import AdminReportsPage from '@/pages/admin/AdminReportsPage'
+import AdminRbacPage from '@/pages/admin/AdminRbacPage'
+import AdminSignalsPage from '@/pages/admin/AdminSignalsPage'
+import AdminSignalTracePage from '@/pages/admin/AdminSignalTracePage'
 import AdminUserDetailPage from '@/pages/admin/AdminUserDetailPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import { FullPageLoading } from './FullPageLoading'
@@ -459,6 +463,40 @@ export function AppRoutes() {
           element={
             <AdminPage>
               <AdminPageContentPage />
+            </AdminPage>
+          }
+        />
+
+        {/* Panel sinyal: daftar dan telusur perjalanan sinyal. */}
+        <Route
+          path="/admin/sinyal"
+          element={
+            <AdminPage>
+              <RequireAdminPermission permission="signal.view">
+                <AdminSignalsPage />
+              </RequireAdminPermission>
+            </AdminPage>
+          }
+        />
+        <Route
+          path="/admin/sinyal/:id"
+          element={
+            <AdminPage>
+              <RequireAdminPermission permission="signal.trace">
+                <AdminSignalTracePage />
+              </RequireAdminPermission>
+            </AdminPage>
+          }
+        />
+
+        {/* RBAC: dua tab (role dan user) di satu halaman. */}
+        <Route
+          path="/admin/rbac"
+          element={
+            <AdminPage>
+              <RequireAdminPermission permission="role.view">
+                <AdminRbacPage />
+              </RequireAdminPermission>
             </AdminPage>
           }
         />

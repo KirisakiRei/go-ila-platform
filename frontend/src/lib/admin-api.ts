@@ -2,6 +2,9 @@ import { request, requestList } from './http'
 import type { TimePair } from '@/types/api'
 import type { PublicPlan } from '@/types/admin'
 import type {
+  AdminRole,
+  AdminRoleDetail,
+  AdminPermissionGroup,
   AdminAccountItem,
   AdminInvoiceItem,
   AdminTrialItem,
@@ -13,6 +16,8 @@ import type {
   AdminLegalItem,
   AdminNoteItem,
   AdminPositionItem,
+  AdminSignalItem,
+  AdminSignalTrace,
   AdminUserDetail,
   AdminUserListItem,
   AuditCatalogEntry,
@@ -117,6 +122,26 @@ export const adminAuditApi = {
 }
 
 /**
+ * RBAC: role, katalog permission, dan penugasan role ke akun admin.
+ *
+ * PATCH role mengirim SELURUH daftar permission, bukan selisih, karena server
+ * mengganti isi role secara utuh. Mengirim tambahan saja akan mencabut yang
+ * tidak disebut.
+ */
+export const adminRoleApi = {
+  list: () => request<AdminRole[]>(`${ADMIN}/roles`),
+  detail: (id: string) => request<AdminRoleDetail>(`${ADMIN}/roles/${id}`),
+  permissions: () => request<AdminPermissionGroup[]>(`${ADMIN}/permissions`),
+  create: (payload: { code: string; name: string; description?: string; permissions: string[] }) =>
+    request<AdminRole>(`${ADMIN}/roles`, { method: 'POST', body: payload }),
+  updatePermissions: (id: string, permissions: string[]) =>
+    request<AdminRole>(`${ADMIN}/roles/${id}`, { method: 'PATCH', body: { permissions } }),
+  remove: (id: string) => request<void>(`${ADMIN}/roles/${id}`, { method: 'DELETE' }),
+  assign: (userId: string, roleId: string | null) =>
+    request<void>(`${ADMIN}/users/${userId}/role`, { method: 'PATCH', body: { role_id: roleId } }),
+}
+
+/**
  * Katalog pair dikelola admin: kategori → grup → pair.
  *
  * Pair yang dipakai user pada halaman Pair Pantauan hanya boleh berasal dari
@@ -194,6 +219,18 @@ export const adminTrialApi = {
       method: 'POST',
       body: { reason, category: 'other' },
     }),
+}
+
+/**
+ * Panel sinyal admin: daftar sinyal terbit dan telusur perjalanannya.
+ *
+ * Rentang tanggal wajib agar tabel sinyal tidak dipindai seluruhnya; server
+ * memakai bawaan 7 hari bila rentang tidak disebut.
+ */
+export const adminSignalApi = {
+  list: (query: Record<string, string | number | boolean | undefined>) =>
+    requestList<AdminSignalItem>(`${ADMIN}/signals`, { query }),
+  trace: (id: string) => request<AdminSignalTrace>(`${ADMIN}/signals/${id}/trace`),
 }
 
 export const adminReportApi = {
