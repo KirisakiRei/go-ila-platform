@@ -2,7 +2,15 @@ import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Badge,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  Layers,
+  Minus,
+  Users,
+  Zap,
+} from 'lucide-react'
+import {
   Button,
   Card,
   EmptyState,
@@ -11,10 +19,14 @@ import {
   PageHeader,
   Select,
   Skeleton,
+  StatusPill,
 } from '@/components/ui'
 import { adminSignalApi } from '@/lib/admin-api'
 import { formatNumber } from '@/lib/format'
+import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
+import type { SignalStatus } from '@/types/api'
 import { Can } from '@/features/admin/components/Can'
+import { cn } from '@/lib/utils'
 import type { AdminSignalItem } from '@/types/admin'
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -33,9 +45,35 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'SKIPPED', label: 'Dilewati' },
 ]
 
-/** statusLabel memakai bahasa manusia; kode asli tetap pada atribut title. */
-function statusLabel(status: string): string {
-  return STATUS_OPTIONS.find((item) => item.value === status)?.label ?? status
+
+
+function directionMeta(direction: string | undefined) {
+  const dir = (direction ?? '').toUpperCase()
+  if (dir === 'BULLISH' || dir === 'BUY' || dir === 'LONG') {
+    return {
+      label: 'Bullish',
+      icon: ArrowUpRight,
+      borderClass: 'border-emerald-300 dark:border-emerald-800',
+      bgClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+      badgeClass: 'bg-emerald-600 text-white',
+    }
+  }
+  if (dir === 'BEARISH' || dir === 'SELL' || dir === 'SHORT') {
+    return {
+      label: 'Bearish',
+      icon: ArrowDownRight,
+      borderClass: 'border-rose-300 dark:border-rose-800',
+      bgClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
+      badgeClass: 'bg-rose-600 text-white',
+    }
+  }
+  return {
+    label: dir || 'Netral',
+    icon: Minus,
+    borderClass: 'border-border',
+    bgClass: 'bg-muted text-muted-foreground',
+    badgeClass: 'bg-secondary text-secondary-foreground',
+  }
 }
 
 /** isoDate mengubah tanggal lokal menjadi YYYY-MM-DD untuk query server. */
@@ -195,74 +233,119 @@ export default function AdminSignalsPage() {
       )}
 
       {rows.length > 0 && (
-        <Card className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="bg-secondary/40">
-              <tr className="border-b border-border">
-                <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Simbol
-                </th>
-                <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Arah
-                </th>
-                <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Status
-                </th>
-                <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Penerima
-                </th>
-                <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Tereksekusi
-                </th>
-                <th className="h-9 px-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Diterbitkan
-                </th>
-                <th className="h-9 px-3 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.signal_id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2.5">
-                    <div className="flex flex-col">
-                      <span className="text-[13px] font-medium">{row.symbol}</span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {row.strategy_version || '—'} · RR {formatNumber(row.risk_reward)}
+        <div className="space-y-4">
+          {/* Card Grid Daftar Pair / Sinyal */}
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            {rows.map((row) => {
+              const dir = directionMeta(row.direction)
+              const DirIcon = dir.icon
+
+              return (
+                <Card
+                  key={row.signal_id}
+                  className="flex flex-col justify-between overflow-hidden border transition-all hover:border-foreground/30 hover:shadow-sm"
+                >
+                  <div className="p-4">
+                    {/* Header: Simbol, Arah, dan Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[17px] font-bold tracking-tight text-foreground">
+                          {row.symbol}
+                        </span>
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold',
+                            dir.bgClass,
+                          )}
+                        >
+                          <DirIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                          {dir.label}
+                        </span>
+                      </div>
+
+                      <span title={row.status}>
+                        <StatusPill tone={SIGNAL_TONE[row.status as SignalStatus] ?? 'neutral'}>
+                          {SIGNAL_LABEL[row.status as SignalStatus] ?? row.status}
+                        </StatusPill>
                       </span>
                     </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-[12px]">{row.direction || '—'}</td>
-                  <td className="px-3 py-2.5">
-                    <Badge variant="muted" title={row.status}>
-                      {statusLabel(row.status)}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-[12px] tabular-nums">
-                    {row.recipients}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-[12px] tabular-nums">
-                    {row.executed}
-                  </td>
-                  <td className="px-3 py-2.5 text-[12px] text-muted-foreground">
-                    {row.published_at?.wib ?? '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
+
+                    {/* Subheader: Engine & Versi Strategi */}
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Layers className="h-3 w-3 shrink-0" />
+                      <span>{row.strategy_version ? row.strategy_version.toUpperCase() : 'ILA 2.0'}</span>
+                      <span>·</span>
+                      <span>RR {formatNumber(row.risk_reward)}</span>
+                    </div>
+
+                    {/* Parameter Harga (Entry, SL, TP) */}
+                    <div className="mt-3.5 grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-muted/30 p-2.5 text-[11.5px]">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Entry
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {formatNumber(row.entry_price)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Stop Loss
+                        </span>
+                        <span className="font-semibold text-rose-600 dark:text-rose-400">
+                          {formatNumber(row.stop_loss)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Take Profit
+                        </span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {formatNumber(row.take_profit)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Ringkasan Analisis / Summary jika ada */}
+                    {row.summary && (
+                      <p className="mt-3 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
+                        {row.summary.replace(/^💎\s*SETUP[^\n:]+:\s*/gi, '')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Kaki Card: Statistik Distribusi & Tombol Telusuri */}
+                  <div className="flex items-center justify-between border-t border-border/80 bg-muted/20 px-4 py-2.5">
+                    <div className="flex items-center gap-3 text-[11.5px] text-muted-foreground">
+                      <span className="flex items-center gap-1" title="User penerima sinyal">
+                        <Users className="h-3.5 w-3.5" />
+                        <strong className="text-foreground">{row.recipients}</strong> user
+                      </span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1" title="Akun tereksekusi">
+                        <Zap className="h-3.5 w-3.5 text-amber-500" />
+                        <strong className="text-foreground">{row.executed}</strong> order
+                      </span>
+                    </div>
+
                     <Can permission="signal.trace">
-                      <Button asChild size="sm" variant="outline">
-                        <Link to={`/admin/sinyal/${row.signal_id}`}>Telusuri</Link>
+                      <Button asChild size="sm" variant="outline" className="h-7 gap-1 px-2.5 text-[11.5px]">
+                        <Link to={`/admin/sinyal/${row.signal_id}`}>
+                          Detail &amp; Trace
+                          <ArrowRight className="h-3 w-3" />
+                        </Link>
                       </Button>
                     </Can>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">
-              {meta ? `${meta.total} sinyal · halaman ${meta.page}/${meta.total_pages || 1}` : ''}
+          {/* Baris Pagination */}
+          <Card className="flex flex-wrap items-center justify-between gap-2 p-3">
+            <p className="text-[12px] text-muted-foreground">
+              {meta ? `${meta.total} sinyal · halaman ${meta.page} dari ${meta.total_pages || 1}` : ''}
             </p>
             <div className="flex gap-2">
               <Button
@@ -282,8 +365,8 @@ export default function AdminSignalsPage() {
                 Berikutnya
               </Button>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
     </>
   )

@@ -1,25 +1,29 @@
 import type { ReactNode } from 'react'
-import { useMemo } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   Activity,
+  BarChart3,
+  ChevronDown,
+  ChevronRight,
   Coins,
   Cpu,
-  Gauge,
-  Radio,
-  BarChart3,
   FileClock,
   FileText,
+  Gauge,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Percent,
+  Radio,
   Receipt,
-  Ticket,
-  Timer,
   Settings2,
   ShieldAlert,
-  LifeBuoy,
   ShieldCheck,
+  Ticket,
+  Timer,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -119,7 +123,52 @@ const NAV_GROUPS: NavGroup[] = [
 export function AdminShell({ children, actorEmail }: { children: ReactNode; actorEmail?: string }) {
   const { admin, signOut } = useAdminAuth()
   const { can } = usePermissions()
+  const location = useLocation()
   const email = admin?.email ?? actorEmail
+
+  // Sidebar mini/full collapse state
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('ila_admin_sidebar_collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  // Group accordion collapse state (key = group category)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('ila_admin_groups_collapsed')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ila_admin_sidebar_collapsed', String(isCollapsed))
+    } catch {
+      // Ignore storage errors
+    }
+  }, [isCollapsed])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ila_admin_groups_collapsed', JSON.stringify(collapsedGroups))
+    } catch {
+      // Ignore storage errors
+    }
+  }, [collapsedGroups])
+
+  const toggleSidebar = () => setIsCollapsed((prev) => !prev)
+
+  const toggleGroup = (category: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }))
+  }
 
   // Menu tanpa permission tetap tampil (Ringkasan); kelompok yang seluruh
   // menunya tersaring ikut dibuang agar sidebar tidak berisi judul kosong.
@@ -134,16 +183,46 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
-      <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
-        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
-          {/* Logo bersama memakai turunan 64/128px, bukan berkas 660 KB asli. */}
-          <Logo className="h-7 w-auto" />
-          <div className="flex items-baseline gap-1">
-            <span className="text-sm font-bold tracking-tight">ILA</span>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Admin
-            </span>
+      <aside
+        className={cn(
+          'shrink-0 border-b border-border transition-all duration-200 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r',
+          isCollapsed ? 'lg:w-[68px]' : 'lg:w-64',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-14 shrink-0 items-center border-b border-border px-3.5',
+            isCollapsed ? 'lg:justify-center lg:px-2' : 'justify-between',
+          )}
+        >
+          {/* Logo bersama */}
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <Logo className="h-7 w-auto shrink-0" />
+            <div className={cn('flex items-baseline gap-1', isCollapsed && 'lg:hidden')}>
+              <span className="text-sm font-bold tracking-tight">ILA</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Admin
+              </span>
+            </div>
           </div>
+
+          {/* Tombol collapse / expand sidebar desktop */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className={cn(
+              'hidden h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex',
+              isCollapsed && 'mt-1',
+            )}
+            title={isCollapsed ? 'Perluas bilah navigasi' : 'Ciutkan bilah navigasi'}
+            aria-label={isCollapsed ? 'Perluas bilah navigasi' : 'Ciutkan bilah navigasi'}
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+            )}
+          </button>
 
           {/* Pada layar sempit sidebar menjadi bilah atas; tombol keluar ikut pindah ke sini. */}
           <button
@@ -161,55 +240,111 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
           aria-label="Navigasi admin"
           className="flex gap-1 overflow-x-auto p-2 lg:flex-1 lg:flex-col lg:overflow-y-auto"
         >
-          {navGroups.map((group) => (
-            <div key={group.category} className="mb-2 last:mb-0">
-              <p className="hidden px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground lg:block">
-                {group.category}
-              </p>
-              <div className="flex gap-1 lg:flex-col">
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      cn(
-                        'flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] transition-colors',
-                        isActive
-                          ? 'bg-muted font-medium text-foreground'
-                          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                      )
-                    }
+          {navGroups.map((group) => {
+            const isGroupCollapsed = !isCollapsed && Boolean(collapsedGroups[group.category])
+            const hasActiveItem = group.items.some((item) =>
+              item.end
+                ? location.pathname === item.to
+                : location.pathname.startsWith(item.to),
+            )
+
+            return (
+              <div key={group.category} className="mb-2 last:mb-0">
+                {/* Header grup kategori */}
+                {!isCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.category)}
+                    className="group hidden w-full items-center justify-between px-3 pt-2 pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground lg:flex"
+                    aria-expanded={!isGroupCollapsed}
                   >
-                    <item.icon className="h-4 w-4 shrink-0" aria-hidden />
-                    {item.label}
-                  </NavLink>
-                ))}
+                    <span className="flex items-center gap-1.5">
+                      {group.category}
+                      {hasActiveItem && isGroupCollapsed && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
+                    </span>
+                    {isGroupCollapsed ? (
+                      <ChevronRight className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:opacity-100" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 opacity-60 transition-transform group-hover:opacity-100" />
+                    )}
+                  </button>
+                )}
+
+                {/* Garis pemisah halus saat sidebar mode mini (collapsed) */}
+                {isCollapsed && (
+                  <div className="hidden my-1.5 border-t border-border/60 lg:block first:hidden" />
+                )}
+
+                {/* Daftar item menu di dalam grup */}
+                <div
+                  className={cn(
+                    'flex gap-1 lg:flex-col',
+                    isGroupCollapsed && 'lg:hidden',
+                  )}
+                >
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      title={isCollapsed ? item.label : undefined}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] transition-colors',
+                          isCollapsed && 'lg:justify-center lg:px-2.5 lg:py-2',
+                          isActive
+                            ? 'bg-muted font-medium text-foreground'
+                            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                        )
+                      }
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className={cn(isCollapsed && 'lg:hidden')}>{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </nav>
 
-        <div className="hidden shrink-0 border-t border-border p-3 lg:block">
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Masuk sebagai
-              </p>
-              <p className="truncate text-[11px] font-medium text-foreground">
-                {email || admin?.name || 'Administrator'}
-              </p>
+        {/* Footer info user & logout */}
+        <div className="hidden shrink-0 border-t border-border p-2.5 lg:block">
+          {isCollapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={signOut}
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title={`Keluar (${email || admin?.name || 'Administrator'})`}
+                aria-label="Keluar dari panel admin"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={signOut}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Keluar dari panel admin"
-            >
-              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-              Keluar
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 px-1">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Masuk sebagai
+                </p>
+                <p className="truncate text-[11px] font-medium text-foreground">
+                  {email || admin?.name || 'Administrator'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={signOut}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Keluar dari panel admin"
+              >
+                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                Keluar
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

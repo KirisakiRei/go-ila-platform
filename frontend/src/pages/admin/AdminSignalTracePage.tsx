@@ -1,7 +1,14 @@
 import { Link, useParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import {
+  ArrowLeft,
+  Compass,
+  Crosshair,
+  Layers,
+  Target,
+  Zap,
+} from 'lucide-react'
 import {
   Badge,
   Button,
@@ -18,6 +25,69 @@ import {
 } from '@/components/ui'
 import { adminSignalApi } from '@/lib/admin-api'
 import { formatNumber } from '@/lib/format'
+
+type AnalysisPoint = {
+  id: string
+  title: string
+  detail: string
+  iconType: 'sweep' | 'trigger' | 'target' | 'context'
+}
+
+function parseAnalysisSummary(rawSummary: string): AnalysisPoint[] {
+  if (!rawSummary || !rawSummary.trim()) return []
+
+  const cleaned = rawSummary.replace(/^💎\s*SETUP[^\n:]+:\s*/gi, '').trim()
+  const rawParts = cleaned
+    .split(/(?:•|\n)+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+  const points: AnalysisPoint[] = []
+
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i]
+    if (!part) continue
+
+    if (/^level:\s*entry=/i.test(part) || /^entry=/i.test(part)) {
+      continue
+    }
+
+    const cleanDetail = part.replace(/^[•\s\-_]+/, '').replace(/^💎\s*/, '')
+    if (!cleanDetail) continue
+
+    if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl/i.test(cleanDetail)) {
+      points.push({
+        id: `sweep-${i}`,
+        title: 'Sapuan Struktur (HTF / MTF)',
+        detail: cleanDetail,
+        iconType: 'sweep',
+      })
+    } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal/i.test(cleanDetail)) {
+      points.push({
+        id: `trigger-${i}`,
+        title: 'Konfirmasi Pemicu (LTF Trigger)',
+        detail: cleanDetail,
+        iconType: 'trigger',
+      })
+    } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+      points.push({
+        id: `target-${i}`,
+        title: 'Proyeksi Target & Likuiditas',
+        detail: cleanDetail,
+        iconType: 'target',
+      })
+    } else {
+      points.push({
+        id: `point-${i}`,
+        title: 'Konteks Analisis Pasar',
+        detail: cleanDetail,
+        iconType: 'context',
+      })
+    }
+  }
+
+  return points
+}
 
 /**
  * AdminSignalTracePage menampilkan perjalanan satu sinyal: siapa menerima,
@@ -75,28 +145,118 @@ export default function AdminSignalTracePage() {
             <Stat label="Tereksekusi" value={String(data.signal.executed)} />
           </StatGrid>
 
+          {/* Kotak Parameter Eksekusi Utama */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="p-3.5 border-l-4 border-l-primary">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Entry Price
+              </span>
+              <p className="mt-1 text-lg font-bold tracking-tight text-foreground">
+                {formatNumber(data.signal.entry_price)}
+              </p>
+            </Card>
+
+            <Card className="p-3.5 border-l-4 border-l-rose-500">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Stop Loss
+              </span>
+              <p className="mt-1 text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">
+                {formatNumber(data.signal.stop_loss)}
+              </p>
+            </Card>
+
+            <Card className="p-3.5 border-l-4 border-l-emerald-500">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Take Profit
+              </span>
+              <p className="mt-1 text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                {formatNumber(data.signal.take_profit)}
+              </p>
+            </Card>
+
+            <Card className="p-3.5 border-l-4 border-l-amber-500">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Risk : Reward
+              </span>
+              <p className="mt-1 text-lg font-bold tracking-tight text-foreground">
+                1 : {formatNumber(data.signal.risk_reward)}
+              </p>
+            </Card>
+          </div>
+
+          {/* Rincian Analisis Terstruktur */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Ringkasan Sinyal</CardTitle>
+            <CardHeader className="pb-3 border-b border-border/60">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Compass className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm">Rincian Analisis Struktur Pasar</CardTitle>
+                </div>
+                <Badge variant="outline" className="text-[11px]">
+                  {data.signal.strategy_version ? data.signal.strategy_version.toUpperCase() : 'ILA 2.0'}
+                </Badge>
+              </div>
               <CardDescription className="text-xs">
-                {data.signal.summary || 'Tanpa ringkasan analisis.'}
+                Uraian sapuan likuiditas, konfirmasi candle, dan target proyeksi dari engine analisis.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <dl className="grid gap-2 text-[12px] sm:grid-cols-2 lg:grid-cols-4">
-                <Field label="Arah" value={data.signal.direction || '—'} />
-                <Field label="Entry" value={formatNumber(data.signal.entry_price)} />
-                <Field label="Stop loss" value={formatNumber(data.signal.stop_loss)} />
-                <Field label="Take profit" value={formatNumber(data.signal.take_profit)} />
-                <Field label="Risk/reward" value={`1 : ${formatNumber(data.signal.risk_reward)}`} />
-                <Field label="Strategi" value={data.signal.strategy_version || '—'} />
-                <Field label="Diterbitkan" value={data.signal.published_at?.wib ?? '—'} />
-                <Field label="Kedaluwarsa" value={data.signal.expires_at?.wib ?? '—'} />
+            <CardContent className="pt-4 space-y-4">
+              {(() => {
+                const points = parseAnalysisSummary(data.signal.summary || '')
+                if (points.length === 0) {
+                  return (
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      {data.signal.summary || 'Tanpa ringkasan analisis khusus.'}
+                    </p>
+                  )
+                }
+
+                return (
+                  <div className="flex flex-col gap-2.5">
+                    {points.map((pt) => {
+                      const icon =
+                        pt.iconType === 'sweep' ? (
+                          <Crosshair className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                        ) : pt.iconType === 'trigger' ? (
+                          <Zap className="h-4 w-4 shrink-0 text-emerald-500 mt-0.5" />
+                        ) : pt.iconType === 'target' ? (
+                          <Target className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
+                        ) : (
+                          <Layers className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                        )
+
+                      return (
+                        <div
+                          key={pt.id}
+                          className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 p-3"
+                        >
+                          {icon}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[11.5px] font-semibold text-foreground">
+                              {pt.title}
+                            </span>
+                            <span className="text-[12.5px] leading-relaxed text-muted-foreground">
+                              {pt.detail}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+              <dl className="grid gap-2 border-t border-border/60 pt-3 text-[12px] sm:grid-cols-2 lg:grid-cols-4">
+                <Field label="Arah Posisi" value={data.signal.direction || '—'} />
+                <Field label="Engine Version" value={data.signal.engine_version || '—'} />
+                <Field label="Diterbitkan (WIB)" value={data.signal.published_at?.wib ?? '—'} />
+                <Field label="Kedaluwarsa (WIB)" value={data.signal.expires_at?.wib ?? '—'} />
               </dl>
+
               {data.signal.cancel_reason && (
-                <p className="mt-3 text-[12px] text-muted-foreground">
-                  Alasan pembatalan: {data.signal.cancel_reason}
-                </p>
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-[12px] text-destructive">
+                  <strong>Alasan Pembatalan:</strong> {data.signal.cancel_reason}
+                </div>
               )}
             </CardContent>
           </Card>
