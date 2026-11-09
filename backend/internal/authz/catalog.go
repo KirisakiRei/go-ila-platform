@@ -70,7 +70,9 @@ const (
 // Tata kelola.
 const (
 	RoleView    = "role.view"
+	RoleCreate  = "role.create"
 	RoleEdit    = "role.edit"
+	RoleDelete  = "role.delete"
 	AuditView   = "audit.view"
 	AuditExport = "audit.export"
 )
@@ -117,7 +119,9 @@ var Catalog = []Permission{
 	{CMSPublish, "Konten", "Terbitkan konten", RiskHigh},
 
 	{RoleView, "Tata Kelola", "Lihat role & permission", RiskLow},
-	{RoleEdit, "Tata Kelola", "Kelola role & penugasan", RiskHigh},
+	{RoleCreate, "Tata Kelola", "Buat role baru", RiskHigh},
+	{RoleEdit, "Tata Kelola", "Ubah permission role & penugasan", RiskHigh},
+	{RoleDelete, "Tata Kelola", "Hapus role", RiskHigh},
 	{AuditView, "Tata Kelola", "Lihat audit log", RiskMedium},
 	{AuditExport, "Tata Kelola", "Ekspor audit log", RiskHigh},
 

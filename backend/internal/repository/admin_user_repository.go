@@ -22,8 +22,10 @@ type UserFilter struct {
 	HasAccounts *bool
 	HasTrial    bool
 	OnlyAdmin   bool
-	From        *time.Time
-	To          *time.Time
+	// RoleID menyaring menurut role RBAC (kolom u.role_id).
+	RoleID string
+	From   *time.Time
+	To     *time.Time
 }
 
 // UserRow adalah baris daftar pelanggan beserta hitungan akun broker.
@@ -71,6 +73,9 @@ func (r *adminUserRepository) base(ctx context.Context, filter UserFilter) *gorm
 	}
 	if filter.OnlyAdmin {
 		q = q.Where("u.role = ?", "admin")
+	}
+	if filter.RoleID != "" {
+		q = q.Where("u.role_id = ?", filter.RoleID)
 	}
 	if filter.HasTrial {
 		q = q.Where("u.trial_used = ?", true)
@@ -127,6 +132,9 @@ func (r *adminUserRepository) Count(ctx context.Context, filter UserFilter) (int
 	}
 	if filter.OnlyAdmin {
 		q = q.Where("role = ?", "admin")
+	}
+	if filter.RoleID != "" {
+		q = q.Where("role_id = ?", filter.RoleID)
 	}
 	if filter.HasTrial {
 		q = q.Where("trial_used = ?", true)

@@ -214,7 +214,10 @@ mengubah sebagian pengaturan meski panel menampilkan menunya.
 | `billing.plan` | `PATCH /plans/:code`, `PUT /plans/:code/guard` |
 | `billing.voucher` | kupon & kredit (`POST/PATCH /coupons`, `/credit-codes`, `/users/:id/credit`) |
 | `cms.view` / `cms.edit` / `cms.publish` | dokumen legal, FAQ, pengumuman, isi halaman |
-| `role.view` / `role.edit` | `/roles`, `/permissions` |
+| `role.view` | `GET /roles`, `/roles/:id`, `/permissions` |
+| `role.create` | `POST /roles` |
+| `role.edit` | `PATCH /roles/:id`, `PATCH /users/:id/role` |
+| `role.delete` | `DELETE /roles/:id` |
 | `audit.view` | `GET /audit`, `/audit/:id`, `/audit-catalog` |
 | `audit.export` | `GET /audit-export` (baca sensitif, ekspornya dicatat) |
 | `system.view` | status engine, runner, broker, laporan operasional |
@@ -260,6 +263,13 @@ lain diabaikan oleh pengikat DTO.
 `reason` minimal 10 karakter (aksi destruktif). Kredensial ikut terhapus dan
 langganan yang menempel pada akun itu dinonaktifkan. Posisi terbuka di broker
 tidak ditutup — platform tidak pernah menutup posisi pelanggan.
+
+### GET `/admin/users` — `user.view`
+
+Query: `page`, `per_page`, `q`, `sort`, `order`, `from`, `to`, `status`,
+`tier`, `accounts=yes|no`, `trial=yes`, `role=admin`, `role_id=<uuid>`.
+`role_id` menyaring menurut role RBAC tertentu (dipakai tab User pada panel
+RBAC). Filter yang sama berlaku untuk `GET /admin/users-export`.
 
 ### GET `/admin/users/:id/positions-export` — `trade.export`
 

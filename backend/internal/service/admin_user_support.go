@@ -74,6 +74,7 @@ func buildUserList(filter dto.AdminUserFilter) (pagination.Params, repository.Us
 		HasAccounts: hasAccounts,
 		HasTrial:    filter.HasTrial,
 		OnlyAdmin:   filter.OnlyAdmins,
+		RoleID:      strings.TrimSpace(filter.RoleID),
 		From:        params.From,
 		To:          params.To,
 	}

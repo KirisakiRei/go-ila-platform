@@ -38,6 +38,7 @@ func (h *AdminUserHandler) List(c *gin.Context) {
 	}
 	q.HasTrial = c.Query("trial") == "yes"
 	q.OnlyAdmins = c.Query("role") == "admin"
+	q.RoleID = c.Query("role_id")
 
 	items, meta, err := h.users.List(c.Request.Context(), h.actor(c), q)
 	if err != nil {
@@ -248,6 +249,7 @@ func (h *AdminUserHandler) Export(c *gin.Context) {
 	}
 	q.HasTrial = c.Query("trial") == "yes"
 	q.OnlyAdmins = c.Query("role") == "admin"
+	q.RoleID = c.Query("role_id")
 
 	body, filename, err := h.users.ExportUsers(c.Request.Context(), h.actor(c), q)
 	if err != nil {

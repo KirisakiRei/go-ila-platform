@@ -42,12 +42,12 @@ type CreateRoleRequest struct {
 	Code        string   `json:"code" binding:"required,min=2,max=40"`
 	Name        string   `json:"name" binding:"required,min=2,max=80"`
 	Description string   `json:"description" binding:"omitempty,max=255"`
-	Permissions []string `json:"permissions" binding:"required,min=1,max=40"`
+	Permissions []string `json:"permissions" binding:"required,min=1,max=200"`
 }
 
 // UpdateRoleRequest mengganti seluruh permission sebuah role.
 type UpdateRoleRequest struct {
-	Permissions []string `json:"permissions" binding:"required,min=1,max=40"`
+	Permissions []string `json:"permissions" binding:"required,min=1,max=200"`
 }
 
 // AssignRoleRequest menugaskan role RBAC ke sebuah akun.

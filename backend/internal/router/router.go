@@ -578,10 +578,12 @@ func registerAdmin(
 	admin.PATCH("/legal/:id", guard(http.MethodPatch, "/legal/:id", authz.CMSEdit))
 	admin.POST("/legal/:id/publish", guard(http.MethodPost, "/legal/:id/publish", authz.CMSPublish))
 
-	// Tata kelola: ubah role dan penugasannya.
-	admin.POST("/roles", guard(http.MethodPost, "/roles", authz.RoleEdit))
+	// Tata kelola: ubah role dan penugasannya. Buat dan hapus dipisah dari
+	// RoleEdit agar pemberi izin bisa membatasi dampak tanpa mencabut
+	// kemampuan menyunting permission.
+	admin.POST("/roles", guard(http.MethodPost, "/roles", authz.RoleCreate))
 	admin.PATCH("/roles/:id", guard(http.MethodPatch, "/roles/:id", authz.RoleEdit))
-	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleEdit))
+	admin.DELETE("/roles/:id", guard(http.MethodDelete, "/roles/:id", authz.RoleDelete))
 	admin.PATCH("/users/:id/role", guard(http.MethodPatch, "/users/:id/role", authz.RoleEdit))
 
 	// Pelanggan: daftar, profil, dan aksi berlapis.

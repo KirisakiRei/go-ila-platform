@@ -14,4 +14,6 @@ type AdminUserFilter struct {
 	HasAccounts string
 	HasTrial    bool
 	OnlyAdmins  bool
+	// RoleID menyaring pelanggan menurut role RBAC tertentu.
+	RoleID string
 }
