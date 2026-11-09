@@ -114,31 +114,22 @@ export default function LandingPage() {
           <HeroTradingGeometry className="pointer-events-none absolute inset-0 h-full w-full" />
 
           <div className="relative mx-auto w-full max-w-6xl px-4 pt-28 pb-16 sm:px-6 sm:pt-36 sm:pb-24">
-            <p className="max-w-sm text-[13px] leading-relaxed text-zinc-300">
-              Pemantauan struktur pasar real-time — langsung di akun broker Anda.
-            </p>
-
             {/* Judul utama hero */}
-            <div className="relative mt-10 flex min-h-[190px] flex-col justify-center py-4 sm:mt-14 sm:min-h-[240px]">
+            <div className="relative mt-6 flex min-h-[190px] flex-col justify-center py-4 sm:mt-10 sm:min-h-[240px]">
               <div className="relative z-10 w-full max-w-4xl text-left">
                 <h1 className="text-4xl font-semibold leading-[1.06] tracking-tight sm:text-6xl lg:text-[4.5rem]">
-                  <span className="text-white">Eksekusi Trading</span>
-                  <span className="text-white/55"> Terkendali</span>
+                  <span className="text-white">Imaginary Liquidity</span>{' '}
                   <br />
-                  <span className="text-white/75">Berbasis Likuiditas</span>
+                  <span className="text-white/60">Algorithm</span>
                 </h1>
               </div>
             </div>
 
             {/* Sub-bar horison tipis dengan tombol putih bersih */}
             <div className="relative z-10 mt-12 flex flex-col justify-between gap-6 border-t border-white/15 pt-8 md:mt-16 md:flex-row md:items-end">
-              <div className="max-w-xl space-y-2">
-                <p className="text-[15px] leading-relaxed text-zinc-100">
-                  Pantau setup market berbasis likuiditas, terima sinyal terarah secara real-time,
-                  dan jaga disiplin risk management tanpa overtrading.
-                </p>
-                <p className="text-[12px] text-zinc-300">
-                  Dana dan akun tetap aman di broker Anda · Bukan rekomendasi investasi.
+              <div className="max-w-xl">
+                <p className="text-[15px] leading-relaxed text-zinc-200">
+                  Analisis struktur likuiditas real-time dan eksekusi presisi langsung di akun broker Anda.
                 </p>
               </div>
 
@@ -294,31 +285,22 @@ export default function LandingPage() {
             <SignalOverviewGrid />
           </div>
 
-          <div className="mt-10 grid gap-8 border-t border-zinc-200 pt-8 md:grid-cols-12 md:items-start">
-            <div className="md:col-span-7">
-              <p className="text-[14px] leading-relaxed text-[#3f3f46]">
-                Hubungkan akun broker sekali melalui token akses, atur persentase risiko harian,
-                lalu pantau setiap sinyal yang masuk dari satu tempat. Dana dan posisi terbuka tetap
-                berada sepenuhnya di akun broker Anda.
-              </p>
-                <p className="mt-3 text-[12px] leading-relaxed text-[#71717a]">
-                Detail entry price, stop loss, dan take profit tersedia di dashboard member.
-                Bukan jaminan keuntungan dan bukan rekomendasi investasi.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 md:col-span-5 md:justify-end">
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6">
+            <p className="text-[13px] text-[#71717a]">
+              Parameter lengkap entry price, stop loss, dan take profit tersedia di dashboard member.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
               <Link
                 to="/harga"
-                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
+                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
               >
                 Lihat Paket &amp; Harga
               </Link>
               <Link
-                to="/tentang"
+                to="/fitur"
                 className="text-[13px] font-medium text-[#18181b] underline underline-offset-4 hover:text-[#52525b]"
               >
-                Prinsip kerja kami
+                Pelajari Fitur
               </Link>
             </div>
           </div>

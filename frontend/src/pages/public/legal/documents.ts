@@ -40,7 +40,7 @@ export const LEGAL_GROUPS: { key: LegalDocumentContent['group']; label: string; 
 ]
 
 const PRIVACY = `
-Dokumen ini menjelaskan data apa yang kami kumpulkan saat Anda memakai Imaginary Liquidity, mengapa data itu diperlukan, berapa lama disimpan, dan cara Anda mengendalikannya. Nama penanggung jawab dan alamat surel dukungan di bawah ini adalah kanal resmi untuk setiap permintaan terkait data pribadi.
+Dokumen ini menjelaskan data apa yang kami kumpulkan saat Anda memakai Imaginary Liquidity, mengapa data itu diperlukan, berapa lama disimpan, dan cara Anda mengendalikannya. Nama penanggung jawab dan alamat email dukungan di bawah ini adalah kanal resmi untuk setiap permintaan terkait data pribadi.
 
 | Penyelenggara | Layanan | Kontak |
 |---|---|---|
@@ -48,7 +48,7 @@ Dokumen ini menjelaskan data apa yang kami kumpulkan saat Anda memakai Imaginary
 
 ## 1. Ruang lingkup kebijakan
 
-Kebijakan ini berlaku untuk situs, panel pelanggan, dan saluran notifikasi yang kami sediakan. Kebijakan ini tidak mengatur pemrosesan data oleh broker tempat Anda membuka akun. Broker memiliki kebijakan privasinya sendiri, dan kami menyarankan Anda membacanya.
+Kebijakan ini berlaku untuk situs, dashboard akun, dan saluran notifikasi yang kami sediakan. Kebijakan ini tidak mengatur pemrosesan data oleh broker tempat Anda membuka akun. Broker memiliki kebijakan privasinya sendiri, dan kami menyarankan Anda membacanya.
 
 ## 2. Data yang kami kumpulkan
 
@@ -56,7 +56,7 @@ Kami hanya mengumpulkan data yang dibutuhkan untuk menjalankan layanan, menjaga 
 
 | Kategori | Contoh data | Alasan kami memerlukannya |
 |---|---|---|
-| Identitas akun | Nama, alamat surel, kata sandi terenkripsi | Membuat akun, masuk, dan berkomunikasi dengan Anda |
+| Identitas akun | Nama, alamat email, kata sandi terenkripsi | Membuat akun, masuk, dan berkomunikasi dengan Anda |
 | Keamanan akun | Kata sandi dalam bentuk hash, kode autentikasi dua faktor, cadangan kodenya | Melindungi akun bila kata sandi diketahui pihak lain |
 | Kredensial broker | Token akses broker, disimpan terenkripsi | Menjalankan permintaan atas nama Anda ke broker |
 | Aktivitas | Waktu masuk, perangkat, catatan perubahan pengaturan | Mendeteksi akses tidak sah dan menyusun jejak audit |
@@ -84,7 +84,7 @@ Kami memproses data untuk menjalankan perjanjian layanan dengan Anda, memenuhi k
 
 1. Mengautentikasi akses dan menjaga keamanan akun Anda.
 2. Meneruskan permintaan eksekusi ke broker sesuai aturan yang Anda tetapkan.
-3. Mengirim notifikasi sinyal dan pemberitahuan penting melalui panel, Telegram, atau surel.
+3. Mengirim notifikasi sinyal dan pemberitahuan penting melalui dashboard, Telegram, atau email.
 4. Menyusun riwayat dan jejak keputusan yang dapat Anda periksa.
 5. Menerbitkan tagihan, mencatat pembayaran, dan menangani permintaan pengembalian dana.
 6. Mendeteksi, mencegah, dan menindak penyalahgunaan layanan.
@@ -107,7 +107,7 @@ Kami bekerja sama dengan penyedia terbatas yang diperlukan agar layanan berjalan
 | Pihak | Data yang diterima | Tujuan |
 |---|---|---|
 | Broker Anda | Kredensial akses dan permintaan order | Menjalankan eksekusi atas nama Anda |
-| Penyedia pembayaran | Nomor tagihan, nominal, alamat surel | Memproses pembayaran dan pengembalian dana |
+| Penyedia pembayaran | Nomor tagihan, nominal, alamat email | Memproses pembayaran dan pengembalian dana |
 | Telegram | Pengenal percakapan dan isi notifikasi | Mengirim pemberitahuan yang Anda aktifkan |
 | Penyedia infrastruktur | Data yang tersimpan pada server | Menjalankan dan mencadangkan layanan |
 
@@ -131,7 +131,7 @@ Anda berhak mengetahui, memperbaiki, dan mengendalikan data pribadi Anda. Permin
 
 | Hak | Cara mengajukannya |
 |---|---|
-| Melihat data akun dan riwayat Anda | Langsung melalui panel pelanggan |
+| Melihat data akun dan riwayat Anda | Langsung melalui dashboard akun |
 | Meminta salinan data pribadi | Ajukan melalui dukungan; kami kirimkan dalam format yang dapat dibaca |
 | Memperbaiki data yang keliru | Perbarui sendiri di pengaturan akun atau ajukan melalui dukungan |
 | Menghapus akun | Ajukan melalui dukungan; data pribadi dihapus, bukti persetujuan dipertahankan dalam bentuk teranonimkan |
@@ -334,7 +334,7 @@ Pengembalian dana diberikan berdasarkan tingkat penggunaan layanan dalam periode
 
 ## 3. Prosedur pengajuan
 
-1. Ajukan permintaan melalui dukungan@rekavia.com dari alamat surel yang terdaftar pada akun Anda.
+1. Ajukan permintaan melalui dukungan@rekavia.com dari alamat email yang terdaftar pada akun Anda.
 2. Sertakan nomor tagihan atau tanggal pembayaran agar permintaan dapat ditelusuri dengan cepat.
 3. Kami mengonfirmasi penerimaan permintaan dan menyampaikan keputusan paling lambat 7 hari kerja.
 4. Apabila disetujui, dana dikembalikan ke kanal pembayaran asal sesuai waktu proses penyedia pembayaran.
@@ -352,7 +352,7 @@ Apabila layanan tidak dapat digunakan lebih dari 48 jam berturut-turut karena ga
 
 ## 6. Menghentikan langganan
 
-Anda dapat menghentikan perpanjangan langganan kapan saja melalui panel pelanggan. Langganan yang sudah dibayar tetap berlaku sampai akhir periode berjalan, dan Anda tetap dapat mengakses layanan sampai tanggal tersebut. Penghentian perpanjangan bukan pengembalian dana.
+Anda dapat menghentikan perpanjangan langganan kapan saja melalui dashboard akun. Langganan yang sudah dibayar tetap berlaku sampai akhir periode berjalan, dan Anda tetap dapat mengakses layanan sampai tanggal tersebut. Penghentian perpanjangan bukan pengembalian dana.
 
 ## 7. Kontak
 
@@ -376,7 +376,7 @@ Langganan bersifat pribadi dan diberikan kepada satu pengguna untuk satu akun. S
 |---|---|---|
 | Membagikan sinyal | Mengirim ke grup, menyalin ke kanal, menjual kembali | Pemblokiran permanen |
 | Berbagi akun | Satu langganan dipakai beberapa orang | Peringatan, lalu pemblokiran bila berulang |
-| Akun ganda untuk uji coba | Mendaftar berulang dengan alamat surel berbeda | Uji coba dihentikan |
+| Akun ganda untuk uji coba | Mendaftar berulang dengan alamat email berbeda | Uji coba dihentikan |
 | Memakai akun broker milik orang lain | Menghubungkan akun tanpa izin pemiliknya | Pemblokiran segera |
 | Manipulasi pembayaran | Mengklaim pembayaran yang tidak terjadi | Pemblokiran dan peninjauan |
 | Membebani sistem berlebihan | Permintaan otomatis dalam jumlah besar | Pembatasan akses, lalu pemblokiran |

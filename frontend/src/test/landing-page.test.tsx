@@ -92,7 +92,7 @@ describe('LandingPage & PublicLayout', () => {
 
     const h1List = container.querySelectorAll('h1')
     expect(h1List).toHaveLength(1)
-    expect(h1List[0]).toHaveTextContent(/Eksekusi Trading/i)
+    expect(h1List[0]).toHaveTextContent(/Imaginary Liquidity Algorithm/i)
 
     expect(
       screen.getByText(/Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi/i),

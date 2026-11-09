@@ -146,7 +146,7 @@ export default function PricingPage() {
               href="/app/register"
               className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800"
             >
-              Mulai dengan paket gratis
+              Mulai Trial 7 Hari
             </a>
             <a
               href="/legal/refund"

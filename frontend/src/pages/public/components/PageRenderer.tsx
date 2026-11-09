@@ -63,7 +63,7 @@ export function PageRenderer({ page }: { page: PageContent }) {
         description={page.lead}
         actions={
           <>
-            <ActionLink href="/app/register">Mulai dengan paket gratis</ActionLink>
+            <ActionLink href="/app/register">Mulai Trial 7 Hari</ActionLink>
             <ActionLink href="/harga" variant="secondary">
               Lihat harga
             </ActionLink>
