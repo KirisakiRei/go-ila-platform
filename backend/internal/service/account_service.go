@@ -517,16 +517,21 @@ func (s *accountService) Delete(ctx context.Context, userID, accountID string) e
 	return nil
 }
 
-// ListSubscriptions mengembalikan seluruh langganan simbol user.
+// ListSubscriptions mengembalikan seluruh langganan simbol aktif user, dideduplikasi per simbol.
 func (s *accountService) ListSubscriptions(ctx context.Context, userID string) ([]dto.SubscriptionResponse, error) {
-	rows, err := s.subs.ListByUser(ctx, userID)
+	rows, err := s.subs.ListActiveByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
+	seen := make(map[string]bool, len(rows))
 	out := make([]dto.SubscriptionResponse, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, toSubscriptionResponse(row))
+		sym := strings.ToUpper(strings.TrimSpace(row.Symbol))
+		if !seen[sym] {
+			seen[sym] = true
+			out = append(out, toSubscriptionResponse(row))
+		}
 	}
 	return out, nil
 }
@@ -573,24 +578,41 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 	}
 	activeCount := 0
 	seenSymbol := make(map[string]bool)
-	for _, row := range existing {
-		if !row.IsActive {
-			continue
+	var foundSame *model.Subscription
+	for i := range existing {
+		row := &existing[i]
+		if strings.EqualFold(row.Symbol, symbol) {
+			foundSame = row
 		}
-		// Satu pair cukup dipantau sekali. Menambah pair yang sudah dipantau
-		// mengembalikan baris lama, bukan menggandakan risiko.
-		if row.Symbol == symbol {
-			return ptr(toSubscriptionResponse(row)), nil
-		}
-		if !seenSymbol[row.Symbol] {
+		if row.IsActive && !seenSymbol[row.Symbol] {
 			seenSymbol[row.Symbol] = true
 			activeCount++
 		}
 	}
+
+	// Jika simbol ini sudah aktif, kembalikan barisnya langsung agar tidak pernah double
+	if foundSame != nil && foundSame.IsActive {
+		return ptr(toSubscriptionResponse(*foundSame)), nil
+	}
+
 	// Batas simbol mengikuti tier dan bisa diubah admin tanpa deploy.
 	limit := s.tierSymbolLimit(ctx, tier)
 	if activeCount >= limit {
 		return nil, fmt.Errorf("%w: tier %s maksimal %d simbol dipantau", apperror.ErrForbidden, tier, limit)
+	}
+
+	if foundSame != nil {
+		// Reaktivasi baris lama yang pernah dinonaktifkan alih-alih membuat baris baru
+		foundSame.IsActive = true
+		if req.BrokerAccountID != "" {
+			foundSame.BrokerAccountID = &req.BrokerAccountID
+		}
+		_ = s.subs.Reactivate(ctx, foundSame.ID, userID)
+		s.recordStrategyAudit(ctx, userID, "ila-2.0", "subscription.enable", symbol)
+		if s.seeder != nil {
+			_ = s.seeder.EnsureDefaults(ctx, userID, symbol)
+		}
+		return ptr(toSubscriptionResponse(*foundSame)), nil
 	}
 
 	sub := &model.Subscription{
@@ -624,12 +646,20 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 	return ptr(toSubscriptionResponse(*sub)), nil
 }
 
-// Unsubscribe menonaktifkan langganan tanpa menghapus riwayat.
+// Unsubscribe menghapus langganan simbol dari watchlist.
 func (s *accountService) Unsubscribe(ctx context.Context, userID, subscriptionID string) error {
-	if err := s.subs.Deactivate(ctx, subscriptionID, userID); err != nil {
+	sub, err := s.subs.FindByID(ctx, subscriptionID, userID)
+	if err == nil && sub != nil {
+		if delErr := s.subs.DeleteBySymbol(ctx, userID, sub.Symbol); delErr != nil {
+			return delErr
+		}
+		s.recordStrategyAudit(ctx, userID, "", "subscription.delete", subscriptionID)
+		return nil
+	}
+	if err := s.subs.Delete(ctx, subscriptionID, userID); err != nil {
 		return err
 	}
-	s.recordStrategyAudit(ctx, userID, "", "subscription.disable", subscriptionID)
+	s.recordStrategyAudit(ctx, userID, "", "subscription.delete", subscriptionID)
 	return nil
 }
 

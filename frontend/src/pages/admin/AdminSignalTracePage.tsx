@@ -33,7 +33,7 @@ type AnalysisPoint = {
   iconType: 'sweep' | 'trigger' | 'target' | 'context'
 }
 
-function parseAnalysisSummary(rawSummary: string): AnalysisPoint[] {
+function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): AnalysisPoint[] {
   if (!rawSummary || !rawSummary.trim()) return []
 
   const cleaned = rawSummary.replace(/^💎\s*SETUP[^\n:]+:\s*/gi, '').trim()
@@ -58,28 +58,28 @@ function parseAnalysisSummary(rawSummary: string): AnalysisPoint[] {
     if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl/i.test(cleanDetail)) {
       points.push({
         id: `sweep-${i}`,
-        title: 'Sapuan Struktur (HTF / MTF)',
+        title: strategyVersion === 'ila-3.0' ? 'HTF / MTF Liquidity Sweep' : 'HTF Liquidity Sweep',
         detail: cleanDetail,
         iconType: 'sweep',
       })
     } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal/i.test(cleanDetail)) {
       points.push({
         id: `trigger-${i}`,
-        title: 'Konfirmasi Pemicu (LTF Trigger)',
+        title: 'LTF Trigger (CISD)',
         detail: cleanDetail,
         iconType: 'trigger',
       })
     } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
       points.push({
         id: `target-${i}`,
-        title: 'Proyeksi Target & Likuiditas',
+        title: 'Target & DOL (Draw on Liquidity)',
         detail: cleanDetail,
         iconType: 'target',
       })
     } else {
       points.push({
         id: `point-${i}`,
-        title: 'Konteks Analisis Pasar',
+        title: 'Market Structure Context',
         detail: cleanDetail,
         iconType: 'context',
       })
@@ -197,12 +197,12 @@ export default function AdminSignalTracePage() {
                 </Badge>
               </div>
               <CardDescription className="text-xs">
-                Uraian sapuan likuiditas, konfirmasi candle, dan target proyeksi dari engine analisis.
+                Uraian liquidity sweep, konfirmasi CISD, dan target DOL dari engine analisis.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
               {(() => {
-                const points = parseAnalysisSummary(data.signal.summary || '')
+                const points = parseAnalysisSummary(data.signal.summary || '', data.signal.strategy_version)
                 if (points.length === 0) {
                   return (
                     <p className="text-[13px] leading-relaxed text-muted-foreground">

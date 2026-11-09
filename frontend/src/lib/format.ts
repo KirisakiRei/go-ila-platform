@@ -22,15 +22,38 @@ export function formatR(value: number): string {
   return `${value > 0 ? '+' : ''}${value.toFixed(2)}R`
 }
 
-/** Waktu lokal pengguna; nilai kosong menjadi tanda pisah. */
+/** Waktu standar WIB; nilai kosong menjadi tanda pisah. */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('id-ID', {
+  return `${new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(date)
+    timeZone: 'Asia/Jakarta',
+  }).format(date)} WIB`
+}
+
+/** Menghasilkan format jam New York (NY), misal "12:51 NY" */
+export function formatNYTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return `${new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/New_York',
+  }).format(date)} NY`
+}
+
+/** Menghasilkan waktu ganda: "10 Nov 2026, 00.51 WIB · 12:51 NY" */
+export function formatDualDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const wib = formatDateTime(value)
+  const ny = formatNYTime(value)
+  if (wib === '—') return '—'
+  return `${wib} · ${ny}`
 }
 
 export function formatDate(value: string | null | undefined): string {

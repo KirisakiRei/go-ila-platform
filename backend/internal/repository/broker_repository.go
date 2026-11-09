@@ -192,6 +192,21 @@ func (r *subscriptionRepository) FindActive(ctx context.Context, userID, symbol 
 	return &sub, nil
 }
 
+// FindByID mencari langganan berdasarkan ID dan userID.
+func (r *subscriptionRepository) FindByID(ctx context.Context, id, userID string) (*model.Subscription, error) {
+	var sub model.Subscription
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", id, userID).
+		First(&sub).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, fmt.Errorf("membaca subscription: %w", err)
+	}
+	return &sub, nil
+}
+
 // Deactivate hanya mengubah baris milik user sendiri.
 func (r *subscriptionRepository) Deactivate(ctx context.Context, id, userID string) error {
 	res := r.db.WithContext(ctx).Model(&model.Subscription{}).
@@ -202,6 +217,43 @@ func (r *subscriptionRepository) Deactivate(ctx context.Context, id, userID stri
 	}
 	if res.RowsAffected == 0 {
 		return apperror.ErrNotFound
+	}
+	return nil
+}
+
+// Delete menghapus langganan milik user.
+func (r *subscriptionRepository) Delete(ctx context.Context, id, userID string) error {
+	res := r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", id, userID).
+		Delete(&model.Subscription{})
+	if res.Error != nil {
+		return fmt.Errorf("menghapus subscription: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return apperror.ErrNotFound
+	}
+	return nil
+}
+
+// DeleteBySymbol menghapus semua baris langganan untuk simbol tertentu milik user.
+func (r *subscriptionRepository) DeleteBySymbol(ctx context.Context, userID, symbol string) error {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND UPPER(symbol) = ?", userID, symbol).
+		Delete(&model.Subscription{}).Error
+	if err != nil {
+		return fmt.Errorf("menghapus subscription per simbol: %w", err)
+	}
+	return nil
+}
+
+// Reactivate mengaktifkan kembali langganan yang pernah ada.
+func (r *subscriptionRepository) Reactivate(ctx context.Context, id, userID string) error {
+	res := r.db.WithContext(ctx).Model(&model.Subscription{}).
+		Where("id = ? AND user_id = ?", id, userID).
+		Update("is_active", true)
+	if res.Error != nil {
+		return fmt.Errorf("mengaktifkan subscription: %w", res.Error)
 	}
 	return nil
 }

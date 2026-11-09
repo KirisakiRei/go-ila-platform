@@ -376,7 +376,19 @@ export default function StrategiesPage() {
   const [infoMetode, setInfoMetode] = useState<StrategyVersion | null>(null)
   const [deletingSub, setDeletingSub] = useState<{ id: string; symbol: string } | null>(null)
 
-  const activeCount = (subs ?? []).filter((s) => s.is_active).length
+  // Hanya tampilkan subscription aktif dan deduplikasi per simbol agar tidak pernah terjadi double
+  const displaySubs = useMemo(() => {
+    const seen = new Set<string>()
+    return (subs ?? []).filter((s) => {
+      if (!s.is_active) return false
+      const sym = s.symbol.toUpperCase()
+      if (seen.has(sym)) return false
+      seen.add(sym)
+      return true
+    })
+  }, [subs])
+
+  const activeCount = displaySubs.length
   const canAdd = activeCount < 8
 
   // Metode yang boleh ditampilkan ke tier ini. ILA 3.0 disembunyikan total
@@ -463,7 +475,7 @@ export default function StrategiesPage() {
       >
         {loadingSubs && <Skeleton className="h-16 w-full" />}
 
-        {subs?.length === 0 && (
+        {displaySubs.length === 0 && !loadingSubs && (
           <EmptyState
             title="Watchlist pair masih kosong"
             description="Pilih instrumen dari katalog pair resmi untuk mulai menerima dan memantau sinyal."
@@ -475,10 +487,10 @@ export default function StrategiesPage() {
           />
         )}
 
-        {subs && subs.length > 0 && (
+        {displaySubs.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <ul className="divide-y divide-border">
-              {subs.map((sub) => {
+              {displaySubs.map((sub) => {
                 const nama = namaBySymbol.get(sub.symbol)
                 const diLuarKatalog = catalog ? !simbolKatalog.has(sub.symbol) : false
                 return (
@@ -495,7 +507,6 @@ export default function StrategiesPage() {
                       </div>
                       <Badge variant="outline">ILA 2.0</Badge>
                       {adaIla3 && <Badge variant="outline">ILA 3.0</Badge>}
-                      {!sub.is_active && <Badge variant="muted">Nonaktif</Badge>}
                       {diLuarKatalog && <Badge variant="muted">Di luar katalog</Badge>}
                     </div>
 

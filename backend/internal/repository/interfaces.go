@@ -57,7 +57,11 @@ type SubscriptionRepository interface {
 	ListActiveByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	ListByUser(ctx context.Context, userID string) ([]model.Subscription, error)
 	FindActive(ctx context.Context, userID, symbol string) (*model.Subscription, error)
+	FindByID(ctx context.Context, id, userID string) (*model.Subscription, error)
 	Deactivate(ctx context.Context, id, userID string) error
+	Delete(ctx context.Context, id, userID string) error
+	DeleteBySymbol(ctx context.Context, userID, symbol string) error
+	Reactivate(ctx context.Context, id, userID string) error
 
 	// ListActiveByAccount membaca langganan aktif yang berlaku untuk satu akun.
 	// Langganan lama tanpa broker_account_id (NULL) ikut dianggap berlaku,

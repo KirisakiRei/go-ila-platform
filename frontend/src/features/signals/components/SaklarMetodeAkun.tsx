@@ -134,15 +134,17 @@ function Saklar({
       disabled={sibuk}
       onClick={() => onToggle(!menyala)}
       className={cn(
-        'inline-flex h-6 w-11 items-center rounded-full border transition-colors',
-        menyala ? 'border-foreground bg-foreground' : 'border-border bg-secondary',
+        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 border transition-colors',
+        menyala
+          ? 'border-primary bg-primary'
+          : 'border-border bg-secondary hover:bg-secondary/80',
         sibuk && 'cursor-wait opacity-70',
       )}
     >
       <span
         className={cn(
-          'flex h-4.5 w-4.5 items-center justify-center rounded-full bg-background transition-transform',
-          menyala ? 'translate-x-[22px]' : 'translate-x-1',
+          'pointer-events-none flex h-5 w-5 items-center justify-center rounded-full bg-background shadow-xs ring-0 transition-transform duration-200',
+          menyala ? 'translate-x-5' : 'translate-x-0',
         )}
       >
         {sibuk && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}

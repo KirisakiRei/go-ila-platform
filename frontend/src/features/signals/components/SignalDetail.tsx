@@ -19,7 +19,7 @@ import {
   CardTitle,
   StatusPill,
 } from '@/components/ui'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDualDateTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '../lib/status'
@@ -33,10 +33,9 @@ type AnalysisPoint = {
   iconType: 'sweep' | 'trigger' | 'target' | 'context'
 }
 
-function parseAnalysisSummary(rawSummary: string): AnalysisPoint[] {
+function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): AnalysisPoint[] {
   if (!rawSummary || !rawSummary.trim()) return []
 
-  // Bersihkan emoji chat dan header template broadcast telegram
   const cleaned = rawSummary.replace(/^💎\s*SETUP[^\n:]+:\s*/gi, '').trim()
   const rawParts = cleaned
     .split(/(?:•|\n)+/)
@@ -60,28 +59,28 @@ function parseAnalysisSummary(rawSummary: string): AnalysisPoint[] {
     if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl/i.test(cleanDetail)) {
       points.push({
         id: `sweep-${i}`,
-        title: 'Sapuan Struktur (HTF / MTF)',
+        title: strategyVersion === 'ila-3.0' ? 'HTF / MTF Liquidity Sweep' : 'HTF Liquidity Sweep',
         detail: cleanDetail,
         iconType: 'sweep',
       })
     } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal/i.test(cleanDetail)) {
       points.push({
         id: `trigger-${i}`,
-        title: 'Konfirmasi Pemicu (LTF Trigger)',
+        title: 'LTF Trigger (CISD)',
         detail: cleanDetail,
         iconType: 'trigger',
       })
     } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
       points.push({
         id: `target-${i}`,
-        title: 'Proyeksi Target & Likuiditas',
+        title: 'Target & DOL (Draw on Liquidity)',
         detail: cleanDetail,
         iconType: 'target',
       })
     } else {
       points.push({
         id: `point-${i}`,
-        title: 'Konteks Analisis Pasar',
+        title: 'Market Structure Context',
         detail: cleanDetail,
         iconType: 'context',
       })
@@ -148,7 +147,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         <CardDescription className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <Radio className="h-3 w-3 animate-pulse text-emerald-500" />
           Analisis Pasar: {signal.strategy_version.toUpperCase()} · Terbit{' '}
-          {formatDateTime(signal.published_at)}
+          {formatDualDateTime(signal.published_at)}
         </CardDescription>
       </CardHeader>
 
@@ -181,7 +180,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   ) : (
                     <Clock className="h-4 w-4 text-muted-foreground animate-spin" />
                   )}
-                  <span>Tahap 1: HTF ({signal.htf || 'HTF'})</span>
+                  <span>HTF Sweep ({signal.htf || 'HTF'})</span>
                 </div>
                 <Badge
                   variant={isHtfSweepDone ? 'solid' : 'outline'}
@@ -190,17 +189,17 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                     isHtfSweepDone && 'bg-emerald-600 text-white',
                   )}
                 >
-                  {isHtfSweepDone ? 'Valid (Closed)' : 'Memantau'}
+                  {isHtfSweepDone ? 'Valid (Closed)' : 'Monitoring'}
                 </Badge>
               </div>
               <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
                 {isHtfSweepDone
-                  ? 'Struktur pasar timeframe besar terkonfirmasi resmi closed.'
-                  : 'Menunggu penutupan candle timeframe besar pada level kunci.'}
+                  ? 'HTF liquidity sweep terkonfirmasi valid (Candle Closed).'
+                  : 'Menunggu HTF candle sweep & close pada liquidity level / FVG.'}
               </p>
               {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
                 <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
-                  <span className="text-muted-foreground">Target Level:</span>
+                  <span className="text-muted-foreground">Target DOL:</span>
                   <span className="font-semibold tabular-nums">
                     {formatNumber(signal.htf_sweep.target_dol, 5)}
                   </span>
@@ -228,7 +227,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   ) : (
                     <Layers className="h-4 w-4 text-muted-foreground" />
                   )}
-                  <span>Tahap 2: LTF ({signal.ltf || 'LTF'})</span>
+                  <span>LTF Trigger ({signal.ltf || 'LTF'})</span>
                 </div>
                 <Badge
                   variant={isReady ? 'solid' : 'outline'}
@@ -238,19 +237,19 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                     isWaitLtf && 'border-amber-500 text-amber-600 dark:text-amber-400',
                   )}
                 >
-                  {isReady ? 'Konfirmasi Siap' : isWaitLtf ? 'Menunggu Body Close' : 'Belum Dimulai'}
+                  {isReady ? 'Ready Setup' : isWaitLtf ? 'Waiting CISD Close' : 'Pending HTF'}
                 </Badge>
               </div>
               <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
                 {isReady
-                  ? 'Konfirmasi momentum timeframe kecil terpenuhi. Order siap dieksekusi.'
+                  ? 'LTF CISD terkonfirmasi valid. Setup siap dieksekusi.'
                   : isWaitLtf
-                    ? 'Struktur HTF valid. Menunggu penutupan body candle pada timeframe kecil.'
-                    : 'Fase ini dimulai setelah struktur timeframe besar selesai.'}
+                    ? 'HTF sweep valid. Menunggu CISD body close pada LTF.'
+                    : 'Fase LTF trigger dimulai setelah HTF liquidity sweep selesai.'}
               </p>
               {signal.cisd && signal.cisd.cisd_level > 0 && (
                 <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
-                  <span className="text-muted-foreground">Batas Konfirmasi:</span>
+                  <span className="text-muted-foreground">CISD Level:</span>
                   <span className="font-semibold tabular-nums">
                     {formatNumber(signal.cisd.cisd_level, 5)}
                   </span>
@@ -277,21 +276,21 @@ export function SignalDetail({ signal }: { signal: Signal }) {
           <div className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-secondary/15 p-3.5 text-xs text-muted-foreground">
             <Clock className="h-4 w-4 shrink-0 text-amber-500" />
             <span>
-              Parameter entry, stop loss, dan take profit akan dihitung seketika
-              konfirmasi penutupan candle tercapai.
+              Level Entry, Stop Loss, dan Take Profit otomatis aktif seketika
+              konfirmasi LTF CISD terpenuhi.
             </span>
           </div>
         )}
 
         {/* Ringkasan Analisis & Aksi Selanjutnya */}
         {signal.summary && (() => {
-          const points = parseAnalysisSummary(signal.summary)
+          const points = parseAnalysisSummary(signal.summary, signal.strategy_version)
           return (
             <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs">
               <div className="flex items-center justify-between border-b border-border/50 pb-2">
                 <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Compass className="h-3.5 w-3.5 text-primary" />
-                  Keterangan Analisis
+                  Konteks Analisis Setup
                 </span>
                 <span className="text-[10px] font-medium text-muted-foreground">
                   {signal.strategy_version === 'ila-3.0' ? 'ILA 3.0 Sequence' : 'ILA 2.0 Engine'}
@@ -350,8 +349,8 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         )}
 
         <div className="flex flex-wrap items-center justify-between border-t border-border pt-3 text-[11px] text-muted-foreground">
-          <span>Terbit: {formatDateTime(signal.published_at)}</span>
-          <span>Batas Waktu: {formatDateTime(signal.expires_at)}</span>
+          <span>Terbit: {formatDualDateTime(signal.published_at)}</span>
+          <span>Batas Waktu: {formatDualDateTime(signal.expires_at)}</span>
         </div>
 
         {/* Tombol Eksekusi jika Status Ready/Opportunity */}

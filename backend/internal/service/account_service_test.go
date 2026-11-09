@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"ila/backend/internal/ctraderapi"
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
+	"ila/backend/pkg/apperror"
 	"ila/backend/pkg/cryptox"
 )
 
@@ -102,6 +104,43 @@ func (f *fakeSubRepo) ListByUser(_ context.Context, userID string) ([]model.Subs
 		}
 	}
 	return out, nil
+}
+func (f *fakeSubRepo) FindByID(_ context.Context, id, userID string) (*model.Subscription, error) {
+	for _, s := range f.subs {
+		if s.ID == id && s.UserID == userID {
+			return s, nil
+		}
+	}
+	return nil, apperror.ErrNotFound
+}
+func (f *fakeSubRepo) Delete(_ context.Context, id, userID string) error {
+	for i, s := range f.subs {
+		if s.ID == id && s.UserID == userID {
+			f.subs = append(f.subs[:i], f.subs[i+1:]...)
+			return nil
+		}
+	}
+	return apperror.ErrNotFound
+}
+func (f *fakeSubRepo) DeleteBySymbol(_ context.Context, userID, symbol string) error {
+	var filtered []*model.Subscription
+	for _, s := range f.subs {
+		if s.UserID == userID && strings.EqualFold(s.Symbol, symbol) {
+			continue
+		}
+		filtered = append(filtered, s)
+	}
+	f.subs = filtered
+	return nil
+}
+func (f *fakeSubRepo) Reactivate(_ context.Context, id, userID string) error {
+	for _, s := range f.subs {
+		if s.ID == id && s.UserID == userID {
+			s.IsActive = true
+			return nil
+		}
+	}
+	return errors.New("tidak ditemukan")
 }
 func (f *fakeSubRepo) Deactivate(_ context.Context, id, userID string) error {
 	for _, s := range f.subs {
@@ -649,5 +688,79 @@ func TestCTraderOAuth_AuthURLAndCallback(t *testing.T) {
 	// Akun tidak boleh berlipat ganda
 	if len(accounts.accounts) != 1 {
 		t.Errorf("expected still 1 account, got %d", len(accounts.accounts))
+	}
+}
+
+func TestSubscription_HapusDanReaktivasiTanpaDuplikasi(t *testing.T) {
+	users := newFakeUserRepo()
+	user := newTestUser("plus")
+	users.users[user.Email] = user
+
+	subs := &fakeSubRepo{}
+	svc := NewAccountService(AccountServiceDeps{
+		Users:         users,
+		Accounts:      &fakeAccountRepo{accounts: map[string]*model.BrokerAccount{}},
+		Credentials:   &fakeCredRepo{creds: map[string]*model.Credential{}},
+		Subscriptions: subs,
+		Audit:         &fakeAuditRepo{},
+		Sealer:        testKeyring(t),
+		Strategies:    &fakeStrategies{},
+	})
+
+	ctx := context.Background()
+
+	// 1. Tambah XAUUSD
+	resp1, err := svc.Subscribe(ctx, user.ID, dto.CreateSubscriptionRequest{Symbol: "XAUUSD"})
+	if err != nil {
+		t.Fatalf("Subscribe XAUUSD: %v", err)
+	}
+	if resp1.Symbol != "XAUUSD" || !resp1.IsActive {
+		t.Fatalf("expected active subscription, got %+v", resp1)
+	}
+
+	// 2. Pastikan muncul di ListSubscriptions
+	list1, err := svc.ListSubscriptions(ctx, user.ID)
+	if err != nil || len(list1) != 1 {
+		t.Fatalf("ListSubscriptions harus berisi 1 simbol, dapat %d: %v", len(list1), err)
+	}
+
+	// 3. Tambah lagi XAUUSD (idempoten) tidak boleh membuat duplikat
+	resp2, err := svc.Subscribe(ctx, user.ID, dto.CreateSubscriptionRequest{Symbol: "XAUUSD"})
+	if err != nil {
+		t.Fatalf("Subscribe ulang XAUUSD: %v", err)
+	}
+	list2, err := svc.ListSubscriptions(ctx, user.ID)
+	if err != nil || len(list2) != 1 {
+		t.Fatalf("ListSubscriptions harus tetap 1 simbol (tidak double), dapat %d", len(list2))
+	}
+	if resp2.ID != resp1.ID {
+		t.Fatalf("id harus sama, dapat %s vs %s", resp2.ID, resp1.ID)
+	}
+
+	// 4. Hapus XAUUSD
+	if err := svc.Unsubscribe(ctx, user.ID, resp1.ID); err != nil {
+		t.Fatalf("Unsubscribe: %v", err)
+	}
+
+	// 5. Pastikan hilang dari ListSubscriptions (bukan hanya nonaktif)
+	list3, err := svc.ListSubscriptions(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListSubscriptions setelah hapus: %v", err)
+	}
+	if len(list3) != 0 {
+		t.Fatalf("setelah dihapus simbol harus hilang (0 item), tetapi masih ada %d item: %+v", len(list3), list3)
+	}
+
+	// 6. Tambah lagi XAUUSD setelah dihapus -> harus aktif kembali dan tidak double
+	resp3, err := svc.Subscribe(ctx, user.ID, dto.CreateSubscriptionRequest{Symbol: "XAUUSD"})
+	if err != nil {
+		t.Fatalf("Subscribe setelah dihapus: %v", err)
+	}
+	list4, err := svc.ListSubscriptions(ctx, user.ID)
+	if err != nil || len(list4) != 1 {
+		t.Fatalf("ListSubscriptions setelah reaktivasi harus 1 item, dapat %d", len(list4))
+	}
+	if resp3.Symbol != "XAUUSD" || !resp3.IsActive {
+		t.Fatalf("expected active XAUUSD, got %+v", resp3)
 	}
 }
