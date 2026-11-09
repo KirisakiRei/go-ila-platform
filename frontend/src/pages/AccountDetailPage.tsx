@@ -520,7 +520,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
         open={konfirmasiRisiko}
         onClose={() => setKonfirmasiRisiko(false)}
         title="Risiko di atas 1%"
-        description="Setelan ini masih dapat disimpan, tetapi tergolong agresif untuk akun nyata."
+        description="Setelan ini masih dapat disimpan, tetapi tergolong agresif untuk akun live."
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setKonfirmasiRisiko(false)}>

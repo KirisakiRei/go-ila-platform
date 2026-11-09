@@ -1170,7 +1170,7 @@ function CreateAdminModal({
             onChange={(event) => setEmail(event.target.value)}
           />
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Hanya untuk surel. Tidak ada verifikasi email pada akun pengelola.
+            Hanya untuk identitas email. Tidak ada verifikasi email pada akun pengelola.
           </p>
         </div>
       </div>

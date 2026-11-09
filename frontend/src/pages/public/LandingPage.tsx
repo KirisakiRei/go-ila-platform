@@ -41,7 +41,7 @@ const PILLARS = [
   {
     kind: 'standard' as const,
     title: 'Mode Manual & Otomatis',
-    body: 'Setujui sinyal lewat satu ketukan di Telegram, atau aktifkan eksekusi otomatis sesuai batas risiko yang sudah Anda tetapkan.',
+    body: 'Setujui sinyal lewat satu ketukan di Telegram, atau aktifkan eksekusi otomatis sesuai batas risiko yang Anda tetapkan.',
   },
   {
     kind: 'accent' as const,
@@ -51,11 +51,11 @@ const PILLARS = [
   {
     kind: 'standard' as const,
     title: 'Pendekatan Berbasis Likuiditas',
-    body: 'Mengamati sapuan likuiditas serta perubahan struktur harga, lalu menunggu konfirmasi alih-alih menebak arah pasar.',
+    body: 'Membaca liquidity sweep dan pergeseran struktur pasar, menunggu konfirmasi candle valid tanpa spekulasi.',
   },
   {
     kind: 'accent' as const,
-    note: 'Coba seluruh alur dalam mode simulasi selama 7 hari tanpa kartu kredit maupun komitmen langganan.',
+    note: 'Coba seluruh alur dalam mode simulasi selama 7 hari tanpa komitmen pembayaran.',
     anchor: 'Mulai Uji Coba Simulasi',
   },
 ]
@@ -115,7 +115,7 @@ export default function LandingPage() {
 
           <div className="relative mx-auto w-full max-w-6xl px-4 pt-28 pb-16 sm:px-6 sm:pt-36 sm:pb-24">
             <p className="max-w-sm text-[13px] leading-relaxed text-zinc-300">
-              Pemantauan pasar terstruktur — berjalan di atas akun broker milik Anda sendiri.
+              Pemantauan struktur pasar real-time — langsung di akun broker Anda.
             </p>
 
             {/* Judul utama hero */}
@@ -134,12 +134,11 @@ export default function LandingPage() {
             <div className="relative z-10 mt-12 flex flex-col justify-between gap-6 border-t border-white/15 pt-8 md:mt-16 md:flex-row md:items-end">
               <div className="max-w-xl space-y-2">
                 <p className="text-[15px] leading-relaxed text-zinc-100">
-                  Imaginary Liquidity membantu Anda memantau setup berdasarkan struktur likuiditas,
-                  menerima peringatan tepat waktu, dan menjaga batas risiko tetap konsisten.
+                  Pantau setup market berbasis likuiditas, terima sinyal terarah secara real-time,
+                  dan jaga disiplin risk management tanpa overtrading.
                 </p>
                 <p className="text-[12px] text-zinc-300">
-                  Akun tetap berada di broker Anda · Bukan jaminan keuntungan &amp; bukan nasihat
-                  investasi.
+                  Dana dan akun tetap aman di broker Anda · Bukan rekomendasi investasi.
                 </p>
               </div>
 
@@ -149,14 +148,14 @@ export default function LandingPage() {
                   href="/app/register"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] shadow-lg shadow-black/30 transition-colors hover:bg-zinc-200"
                 >
-                  Mulai Uji Coba 7 Hari
+                  Mulai Trial 7 Hari
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Link
                   to="/fitur"
                   className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-black/35 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
                 >
-                  Lihat Cara Kerja
+                  Pelajari Cara Kerja
                 </Link>
               </div>
             </div>
@@ -170,18 +169,18 @@ export default function LandingPage() {
         >
           <div className="max-w-2xl space-y-5">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight text-[#09090b] sm:text-4xl lg:text-[2.75rem]">
-              Aturan trading tertulis, kendali risiko terjaga, berjalan konsisten setiap hari
+              Trading lebih sistematis dengan aturan risiko terukur
             </h2>
             <p className="max-w-lg text-[14px] leading-relaxed text-[#3f3f46]">
-              Dari pembacaan struktur harga hingga pencatatan setiap keputusan, semua berlangsung
-              rapi di atas akun broker milik Anda sendiri.
+              Dari analisis struktur chart hingga eksekusi posisi, semua keputusan tercatat
+              transparan di akun trading Anda.
             </p>
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <a
                 href="/app/register"
                 className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
               >
-                Mulai Uji Coba 7 Hari
+                Mulai Trial 7 Hari
               </a>
               <Link
                 to="/bantuan/zona-waktu"
@@ -303,8 +302,8 @@ export default function LandingPage() {
                 berada sepenuhnya di akun broker Anda.
               </p>
                 <p className="mt-3 text-[12px] leading-relaxed text-[#71717a]">
-                Detail harga masuk, batas kerugian, dan target hanya tersedia untuk pelanggan.
-                Bukan jaminan keuntungan dan bukan nasihat investasi.
+                Detail entry price, stop loss, dan take profit tersedia di dashboard member.
+                Bukan jaminan keuntungan dan bukan rekomendasi investasi.
               </p>
             </div>
 
@@ -339,13 +338,12 @@ export default function LandingPage() {
             <div className="flex flex-col justify-between gap-8 lg:col-span-5">
               <div className="space-y-4">
                 <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                  <span className="text-[#09090b]">Dua generasi strategi,</span>{' '}
+                  <span className="text-[#09090b]">Dua metode analisis,</span>{' '}
                   <span className="text-[#52525b]">satu disiplin risiko</span>
                 </h2>
                 <p className="text-[14px] leading-relaxed text-[#52525b]">
                   Metode ILA memetakan area likuiditas dan menunggu konfirmasi pergerakan harga
-                  sebelum mengirim setup — bukan menebak arah pasar maupun bereaksi terhadap berita
-                  ekonomi secara otomatis.
+                  sebelum mengirim setup — tanpa spekulasi berlebihan.
                 </p>
               </div>
 
@@ -354,13 +352,13 @@ export default function LandingPage() {
                   href="/app/register"
                   className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
                 >
-                  Daftar Uji Coba
+                  Mulai Trial
                 </a>
                 <Link
                   to="/fitur"
                   className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100"
                 >
-                  Detail Strategi
+                  Pelajari Fitur
                 </Link>
               </div>
             </div>
@@ -382,7 +380,7 @@ export default function LandingPage() {
                     ILA 2.0 · Tersedia Sekarang
                   </h3>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
-                    Menyaring sapuan likuiditas dan konfirmasi struktur pasar secara konsisten pada
+                    Menyaring liquidity sweep dan konfirmasi struktur pasar secara konsisten pada
                     seluruh paket langganan.
                   </p>
                 </div>
@@ -391,7 +389,7 @@ export default function LandingPage() {
                     ILA 3.0 · Hadir Bertahap
                   </h3>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
-                    Penyaringan struktur generasi lanjutan yang disiapkan bertahap sebagai pilihan
+                    Penyaringan struktur multi-frame lanjutan yang disiapkan bertahap sebagai pilihan
                     tambahan di paket Plus.
                   </p>
                 </div>
@@ -429,7 +427,7 @@ export default function LandingPage() {
                   Pemindaian Sesi Aktif
                 </p>
                 <p className="mt-2 text-[14px] leading-relaxed text-[#3f3f46]">
-                  Sistem memantau instrumen pilihan secara terjadwal selama jam pasar dibuka dan
+                  Memantau instrumen pilihan secara terjadwal selama jam pasar dibuka dan
                   mencatat setiap sinyal yang lolos maupun yang dilewati agar mudah Anda tinjau.
                 </p>
               </div>
@@ -612,15 +610,15 @@ export default function LandingPage() {
               </h2>
 
               <p className="text-[14px] leading-relaxed text-zinc-300">
-                Mulai uji coba simulasi 7 hari tanpa kartu kredit. Hubungkan akun Anda saat sudah
-                yakin dengan alur kerja sistem.
+                Mulai trial simulasi 7 hari tanpa kartu kredit. Hubungkan akun broker Anda saat sudah
+                siap menjalankan trading.
               </p>
 
               <p className="border-l-2 border-zinc-700 pl-4 text-[12px] leading-relaxed text-zinc-300">
                 <strong className="font-semibold text-white">Disclaimer Risiko Trading:</strong>{' '}
-                Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi. Imaginary
-                Liquidity adalah alat bantu analisis dan eksekusi—bukan jaminan keuntungan dan bukan
-                nasihat keuangan. Hasil masa lalu tidak menjamin hasil di masa depan.
+                Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi. Platform ini
+                adalah alat bantu analisis dan eksekusi—bukan jaminan keuntungan dan bukan nasihat
+                keuangan.
               </p>
 
               <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -628,7 +626,7 @@ export default function LandingPage() {
                   href="/app/register"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] transition-colors hover:bg-zinc-200"
                 >
-                  Mulai Uji Coba 7 Hari
+                  Mulai Trial 7 Hari
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Link

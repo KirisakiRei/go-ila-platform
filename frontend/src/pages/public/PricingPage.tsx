@@ -44,8 +44,8 @@ const COMPARISON: ComparisonRow[] = [
   {
     label: 'Eksekusi',
     value: (plan) => {
-      if (plan.code === 'free') return 'Simulasi'
-      return plan.features?.auto_execute === 'true' ? 'Otomatis & manual' : 'Manual'
+      if (plan.code === 'free') return 'Demo'
+      return plan.features?.auto_execute === 'true' ? 'Auto & Manual' : 'Manual'
     },
   },
   {
@@ -352,7 +352,7 @@ export default function PricingPage() {
               </table>
             </div>
             <p className="mt-3 text-[12px] text-[#71717a]">
-              Uji coba 7 hari memberi fitur setara paket tertinggi dalam mode simulasi.
+              Trial 7 hari menyertakan fitur setara paket tertinggi dalam mode demo.
             </p>
           </div>
         </section>

@@ -116,10 +116,10 @@ export default function HelpTimezonePage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#71717a]">
               Waktu Indonesia Barat
             </p>
-            <p className="mt-1.5 text-[15px] font-semibold">Hari akuntansi Anda</p>
+            <p className="mt-1.5 text-[15px] font-semibold">Siklus Harian (WIB)</p>
             <p className="mt-2 text-[13px] leading-relaxed text-[#52525b]">
-              Kuota harian, jumlah transaksi, dan penentuan hari menang mengikuti tanggal WIB, agar
-              batas harian mengikuti kebiasaan Anda.
+              Reset kuota harian, jumlah transaksi, dan batas risiko dihitung berdasarkan tanggal
+              WIB.
             </p>
             {data?.time_pair?.wib && (
               <p className="mt-3 text-[12px] text-[#a1a1aa] tabular">
@@ -196,7 +196,7 @@ export default function HelpTimezonePage() {
             Saya trading pukul 23.00 dan 01.00 WIB. Mengapa dihitung dua hari?
           </h2>
           <p className="mt-2 text-[13.5px] leading-relaxed text-[#52525b]">
-            23.00 WIB dan 01.00 WIB memang dua tanggal berbeda, dan hari akuntansi mengikuti tanggal
+            23.00 WIB dan 01.00 WIB memang dua tanggal berbeda, dan siklus harian mengikuti tanggal
             WIB. Kuota harian Anda direset pada 00.00 WIB.
           </p>
         </section>

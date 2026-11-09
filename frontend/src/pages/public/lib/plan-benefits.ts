@@ -6,8 +6,8 @@ export type PlanBenefit = {
 }
 
 const TIER_AUDIENCE: Record<string, string> = {
-  free: 'Untuk mengenal cara kerja sinyal dalam mode simulasi.',
-  basic: 'Untuk trader aktif dengan konfirmasi manual satu ketuk.',
+  free: 'Untuk mengevaluasi cara kerja sinyal dalam mode demo.',
+  basic: 'Untuk trader aktif dengan eksekusi terarah & sinyal real-time.',
   plus: 'Untuk otomasi penuh, multi-akun, dan kontrol risiko fleksibel.',
 }
 
@@ -27,7 +27,7 @@ export function formatPlanBenefits(plan: PublicPlan): PlanBenefit[] {
   if (delay === '0') {
     benefits.push({ label: 'Sinyal real-time tanpa jeda', included: true })
   } else if (delay) {
-    benefits.push({ label: `Sinyal simulasi (jeda ${delay} menit)`, included: true })
+    benefits.push({ label: `Sinyal demo (jeda ${delay} menit)`, included: true })
   }
 
   const maxSymbols = f.max_symbols
@@ -59,7 +59,7 @@ export function formatPlanBenefits(plan: PublicPlan): PlanBenefit[] {
     benefits.push({
       label:
         plan.code === 'free'
-          ? 'Mode simulasi tanpa eksekusi live'
+          ? 'Mode demo tanpa eksekusi live'
           : 'Konfirmasi eksekusi manual via Telegram',
       included: true,
     })

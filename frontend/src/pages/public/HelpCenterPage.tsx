@@ -33,11 +33,11 @@ const TOPICS = [
     steps: [
       {
         title: 'Buat akun',
-        body: 'Daftar dengan alamat surel aktif. Persetujuan dokumen dasar diminta pada langkah ini dan dicatat beserta nomor versinya.',
+        body: 'Daftar dengan alamat email aktif. Persetujuan dokumen dasar diminta pada langkah ini dan dicatat beserta nomor versinya.',
       },
       {
         title: 'Kenali mode simulasi',
-        body: 'Selama tujuh hari, fitur setara paket tertinggi aktif dalam mode simulasi. Tidak ada eksekusi dana nyata dan tidak ada data pembayaran yang diminta.',
+        body: 'Selama tujuh hari, fitur setara paket tertinggi aktif dalam mode simulasi. Tidak ada eksekusi dana riil dan tidak ada data pembayaran yang diminta.',
       },
       {
         title: 'Tentukan aturan risiko',
@@ -45,11 +45,11 @@ const TOPICS = [
       },
       {
         title: 'Hubungkan akun broker',
-        body: 'Gunakan kredensial akses dari aplikasi broker Anda. Sebelum akun nyata dihubungkan, Anda akan diminta menyetujui Disclaimer Risiko Trading.',
+        body: 'Gunakan kredensial akses dari aplikasi broker Anda. Sebelum akun live dihubungkan, Anda akan diminta menyetujui Disclaimer Risiko Trading.',
       },
       {
         title: 'Terima notifikasi',
-        body: 'Aktifkan Telegram agar permintaan persetujuan sampai tanpa perlu membuka panel. Sinyal juga selalu tersedia di panel pelanggan.',
+        body: 'Aktifkan Telegram agar permintaan persetujuan sampai tanpa perlu membuka dashboard. Sinyal juga selalu tersedia di dashboard akun Anda.',
       },
     ],
   },
@@ -90,7 +90,7 @@ const TOPICS = [
         body: 'Buat kredensial akses melalui aplikasi atau portal broker Anda. Gunakan kredensial khusus untuk layanan ini, bukan kata sandi akun utama Anda.',
       },
       {
-        title: 'Hubungkan melalui panel pelanggan',
+        title: 'Hubungkan melalui dashboard',
         body: 'Masukkan kredensial pada halaman akun. Sistem menguji koneksi sebelum akun diaktifkan untuk pemantauan.',
       },
       {
@@ -99,7 +99,7 @@ const TOPICS = [
       },
       {
         title: 'Cabut kapan saja',
-        body: 'Lepas akun dari panel bila Anda tidak lagi menggunakannya. Kredensial dihapus dan pemantauan untuk akun tersebut dihentikan.',
+        body: 'Putus akun dari dashboard bila Anda tidak lagi menggunakannya. Kredensial dihapus dan pemantauan untuk akun tersebut dihentikan.',
       },
     ],
   },
@@ -112,7 +112,7 @@ const TOPICS = [
     steps: [
       {
         title: 'Periode bulanan',
-        body: 'Langganan ditagihkan per periode bulanan sesuai paket yang aktif. Rincian tagihan dan status pembayaran tersedia di panel pelanggan.',
+        body: 'Langganan ditagihkan per periode bulanan sesuai paket yang aktif. Rincian tagihan dan status pembayaran tersedia di dashboard.',
       },
       {
         title: 'Masa tenggang',
@@ -141,7 +141,7 @@ const TOPICS = [
       },
       {
         title: 'Kelola sesi aktif',
-        body: 'Panel pelanggan menampilkan sesi yang sedang aktif. Akhiri sesi yang tidak Anda kenali, lalu ubah kata sandi.',
+        body: 'Dashboard menampilkan daftar sesi yang sedang aktif. Akhiri sesi yang tidak Anda kenali, lalu ubah kata sandi.',
       },
       {
         title: 'Keluar otomatis',
@@ -237,7 +237,7 @@ function HelpHubPage() {
             <div className="max-w-xl">
               <h2 className="text-[17px] font-semibold tracking-tight">Belum menemukan jawaban?</h2>
               <p className="mt-2 text-[13px] leading-relaxed text-[#52525b]">
-                Hubungi dukungan melalui surel. Sertakan alamat surel akun Anda dan waktu kejadian
+                Hubungi tim dukungan via email. Sertakan alamat email akun Anda dan detail kejadian
                 agar penelusuran lebih cepat.
               </p>
             </div>
@@ -303,7 +303,7 @@ function TopicGrid({ query }: { query: string }) {
                   Sesi pasar &amp; zona waktu
                 </h3>
                 <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#52525b]">
-                  Mengapa panel menampilkan jam New York dan WIB sekaligus.
+                  Mengapa platform menampilkan jam New York dan WIB sekaligus.
                 </p>
               </div>
               <span className="mt-4 inline-flex items-center gap-1 text-[12px] font-medium text-[#3f3f46]">

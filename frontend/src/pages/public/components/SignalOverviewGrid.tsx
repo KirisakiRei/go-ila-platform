@@ -69,8 +69,8 @@ export function SignalOverviewGrid() {
 
       <p className="text-[11px] text-[#71717a]">
         {data
-          ? `Diperbarui ${formatRelativeTime(data.generated_at)} · tanpa harga masuk, batas kerugian, maupun target.`
-          : 'Tanpa harga masuk, batas kerugian, maupun target.'}
+          ? `Diperbarui ${formatRelativeTime(data.generated_at)} · Khusus informasi arah pasar tanpa parameter eksekusi.`
+          : 'Khusus informasi arah pasar tanpa parameter eksekusi.'}
       </p>
     </div>
   )

@@ -67,7 +67,7 @@ function StatusTag({ hasSignal, marketOpen }: { hasSignal: boolean; marketOpen: 
       ? 'border-[#09090b] bg-[#09090b] text-white'
       : 'border-zinc-300 bg-transparent text-[#3f3f46]'
 
-  const teks = !marketOpen ? 'Pasar tutup' : hasSignal ? 'Sinyal terbaru' : 'Dipantau'
+  const teks = !marketOpen ? 'Pasar tutup' : hasSignal ? 'Sinyal Aktif' : 'Dipantau'
 
   return (
     <span
@@ -136,7 +136,7 @@ export function SignalOverviewCard({
               </p>
             </div>
             <p className="mt-1.5 text-[12px] leading-relaxed text-[#52525b]">
-              {rentang ? `Rentang waktu ${rentang}` : 'Rentang waktu belum tersedia'}
+              {rentang ? `Timeframe ${rentang}` : 'Timeframe belum tersedia'}
             </p>
           </>
         ) : (
@@ -145,8 +145,8 @@ export function SignalOverviewCard({
               Sedang dipantau
             </p>
             <p className="mt-1.5 text-[12px] leading-relaxed text-[#52525b]">
-              Belum ada arah yang dikonfirmasi. Tim terus membaca pergerakan harga pada instrumen
-              ini.
+              Belum ada arah terkonfirmasi. Platform memantau pergerakan struktur harga instrumen ini
+              secara kontinu.
             </p>
           </>
         )}

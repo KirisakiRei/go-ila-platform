@@ -379,7 +379,7 @@ export function PublicLayout() {
             />
             <div>
               <p className="text-base font-bold tracking-tight text-[#09090b]">Imaginary Liquidity</p>
-              <p className="text-xs text-zinc-500">Analisis Likuiditas &amp; Eksekusi Trading di Broker Anda</p>
+              <p className="text-xs text-zinc-500">Analisis Likuiditas &amp; Eksekusi Trading Presisi</p>
             </div>
           </div>
 
@@ -391,7 +391,7 @@ export function PublicLayout() {
               <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
                 <li>
                   <Link to="/fitur" className="transition-colors hover:text-[#52525b]">
-                    Fitur Sistem
+                    Fitur Platform
                   </Link>
                 </li>
                 <li>
@@ -401,7 +401,7 @@ export function PublicLayout() {
                 </li>
                 <li>
                   <Link to="/#cara-kerja" className="transition-colors hover:text-[#52525b]">
-                    Cara Kerja ILA
+                    Cara Kerja
                   </Link>
                 </li>
                 <li>
@@ -419,7 +419,7 @@ export function PublicLayout() {
               <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
                 <li>
                   <a href="/app/register" className="transition-colors hover:text-[#52525b]">
-                    Daftar Uji Coba
+                    Mulai Trial
                   </a>
                 </li>
                 <li>
@@ -475,9 +475,7 @@ export function PublicLayout() {
 
             <div className="space-y-4 lg:col-span-5 lg:pl-6">
               <p className="text-[14px] leading-relaxed text-[#18181b]">
-                Perangkat lunak analisis likuiditas &amp; eksekusi trading di atas akun broker milik
-                Anda sendiri. Bukan nasihat keuangan; perdagangan derivatif mengandung risiko
-                kehilangan modal.
+                Platform analisis likuiditas dan eksekusi trading langsung di broker Anda. Bukan penasihat keuangan; instrumen derivatif memiliki risiko modal.
               </p>
               <div className="flex flex-wrap items-center gap-4">
                 <a
