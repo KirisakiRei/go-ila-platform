@@ -168,12 +168,16 @@ export type Subscription = {
 }
 
 /**
- * Pair pantauan bersifat global: `broker_account_id` opsional dan tidak dikirim
- * lagi oleh halaman Pair Pantauan. Field tetap ada untuk jejak data lama.
+ * Pair pantauan bersifat global.
+ *
+ * `strategy` tidak lagi dikirim: satu pair dipantau oleh kedua metode analisis,
+ * dan metode mana yang dieksekusi ditentukan per akun trading. Server memakai
+ * `ila-2.0` sebagai nilai bawaan bila field ini kosong.
+ * `broker_account_id` juga opsional dan tidak dipakai halaman Pair Pantauan.
  */
 export type CreateSubscriptionPayload = {
   symbol: string
-  strategy: StrategyVersion
+  strategy?: StrategyVersion
   broker_account_id?: string
 }
 

@@ -50,7 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Trading & Pantauan',
     items: [
-      { to: '/sinyal', label: 'Sinyal Per Pair', short: 'Sinyal', icon: Radio },
+      { to: '/sinyal', label: 'Sinyal', short: 'Sinyal', icon: Radio },
       { to: '/posisi', label: 'Riwayat Posisi', short: 'Posisi', icon: BarChart3 },
       { to: '/akun', label: 'Akun Broker', short: 'Akun', icon: Wallet },
       { to: '/strategi', label: 'Pair Pantauan', short: 'Pair', icon: Bot },

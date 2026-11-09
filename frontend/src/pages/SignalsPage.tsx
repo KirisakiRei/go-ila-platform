@@ -21,7 +21,7 @@ import {
   Skeleton,
   StatusPill,
 } from '@/components/ui'
-import { usePositions, useSignals, useSubscriptions } from '@/lib/queries'
+import { usePositions, useSignals, useStrategies, useSubscriptions } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
@@ -34,8 +34,28 @@ export default function SignalsPage() {
   const { data: signals, isLoading: loadingSignals, isFetching, refetch } = useSignals(100)
   const { data: positions, isLoading: loadingPositions } = usePositions(100)
   const { data: subscriptions, isLoading: loadingSubs } = useSubscriptions()
+  const { data: strategies } = useStrategies()
+
+  /**
+   * ILA 3.0 hanya ditampilkan bagi tier yang berhak. Bagi pengguna lain seluruh
+   * jejak metode ini disembunyikan agar fitur berbayar tidak terbocorkan.
+   */
+  const adaIla3 = useMemo(
+    () => (strategies ?? []).some((s) => s.version === 'ila-3.0' && s.allowed),
+    [strategies],
+  )
 
   const [activeStrategyFilter, setActiveStrategyFilter] = useState<'all' | 'ila-2.0' | 'ila-3.0'>('all')
+
+  // Filter metode yang ditawarkan mengikuti hak akses tier pengguna.
+  const strategiTersedia = useMemo(
+    () =>
+      (adaIla3
+        ? (['all', 'ila-2.0', 'ila-3.0'] as const)
+        : (['all', 'ila-2.0'] as const)
+      ).slice(),
+    [adaIla3],
+  )
 
   // Gabungkan daftar pair unik dari subscription dan sinyal yang pernah ada
   const allPairs = useMemo(() => {
@@ -90,10 +110,10 @@ export default function SignalsPage() {
   return (
     <>
       <PageHeader
-        title={activePair ? `Sinyal ${activePair}` : 'Sinyal Trading'}
+        title={activePair ? `Sinyal ${activePair}` : 'Sinyal'}
         description={
           activePair
-            ? `Overview sinyal aktif, analisis per metode (ILA 2.0 & ILA 3.0), serta riwayat eksekusi order pada pair ${activePair}.`
+            ? `Ringkasan sinyal aktif${adaIla3 ? ', analisis per metode (ILA 2.0 & ILA 3.0),' : ''} serta riwayat eksekusi order pada pair ${activePair}.`
             : 'Ringkasan sinyal pasar terorganisasi per pair instrumen dan per metode analisis.'
         }
         actions={
@@ -133,7 +153,7 @@ export default function SignalsPage() {
                 Metode Analisis:
               </span>
               <div className="flex items-center gap-1.5">
-                {(['all', 'ila-2.0', 'ila-3.0'] as const).map((strat) => (
+                {strategiTersedia.map((strat) => (
                   <Button
                     key={strat}
                     size="sm"
@@ -400,39 +420,41 @@ export default function SignalsPage() {
                         )}
                       </div>
 
-                      {/* Sub-card ILA 3.0 */}
-                      <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-foreground">ILA 3.0</span>
-                            <Badge variant="muted" className="text-[9px]">Plus</Badge>
+                      {/* Sub-card ILA 3.0 — hanya untuk tier yang berhak. */}
+                      {adaIla3 && (
+                        <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-foreground">ILA 3.0</span>
+                              <Badge variant="muted" className="text-[9px]">Plus</Badge>
+                            </div>
+                            {latestIla3 ? (
+                              <StatusPill tone={SIGNAL_TONE[latestIla3.status]} className="text-[10px]">
+                                {SIGNAL_LABEL[latestIla3.status]}
+                              </StatusPill>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">Menunggu setup</span>
+                            )}
                           </div>
-                          {latestIla3 ? (
-                            <StatusPill tone={SIGNAL_TONE[latestIla3.status]} className="text-[10px]">
-                              {SIGNAL_LABEL[latestIla3.status]}
-                            </StatusPill>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground">Menunggu setup</span>
+
+                          {latestIla3 && (
+                            <div className="mt-2 flex items-center justify-between text-xs">
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-1 font-bold',
+                                  latestIla3.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
+                                )}
+                              >
+                                {latestIla3.direction === 'BUY' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                {latestIla3.direction} @ {formatNumber(latestIla3.entry_price, 4)}
+                              </span>
+                              <span className="text-[10.5px] tabular-nums text-muted-foreground">
+                                R:R 1:{formatNumber(latestIla3.risk_reward, 1)}
+                              </span>
+                            </div>
                           )}
                         </div>
-
-                        {latestIla3 && (
-                          <div className="mt-2 flex items-center justify-between text-xs">
-                            <span
-                              className={cn(
-                                'inline-flex items-center gap-1 font-bold',
-                                latestIla3.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
-                              )}
-                            >
-                              {latestIla3.direction === 'BUY' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                              {latestIla3.direction} @ {formatNumber(latestIla3.entry_price, 4)}
-                            </span>
-                            <span className="text-[10.5px] tabular-nums text-muted-foreground">
-                              R:R 1:{formatNumber(latestIla3.risk_reward, 1)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1">
