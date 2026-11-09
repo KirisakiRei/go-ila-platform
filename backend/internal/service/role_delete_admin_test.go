@@ -126,14 +126,51 @@ func TestDeleteAdminDiriSendiriDitolak(t *testing.T) {
 func TestDeleteAdminTidakBolehMelebihiKewenangan(t *testing.T) {
 	f := newDeleteAdminFixture()
 
-	// plainAdmin hanya memegang user.view, role.edit, role.view; role target
-	// memuat seluruh kewenangan, jadi penghapusan harus ditolak.
-	err := f.svc.DeleteAdmin(context.Background(), plainAdminID, superUserID, alasanHapus)
+	// Target diberi role non-superadmin dengan kewenangan lebih luas daripada
+	// milik pelaku. Role superadmin sengaja tidak dipakai di sini karena kasus
+	// itu punya pengaman sendiri (lihat TestDeleteAdminSuperadminLainDitolak).
+	luasID := "role-luas"
+	pejabat := "u-pejabat"
+	f.users.users[pejabat] = &model.User{
+		Base: model.Base{ID: pejabat}, Role: "admin", RoleID: &luasID,
+		Email: "pejabat@rekavia.com",
+	}
+
+	err := f.svc.DeleteAdmin(context.Background(), plainAdminID, pejabat, alasanHapus)
 	if !errors.Is(err, apperror.ErrBadRequest) {
 		t.Fatalf("error = %v; ingin BAD_REQUEST", err)
 	}
 	if len(f.anonymizer.removed) != 0 {
 		t.Fatal("target dengan kewenangan lebih tinggi tetap dihapus")
+	}
+}
+
+// Superadmin tidak boleh menghapus superadmin lain.
+//
+// Bug yang dijaga: dua superadmin bisa saling menghapus sampai tersisa satu.
+// ensureCanGrant tidak menangkapnya karena permission keduanya sama, sehingga
+// yang harus dijaga adalah jabatannya, bukan selisih kewenangan.
+func TestDeleteAdminSuperadminLainDitolak(t *testing.T) {
+	f := newDeleteAdminFixture()
+
+	// superUser dan protectedAdmin sama-sama superadmin. Yang diuji adalah akun
+	// yang TIDAK terlindungi, agar penolakan datang dari aturan jabatan.
+	saLainID := "u-super-kedua"
+	f.store.userRoles[saLainID] = strPtr(superRoleID)
+	f.users.users[saLainID] = &model.User{
+		Base: model.Base{ID: saLainID}, Role: "admin",
+		RoleID: strPtr(superRoleID), Email: "super.lain@rekavia.com",
+	}
+
+	err := f.svc.DeleteAdmin(context.Background(), superUserID, saLainID, alasanHapus)
+	if !errors.Is(err, apperror.ErrBadRequest) {
+		t.Fatalf("error = %v; ingin BAD_REQUEST", err)
+	}
+	if len(f.anonymizer.removed) != 0 {
+		t.Fatalf("superadmin lain tetap dihapus: %v", f.anonymizer.removed)
+	}
+	if len(f.audit.entries) != 0 {
+		t.Fatal("penolakan tidak boleh meninggalkan catatan audit penghapusan")
 	}
 }
 

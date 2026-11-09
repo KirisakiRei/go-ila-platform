@@ -495,6 +495,23 @@ func (s *roleService) DeleteAdmin(ctx context.Context, actorID, userID, reason s
 		return validation("akun superadmin utama tidak dapat dihapus")
 	}
 
+	// Larangan #2 versi penghapusan: role superadmin hanya boleh diurus
+	// superadmin, dan superadmin TIDAK boleh menghapus superadmin lain.
+	//
+	// Tanpa aturan ini dua superadmin bisa saling menghapus sampai tersisa
+	// satu, padahal keduanya setara. Pemeriksaan ensureCanGrant di bawah tidak
+	// menangkapnya karena permission keduanya sama, sehingga tidak ada izin
+	// "milik orang lain" yang dilanggar. Yang dijaga di sini adalah jabatannya.
+	if target.RoleID != nil && *target.RoleID != "" {
+		targetRole, err := s.store.FindRoleByID(ctx, *target.RoleID)
+		if err != nil {
+			return err
+		}
+		if targetRole.Code == authz.RoleSuperadmin {
+			return validation("akun superadmin tidak dapat dihapus melalui panel")
+		}
+	}
+
 	// Role target tidak boleh lebih tinggi daripada milik pelaku.
 	if target.RoleID != nil && *target.RoleID != "" {
 		perms, err := s.store.PermissionsOfRole(ctx, *target.RoleID)
