@@ -260,6 +260,31 @@ func TestDeleteAdminBerhasil(t *testing.T) {
 	}
 }
 
+// Akun yang sudah dihapus tidak bisa dihapus lagi.
+//
+// Bug yang dijaga: FindByID tetap menemukan baris yang sudah dianonimkan,
+// sehingga penghapusan kedua dibalas berhasil padahal tidak ada yang berubah.
+func TestDeleteAdminAkunSudahDihapus(t *testing.T) {
+	f := newDeleteAdminFixture()
+	ctx := context.Background()
+
+	if err := f.svc.DeleteAdmin(ctx, superUserID, plainAdminID, alasanHapus); err != nil {
+		t.Fatalf("penghapusan pertama error: %v", err)
+	}
+	jumlahAudit := len(f.audit.entries)
+
+	err := f.svc.DeleteAdmin(ctx, superUserID, plainAdminID, alasanHapus)
+	if !errors.Is(err, apperror.ErrNotFound) {
+		t.Fatalf("error = %v; ingin NOT_FOUND", err)
+	}
+	if len(f.anonymizer.removed) != 1 {
+		t.Errorf("akun dianonimkan %d kali; ingin sekali", len(f.anonymizer.removed))
+	}
+	if len(f.audit.entries) != jumlahAudit {
+		t.Error("penghapusan ulang tidak boleh menambah catatan audit")
+	}
+}
+
 // Tanpa anonymizer, penghapusan ditolak alih-alih menghapus separuh jalan.
 func TestDeleteAdminTanpaAnonymizerDitolak(t *testing.T) {
 	f := newDeleteAdminFixture()

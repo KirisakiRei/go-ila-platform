@@ -491,6 +491,12 @@ func (s *roleService) DeleteAdmin(ctx context.Context, actorID, userID, reason s
 	if target.Role != string(config.RoleAdmin) {
 		return validation("akun ini bukan akun pengelola")
 	}
+	// Akun yang sudah dihapus dianonimkan, bukan dihilangkan barisnya. Tanpa
+	// pemeriksaan ini penghapusan kedua atas akun yang sama tetap dibalas
+	// berhasil, padahal tidak ada yang berubah.
+	if target.Status == model.UserStatusDeleted {
+		return apperror.ErrNotFound
+	}
 	if target.IsProtected {
 		return validation("akun superadmin utama tidak dapat dihapus")
 	}
