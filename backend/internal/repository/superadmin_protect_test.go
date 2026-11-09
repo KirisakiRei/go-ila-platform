@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +30,10 @@ dihapus tanpa sepengetahuan pemilik workspace.
 func newProtectTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	dsn := filepath.Join(t.TempDir(), "protect.db")
+	// SQLITE_DQS(0) mematikan kutip ganda sebagai string, sehingga `"user"`
+	// dibaca sebagai nama tabel persis seperti di Postgres. Tanpa itu, kueri
+	// yang benar di produksi akan gagal di pengujian.
+	dsn := filepath.ToSlash(filepath.Join(t.TempDir(), "protect.db")) + "?_pragma=SQLITE_DQS(0)"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
@@ -99,6 +103,36 @@ func protectedEmails(t *testing.T, db *gorm.DB) []string {
 		t.Fatalf("membaca akun terlindungi: %v", err)
 	}
 	return email
+}
+
+// Kueri wajib mengutip nama tabel `user`.
+//
+// Bug yang dijaga: `user` adalah kata kunci SQL di Postgres. Kueri tanpa kutip
+// membuat Postgres membacanya sebagai fungsi USER(), dan migrasi gagal dengan
+// "column u.role_id does not exist" — kejadian nyata di server. Pengujian ini
+// membaca SQL yang benar-benar akan dikirim GORM.
+func TestProtectPrimarySuperadminMengutipNamaTabel(t *testing.T) {
+	db := newProtectTestDB(t)
+	seedSuperadmin(t, db, []model.User{
+		{Base: model.Base{ID: "u-tua"}, Username: "tua", Role: "admin", Status: model.UserStatusActive},
+	})
+
+	// ToSQL hanya menyusun kueri, tidak mengeksekusinya.
+	sqlTeks := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		var ids []string
+		return tx.Model(&model.User{}).
+			Joins(`JOIN role r ON r.id = "user".role_id`).
+			Where("r.code = ?", "superadmin").
+			Where(`"user".status = ?`, "active").
+			Where(`"user".deleted_at IS NULL`).
+			Order(`"user".created_at ASC`).
+			Limit(1).
+			Pluck(`"user".id`, &ids)
+	})
+
+	if !strings.Contains(sqlTeks, `"user"`) {
+		t.Fatalf("nama tabel tidak dikutip, kueri akan gagal di Postgres: %s", sqlTeks)
+	}
 }
 
 // Superadmin tertua ditandai, dan hanya satu.

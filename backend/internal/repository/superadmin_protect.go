@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
+
+	"ila/backend/internal/model"
 )
 
 // ProtectPrimarySuperadmin menandai SATU akun superadmin sebagai akun utama
@@ -24,7 +26,7 @@ import (
 // Mengembalikan true bila migrasi ini benar-benar menandai sebuah akun.
 func ProtectPrimarySuperadmin(ctx context.Context, db *gorm.DB) (bool, error) {
 	var sudahAda int64
-	if err := db.WithContext(ctx).Model(&userProtectRow{}).
+	if err := db.WithContext(ctx).Model(&model.User{}).
 		Where("is_protected = ?", true).
 		Count(&sudahAda).Error; err != nil {
 		return false, fmt.Errorf("memeriksa akun terlindungi: %w", err)
@@ -33,50 +35,34 @@ func ProtectPrimarySuperadmin(ctx context.Context, db *gorm.DB) (bool, error) {
 		return false, nil
 	}
 
-	// Cari superadmin aktif tertua. Role dicocokkan lewat kode agar tidak
-	// bergantung pada id role yang berbeda antar lingkungan.
-	var kandidat struct {
-		ID string `gorm:"column:id"`
-	}
-	// Nama tabel dibiarkan tanpa tanda kutip: SQLite (dipakai pengujian) tidak
-	// menerima `"user"` sebagai nama tabel, sedangkan Postgres menerima
-	// keduanya. Kolom tetap dibatasi alias agar tidak bergantung dialek.
-	const tabelPengguna = "user AS u"
-	err := db.WithContext(ctx).
-		Table(tabelPengguna).
-		Select("u.id").
-		Joins("JOIN role r ON r.id = u.role_id").
+	// Kueri dibentuk lewat Model(&model.User{}) supaya GORM sendiri yang
+	// mengutip nama tabel: `user` adalah kata kunci SQL di Postgres, sedangkan
+	// SQLite menolak kutip ganda bertingkat. Menulis nama tabel di dalam
+	// Table() membuat GORM mengutipnya dua kali dan kueri gagal di SQLite.
+	//
+	// Role dicocokkan lewat kode agar tidak bergantung pada id role yang
+	// berbeda antar lingkungan.
+	var kandidat []string
+	err := db.WithContext(ctx).Model(&model.User{}).
+		Joins(`JOIN role r ON r.id = "user".role_id`).
 		Where("r.code = ?", "superadmin").
-		Where("u.status = ?", "active").
-		Where("u.deleted_at IS NULL").
-		Order("u.created_at ASC").
+		Where(`"user".status = ?`, "active").
+		Where(`"user".deleted_at IS NULL`).
+		Order(`"user".created_at ASC`).
 		Limit(1).
-		Scan(&kandidat).Error
+		Pluck(`"user".id`, &kandidat).Error
 	if err != nil {
 		return false, fmt.Errorf("mencari superadmin utama: %w", err)
 	}
-	if kandidat.ID == "" {
+	if len(kandidat) == 0 || kandidat[0] == "" {
 		return false, nil
 	}
 
-	res := db.WithContext(ctx).
-		Table("user").
-		Where("id = ?", kandidat.ID).
+	res := db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ?", kandidat[0]).
 		Update("is_protected", true)
 	if res.Error != nil {
 		return false, fmt.Errorf("menandai superadmin utama: %w", res.Error)
 	}
 	return res.RowsAffected > 0, nil
-}
-
-// userProtectRow adalah bentuk minimal untuk menghitung akun terlindungi tanpa
-// menyeret seluruh kolom model.
-type userProtectRow struct {
-	ID          string `gorm:"column:id;primaryKey"`
-	IsProtected bool   `gorm:"column:is_protected"`
-}
-
-// TableName menetapkan nama tabel.
-func (userProtectRow) TableName() string {
-	return "user"
 }
