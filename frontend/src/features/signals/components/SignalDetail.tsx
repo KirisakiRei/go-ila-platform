@@ -10,6 +10,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '../lib/status'
 import { TimeframeBadge } from './TimeframeBadge'
+import { TombolEksekusi } from './TombolEksekusi'
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -82,6 +83,14 @@ export function SignalDetail({ signal }: { signal: Signal }) {
           <span>Terbit {formatDateTime(signal.published_at)}</span>
           <span>Kedaluwarsa {formatDateTime(signal.expires_at)}</span>
         </div>
+
+        {/* Keputusan hanya ditawarkan selama sinyal masih bisa ditindaklanjuti,
+            dan hanya untuk status yang memang menunggu keputusan user. */}
+        {(signal.status === 'READY_TO_ENTRY' || signal.status === 'OPPORTUNITY') && (
+          <div className="border-t border-border pt-3">
+            <TombolEksekusi signal={signal} />
+          </div>
+        )}
       </CardContent>
     </Card>
   )

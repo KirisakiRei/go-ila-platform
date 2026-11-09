@@ -19,6 +19,8 @@ type fakeTokenStore struct {
 	token  *model.ApprovalToken
 	marked bool
 	usedAt time.Time
+	// diterbitkan menyimpan token yang dibuat lewat Issue.
+	diterbitkan []*model.ApprovalToken
 }
 
 func (s *fakeTokenStore) FindByHash(_ context.Context, hash string) (*model.ApprovalToken, error) {
@@ -34,6 +36,13 @@ func (s *fakeTokenStore) MarkUsed(_ context.Context, _ string, at time.Time) err
 	}
 	s.marked = true
 	s.usedAt = at
+	return nil
+}
+
+// Create menyimpan token yang diterbitkan untuk tombol dashboard.
+func (s *fakeTokenStore) Create(_ context.Context, token *model.ApprovalToken) error {
+	s.diterbitkan = append(s.diterbitkan, token)
+	s.token = token
 	return nil
 }
 
@@ -349,5 +358,82 @@ func TestResolveRejectsUnknownToken(t *testing.T) {
 	_, err := h.svc.Resolve(context.Background(), "u1", "token-palsu")
 	if !errors.Is(err, apperror.ErrNotFound) {
 		t.Fatalf("err = %v, ingin ErrNotFound", err)
+	}
+}
+
+// TestIssueMenerbitkanTokenUntukTombolDashboard memastikan tombol eksekusi di
+// dashboard mendapat token yang sah, bukan hanya tautan Telegram.
+func TestIssueMenerbitkanTokenUntukTombolDashboard(t *testing.T) {
+	h := newHarness()
+	h.signals.signal = freshSignal()
+	h.users.signal = &model.UserSignal{
+		Status: model.SignalStatusReadyToEntry, BrokerAccountID: "acct-1",
+	}
+
+	hasil, err := h.svc.Issue(context.Background(), "u1", "sig-1")
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if !hasil.CanConfirm {
+		t.Fatalf("seharusnya bisa dikonfirmasi, terblokir: %q", hasil.BlockedReason)
+	}
+	if hasil.Token == "" {
+		t.Fatal("token tidak boleh kosong")
+	}
+	if len(h.tokens.diterbitkan) != 1 {
+		t.Fatalf("token tersimpan = %d, ingin 1", len(h.tokens.diterbitkan))
+	}
+	// Yang disimpan hanya hash; token mentah tidak boleh ikut tersimpan.
+	simpan := h.tokens.diterbitkan[0]
+	if simpan.TokenHash == hasil.Token {
+		t.Fatal("basis data tidak boleh menyimpan token mentah")
+	}
+	if simpan.TokenHash != service.HashApprovalToken(hasil.Token) {
+		t.Fatal("hash token tidak cocok dengan token yang dikirim")
+	}
+}
+
+// TestIssuePadaPeluangTetapBisaDikonfirmasi adalah inti fitur: sinyal peluang
+// TIDAK dieksekusi otomatis, tetapi user harus tetap bisa memilih
+// mengeksekusinya. Bila pesan peluang ikut terbaca sebagai alasan blokir,
+// pilihan itu jadi mustahil.
+func TestIssuePadaPeluangTetapBisaDikonfirmasi(t *testing.T) {
+	h := newHarness()
+	h.signals.signal = freshSignal()
+	h.users.signal = &model.UserSignal{
+		Status:          model.SignalStatusOpportunity,
+		RejectReason:    "Setup pasangan W1-H4 tersedia untuk dipantau. Eksekusi otomatis tidak aktif untuk akun ini.",
+		BrokerAccountID: "acct-1",
+	}
+
+	hasil, err := h.svc.Issue(context.Background(), "u2", "sig-1")
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if !hasil.CanConfirm {
+		t.Fatalf("peluang harus bisa dieksekusi manual, terblokir: %q", hasil.BlockedReason)
+	}
+}
+
+// TestIssueDitolakSaatKedaluwarsa memastikan tombol tidak diberi token ketika
+// sinyal sudah lewat batas waktu — keputusan A yang disepakati.
+func TestIssueDitolakSaatKedaluwarsa(t *testing.T) {
+	h := newHarness()
+	sig := freshSignal()
+	sig.ExpiresAt = time.Now().UTC().Add(-time.Minute)
+	h.signals.signal = sig
+
+	hasil, err := h.svc.Issue(context.Background(), "u1", "sig-1")
+	if err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if hasil.CanConfirm {
+		t.Fatal("sinyal kedaluwarsa tidak boleh mendapat token")
+	}
+	if hasil.BlockedReason == "" {
+		t.Fatal("alasan harus diisi agar user tahu kenapa tombol mati")
+	}
+	if len(h.tokens.diterbitkan) != 0 {
+		t.Fatalf("token tidak boleh diterbitkan, dapat %d", len(h.tokens.diterbitkan))
 	}
 }

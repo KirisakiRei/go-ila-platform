@@ -7,6 +7,7 @@ import { AuthProvider } from '@/features/auth/AuthProvider'
 import { SignalRow } from '@/features/signals/components/SignalRow'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
+import { TombolEksekusi } from '@/features/signals/components/TombolEksekusi'
 import { formatDateTime, formatNumber, formatR } from '@/lib/format'
 import { SIGNAL_LABEL, isFinal } from '@/features/signals/lib/status'
 import type { Signal } from '@/types/api'
@@ -120,5 +121,41 @@ describe('TimeframeBadge', () => {
   it('tetap tampil bila hanya satu sisi terisi', () => {
     renderWithProviders(<TimeframeBadge htf="H4" ltf="" />)
     expect(screen.getByText('H4')).toBeDefined()
+  })
+})
+
+describe('TombolEksekusi', () => {
+  const dasar: Signal = { ...signal, can_confirm: true, status: 'OPPORTUNITY' }
+
+  it('menampilkan hitung mundur selama sinyal masih berlaku', () => {
+    const berlaku = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    renderWithProviders(<TombolEksekusi signal={{ ...dasar, expires_at: berlaku }} />)
+    expect(screen.getByText(/Berlaku \d+m \d+s lagi/)).toBeDefined()
+  })
+
+  it('mematikan tombol setelah batas waktu lewat', () => {
+    const lewat = new Date(Date.now() - 60 * 1000).toISOString()
+    renderWithProviders(<TombolEksekusi signal={{ ...dasar, expires_at: lewat }} />)
+
+    expect(screen.getByText('Batas waktu sudah lewat')).toBeDefined()
+    const tombol = screen.getByRole('button', { name: /Eksekusi/ }) as HTMLButtonElement
+    expect(tombol.disabled).toBe(true)
+  })
+
+  it('mematikan tombol bila server menyatakan belum bisa dikonfirmasi', () => {
+    const berlaku = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    renderWithProviders(
+      <TombolEksekusi signal={{ ...dasar, can_confirm: false, expires_at: berlaku }} />,
+    )
+    const tombol = screen.getByRole('button', { name: /Eksekusi/ }) as HTMLButtonElement
+    expect(tombol.disabled).toBe(true)
+  })
+
+  it('menampilkan pilihan untuk sinyal peluang', () => {
+    const berlaku = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    renderWithProviders(<TombolEksekusi signal={{ ...dasar, expires_at: berlaku }} />)
+
+    expect(screen.getByRole('button', { name: /Eksekusi/ })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Lewati/ })).toBeDefined()
   })
 })

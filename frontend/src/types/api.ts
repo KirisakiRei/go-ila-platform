@@ -446,6 +446,14 @@ export type TelegramLink = {
   expires_at: string
 }
 
+/** Token konfirmasi untuk tombol eksekusi di dashboard. */
+export type ApprovalIssue = {
+  token: string
+  expires_at: string
+  can_confirm: boolean
+  blocked_reason?: string
+}
+
 export type Approval = {
   signal_id: string
   symbol: string

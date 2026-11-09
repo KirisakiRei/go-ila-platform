@@ -34,6 +34,22 @@ type ApproveService interface {
 	Confirm(ctx context.Context, userID, rawToken string) (*ApproveResult, error)
 	// Decline menandai sinyal dilewati user.
 	Decline(ctx context.Context, userID, rawToken string) (*ApproveResult, error)
+	// Issue menerbitkan token konfirmasi baru untuk tombol di dashboard.
+	//
+	// Tanpa ini, aksi konfirmasi hanya bisa dilakukan lewat tautan Telegram,
+	// padahal user yang melihat peluang di dashboard butuh tombol yang sama.
+	Issue(ctx context.Context, userID, signalID string) (*ApproveIssue, error)
+}
+
+// ApproveIssue adalah token baru beserta ringkasan kelayakannya.
+//
+// CanConfirm ikut dikirim supaya UI bisa langsung menonaktifkan tombol beserta
+// alasannya, tanpa perlu satu permintaan lagi.
+type ApproveIssue struct {
+	Token         string    `json:"token"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	CanConfirm    bool      `json:"can_confirm"`
+	BlockedReason string    `json:"blocked_reason,omitempty"`
 }
 
 // ApprovePreview adalah ringkasan yang ditampilkan sebelum konfirmasi.
@@ -62,6 +78,8 @@ type ApprovalRunner interface {
 type ApprovalTokenStore interface {
 	FindByHash(ctx context.Context, hash string) (*model.ApprovalToken, error)
 	MarkUsed(ctx context.Context, id string, at time.Time) error
+	// Create menyimpan token baru untuk konfirmasi dari dashboard.
+	Create(ctx context.Context, token *model.ApprovalToken) error
 }
 
 // UserSignalStore membaca status sinyal per user.
@@ -208,6 +226,45 @@ func (s *approveService) Decline(ctx context.Context, userID, rawToken string) (
 	}, nil
 }
 
+// Issue menerbitkan token konfirmasi untuk tombol dashboard.
+//
+// Token tetap dipakai sebagai satu-satunya jalan konfirmasi, sehingga tombol di
+// dashboard dan tautan Telegram memakai alur yang sama — termasuk pemeriksaan
+// ulang seluruh syarat trading saat tombol benar-benar ditekan.
+//
+// Token tidak diterbitkan bila syaratnya sudah pasti gugur (mis. sinyal
+// kedaluwarsa): membiarkan UI menampilkan tombol yang pasti gagal hanya
+// menyesatkan. Alasan penolakan dikembalikan agar bisa ditampilkan.
+func (s *approveService) Issue(ctx context.Context, userID, signalID string) (*ApproveIssue, error) {
+	signal, err := s.signals.FindSignal(ctx, signalID)
+	if err != nil {
+		return nil, err
+	}
+
+	if reason := s.blockedReason(ctx, userID, signal); reason != "" {
+		return &ApproveIssue{CanConfirm: false, BlockedReason: reason}, nil
+	}
+
+	raw, hash, err := newApprovalTokenPair()
+	if err != nil {
+		return nil, err
+	}
+
+	expiresAt := s.clock().Add(ApprovalTokenTTL)
+	record := &model.ApprovalToken{
+		TokenHash: hash,
+		UserID:    userID,
+		SignalID:  signalID,
+		Action:    "ENTRY",
+		ExpiresAt: expiresAt,
+	}
+	if err := s.tokens.Create(ctx, record); err != nil {
+		return nil, err
+	}
+
+	return &ApproveIssue{Token: raw, ExpiresAt: expiresAt, CanConfirm: true}, nil
+}
+
 // validate memastikan token sah, milik user, dan belum kedaluwarsa.
 func (s *approveService) validate(ctx context.Context, userID, rawToken string) (*model.ApprovalToken, *model.Signal, error) {
 	if rawToken == "" {
@@ -272,6 +329,11 @@ func (s *approveService) blockedReason(ctx context.Context, userID string, signa
 		return "Sinyal ini tertahan aturan harian."
 	case model.SignalStatusCancelled, model.SignalStatusSuperseded, model.SignalStatusExpired:
 		return "Setup ini tidak lagi berlaku."
+	case model.SignalStatusOpportunity:
+		// Peluang memang menunggu keputusan user: eksekusi otomatisnya mati,
+		// bukan sinyalnya ditolak. Tanpa cabang eksplisit ini pesannya akan
+		// terbaca sebagai alasan blokir dan tombol eksekusi jadi mustahil.
+		return ""
 	}
 
 	return ""

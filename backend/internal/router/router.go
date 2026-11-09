@@ -411,6 +411,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		me.GET("/approve/:token", approveHandler.Preview)
 		me.POST("/approve/:token/confirm", approveHandler.Confirm)
 		me.POST("/approve/:token/decline", approveHandler.Decline)
+		// Token untuk tombol eksekusi di dashboard. Rute statis ini didaftarkan
+		// sesudah rute token agar tidak tertukar dengan /approve/:token.
+		me.POST("/approve/signals/:signalID", approveHandler.Issue)
 
 		// Akun broker: kredensial masuk terenkripsi, tidak pernah keluar lagi.
 		me.GET("/accounts", accountHandler.List)

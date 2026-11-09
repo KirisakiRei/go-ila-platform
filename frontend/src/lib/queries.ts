@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accountApi,
+  approvalApi,
   pairApi,
   riskApi,
   securityApi,
@@ -109,6 +110,39 @@ export function usePairCatalog() {
  */
 export function useRiskSimulation() {
   return useMutation({ mutationFn: riskApi.simulate })
+}
+
+/** Menerbitkan token konfirmasi untuk tombol eksekusi di dashboard. */
+export function useIssueApproval() {
+  return useMutation({ mutationFn: (signalID: string) => approvalApi.issue(signalID) })
+}
+
+/**
+ * useConfirmApproval mengeksekusi sinyal lewat token.
+ *
+ * Seluruh syarat trading diperiksa ulang di Runner, jadi penolakan bisa muncul
+ * di sini walau tombol sempat aktif.
+ */
+export function useConfirmApproval() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (token: string) => approvalApi.confirm(token),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.signals(100) })
+      void qc.invalidateQueries({ queryKey: queryKeys.positions(100) })
+    },
+  })
+}
+
+/** useDeclineApproval menandai sinyal dilewati user. */
+export function useDeclineApproval() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (token: string) => approvalApi.decline(token),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.signals(100) })
+    },
+  })
 }
 
 /** Matriks saklar pasangan timeframe per akun untuk satu pair. */

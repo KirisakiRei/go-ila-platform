@@ -2,6 +2,7 @@ import { request } from './http'
 import type {
   AccountPairSelectionResponse,
   Approval,
+  ApprovalIssue,
   ApprovalResult,
   BrokerAccount,
   CreateAccountPayload,
@@ -147,6 +148,17 @@ export const approvalApi = {
     }),
   decline: (token: string) =>
     request<ApprovalResult>(`/approve/${encodeURIComponent(token)}/decline`, {
+      method: 'POST',
+    }),
+  /**
+   * Menerbitkan token untuk tombol eksekusi di dashboard.
+   *
+   * Token sengaja tetap dipakai walau tombol berada di dalam aplikasi: dengan
+   * begitu tombol dan tautan Telegram melewati alur yang sama, termasuk
+   * pemeriksaan ulang seluruh syarat trading saat benar-benar ditekan.
+   */
+  issue: (signalID: string) =>
+    request<ApprovalIssue>(`/approve/signals/${encodeURIComponent(signalID)}`, {
       method: 'POST',
     }),
 }

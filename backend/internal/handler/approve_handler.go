@@ -21,6 +21,25 @@ func NewApproveHandler(approveService service.ApproveService) *ApproveHandler {
 	return &ApproveHandler{approveService: approveService}
 }
 
+// Issue menangani POST /api/v1/approve/signals/:signalID.
+//
+// Dipakai tombol "Eksekusi" di dashboard. Token yang diterbitkan dipakai lewat
+// endpoint yang sama dengan tautan Telegram, sehingga tombol dan deep-link tidak
+// pernah berbeda perilaku.
+func (h *ApproveHandler) Issue(c *gin.Context) {
+	result, err := h.approveService.Issue(
+		c.Request.Context(),
+		middleware.CurrentUserID(c),
+		c.Param("signalID"),
+	)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	httpx.OK(c, "Token konfirmasi", result)
+}
+
 // Preview menangani GET /api/v1/approve/:token.
 func (h *ApproveHandler) Preview(c *gin.Context) {
 	preview, err := h.approveService.Resolve(
