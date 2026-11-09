@@ -431,7 +431,7 @@ func streamOnce(
 					"strategy", target.Strategy, "addr", target.Addr)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
 				svc.SetAckSender(ackSender(client, subscriberID))
-				svc.SetSymbolSync(symbolSync(client, subscriberID))
+				svc.SetSymbolSync(symbolSync(client, subscriberID, target, svc, logger))
 				// Selaraskan segera: antara hitung kebutuhan dan koneksi
 				// terbuka, langganan pengguna bisa sudah berubah.
 				syncNow(ctx, target, svc, logger)
@@ -461,40 +461,40 @@ func streamOnce(
 	)
 }
 
-// symbolSync mengirim selisih langganan ke engine.
-func symbolSync(client enginev1.EngineServiceClient, subscriberID string) runner.SymbolSync {
-	return func(ctx context.Context, add, remove []string) error {
+// symbolSync mengirim langganan terbaru ke engine.
+//
+// Subscribe di engine MENGGANTI seluruh daftar, bukan menambah. Karena itu
+// setiap penyelarasan mengirim daftar simbol lengkap bersama pasangan
+// timeframe-nya; mengirim hanya "add" akan menghapus simbol lain tanpa
+// terlihat.
+//
+// Pasangan ikut dikirim setiap kali agar perubahan saklar timeframe di
+// dashboard langsung berlaku, tanpa menunggu stream terputus dan tersambung
+// ulang.
+func symbolSync(client enginev1.EngineServiceClient, subscriberID string, target engineTarget, svc *runner.Service, logger *slog.Logger) runner.SymbolSync {
+	return func(ctx context.Context, _, _ []string) error {
 		syncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		syncCtx = engineclient.DenganTrace(syncCtx, logkit.Trace())
 
-		if len(add) > 0 {
-			// Catatan: Pairs hanya dikirim pada langganan awal. Penambahan
-			// simbol di tengah jalan memakai perilaku lama agar tidak mengubah
-			// arti permintaan ke engine; pasangan timeframe dikirim ulang saat
-			// stream tersambung kembali.
-			resp, err := client.Subscribe(syncCtx, &enginev1.SubscribeRequest{
-				SubscriberId: subscriberID,
-				Symbols:      add,
-			})
-			if err != nil {
-				return fmt.Errorf("menambah langganan engine: %w", err)
-			}
-			if !resp.GetOk() {
-				return errors.New(resp.GetMessage())
-			}
+		symbols := subscribedSymbols(syncCtx, target, svc)
+		if len(symbols) == 0 {
+			// Tidak ada yang perlu dipantau: engine dibiarkan seperti
+			// sebelumnya agar tidak ada langganan menggantung.
+			return nil
 		}
-		if len(remove) > 0 {
-			resp, err := client.Unsubscribe(syncCtx, &enginev1.UnsubscribeRequest{
-				SubscriberId: subscriberID,
-				Symbols:      remove,
-			})
-			if err != nil {
-				return fmt.Errorf("mencabut langganan engine: %w", err)
-			}
-			if !resp.GetOk() {
-				return errors.New(resp.GetMessage())
-			}
+
+		resp, err := client.Subscribe(syncCtx, &enginev1.SubscribeRequest{
+			SubscriberId:      subscriberID,
+			Symbols:           symbols,
+			Pairs:             timeframePairs(syncCtx, target, svc, logger),
+			WantStatusUpdates: true,
+		})
+		if err != nil {
+			return fmt.Errorf("menyelaraskan langganan engine: %w", err)
+		}
+		if !resp.GetOk() {
+			return errors.New(resp.GetMessage())
 		}
 		return nil
 	}

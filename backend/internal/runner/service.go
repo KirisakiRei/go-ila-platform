@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -131,8 +132,12 @@ type Service struct {
 	// yang benar-benar dibutuhkan pengguna saat ini.
 	symbolSync  SymbolSync
 	symbolsSent map[string]struct{}
-	clients     map[string]broker.Client
-	keyring     *cryptox.Keyring
+	// pairsSent adalah sidik pasangan timeframe terakhir yang dikirim.
+	// Perubahan saklar timeframe tidak mengubah daftar simbol, jadi tanpa
+	// pembanding ini perubahan saklar tidak pernah sampai ke engine.
+	pairsSent string
+	clients   map[string]broker.Client
+	keyring   *cryptox.Keyring
 	// schedule mengawasi kecocokan status pasar dengan jadwal NY.
 	schedule *ScheduleWatch
 }
@@ -1121,15 +1126,28 @@ func (s *Service) SetSymbolSync(sync SymbolSync) {
 	s.mu.Lock()
 	s.symbolSync = sync
 	s.symbolsSent = nil
+	// Engine bisa sudah lupa pasangan setelah putus, sehingga sidik lama harus
+	// dibuang agar penyelarasan berikutnya mengirim ulang.
+	s.pairsSent = ""
 	s.mu.Unlock()
 }
 
 // SyncSubscriptions membandingkan kebutuhan engine saat ini dengan yang sudah
-// dikirim, lalu mengirim selisihnya lewat Subscribe/Unsubscribe.
+// dikirim, lalu menyelaraskannya.
 //
 // Tanpa ini, simbol hanya dihitung sekali saat koneksi dibuka: user yang baru
 // berlangganan harus menunggu Runner restart. Fungsi ini dipanggil berkala.
+//
+// Pasangan timeframe ikut diperiksa: mengubah saklar di dashboard tidak
+// mengubah daftar simbol, jadi tanpa perbandingan ini engine akan terus
+// memakai pasangan lama sampai stream terputus.
 func (s *Service) SyncSubscriptions(ctx context.Context, desired []string) error {
+	return s.syncDenganSidik(ctx, desired, s.hitungPasangan(ctx, desired))
+}
+
+// syncDenganSidik menjalankan penyelarasan dengan sidik pasangan yang sudah
+// dihitung. Dipisahkan agar bisa diuji tanpa basis data.
+func (s *Service) syncDenganSidik(ctx context.Context, desired []string, sidik string) error {
 	s.mu.Lock()
 	sync := s.symbolSync
 	sent := s.symbolsSent
@@ -1140,22 +1158,66 @@ func (s *Service) SyncSubscriptions(ctx context.Context, desired []string) error
 	}
 
 	add, remove := diffSymbols(sent, desired)
-	if len(add) == 0 && len(remove) == 0 {
+	daftarBerubah := len(add) > 0 || len(remove) > 0
+
+	s.mu.Lock()
+	pasanganBerubah := sidik != s.pairsSent
+	s.mu.Unlock()
+
+	if !daftarBerubah && !pasanganBerubah {
 		return nil
 	}
 
 	if err := sync(ctx, add, remove); err != nil {
-		// Daftar terkirim tidak diperbarui: percobaan berikutnya mengulang.
+		// Daftar terkirim dan sidik tidak diperbarui: percobaan berikutnya
+		// mengulang. Menyimpan sidik sebelum sukses akan membuat perubahan
+		// pasangan hilang selamanya bila satu percobaan gagal.
 		return err
 	}
 
 	s.mu.Lock()
 	s.symbolsSent = toSymbolSet(desired)
+	s.pairsSent = sidik
 	s.mu.Unlock()
 
-	s.logger.Info("langganan engine diselaraskan",
-		"ditambah", add, "dicabut", remove, "total", len(desired))
+	if daftarBerubah {
+		s.logger.Info("langganan engine diselaraskan",
+			"ditambah", add, "dicabut", remove, "total", len(desired))
+	} else {
+		s.logger.Info("pasangan timeframe engine diselaraskan",
+			"simbol", len(desired))
+	}
 	return nil
+}
+
+// hitungPasangan menyusun sidik pasangan timeframe dari seluruh simbol.
+func (s *Service) hitungPasangan(ctx context.Context, symbols []string) string {
+	semua := make([]string, 0, len(symbols))
+	for _, symbol := range symbols {
+		reqs, err := s.ComputeTimeframeRequirements(ctx, symbol)
+		if err != nil {
+			continue
+		}
+		for strategy, list := range reqs {
+			for _, p := range list {
+				semua = append(semua, strategy+":"+p.Htf+"/"+p.Ltf)
+			}
+		}
+	}
+	sort.Strings(semua)
+
+	// Duplikat dibuang: dua simbol dengan pasangan sama tetap satu sidik.
+	var b strings.Builder
+	var terakhir string
+	for _, item := range semua {
+		if item == terakhir {
+			continue
+		}
+		b.WriteString(item)
+		b.WriteByte('\n')
+		terakhir = item
+	}
+	return b.String()
 }
 
 // SymbolsSent mengembalikan salinan simbol yang sudah dikirim ke engine.
