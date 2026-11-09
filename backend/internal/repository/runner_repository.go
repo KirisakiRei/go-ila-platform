@@ -46,6 +46,14 @@ type RunnerRepository interface {
 	// ReclaimStaleExecution mengambil alih klaim yang tertinggal karena proses
 	// berhenti sebelum order terkirim. Nilai false berarti klaim sudah selesai.
 	ReclaimStaleExecution(ctx context.Context, key string, staleBefore time.Time) (bool, error)
+	// ClaimAccountLock mengunci satu akun broker selama eksekusi berlangsung.
+	// Nilai balik false berarti akun sedang mengeksekusi sinyal lain.
+	ClaimAccountLock(ctx context.Context, accountID, signalID string, now time.Time) (bool, error)
+	// ReleaseAccountLock melepas kunci akun setelah eksekusi selesai.
+	ReleaseAccountLock(ctx context.Context, accountID string) error
+	// ReleaseStaleAccountLock melepas kunci yang tertinggal karena proses
+	// berhenti di tengah eksekusi, agar akun tidak terkunci selamanya.
+	ReleaseStaleAccountLock(ctx context.Context, staleBefore time.Time) error
 	ListStaleExecutions(ctx context.Context, staleBefore time.Time) ([]model.ExecutionRecord, error)
 
 	// Kuota harian.
@@ -347,6 +355,50 @@ func (r *runnerRepository) ReclaimStaleExecution(ctx context.Context, key string
 		return false, fmt.Errorf("mengambil alih klaim eksekusi: %w", res.Error)
 	}
 	return res.RowsAffected == 1, nil
+}
+
+// ClaimAccountLock mengunci satu akun broker selama eksekusi berlangsung.
+//
+// Kunci berbentuk baris dengan primary key akun, sehingga percobaan kedua pada
+// akun yang sama ditolak oleh basis data — bukan oleh pemeriksaan di memori
+// yang bisa dilewati dua goroutine sekaligus.
+func (r *runnerRepository) ClaimAccountLock(ctx context.Context, accountID, signalID string, now time.Time) (bool, error) {
+	row := &model.AccountExecutionLock{
+		BrokerAccountID: accountID,
+		SignalID:        signalID,
+		ClaimedAt:       now,
+	}
+	res := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(row)
+	if res.Error != nil {
+		return false, fmt.Errorf("mengunci akun untuk eksekusi: %w", res.Error)
+	}
+	return res.RowsAffected == 1, nil
+}
+
+// ReleaseAccountLock melepas kunci akun. Selalu dipanggil setelah eksekusi,
+// termasuk saat gagal, agar akun tidak terkunci karena satu order bermasalah.
+func (r *runnerRepository) ReleaseAccountLock(ctx context.Context, accountID string) error {
+	res := r.db.WithContext(ctx).
+		Where("broker_account_id = ?", accountID).
+		Delete(&model.AccountExecutionLock{})
+	if res.Error != nil {
+		return fmt.Errorf("melepas kunci akun: %w", res.Error)
+	}
+	return nil
+}
+
+// ReleaseStaleAccountLock melepas kunci yang tertinggal karena proses berhenti
+// di tengah eksekusi. Tanpa ini, akun bisa terkunci selamanya setelah restart.
+func (r *runnerRepository) ReleaseStaleAccountLock(ctx context.Context, staleBefore time.Time) error {
+	res := r.db.WithContext(ctx).
+		Where("claimed_at < ?", staleBefore).
+		Delete(&model.AccountExecutionLock{})
+	if res.Error != nil {
+		return fmt.Errorf("melepas kunci akun tertinggal: %w", res.Error)
+	}
+	return nil
 }
 
 // ListStaleExecutions membaca seluruh klaim yang tertinggal, untuk dilaporkan

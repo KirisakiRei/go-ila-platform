@@ -62,6 +62,26 @@ func (ExecutionRecord) TableName() string {
 	return "execution_record"
 }
 
+// AccountExecutionLock adalah kunci jangka pendek per akun broker.
+//
+// Kunci idempotensi eksekusi berbasis (signal_id, akun) tidak cukup: dua
+// sinyal BERBEDA untuk akun yang sama — misalnya dua pasangan timeframe pada
+// pair yang sama — punya kunci berbeda sehingga keduanya bisa lolos pagar
+// "satu posisi terbuka" bila tiba bersamaan. Kunci ini menutup celah itu.
+//
+// Baris hanya hidup selama proses eksekusi berlangsung; Runner melepasnya
+// begitu order selesai, berhasil maupun gagal.
+type AccountExecutionLock struct {
+	BrokerAccountID string    `gorm:"type:varchar(36);primaryKey" json:"broker_account_id"`
+	SignalID        string    `gorm:"type:varchar(64);not null" json:"signal_id"`
+	ClaimedAt       time.Time `json:"claimed_at"`
+}
+
+// TableName menetapkan nama tabel.
+func (AccountExecutionLock) TableName() string {
+	return "account_execution_lock"
+}
+
 // BrokerAccountState menampung telemetry koneksi dan saldo akun broker.
 // Ditulis Runner, dibaca backend-api untuk dashboard.
 type BrokerAccountState struct {

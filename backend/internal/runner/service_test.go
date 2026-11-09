@@ -39,6 +39,8 @@ type fakeStore struct {
 	correlations map[string][]string
 	// switches menyimpan saklar metode per akun × pair untuk pengujian.
 	switches map[string]map[string]bool
+	// accountLocks meniru kunci eksekusi per akun pada basis data.
+	accountLocks map[string]string
 	// staleClaims menandai klaim yang dianggap tertinggal pada pengujian.
 	staleClaims map[string]struct{}
 }
@@ -54,6 +56,7 @@ func newFakeStore() *fakeStore {
 		accounts:     map[string]*model.BrokerAccount{},
 		correlations: map[string][]string{},
 		switches:     map[string]map[string]bool{},
+		accountLocks: map[string]string{},
 	}
 }
 
@@ -399,6 +402,30 @@ func (s *fakeStore) EnabledAccountStrategies(_ context.Context, symbol string) (
 		out[accountID] = metode
 	}
 	return out, nil
+}
+
+// ClaimAccountLock meniru primary key akun: hanya satu sinyal yang boleh
+// memegang kunci pada satu waktu.
+func (s *fakeStore) ClaimAccountLock(_ context.Context, accountID, signalID string, _ time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ada := s.accountLocks[accountID]; ada {
+		return false, nil
+	}
+	s.accountLocks[accountID] = signalID
+	return true, nil
+}
+
+func (s *fakeStore) ReleaseAccountLock(_ context.Context, accountID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.accountLocks, accountID)
+	return nil
+}
+
+func (s *fakeStore) ReleaseStaleAccountLock(_ context.Context, _ time.Time) error {
+	// Fake store tidak menyimpan waktu klaim, jadi tidak ada yang kedaluwarsa.
+	return nil
 }
 
 // ConfiguredAccounts melaporkan akun yang punya baris saklar untuk simbol ini,

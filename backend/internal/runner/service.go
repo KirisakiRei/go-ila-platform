@@ -388,6 +388,31 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectAccountFrozen)
 	}
 
+	// [3b] Kunci akun selama eksekusi berlangsung.
+	//
+	// Pagar "satu posisi terbuka" pada evaluate hanya melihat posisi yang SUDAH
+	// tercatat. Dua sinyal berbeda untuk akun yang sama — misalnya dua pasangan
+	// timeframe pada pair yang sama — bisa melewati pemeriksaan itu bersamaan
+	// lalu mengeksekusi keduanya. Kunci ini menutup celah tersebut.
+	//
+	// Kunci hanya dipakai pada mode yang benar-benar mengeksekusi; mode manual
+	// hanya mencatat kandidat sehingga tidak perlu dikunci.
+	otomatis := account.Mode == "auto" && s.autoExecute(ctx)
+	if otomatis {
+		release, dikunci, lockErr := s.lockAccount(ctx, account.ID, signal.SignalID, now)
+		if lockErr != nil {
+			return lockErr
+		}
+		if !dikunci {
+			// Akun sedang mengeksekusi sinyal lain. Ini bukan kegagalan: sinyal
+			// ini memang tidak boleh membuka posisi kedua.
+			s.logger.Info("akun sedang mengeksekusi sinyal lain",
+				"user_id", user.ID, "account_id", account.ID, "signal_id", signal.SignalID)
+			return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectOpenPosition)
+		}
+		defer release()
+	}
+
 	reason, evalErr := s.evaluate(ctx, user, account, signal, tier, now)
 	if evalErr != nil {
 		return evalErr
@@ -399,7 +424,7 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, reason)
 	}
 
-	if account.Mode == "auto" && s.autoExecute(ctx) {
+	if otomatis {
 		return s.execute(ctx, user, account, signal)
 	}
 
@@ -998,6 +1023,20 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 	}
 
 	tier := EffectiveTier(user.Tier, user.TrialExpiresAt, user.TierExpiresAt, now)
+
+	// Kunci akun juga berlaku di jalur manual: dua klik konfirmasi yang tiba
+	// bersamaan tidak boleh melahirkan dua order. Tanpa ini, celah yang sama
+	// dengan jalur otomatis tetap terbuka lewat tombol eksekusi.
+	release, dikunci, lockErr := s.lockAccount(ctx, account.ID, signal.SignalID, now)
+	if lockErr != nil {
+		return RejectNone, lockErr
+	}
+	if !dikunci {
+		s.logger.Info("akun sedang mengeksekusi sinyal lain",
+			"user_id", userID, "account_id", account.ID, "signal_id", signal.SignalID)
+		return RejectOpenPosition, nil
+	}
+	defer release()
 
 	reason, evalErr := s.evaluate(ctx, user, account, signal, tier, now)
 	if evalErr != nil {
