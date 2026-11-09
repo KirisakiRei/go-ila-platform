@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ila/backend/internal/export"
+	"ila/backend/internal/model"
 )
 
 // PositionExport adalah berkas CSV riwayat posisi beserta namanya.
@@ -24,7 +25,14 @@ func (s *tradingService) ExportPositions(ctx context.Context, userID string, fro
 	if err != nil {
 		return nil, err
 	}
+	return buildPositionCSV(rows, from, to, "riwayat-posisi")
+}
 
+// buildPositionCSV menyusun CSV riwayat posisi.
+//
+// Dipakai bersama oleh ekspor milik user dan ekspor admin, sehingga kolom dan
+// zona waktunya tidak pernah berbeda antara dua jalur itu.
+func buildPositionCSV(rows []model.Position, from, to time.Time, prefix string) (*PositionExport, error) {
 	builder := export.New(maxExportPositions)
 	if err := builder.Header(
 		"simbol", "strategi", "arah", "tiket", "lot", "harga_masuk", "stop_loss", "take_profit",
@@ -67,7 +75,7 @@ func (s *tradingService) ExportPositions(ctx context.Context, userID string, fro
 	}
 
 	return &PositionExport{
-		Filename: "riwayat-posisi-" + time.Now().UTC().Format("20060102-150405") + ".csv",
+		Filename: prefix + "-" + time.Now().UTC().Format("20060102-150405") + ".csv",
 		Content:  builder.Finished(),
 		Rows:     builder.Rows(),
 	}, nil

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ila/backend/internal/authz"
+	"ila/backend/internal/middleware"
 	"ila/backend/internal/service"
 	"ila/backend/pkg/httpx"
 )
@@ -26,6 +27,22 @@ func (h *AdminReportHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 	g.GET("/reports/customers", guard(http.MethodGet, "/reports/customers", authz.BillingView), h.Customers)
 	g.GET("/reports/coupons", guard(http.MethodGet, "/reports/coupons", authz.BillingView), h.Coupons)
 	g.GET("/reports/operations", guard(http.MethodGet, "/reports/operations", authz.SystemView), h.Operations)
+	// Ekspor laporan bisnis: angka uang, dijaga permission tersendiri.
+	g.GET("/reports-export", guard(http.MethodGet, "/reports-export", authz.BillingExport), h.Export)
+}
+
+// Export menangani GET /api/v1/admin/reports-export?kind=revenue|customers|coupons.
+// Baca sensitif: setiap ekspor dicatat di jejak audit.
+func (h *AdminReportHandler) Export(c *gin.Context) {
+	result, err := h.reports.Export(c.Request.Context(), service.AdminActor{
+		ID:        middleware.CurrentUserID(c),
+		RequestID: c.GetString(middleware.ContextRequestID),
+	}, c.Query("kind"), c.Query("from"), c.Query("to"))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	writeCSV(c, result.Filename, result.Content)
 }
 
 // Revenue menangani GET /api/v1/admin/reports/revenue.

@@ -61,13 +61,12 @@ type AdminAccountItem struct {
 	FrozenReason      string    `json:"frozen_reason,omitempty"`
 	LastVerifiedAt    *TimePair `json:"last_verified_at,omitempty"`
 	LastError         string    `json:"last_error,omitempty"`
-	// Balance hanya terisi bila admin memegang account.balance DAN aksesnya
-	// tercatat di audit (plans/07 §2 tingkat 3).
-	Balance *AdminAccountBalance `json:"balance,omitempty"`
 }
 
-// AdminAccountBalance adalah saldo dari telemetry Runner, bukan dari broker.
-type AdminAccountBalance struct {
+// AdminAccountBalanceItem adalah telemetri saldo satu akun.
+// Hanya keluar lewat GET /admin/users/:id/account-balances (account.balance).
+type AdminAccountBalanceItem struct {
+	AccountID  string   `json:"account_id"`
 	Balance    float64  `json:"balance"`
 	Equity     float64  `json:"equity"`
 	Currency   string   `json:"currency"`
@@ -136,6 +135,14 @@ type UserNoteRequest struct {
 // AccountFreezeRequest membekukan atau membuka pembekuan akun broker.
 type AccountFreezeRequest struct {
 	Reason string `json:"reason" binding:"required,max=500"`
+}
+
+// AdminAccountLabelRequest mengganti label tampilan akun.
+//
+// Hanya label. Mode, risk_percent, is_dry_run, dan kredensial sengaja tidak
+// ada di sini: semuanya milik pelanggan dan tidak boleh diubah admin.
+type AdminAccountLabelRequest struct {
+	Label string `json:"label" binding:"required,min=2,max=60"`
 }
 
 // AdminTrialExtendRequest menambah hari uji coba yang masih berjalan.

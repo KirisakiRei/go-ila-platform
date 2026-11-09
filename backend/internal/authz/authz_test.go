@@ -171,7 +171,6 @@ func TestAdminTidakPunyaKewenanganTerkunci(t *testing.T) {
 	locked := map[string]bool{
 		SystemSettings:    true,
 		SystemMaintenance: true,
-		BillingSettings:   true,
 		UserDelete:        true,
 	}
 

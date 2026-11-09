@@ -79,6 +79,12 @@ const (
 	RolePermChange   Action = "role.permission.change"
 )
 
+// Ekspor data oleh admin.
+const (
+	AuditLogExport       Action = "audit.export"
+	BusinessReportExport Action = "report.export"
+)
+
 // Katalog pair yang dikelola admin.
 const (
 	PairCategoryChange Action = "pair.category.change"
@@ -155,6 +161,9 @@ var Catalog = []Entry{
 	{RoleUpdate, "Tata Kelola", "Role diubah", true},
 	{RoleDelete, "Tata Kelola", "Role dihapus", true},
 	{RolePermChange, "Tata Kelola", "Permission role berubah", true},
+
+	{AuditLogExport, "Tata Kelola", "Audit log diekspor", true},
+	{BusinessReportExport, "Uang", "Laporan bisnis diekspor", true},
 }
 
 // Known menandai aksi yang terdaftar di katalog.

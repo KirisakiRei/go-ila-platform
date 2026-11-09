@@ -169,7 +169,7 @@ Aturan pemakaian di klien:
 | Role | Isi kewenangan |
 |---|---|
 | `superadmin` | seluruh permission |
-| `admin` | seluruh permission **kecuali** empat kewenangan terkunci di bawah |
+| `admin` | seluruh permission **kecuali** tiga kewenangan terkunci di bawah |
 | `support` | baca pelanggan, akun, trading, sinyal, status sistem |
 | `finance` | billing, harga paket, kupon, kredit, ubah tier |
 
@@ -180,11 +180,10 @@ Aturan pemakaian di klien:
 | `user.delete` | hapus akun pelanggan |
 | `system.settings` | lihat & ubah flag sistem |
 | `system.maintenance` | ubah mode platform (normal/read-only/pemeliharaan) |
-| `billing.settings` | ubah kunci gateway pembayaran |
 
 `system.settings` dan `system.maintenance` **hanya** berlaku untuk role
 `superadmin`. Memberikannya lewat role buatan tidak membuat admin biasa bisa
-memakainya. Empat kewenangan inilah yang membuat akun `admin` tidak bisa
+memakainya. Ketiga kewenangan inilah yang membuat akun `admin` tidak bisa
 mengubah sebagian pengaturan meski panel menampilkan menunya.
 
 ### Permission per area
@@ -200,24 +199,105 @@ mengubah sebagian pengaturan meski panel menampilkan menunya.
 | `user.legal` | `GET /users/:id/legal` |
 | `user.export` | `GET /users-export` |
 | `account.view` | `GET /users/:id/accounts` |
+| `account.balance` | `GET /users/:id/account-balances` (baca sensitif, tercatat audit) |
+| `account.edit` | `PATCH /accounts/:id/label` — **hanya label**; mode & risiko milik pelanggan |
+| `account.delete` | `DELETE /accounts/:id` (wajib alasan, menghapus kredensial) |
 | `account.freeze` | `POST /accounts/:id/freeze`, `/unfreeze` |
 | `subscription.edit` | seluruh route katalog pair (`/pairs`, `/pair-categories`, `/pair-groups`) |
 | `trade.view` | `GET /users/:id/positions` |
+| `trade.export` | `GET /users/:id/positions-export` |
+| `signal.view` | `GET /signals` |
+| `signal.trace` | `GET /signals/:id/trace` (baca sensitif) |
 | `billing.view` | invoice, kupon, kredit, paket, laporan |
+| `billing.export` | `GET /reports-export?kind=revenue\|customers\|coupons` |
 | `billing.manual` / `billing.refund` | `POST /invoices/:id/mark-paid` / `/refund` |
 | `billing.plan` | `PATCH /plans/:code`, `PUT /plans/:code/guard` |
 | `billing.voucher` | kupon & kredit (`POST/PATCH /coupons`, `/credit-codes`, `/users/:id/credit`) |
 | `cms.view` / `cms.edit` / `cms.publish` | dokumen legal, FAQ, pengumuman, isi halaman |
 | `role.view` / `role.edit` | `/roles`, `/permissions` |
 | `audit.view` | `GET /audit`, `/audit/:id`, `/audit-catalog` |
+| `audit.export` | `GET /audit-export` (baca sensitif, ekspornya dicatat) |
 | `system.view` | status engine, runner, broker, laporan operasional |
 | `system.settings` | `/system/settings` (superadmin) |
 | `system.maintenance` | `PUT /system/mode` (superadmin) |
 
-> Permission `account.edit`, `account.balance`, `account.delete`,
-> `signal.view`, `signal.trace`, `trade.export`, `billing.export`,
-> `audit.export`, dan `billing.settings` sudah terdaftar di katalog tetapi
-> **belum punya route**. Jangan menampilkan aksinya sebelum endpoint-nya ada.
+> Seluruh permission di katalog kini punya route. `billing.settings` sudah
+dihapus dari katalog karena penyimpanan kunci gateway belum punya desain
+rahasia yang layak; jangan menampilkan menunya di panel.
+
+---
+
+## 2.2. Endpoint Admin Baru
+
+### GET `/admin/users/:id/account-balances` — `account.balance`
+
+Saldo dari telemetri Runner (bukan pembacaan langsung ke broker). Dipisah dari
+`/accounts` supaya angka uang tidak ikut terbawa pada pembacaan biasa.
+
+```json
+[
+  { "account_id": "acc-1", "balance": 1500.25, "equity": 1510.4,
+    "currency": "USD", "observed_at": { "wib": "...", "ny": "..." } }
+]
+```
+
+### PATCH `/admin/accounts/:id/label` — `account.edit`
+
+```json
+{ "label": "Akun Utama" }
+```
+
+Payload hanya boleh berisi `label`. `mode`, `risk_percent`, `is_dry_run`, dan
+kredensial **tidak** dapat diubah admin — itu domain pelanggan. Kiriman field
+lain diabaikan oleh pengikat DTO.
+
+### DELETE `/admin/accounts/:id` — `account.delete`
+
+```json
+{ "reason": "pelanggan meminta akun dihapus", "category": "lainnya" }
+```
+
+`reason` minimal 10 karakter (aksi destruktif). Kredensial ikut terhapus dan
+langganan yang menempel pada akun itu dinonaktifkan. Posisi terbuka di broker
+tidak ditutup — platform tidak pernah menutup posisi pelanggan.
+
+### GET `/admin/users/:id/positions-export` — `trade.export`
+
+Query: `from`, `to` (YYYY-MM-DD, hari akuntansi WIB; bawaan 30 hari terakhir).
+Balasan berupa berkas CSV (`text/csv`) berisi UTF-8 BOM.
+
+### GET `/admin/audit-export` — `audit.export`
+
+Filter sama dengan `GET /admin/audit` (`actor_id`, `action`, `target_type`,
+`target_id`, `from`, `to`). Batas 10.000 baris. Ekspornya sendiri dicatat di
+jejak audit sebagai `audit.export`.
+
+### GET `/admin/reports-export?kind=...` — `billing.export`
+
+`kind` wajib salah satu: `revenue`, `customers`, `coupons`. Ekspor laporan
+pendapatan menambahkan baris `TOTAL` di akhir. Tercatat sebagai `report.export`.
+
+### GET `/admin/signals` — `signal.view`
+
+Query: `from`, `to` (wajib rentang; bawaan 7 hari), `symbol`, `status`,
+`strategy`, `page`, `per_page`, `sort`, `order`. Balasan memakai amplop
+ber-`meta` (pagination). Setiap item memuat `recipients` (jumlah penerima) dan
+`executed` (jumlah yang benar-benar entry).
+
+### GET `/admin/signals/:id/trace` — `signal.trace`
+
+```json
+{
+  "signal": { "signal_id": "sig-...", "symbol": "XAUUSD", "recipients": 3, "executed": 2 },
+  "recipients": [{ "user_id": "...", "user_email": "...", "status": "CONSUMED", "position_id": "..." }],
+  "events": [{ "user_id": "...", "from_status": "READY_TO_ENTRY", "to_status": "CONSUMED" }],
+  "executions": [{ "user_id": "...", "broker_account_id": "...", "status": "SENT" }],
+  "positions": [{ "id": "...", "symbol": "XAUUSD", "status": "OPEN" }]
+}
+```
+
+Pembacaan ini membuka perilaku trading banyak pelanggan sekaligus, jadi selalu
+dicatat sebagai `user.view.sensitive`.
 
 ---
 

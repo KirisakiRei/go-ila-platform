@@ -842,7 +842,9 @@ func TestRiskGuard_TotalRisikoSemuaAkunDibatasi(t *testing.T) {
 func TestRiskGuard_BatasPerTradeTetapDitegakkan(t *testing.T) {
 	fx := newAccountPairFixture(t, model.TierPlus, nil)
 
-	for _, risk := range []float64{0.05, 1.2} {
+	// Nilai di atas pagar per-trade 5% tetap ditolak; di bawahnya diterima
+	// (dengan peringatan di sisi UI, bukan penolakan server).
+	for _, risk := range []float64{0.05, 5.5} {
 		_, err := fx.svc.Create(context.Background(), userIDTest, dto.CreateAccountRequest{
 			BrokerType: "matchtrader", Token: sampleToken, RiskPercent: risk,
 		})
@@ -852,14 +854,26 @@ func TestRiskGuard_BatasPerTradeTetapDitegakkan(t *testing.T) {
 	}
 }
 
-func TestRiskGuard_BatasBawaanBasicSatuPersen(t *testing.T) {
-	if got := defaultMaxTotalRisk(model.TierBasic); got != 1.0 {
-		t.Errorf("default basic = %v, ingin 1.0", got)
+// Batas total risiko bawaan: free nol, paket berbayar positif dan konsisten
+// dengan konstanta yang dipakai kode. Angka pastinya milik kebijakan produk,
+// jadi tes ini menjaga sifatnya, bukan nilainya.
+func TestRiskGuard_BatasBawaanSesuaiKonstanta(t *testing.T) {
+	if got := defaultMaxTotalRisk(model.TierFree); got != defaultMaxTotalRiskFree {
+		t.Errorf("free = %v, ingin %v", got, defaultMaxTotalRiskFree)
 	}
-	if got := defaultMaxTotalRisk(model.TierPlus); got != 2.0 {
-		t.Errorf("default plus = %v, ingin 2.0", got)
+	if defaultMaxTotalRiskFree != 0 {
+		t.Errorf("free harus nol agar tidak ada akun nyata, dapat %v", defaultMaxTotalRiskFree)
 	}
-	if got := defaultMaxTotalRisk(model.TierFree); got != 0 {
-		t.Errorf("default free = %v, ingin 0", got)
+	if got := defaultMaxTotalRisk(model.TierBasic); got != defaultMaxTotalRiskBasic {
+		t.Errorf("basic = %v, ingin %v", got, defaultMaxTotalRiskBasic)
+	}
+	if got := defaultMaxTotalRisk(model.TierPlus); got != defaultMaxTotalRiskPlus {
+		t.Errorf("plus = %v, ingin %v", got, defaultMaxTotalRiskPlus)
+	}
+	if defaultMaxTotalRiskBasic <= 0 || defaultMaxTotalRiskPlus <= 0 {
+		t.Error("paket berbayar harus punya batas total risiko positif")
+	}
+	if defaultMaxTotalRiskPlus < defaultMaxTotalRiskBasic {
+		t.Error("batas Plus tidak boleh lebih ketat dari Basic")
 	}
 }

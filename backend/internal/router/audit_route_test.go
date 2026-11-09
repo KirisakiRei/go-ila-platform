@@ -30,6 +30,8 @@ var harapanAksiAudit = map[string]audit.Action{
 	"POST /api/v1/admin/users/:id/notes":       audit.UserNoteAdd,
 	"POST /api/v1/admin/accounts/:id/freeze":   audit.AccountFreeze,
 	"POST /api/v1/admin/accounts/:id/unfreeze": audit.AccountUnfreeze,
+	"PATCH /api/v1/admin/accounts/:id/label":   audit.AccountUpdate,
+	"DELETE /api/v1/admin/accounts/:id":        audit.AccountDelete,
 	"GET /api/v1/admin/users/:id/positions":    audit.UserViewSensitive,
 
 	// 2FA admin memakai faktor milik sendiri, bukan kewenangan atas orang lain.

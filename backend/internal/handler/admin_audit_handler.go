@@ -7,6 +7,7 @@ import (
 
 	"ila/backend/internal/authz"
 	"ila/backend/internal/dto"
+	"ila/backend/internal/middleware"
 	"ila/backend/internal/service"
 	"ila/backend/pkg/httpx"
 )
@@ -26,6 +27,8 @@ func (h *AdminAuditHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 	g.GET("/audit", guard(http.MethodGet, "/audit", authz.AuditView), h.List)
 	g.GET("/audit/:id", guard(http.MethodGet, "/audit/:id", authz.AuditView), h.Detail)
 	g.GET("/audit-catalog", guard(http.MethodGet, "/audit-catalog", authz.AuditView), h.Catalog)
+	// Ekspor audit memakai jalur terpisah agar dapat dikunci sendiri.
+	g.GET("/audit-export", guard(http.MethodGet, "/audit-export", authz.AuditExport), h.Export)
 }
 
 // List menangani GET /api/v1/admin/audit.
@@ -46,6 +49,30 @@ func (h *AdminAuditHandler) List(c *gin.Context) {
 		return
 	}
 	httpx.OKWithMeta(c, "Jejak audit", items, meta)
+}
+
+// Export menangani GET /api/v1/admin/audit-export.
+// Baca sensitif: ekspornya sendiri dicatat di jejak audit.
+func (h *AdminAuditHandler) Export(c *gin.Context) {
+	var q dto.AdminAuditFilter
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	q.ActorID = c.Query("actor_id")
+	q.Action = c.Query("action")
+	q.TargetType = c.Query("target_type")
+	q.TargetID = c.Query("target_id")
+
+	result, err := h.audit.Export(c.Request.Context(), service.AdminActor{
+		ID:        middleware.CurrentUserID(c),
+		RequestID: c.GetString(middleware.ContextRequestID),
+	}, q)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	writeCSV(c, result.Filename, result.Content)
 }
 
 // Detail menangani GET /api/v1/admin/audit/:id.

@@ -67,6 +67,17 @@ func (h *AdminUserHandler) Accounts(c *gin.Context) {
 	httpx.OK(c, "Akun broker pelanggan", result)
 }
 
+// Balances menangani GET /api/v1/admin/users/:id/account-balances.
+// Baca sensitif: pembacaannya dicatat audit oleh service.
+func (h *AdminUserHandler) Balances(c *gin.Context) {
+	result, err := h.users.Balances(c.Request.Context(), h.actor(c), c.Param("id"))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Saldo akun pelanggan", result)
+}
+
 // Positions menangani GET /api/v1/admin/users/:id/positions.
 // Setiap pembacaan tercatat sebagai baca sensitif.
 func (h *AdminUserHandler) Positions(c *gin.Context) {
@@ -76,6 +87,45 @@ func (h *AdminUserHandler) Positions(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Riwayat posisi pelanggan", result)
+}
+
+// ExportPositions menangani GET /api/v1/admin/users/:id/positions-export.
+// Berkas langsung diunduh; pembacaan dicatat audit oleh service.
+func (h *AdminUserHandler) ExportPositions(c *gin.Context) {
+	result, err := h.users.ExportPositions(c.Request.Context(), h.actor(c), c.Param("id"), c.Query("from"), c.Query("to"))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	writeCSV(c, result.Filename, result.Content)
+}
+
+// UpdateAccountLabel menangani PATCH /api/v1/admin/accounts/:id/label.
+func (h *AdminUserHandler) UpdateAccountLabel(c *gin.Context) {
+	var req dto.AdminAccountLabelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	if err := h.users.UpdateAccountLabel(c.Request.Context(), h.actor(c), c.Param("id"), req); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Label akun diperbarui", nil)
+}
+
+// DeleteAccount menangani DELETE /api/v1/admin/accounts/:id.
+func (h *AdminUserHandler) DeleteAccount(c *gin.Context) {
+	var req dto.UserActionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	if err := h.users.DeleteAccount(c.Request.Context(), h.actor(c), c.Param("id"), req); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Akun pelanggan dihapus", nil)
 }
 
 // Legal menangani GET /api/v1/admin/users/:id/legal.
@@ -205,6 +255,12 @@ func (h *AdminUserHandler) Export(c *gin.Context) {
 		return
 	}
 	// BOM sudah ikut di dalam isi berkas agar Excel membaca UTF-8 dengan benar.
+	writeCSV(c, filename, body)
+}
+
+// writeCSV mengirim berkas CSV sebagai unduhan.
+// BOM sudah ikut di dalam isi berkas agar Excel membaca UTF-8 dengan benar.
+func writeCSV(c *gin.Context, filename string, body []byte) {
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Data(http.StatusOK, "text/csv; charset=utf-8", body)

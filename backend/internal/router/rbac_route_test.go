@@ -14,17 +14,9 @@ import (
 // setiap penambahan atau penghapusan route RBAC terlihat di tinjauan kode.
 //
 // Menghapus satu baris di sini hanya sah setelah route-nya benar-benar ada.
-var permissionBelumBerroute = map[string]string{
-	authz.AccountEdit:     "admin belum bisa mengubah akun broker pelanggan",
-	authz.AccountBalance:  "saldo pelanggan dibaca lewat telemetri, bukan route admin",
-	authz.AccountDelete:   "penghapusan akun broker belum disediakan untuk admin",
-	authz.SignalView:      "panel sinyal admin belum dibangun",
-	authz.SignalTrace:     "penelusuran riwayat sinyal admin belum dibangun",
-	authz.TradeExport:     "ekspor riwayat posisi pelanggan belum dibangun",
-	authz.BillingExport:   "ekspor laporan bisnis belum dibangun",
-	authz.AuditExport:     "ekspor audit log belum dibangun",
-	authz.BillingSettings: "kunci gateway pembayaran belum dapat diubah dari panel",
-}
+// Kosong: seluruh permission katalog sudah punya route. Bila suatu saat ada
+// fitur yang izinnya lebih dulu dibuat, catat di sini beserta alasannya.
+var permissionBelumBerroute = map[string]string{}
 
 // Setiap permission yang dipakai route wajib terdaftar di katalog, sehingga
 // tidak ada penjagaan route yang mengacu ke kunci asing.
@@ -104,7 +96,6 @@ func TestRoleAdminMemegangSeluruhPermissionRoute(t *testing.T) {
 		authz.UserDelete:        true,
 		authz.SystemSettings:    true,
 		authz.SystemMaintenance: true,
-		authz.BillingSettings:   true,
 	}
 
 	var missing []string

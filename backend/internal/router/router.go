@@ -187,7 +187,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 
 	pricingRepo := repository.NewPricingRepository(db)
 	pricingService := service.NewPricingService(pricingRepo)
-	adminReportService := service.NewAdminReportService(repository.NewReportRepository(db))
+	adminReportService := service.NewAdminReportService(repository.NewReportRepository(db), adminAudit)
+	adminSignalService := service.NewAdminSignalService(repository.NewAdminSignalRepository(db), adminAudit)
 
 	// Flag operasional: nilai database menimpa env, dengan cache 10 detik agar
 	// rem darurat berlaku cepat tanpa membebani database (plans/11 I2).
@@ -265,6 +266,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
 	adminReportHandler := handler.NewAdminReportHandler(adminReportService)
+	adminSignalHandler := handler.NewAdminSignalHandler(adminSignalService)
 	adminSystemHandler := handler.NewAdminSystemHandler(adminSystemService, systemOpsService, systemOpsService)
 	publicStatusHandler := handler.NewPublicStatusHandler(systemOpsService)
 	cmsHandler := handler.NewCMSHandler(cmsService)
@@ -437,7 +439,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -494,6 +496,7 @@ func registerAdmin(
 	pageHandler *handler.PageHandler,
 	adminTrialHandler *handler.AdminTrialHandler,
 	adminPairHandler *handler.AdminPairHandler,
+	adminSignalHandler *handler.AdminSignalHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -575,6 +578,9 @@ func registerAdmin(
 	systemHandler.Register(admin.Group(""), guard)
 	cmsHandler.Register(admin.Group(""), guard)
 	adminPairHandler.Register(admin.Group(""), guard)
+
+	// Sinyal lintas pengguna: baca tingkat lanjut untuk operasional.
+	adminSignalHandler.Register(admin.Group(""), guard)
 	pageHandler.Register(admin.Group(""), guard)
 
 	logger.Info("pintu admin siap", "base", "/api/v1/admin")

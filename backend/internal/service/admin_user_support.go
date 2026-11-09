@@ -84,7 +84,13 @@ func buildUserList(filter dto.AdminUserFilter) (pagination.Params, repository.Us
 type AdminAccountStore interface {
 	ListForAdmin(ctx context.Context, userID string) ([]repository.AdminAccountRow, error)
 	FindForAdmin(ctx context.Context, accountID string) (*repository.AdminAccountRow, error)
+	// BalancesForUser membaca telemetri saldo Runner per akun.
+	BalancesForUser(ctx context.Context, userID string) (map[string]repository.AccountBalanceRow, error)
 	SetFrozen(ctx context.Context, accountID string, frozen bool, at *time.Time, reason string) error
+	// SetLabel hanya mengubah label tampilan akun.
+	SetLabel(ctx context.Context, accountID, label string) error
+	// DeleteAccount menghapus akun beserta kredensialnya.
+	DeleteAccount(ctx context.Context, accountID string) error
 	DeleteAllForUser(ctx context.Context, userID string) error
 }
 

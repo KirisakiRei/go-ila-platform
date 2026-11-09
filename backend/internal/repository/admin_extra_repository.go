@@ -71,6 +71,31 @@ func (r *adminAccountRepository) FindForAdmin(ctx context.Context, accountID str
 	return &row, nil
 }
 
+// AccountBalanceRow adalah telemetri saldo satu akun, ditulis Runner.
+type AccountBalanceRow struct {
+	BrokerAccountID string     `json:"broker_account_id"`
+	Balance         float64    `json:"balance"`
+	Equity          float64    `json:"equity"`
+	Currency        string     `json:"currency"`
+	LastSyncedAt    *time.Time `json:"last_synced_at"`
+}
+
+func (r *adminAccountRepository) BalancesForUser(ctx context.Context, userID string) (map[string]AccountBalanceRow, error) {
+	var rows []AccountBalanceRow
+	err := r.db.WithContext(ctx).Model(&model.BrokerAccountState{}).
+		Select("broker_account_id, balance, equity, currency, last_synced_at").
+		Where("user_id = ?", userID).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca saldo akun pelanggan: %w", err)
+	}
+	out := make(map[string]AccountBalanceRow, len(rows))
+	for _, row := range rows {
+		out[row.BrokerAccountID] = row
+	}
+	return out, nil
+}
+
 func (r *adminAccountRepository) SetFrozen(ctx context.Context, accountID string, frozen bool, at *time.Time, reason string) error {
 	reason = truncate(reason, 255)
 	res := r.db.WithContext(ctx).Model(&model.BrokerAccount{}).
@@ -85,6 +110,50 @@ func (r *adminAccountRepository) SetFrozen(ctx context.Context, accountID string
 	}
 	if res.RowsAffected == 0 {
 		return apperror.ErrNotFound
+	}
+	return nil
+}
+
+// SetLabel mengganti label tampilan akun. Kolom lain tidak disentuh.
+func (r *adminAccountRepository) SetLabel(ctx context.Context, accountID, label string) error {
+	res := r.db.WithContext(ctx).Model(&model.BrokerAccount{}).
+		Where("id = ? AND deleted_at IS NULL", accountID).
+		Update("label", label)
+	if res.Error != nil {
+		return fmt.Errorf("mengubah label akun: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return apperror.ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAccount menghapus satu akun broker beserta kredensialnya.
+// Langganan yang menempel pada akun itu ikut dinonaktifkan agar Runner tidak
+// lagi menganggap simbol tersebut dipantau akun yang sudah tidak ada.
+func (r *adminAccountRepository) DeleteAccount(ctx context.Context, accountID string) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Where("id = ?", accountID).Delete(&model.BrokerAccount{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return apperror.ErrNotFound
+		}
+
+		if err := tx.Where("broker_account_id = ?", accountID).Delete(&model.Credential{}).Error; err != nil {
+			return err
+		}
+		// Langganan tidak dihapus: riwayat tetap ada, tetapi tidak aktif lagi.
+		if err := tx.Model(&model.Subscription{}).
+			Where("broker_account_id = ?", accountID).
+			Update("is_active", false).Error; err != nil {
+			return err
+		}
+		return tx.Where("broker_account_id = ?", accountID).Delete(&model.BrokerAccountState{}).Error
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }

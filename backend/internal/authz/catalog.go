@@ -52,13 +52,12 @@ const (
 
 // Billing.
 const (
-	BillingView     = "billing.view"
-	BillingManual   = "billing.manual"
-	BillingRefund   = "billing.refund"
-	BillingPlan     = "billing.plan"
-	BillingVoucher  = "billing.voucher"
-	BillingSettings = "billing.settings"
-	BillingExport   = "billing.export"
+	BillingView    = "billing.view"
+	BillingManual  = "billing.manual"
+	BillingRefund  = "billing.refund"
+	BillingPlan    = "billing.plan"
+	BillingVoucher = "billing.voucher"
+	BillingExport  = "billing.export"
 )
 
 // Konten.
@@ -111,7 +110,6 @@ var Catalog = []Permission{
 	{BillingRefund, "Billing", "Tandai refund", RiskHigh},
 	{BillingPlan, "Billing", "Ubah harga & fitur paket", RiskHigh},
 	{BillingVoucher, "Billing", "Buat kupon & beri kredit", RiskHigh},
-	{BillingSettings, "Billing", "Ubah kunci gateway pembayaran", RiskHigh},
 	{BillingExport, "Billing", "Ekspor laporan bisnis", RiskHigh},
 
 	{CMSView, "Konten", "Lihat dokumen, FAQ, pengumuman", RiskLow},
@@ -171,7 +169,6 @@ func DefaultRoles() []DefaultRole {
 	excluded := map[string]bool{
 		SystemMaintenance: true,
 		SystemSettings:    true,
-		BillingSettings:   true,
 		UserDelete:        true,
 	}
 	adminPerms := make([]string, 0, len(all))

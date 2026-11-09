@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,7 +24,11 @@ type AdminUserService interface {
 	List(ctx context.Context, actor AdminActor, filter dto.AdminUserFilter) ([]dto.UserListItem, pagination.Meta, error)
 	Detail(ctx context.Context, actor AdminActor, userID string) (*dto.UserDetail, error)
 	Accounts(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminAccountItem, error)
+	// Balances mengembalikan saldo akun; dijaga account.balance.
+	Balances(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminAccountBalanceItem, error)
 	Positions(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminPositionItem, error)
+	// ExportPositions mengunduh riwayat posisi pelanggan sebagai CSV.
+	ExportPositions(ctx context.Context, actor AdminActor, userID, from, to string) (*PositionExport, error)
 	Legal(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminLegalAcceptance, error)
 	Notes(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminNoteItem, error)
 	AddNote(ctx context.Context, actor AdminActor, userID string, req dto.UserNoteRequest) error
@@ -35,6 +40,11 @@ type AdminUserService interface {
 	Delete(ctx context.Context, actor AdminActor, userID string, req dto.UserActionRequest) error
 	FreezeAccount(ctx context.Context, actor AdminActor, accountID string, req dto.AccountFreezeRequest) error
 	UnfreezeAccount(ctx context.Context, actor AdminActor, accountID string, req dto.AccountFreezeRequest) error
+	// UpdateAccountLabel hanya mengganti label tampilan. Mode, risiko, dan
+	// kredensial tetap milik pelanggan: admin tidak boleh mengubahnya.
+	UpdateAccountLabel(ctx context.Context, actor AdminActor, accountID string, req dto.AdminAccountLabelRequest) error
+	// DeleteAccount menghapus akun broker pelanggan beserta kredensialnya.
+	DeleteAccount(ctx context.Context, actor AdminActor, accountID string, req dto.UserActionRequest) error
 	ExportUsers(ctx context.Context, actor AdminActor, filter dto.AdminUserFilter) ([]byte, string, error)
 }
 
@@ -157,6 +167,51 @@ func (s *adminUserService) Accounts(ctx context.Context, actor AdminActor, userI
 	return items, nil
 }
 
+// Balances mengembalikan telemetri saldo akun pelanggan.
+//
+// Sengaja dipisah dari daftar akun: angka uang hanya keluar lewat satu pintu
+// yang dijaga account.balance dan setiap pembacaannya dicatat audit
+// (plans/07 §2 tingkat 3).
+func (s *adminUserService) Balances(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminAccountBalanceItem, error) {
+	if _, err := s.store.FindRow(ctx, userID); err != nil {
+		return nil, err
+	}
+	if s.extras.Accounts == nil {
+		return []dto.AdminAccountBalanceItem{}, nil
+	}
+
+	balances, err := s.extras.Accounts.BalancesForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.audit.Record(ctx, AuditEntry{
+		ActorID: actor.ID, Action: audit.UserViewSensitive,
+		TargetType: "user", TargetID: userID, RequestID: actor.RequestID,
+		Reason: "membuka saldo akun pelanggan",
+	}); err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.AdminAccountBalanceItem, 0, len(balances))
+	for accountID, balance := range balances {
+		observed := dto.TimePair{}
+		if balance.LastSyncedAt != nil {
+			observed = dto.NewTimePair(*balance.LastSyncedAt)
+		}
+		items = append(items, dto.AdminAccountBalanceItem{
+			AccountID:  accountID,
+			Balance:    balance.Balance,
+			Equity:     balance.Equity,
+			Currency:   balance.Currency,
+			ObservedAt: observed,
+		})
+	}
+	// Urutan peta acak; disortir agar tampilan dan ekspor stabil.
+	sort.Slice(items, func(i, j int) bool { return items[i].AccountID < items[j].AccountID })
+	return items, nil
+}
+
 func (s *adminUserService) Positions(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminPositionItem, error) {
 	if _, err := s.store.FindRow(ctx, userID); err != nil {
 		return nil, err
@@ -181,6 +236,55 @@ func (s *adminUserService) Positions(ctx context.Context, actor AdminActor, user
 		items = append(items, toAdminPositionItem(row))
 	}
 	return items, nil
+}
+
+// ExportPositions mengunduh riwayat posisi pelanggan sebagai CSV.
+//
+// Rentang tanggal memakai hari akuntansi WIB agar "5 November" berarti hari
+// yang sama dengan yang dipakai Runner. Ekspor adalah baca sensitif, jadi
+// aksesnya tercatat audit sebelum berkas disusun.
+func (s *adminUserService) ExportPositions(ctx context.Context, actor AdminActor, userID, from, to string) (*PositionExport, error) {
+	if _, err := s.store.FindRow(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	params, err := pagination.Build(pagination.Request{
+		From:             from,
+		To:               to,
+		AllowedSort:      map[string]string{"created_at": "created_at"},
+		DefaultSort:      "created_at",
+		RequireRange:     true,
+		DefaultRangeDays: 30,
+		Now:              s.now(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if s.extras.Positions == nil {
+		return nil, apperror.ErrNotFound
+	}
+	rows, err := s.extras.Positions.ListForAdmin(ctx, userID, maxExportPositions)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.audit.Record(ctx, AuditEntry{
+		ActorID: actor.ID, Action: audit.UserViewSensitive,
+		TargetType: "user", TargetID: userID, RequestID: actor.RequestID,
+		Reason: "mengekspor riwayat posisi pelanggan",
+	}); err != nil {
+		return nil, err
+	}
+
+	var start, end time.Time
+	if params.From != nil {
+		start = *params.From
+	}
+	if params.To != nil {
+		end = *params.To
+	}
+	return buildPositionCSV(rows, start, end, "riwayat-posisi-"+userID[:min(8, len(userID))])
 }
 
 func (s *adminUserService) Legal(ctx context.Context, actor AdminActor, userID string) ([]dto.AdminLegalAcceptance, error) {
@@ -478,6 +582,72 @@ func (s *adminUserService) UnfreezeAccount(ctx context.Context, actor AdminActor
 		TargetType: "account", TargetID: accountID, RequestID: actor.RequestID,
 		Before: map[string]any{"is_frozen": true, "reason": account.FrozenReason},
 		After:  map[string]any{"is_frozen": false},
+	})
+}
+
+// UpdateAccountLabel hanya mengganti label tampilan akun.
+//
+// Batas kewenangan disengaja: mode, risk_percent, dan kredensial adalah milik
+// pelanggan. Admin yang bisa menaikkan risiko atau memindahkan mode ke auto
+// dapat mengubah kerugian pelanggan tanpa persetujuan, jadi kolom itu ditolak
+// di DTO — bukan sekadar disembunyikan di antarmuka.
+func (s *adminUserService) UpdateAccountLabel(ctx context.Context, actor AdminActor, accountID string, req dto.AdminAccountLabelRequest) error {
+	label := strings.TrimSpace(req.Label)
+	if len(label) < 2 || len(label) > 60 {
+		return validation("label akun harus 2 sampai 60 karakter")
+	}
+
+	account, err := s.extras.Accounts.FindForAdmin(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	if account.Label == label {
+		return nil
+	}
+	if err := s.extras.Accounts.SetLabel(ctx, accountID, label); err != nil {
+		return err
+	}
+	return s.audit.Record(ctx, AuditEntry{
+		ActorID: actor.ID, Action: audit.AccountUpdate,
+		TargetType: "account", TargetID: accountID, RequestID: actor.RequestID,
+		Reason: "mengubah label akun pelanggan",
+		Before: map[string]any{"label": account.Label, "user_id": account.UserID},
+		After:  map[string]any{"label": label},
+	})
+}
+
+// DeleteAccount menghapus akun broker beserta kredensialnya.
+//
+// Posisi yang sudah terbuka di broker tidak ditutup di sini: platform memang
+// tidak pernah menutup posisi pelanggan. Yang dihentikan hanya pengawasan
+// sinyal berikutnya.
+func (s *adminUserService) DeleteAccount(ctx context.Context, actor AdminActor, accountID string, req dto.UserActionRequest) error {
+	reason, category, err := destructiveReason(audit.AccountDelete, req)
+	if err != nil {
+		return err
+	}
+
+	account, err := s.extras.Accounts.FindForAdmin(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	if err := s.extras.Accounts.DeleteAccount(ctx, accountID); err != nil {
+		return err
+	}
+
+	// Pencabutan sesi membuat Runner berhenti memakai akun ini pada putaran
+	// berikutnya, tanpa menunggu kedaluwarsa token.
+	s.revoke(ctx, account.UserID)
+
+	return s.audit.Record(ctx, AuditEntry{
+		ActorID: actor.ID, Action: audit.AccountDelete,
+		TargetType: "account", TargetID: accountID,
+		Reason: reason, RequestID: actor.RequestID,
+		Before: map[string]any{
+			"user_id": account.UserID, "label": account.Label,
+			"broker_type": account.BrokerType, "category": category,
+		},
+		After: map[string]any{"deleted": true},
 	})
 }
 
