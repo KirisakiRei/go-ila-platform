@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { Alert, Button, Input, Label } from '@/components/ui'
-import { adminAuthApi } from '@/lib/admin-api'
+import { adminAuthApi, type AdminLoginResult } from '@/lib/admin-api'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
 
 /**
@@ -24,8 +24,17 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
-  const finish = (user: { id: string; name: string; email: string; role: string }) => {
-    signIn({ id: user.id, name: user.name, email: user.email, role: user.role })
+  const finish = (result: AdminLoginResult) => {
+    // Permission ikut disimpan: tanpa ini panel tidak tahu menu mana yang boleh
+    // ditampilkan dan memaksa setiap halaman menerima 403 dari server.
+    signIn({
+      id: result.user.id,
+      name: result.user.name,
+      email: result.user.email,
+      role: result.role_code || result.user.role,
+      isSuperadmin: result.role_code === 'superadmin',
+      permissions: result.permissions ?? [],
+    })
     navigate('/admin', { replace: true })
   }
 
@@ -42,7 +51,7 @@ export default function AdminLoginPage() {
         return
       }
 
-      finish(result.user)
+      finish(result)
     } catch (cause) {
       // Pesan server dipakai apa adanya, tetapi akun yang bukan admin
       // ditampilkan sebagai kredensial salah agar keberadaan akun tidak bocor.
@@ -59,7 +68,7 @@ export default function AdminLoginPage() {
 
     try {
       const result = await adminAuthApi.verify2fa({ challenge_id: challengeId, code: code.trim() })
-      finish(result.user)
+      finish(result)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kode tidak diterima.')
     } finally {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useQueryClient } from '@tanstack/react-query'
 import { adminAuthApi } from '@/lib/admin-api'
 import { AdminAuthContext, type AdminAuthContextValue, type AdminUser } from './admin-auth-context'
+import { mapProfile } from './lib/profile'
 
 type Status = 'restoring' | 'authenticated' | 'anonymous'
 
@@ -25,12 +26,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       .me()
       .then((profile) => {
         if (!active) return
-        setAdmin({
-          id: profile.user.id,
-          name: profile.user.name,
-          email: profile.user.email,
-          role: profile.role.code || profile.user.role,
-        })
+        setAdmin(mapProfile(profile))
         setStatus('authenticated')
       })
       .catch(() => {
@@ -63,14 +59,20 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear()
   }, [queryClient])
 
+  const refreshPermissions = useCallback(async () => {
+    const profile = await adminAuthApi.me()
+    setAdmin(mapProfile(profile))
+  }, [])
+
   const value = useMemo<AdminAuthContextValue>(
     () => ({
       admin,
       isLoading: status === 'restoring',
       signIn,
       signOut,
+      refreshPermissions,
     }),
-    [admin, status, signIn, signOut],
+    [admin, status, signIn, signOut, refreshPermissions],
   )
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>
