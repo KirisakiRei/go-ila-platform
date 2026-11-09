@@ -52,7 +52,6 @@ func main() {
 		&model.UserSignal{},
 		&model.SignalEvent{},
 		&model.ExecutionRecord{},
-		&model.AccountExecutionLock{},
 		&model.BrokerAccountState{},
 		&model.DailySummary{},
 		&model.EngineState{},
