@@ -153,6 +153,15 @@ export const adminRoleApi = {
     name?: string
     email?: string
   }) => request<AdminUserListItem>(`${ADMIN}/admins`, { method: 'POST', body: payload }),
+  /**
+   * Menghapus akun pengelola.
+   *
+   * Alasan wajib (minimal 10 karakter) karena penghapusan ini tidak bisa
+   * dibatalkan. Akun superadmin utama (is_protected) selalu ditolak server,
+   * begitu pula penghapusan akun sendiri.
+   */
+  deleteAdmin: (id: string, reason: string) =>
+    request<void>(`${ADMIN}/admins/${id}`, { method: 'DELETE', body: { reason } }),
 }
 
 /**

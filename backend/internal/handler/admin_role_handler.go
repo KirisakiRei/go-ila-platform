@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"ila/backend/internal/dto"
@@ -112,6 +114,27 @@ func (h *AdminRoleHandler) CreateAdmin(c *gin.Context) {
 		return
 	}
 	httpx.Created(c, "Akun pengelola dibuat", result)
+}
+
+// DeleteAdmin menangani DELETE /api/v1/admin/admins/:id.
+//
+// Alasan boleh dikirim lewat body JSON {"reason": "..."} atau query
+// ?reason=..., agar panel dan perkakas CLI sama-sama nyaman.
+func (h *AdminRoleHandler) DeleteAdmin(c *gin.Context) {
+	var req dto.DeleteAdminRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.Reason = c.Query("reason")
+	}
+	if len(strings.TrimSpace(req.Reason)) < 10 {
+		c.Error(httpx.WrapValidation("alasan penghapusan wajib diisi minimal 10 karakter"))
+		return
+	}
+
+	if err := h.roles.DeleteAdmin(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id"), req.Reason); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Akun pengelola dihapus", nil)
 }
 
 // Permissions menangani GET /api/v1/admin/permissions.

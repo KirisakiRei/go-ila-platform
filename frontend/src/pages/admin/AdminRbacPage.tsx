@@ -580,6 +580,7 @@ function UserRoleTab() {
   const [notice, setNotice] = useState<string | null>(null)
   const [assigning, setAssigning] = useState<AdminUserListItem | null>(null)
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<AdminUserListItem | null>(null)
 
   const roles = useQuery({ queryKey: ['admin', 'rbac', 'roles'], queryFn: adminRoleApi.list })
 
@@ -622,6 +623,19 @@ function UserRoleTab() {
     },
     onError: (error) =>
       setNotice(error instanceof Error ? error.message : 'Gagal membuat akun pengelola.'),
+  })
+
+  const deleteAdmin = useMutation({
+    mutationFn: (input: { id: string; reason: string }) =>
+      adminRoleApi.deleteAdmin(input.id, input.reason),
+    onSuccess: () => {
+      setNotice('Akun pengelola dihapus. Jejak auditnya tetap tersimpan.')
+      setDeleting(null)
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'rbac', 'users'] })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'rbac', 'roles'] })
+    },
+    onError: (error) =>
+      setNotice(error instanceof Error ? error.message : 'Gagal menghapus akun pengelola.'),
   })
 
   const roleRows = roles.data ?? []
@@ -722,12 +736,32 @@ function UserRoleTab() {
                       <span className="text-muted-foreground">Belum ditugaskan</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right">
-                    {can('role.edit') && (
-                      <Button size="sm" variant="outline" onClick={() => setAssigning(row)}>
-                        Ubah role
-                      </Button>
-                    )}
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {can('role.edit') && (
+                        <Button size="sm" variant="outline" onClick={() => setAssigning(row)}>
+                          Ubah role
+                        </Button>
+                      )}
+                      {/* Akun terlindungi tidak ditawari tombol hapus: server
+                          tetap menolak, dan tombol mati lebih jelas daripada
+                          pesan galat setelah alasan diketik. */}
+                      {can('role.delete') &&
+                        (row.is_protected ? (
+                          <Badge variant="muted" title="Akun superadmin utama tidak dapat dihapus">
+                            Terlindungi
+                          </Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive"
+                            onClick={() => setDeleting(row)}
+                          >
+                            Hapus
+                          </Button>
+                        ))}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -780,7 +814,105 @@ function UserRoleTab() {
           onSubmit={(payload) => createAdmin.mutate(payload)}
         />
       )}
+
+      {deleting && (
+        <DeleteAdminModal
+          user={deleting}
+          pending={deleteAdmin.isPending}
+          onClose={() => setDeleting(null)}
+          onSubmit={(reason) => deleteAdmin.mutate({ id: deleting.id, reason })}
+        />
+      )}
     </div>
+  )
+}
+
+/**
+ * DeleteAdminModal menghapus akun pengelola.
+ *
+ * Alasan wajib diketik karena penghapusan tidak bisa dibatalkan: kata sandi
+ * akun dikosongkan dan barisnya dianonimkan. Alasannya tercatat di audit log
+ * bersama identitas akun, sehingga identitas itu tetap bisa ditelusuri.
+ */
+function DeleteAdminModal({
+  user,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  user: AdminUserListItem
+  pending: boolean
+  onClose: () => void
+  onSubmit: (reason: string) => void
+}) {
+  const [reason, setReason] = useState('')
+  const [confirm, setConfirm] = useState('')
+
+  const reasonSah = reason.trim().length >= 10
+  const username = user.email.split('@')[0] ?? ''
+  const cocok = confirm.trim().toLowerCase() === username.toLowerCase()
+  const siap = reasonSah && cocok
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Hapus akun pengelola"
+      description="Akun ini tidak akan bisa masuk lagi. Invoice dan dokumen legal yang menunjuknya tetap utuh."
+      footer={
+        <>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Batal
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            isLoading={pending}
+            disabled={!siap}
+            onClick={() => onSubmit(reason.trim())}
+          >
+            Hapus akun
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <Alert variant="warning">
+          Akun <strong>{user.name}</strong> ({user.email}) akan dihapus. Tindakan ini tidak dapat
+          dibatalkan.
+        </Alert>
+
+        <div>
+          <Label htmlFor="hapus-admin-alasan">Alasan penghapusan</Label>
+          <Input
+            id="hapus-admin-alasan"
+            className="mt-1"
+            value={reason}
+            placeholder="mis. Akun tidak lagi bertugas di tim operasional"
+            onChange={(event) => setReason(event.target.value)}
+          />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Minimal 10 karakter dan tercatat di audit log. {reason.trim().length}/10
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="hapus-admin-konfirmasi">
+            Ketik <code>{username}</code> untuk mengonfirmasi
+          </Label>
+          <Input
+            id="hapus-admin-konfirmasi"
+            className="mt-1"
+            value={confirm}
+            autoComplete="off"
+            onChange={(event) => setConfirm(event.target.value)}
+          />
+          {confirm !== '' && !cocok && (
+            <p className="mt-1 text-[11px] text-destructive">Belum sama.</p>
+          )}
+        </div>
+      </div>
+    </Modal>
   )
 }
 

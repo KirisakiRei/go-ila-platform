@@ -10,6 +10,8 @@ export type AdminUserListItem = {
   role: string
   role_code?: string
   telegram_linked: boolean
+  /** Akun superadmin utama: tidak boleh dihapus dari panel. */
+  is_protected?: boolean
   account_count: number
   created_at: TimePair
   last_login_at?: TimePair

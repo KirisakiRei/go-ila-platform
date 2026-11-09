@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -14,42 +15,54 @@ import (
 	"ila/backend/internal/dto"
 	"ila/backend/internal/handler"
 	"ila/backend/internal/middleware"
+	"ila/backend/pkg/httpx"
 )
 
-// stubRoleService hanya melayani ListRoles untuk uji kontrak balasan.
+// stubRoleService melayani kontrak balasan daftar role dan penghapusan akun
+// pengelola.
 type stubRoleService struct {
-	roles []dto.RoleResponse
+	roles     []dto.RoleResponse
+	deleted   []string
+	deleteErr error
 }
 
-func (s stubRoleService) ListRoles(context.Context, string) ([]dto.RoleResponse, error) {
+func (s *stubRoleService) ListRoles(context.Context, string) ([]dto.RoleResponse, error) {
 	return s.roles, nil
 }
 
-func (s stubRoleService) GetRole(context.Context, string, string) (*dto.RoleDetailResponse, error) {
+func (s *stubRoleService) GetRole(context.Context, string, string) (*dto.RoleDetailResponse, error) {
 	return nil, nil
 }
 
-func (s stubRoleService) CreateRole(context.Context, string, dto.CreateRoleRequest) (*dto.RoleResponse, error) {
+func (s *stubRoleService) CreateRole(context.Context, string, dto.CreateRoleRequest) (*dto.RoleResponse, error) {
 	return nil, nil
 }
 
-func (s stubRoleService) UpdateRole(context.Context, string, string, dto.UpdateRoleRequest) (*dto.RoleResponse, error) {
+func (s *stubRoleService) UpdateRole(context.Context, string, string, dto.UpdateRoleRequest) (*dto.RoleResponse, error) {
 	return nil, nil
 }
 
-func (s stubRoleService) DeleteRole(context.Context, string, string) error {
+func (s *stubRoleService) DeleteRole(context.Context, string, string) error {
 	return nil
 }
 
-func (s stubRoleService) AssignRole(context.Context, string, string, dto.AssignRoleRequest) error {
+func (s *stubRoleService) AssignRole(context.Context, string, string, dto.AssignRoleRequest) error {
 	return nil
 }
 
-func (s stubRoleService) CreateAdmin(context.Context, string, dto.CreateAdminRequest) (*dto.UserListItem, error) {
+func (s *stubRoleService) CreateAdmin(context.Context, string, dto.CreateAdminRequest) (*dto.UserListItem, error) {
 	return nil, nil
 }
 
-func (s stubRoleService) ListPermissions(context.Context, string) ([]dto.PermissionGroup, error) {
+func (s *stubRoleService) DeleteAdmin(_ context.Context, _ /*actorID*/, userID, reason string) error {
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+	s.deleted = append(s.deleted, userID+"|"+reason)
+	return nil
+}
+
+func (s *stubRoleService) ListPermissions(context.Context, string) ([]dto.PermissionGroup, error) {
 	return nil, nil
 }
 
@@ -83,7 +96,7 @@ func TestDaftarRoleDikirimSebagaiLarik(t *testing.T) {
 			CreatedAt:   "2026-11-09T00:00:00Z",
 		},
 	}}
-	r.GET("/roles", handler.NewAdminRoleHandler(stub).List)
+	r.GET("/roles", handler.NewAdminRoleHandler(&stub).List)
 
 	req := httptest.NewRequest(http.MethodGet, "/roles", nil)
 	rec := httptest.NewRecorder()
@@ -139,7 +152,7 @@ func TestKatalogPermissionDikirimSebagaiLarikGrup(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.ErrorHandler(slog.New(slog.NewTextHandler(io.Discard, nil))))
-	r.GET("/permissions", handler.NewAdminRoleHandler(katalogStub{}).Permissions)
+	r.GET("/permissions", handler.NewAdminRoleHandler(&katalogStub{}).Permissions)
 
 	req := httptest.NewRequest(http.MethodGet, "/permissions", nil)
 	rec := httptest.NewRecorder()
@@ -193,4 +206,104 @@ func truncate(s string) string {
 		return s
 	}
 	return s[:200] + "…"
+}
+
+/*
+Penghapusan akun pengelola lewat DELETE /admin/admins/:id.
+
+Yang dijaga:
+  - Alasan wajib dan minimal 10 karakter; lebih pendek ditolak sebelum service
+    sempat menghapus apa pun.
+  - Alasan boleh datang dari body JSON maupun query, sehingga panel dan
+    perkakas CLI sama-sama bisa memakainya.
+  - Penolakan service (mis. akun terlindungi) diteruskan sebagai galat, bukan
+    dibalas 200.
+*/
+func TestHapusAdminButuhAlasan(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := stubRoleService{}
+	r := gin.New()
+	r.Use(middleware.ErrorHandler(slog.New(slog.NewTextHandler(io.Discard, nil))))
+	r.DELETE("/admins/:id", handler.NewAdminRoleHandler(&stub).DeleteAdmin)
+
+	for _, body := range []string{`{}`, `{"reason":"pendek"}`, `bukan json`} {
+		req := httptest.NewRequest(http.MethodDelete, "/admins/u9", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("body %q: status = %d, seharusnya 400", body, rec.Code)
+		}
+	}
+	if len(stub.deleted) != 0 {
+		t.Fatalf("penghapusan dijalankan tanpa alasan sah: %v", stub.deleted)
+	}
+}
+
+func TestHapusAdminMeneruskanAlasan(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const alasan = "Akun tidak lagi bertugas di tim operasional"
+
+	kasus := []struct {
+		nama string
+		url  string
+		body string
+	}{
+		{"body", "/admins/u9", `{"reason":"` + alasan + `"}`},
+		{"query", "/admins/u9?reason=Akun+tidak+lagi+bertugas+di+tim+operasional", ``},
+	}
+
+	for _, kasus := range kasus {
+		t.Run(kasus.nama, func(t *testing.T) {
+			stub := stubRoleService{}
+			r := gin.New()
+			r.Use(middleware.ErrorHandler(slog.New(slog.NewTextHandler(io.Discard, nil))))
+			r.DELETE("/admins/:id", handler.NewAdminRoleHandler(&stub).DeleteAdmin)
+
+			req := httptest.NewRequest(http.MethodDelete, kasus.url, strings.NewReader(kasus.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, body: %s", rec.Code, truncate(rec.Body.String()))
+			}
+			var envelope struct {
+				Success bool `json:"success"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil || !envelope.Success {
+				t.Fatalf("balasan bukan JSON sukses: %s", truncate(rec.Body.String()))
+			}
+			if len(stub.deleted) != 1 {
+				t.Fatalf("penghapusan tidak diteruskan: %v", stub.deleted)
+			}
+			if !strings.HasPrefix(stub.deleted[0], "u9|Akun tidak lagi bertugas") {
+				t.Errorf("argumen service = %q", stub.deleted[0])
+			}
+		})
+	}
+}
+
+// Penolakan service wajib sampai ke panel sebagai galat, bukan 200 kosong.
+func TestHapusAdminPenolakanDiteruskan(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := stubRoleService{deleteErr: httpx.WrapValidation("akun superadmin utama tidak dapat dihapus")}
+
+	r := gin.New()
+	r.Use(middleware.ErrorHandler(slog.New(slog.NewTextHandler(io.Discard, nil))))
+	r.DELETE("/admins/:id", handler.NewAdminRoleHandler(&stub).DeleteAdmin)
+
+	req := httptest.NewRequest(http.MethodDelete, "/admins/u9",
+		strings.NewReader(`{"reason":"Akun tidak lagi bertugas di tim"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, seharusnya 400 (body: %s)", rec.Code, truncate(rec.Body.String()))
+	}
+	if !strings.Contains(rec.Body.String(), "superadmin utama") {
+		t.Errorf("alasan penolakan tidak sampai ke panel: %s", truncate(rec.Body.String()))
+	}
 }

@@ -89,7 +89,7 @@ func newCreateAdminFixture() *createAdminFixture {
 
 	audit := &recordingAudit{}
 	return &createAdminFixture{
-		svc:   NewRoleService(store, users, audit, &fakePermCache{}),
+		svc:   NewRoleService(store, users, audit, &fakePermCache{}, &fakeAnonymizer{users: users.users}),
 		store: store,
 		users: users,
 		audit: audit,

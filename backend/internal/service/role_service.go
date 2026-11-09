@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +28,9 @@ type RoleService interface {
 	AssignRole(ctx context.Context, actorID, userID string, req dto.AssignRoleRequest) error
 	// CreateAdmin membuat akun pengelola beserta role awalnya.
 	CreateAdmin(ctx context.Context, actorID string, req dto.CreateAdminRequest) (*dto.UserListItem, error)
+	// DeleteAdmin menghapus akun pengelola. Akun terlindungi dan akun sendiri
+	// tidak dapat dihapus.
+	DeleteAdmin(ctx context.Context, actorID, userID, reason string) error
 	ListPermissions(ctx context.Context, actorID string) ([]dto.PermissionGroup, error)
 }
 
@@ -54,21 +58,29 @@ type PermissionCache interface {
 }
 
 type roleService struct {
-	store RoleStore
-	users UserRepository
-	audit AuditRepository
-	cache PermissionCache
-	now   func() time.Time
+	store      RoleStore
+	users      UserRepository
+	audit      AuditRepository
+	cache      PermissionCache
+	anonymizer AdminAnonymizer
+	now        func() time.Time
+}
+
+// AdminAnonymizer menyamarkan data pribadi akun pengelola tanpa menghapus
+// barisnya, sehingga jejak audit dan dokumen legal tetap utuh.
+type AdminAnonymizer interface {
+	Anonymize(ctx context.Context, id string) error
 }
 
 // NewRoleService merangkai layanan RBAC.
-func NewRoleService(store RoleStore, users UserRepository, audit AuditRepository, cache PermissionCache) RoleService {
+func NewRoleService(store RoleStore, users UserRepository, audit AuditRepository, cache PermissionCache, anonymizer AdminAnonymizer) RoleService {
 	return &roleService{
-		store: store,
-		users: users,
-		audit: audit,
-		cache: cache,
-		now:   func() time.Time { return time.Now().UTC() },
+		store:      store,
+		users:      users,
+		audit:      audit,
+		cache:      cache,
+		anonymizer: anonymizer,
+		now:        func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -441,14 +453,112 @@ func (s *roleService) CreateAdmin(ctx context.Context, actorID string, req dto.C
 		username+" role="+role.Code)
 
 	return &dto.UserListItem{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Status:    user.Status,
-		Role:      user.Role,
-		RoleCode:  role.Code,
-		CreatedAt: dto.NewTimePair(user.CreatedAt),
+		ID:          user.ID,
+		Name:        user.Name,
+		Email:       user.Email,
+		Status:      user.Status,
+		Role:        user.Role,
+		RoleCode:    role.Code,
+		IsProtected: user.IsProtected,
+		CreatedAt:   dto.NewTimePair(user.CreatedAt),
 	}, nil
+}
+
+// DeleteAdmin menghapus akun pengelola beserta sesinya.
+//
+// Pengamanan yang dipegang:
+//   - Akun terlindungi (superadmin utama) tidak pernah bisa dihapus. Ini
+//     menjaga agar selalu ada satu pintu masuk yang tidak bisa ditutup.
+//   - Pelaku tidak boleh menghapus akunnya sendiri.
+//   - Akun yang role-nya memuat kewenangan di luar milik pelaku tidak boleh
+//     dihapus (mencegah admin biasa menyingkirkan superadmin).
+//   - Minimal satu admin aktif harus tetap ada.
+//
+// Yang dihapus adalah akun pengelolanya saja: baris ANDA dianonimkan agar
+// jejak audit dan dokumen legalnya tetap utuh. Alasannya wajib dan dicatat.
+func (s *roleService) DeleteAdmin(ctx context.Context, actorID, userID, reason string) error {
+	if strings.TrimSpace(reason) == "" {
+		return validation("alasan penghapusan wajib diisi")
+	}
+	if actorID == userID {
+		return validation("tidak dapat menghapus akun sendiri")
+	}
+
+	target, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if target.Role != string(config.RoleAdmin) {
+		return validation("akun ini bukan akun pengelola")
+	}
+	if target.IsProtected {
+		return validation("akun superadmin utama tidak dapat dihapus")
+	}
+
+	// Role target tidak boleh lebih tinggi daripada milik pelaku.
+	if target.RoleID != nil && *target.RoleID != "" {
+		perms, err := s.store.PermissionsOfRole(ctx, *target.RoleID)
+		if err != nil {
+			return err
+		}
+		if err := s.ensureCanGrant(ctx, actorID, perms); err != nil {
+			return err
+		}
+	}
+
+	active, err := s.store.CountActiveAdmins(ctx)
+	if err != nil {
+		return err
+	}
+	if active <= 1 {
+		return validation("tidak dapat menghapus admin aktif terakhir")
+	}
+
+	if err := s.users.RevokeSessions(ctx, userID); err != nil {
+		return err
+	}
+	cacheInvalidator(s.cache, userID)
+
+	// Jejak audit menyimpan alasan dan identitas akun yang dihapus, karena
+	// barisnya sendiri akan dianonimkan.
+	s.recordAuditWithReason(ctx, actorID, string(audit.AdminDelete), userID,
+		fmt.Sprintf("%s (%s)", target.Email, reason))
+
+	if err := s.anonymize(ctx, userID); err != nil {
+		return err
+	}
+
+	if s.store != nil && s.cache != nil {
+		s.cache.InvalidateAll()
+	}
+	return nil
+}
+
+// anonymize menghapus data pribadi akun tetapi mempertahankan barisnya.
+//
+// Dipakai penghapusan akun pengelola: invoice, audit, dan persetujuan legal
+// yang menunjuk akun ini tetap sah, sementara email dan kata sandinya tidak
+// bisa dipakai masuk lagi.
+func (s *roleService) anonymize(ctx context.Context, userID string) error {
+	if s.anonymizer == nil {
+		return errors.New("penghapusan akun belum tersedia")
+	}
+	return s.anonymizer.Anonymize(ctx, userID)
+}
+
+// recordAuditWithReason mencatat audit beserta alasan tindakan.
+func (s *roleService) recordAuditWithReason(ctx context.Context, actorID, event, entityID, detail string) {
+	if s.audit == nil {
+		return
+	}
+	_ = s.audit.Record(ctx, &model.AuditLog{
+		UserID:    actorID,
+		Event:     event,
+		Entity:    "user",
+		EntityID:  entityID,
+		Metadata:  detail,
+		CreatedAt: s.now(),
+	})
 }
 
 // ensureCanGrant memastikan seluruh permission yang diberikan dimiliki pelaku.

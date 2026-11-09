@@ -76,6 +76,15 @@ type User struct {
 	// bisa dilanjutkan setelah keluar-tengah-jalan (plans/17 §5).
 	OnboardingStep int  `gorm:"not null;default:0" json:"onboarding_step"`
 	OnboardingDone bool `gorm:"not null;default:false" json:"onboarding_done"`
+
+	// IsProtected menandai akun pengelola utama yang tidak boleh dihapus,
+	// dicabut role-nya, atau diblokir. Tujuannya menjaga agar selalu ada satu
+	// pintu masuk yang tidak bisa ditutup oleh siapa pun — termasuk oleh
+	// pemegang role superadmin lain.
+	//
+	// Hanya akun superadmin tertua yang ditandai, dan penandanya dipasang
+	// sekali oleh migrasi (lihat ProtectPrimarySuperadmin).
+	IsProtected bool `gorm:"not null;default:false;index" json:"is_protected"`
 }
 
 // TableName menetapkan nama tabel tanpa bentuk jamak.

@@ -74,3 +74,12 @@ type CreateAdminRequest struct {
 	// dan tidak bisa masuk lewat pintu admin.
 	RoleID string `json:"role_id" binding:"required,uuid"`
 }
+
+// DeleteAdminRequest menghapus akun pengelola.
+//
+// Alasan wajib karena penghapusan akun pengelola meninggalkan jejak yang tidak
+// bisa dipulihkan: kata sandinya dikosongkan dan barisnya dianonimkan. Batas
+// 10 karakter mengikuti aturan aksi destruktif di katalog audit.
+type DeleteAdminRequest struct {
+	Reason string `json:"reason" binding:"required,min=10,max=500"`
+}

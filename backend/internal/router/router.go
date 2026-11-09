@@ -175,7 +175,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	telegramService := service.NewTelegramService(userRepo, onboardingRepo, auditRepo)
 	trialService := service.NewTrialService(userRepo, auditRepo)
 
-	roleService := service.NewRoleService(roleRepo, userRepo, auditRepo, permCache)
+	// anonymizer dipakai penghapusan akun pengelola: baris pengguna dianonimkan
+	// agar invoice dan dokumen legal yang menunjuknya tetap utuh.
+	roleService := service.NewRoleService(roleRepo, userRepo, auditRepo, permCache, repository.NewAdminUserRepository(db))
 
 	// Manajemen pelanggan: seluruh aksinya lewat perekam audit standar.
 	adminAudit := service.NewAuditRecorder(auditRepo)
@@ -593,6 +595,11 @@ func registerAdmin(
 	// dasarnya adalah penugasan role; service tetap menolak role yang memuat
 	// kewenangan di luar milik pelaku.
 	admin.POST("/admins", guard(http.MethodPost, "/admins", authz.RoleEdit), roleHandler.CreateAdmin)
+	// Penghapusan akun pengelola dijaga role.delete karena dampaknya setara
+	// menghapus kewenangan: akun tidak bisa lagi masuk dan barisnya
+	// dianonimkan. Akun superadmin utama berpenanda is_protected tetap
+	// ditolak service. Larangan hapus akun sendiri juga dipegang service.
+	admin.DELETE("/admins/:id", guard(http.MethodDelete, "/admins/:id", authz.RoleDelete), roleHandler.DeleteAdmin)
 
 	// Pelanggan: daftar, profil, dan aksi berlapis.
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.

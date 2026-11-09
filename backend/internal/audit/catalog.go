@@ -37,6 +37,10 @@ const (
 	// AdminCreate mencatat pembuatan akun pengelola beserta role awalnya.
 	// Kata sandi tidak pernah ikut tercatat.
 	AdminCreate Action = "admin.create"
+	// AdminDelete mencatat penghapusan akun pengelola. Baris pengguna hanya
+	// dianonimkan, sehingga identitas pada catatan audit ini menjadi satu-satunya
+	// jejak akun yang dihapus.
+	AdminDelete Action = "admin.delete"
 )
 
 // Akun broker.
@@ -127,6 +131,7 @@ var Catalog = []Entry{
 	{UserNoteAdd, "Pengguna", "Catatan internal ditambah", false},
 	{SupportNoteAdd, "Pengguna", "Catatan dukungan ditambah", false},
 	{AdminCreate, "Pengguna", "Akun pengelola dibuat", true},
+	{AdminDelete, "Pengguna", "Akun pengelola dihapus", true},
 
 	{AccountCreate, "Akun Broker", "Akun broker ditambah", false},
 	{AccountUpdate, "Akun Broker", "Akun broker diubah", false},
@@ -199,7 +204,7 @@ func Destructive(a Action) bool {
 	switch a {
 	case UserSuspend, UserBan, UserDelete, UserTierChange, AccountFreeze,
 		AccountDelete, RefundCreate, CreditAdjust, CreditRevoke, InvoiceVoid,
-		PlanPriceChange, PricingGuardChange, RoleDelete:
+		PlanPriceChange, PricingGuardChange, RoleDelete, AdminDelete:
 		return true
 	default:
 		return false

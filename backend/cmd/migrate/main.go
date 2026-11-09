@@ -52,6 +52,7 @@ func main() {
 		&model.UserSignal{},
 		&model.SignalEvent{},
 		&model.ExecutionRecord{},
+		&model.AccountExecutionLock{},
 		&model.BrokerAccountState{},
 		&model.DailySummary{},
 		&model.EngineState{},
@@ -109,6 +110,16 @@ func main() {
 	}
 	if err := roles.SeedDefaultRoles(ctx, authz.DefaultRoles()); err != nil {
 		logger.Error("role bawaan gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
+	// Satu akun superadmin ditandai sebagai akun utama yang tidak bisa dihapus.
+	// Dijalankan setelah role bawaan siap agar pencarian menurut kode role
+	// selalu menemukan hasil. Aman dijalankan berulang: tanda hanya dipasang
+	// sekali dan tidak pernah berpindah ke akun lain.
+	superadminDikunci, err := repository.ProtectPrimarySuperadmin(ctx, db)
+	if err != nil {
+		logger.Error("gagal menandai superadmin utama", "error", err.Error())
 		os.Exit(1)
 	}
 
@@ -181,5 +192,6 @@ func main() {
 		"pair_disiapkan", pairsSeeded,
 		"saklar_metode_disalin", saklarDisalin,
 		"kolom_strategy_dihapus", kolomDihapus,
+		"superadmin_dikunci", superadminDikunci,
 	)
 }

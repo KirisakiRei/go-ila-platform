@@ -21,6 +21,8 @@ type fakeRoleStore struct {
 	created    []model.Role
 	deleted    []string
 	assignedTo map[string]*string
+	// activeAdmins menimpa jawaban CountActiveAdmins bila lebih dari nol.
+	activeAdmins int64
 }
 
 func newFakeRoleStore() *fakeRoleStore {
@@ -132,6 +134,9 @@ func (f *fakeRoleStore) CountUsersWithRole(_ context.Context, roleID string) (in
 }
 
 func (f *fakeRoleStore) CountActiveAdmins(context.Context) (int64, error) {
+	if f.activeAdmins > 0 {
+		return f.activeAdmins, nil
+	}
 	return 1, nil
 }
 
@@ -180,6 +185,20 @@ func (f *fakeRoleUsers) UpdateLastLogin(context.Context, string, time.Time) erro
 func (f *fakeRoleUsers) Update(context.Context, *model.User) error                { return nil }
 
 func (f *fakeRoleUsers) RevokeSessions(context.Context, string) error { return nil }
+
+// fakeAnonymizer mencatat akun yang dianonimkan tanpa mengubah peta user.
+type fakeAnonymizer struct {
+	users   map[string]*model.User
+	removed []string
+}
+
+func (f *fakeAnonymizer) Anonymize(_ context.Context, id string) error {
+	f.removed = append(f.removed, id)
+	if user, ok := f.users[id]; ok {
+		user.Status = model.UserStatusDeleted
+	}
+	return nil
+}
 
 func (f *fakeRoleUsers) UpdatePassword(context.Context, string, string) error { return nil }
 
@@ -232,8 +251,9 @@ func newRoleFixture() *roleFixture {
 	}}
 
 	cache := &fakePermCache{}
+	anonymizer := &fakeAnonymizer{users: users.users}
 	return &roleFixture{
-		svc:   NewRoleService(store, users, nil, cache),
+		svc:   NewRoleService(store, users, nil, cache, anonymizer),
 		store: store,
 		cache: cache,
 	}
@@ -394,7 +414,7 @@ func TestUpdateRoleMencatatSelisihPermission(t *testing.T) {
 	users := &fakeRoleUsers{users: map[string]*model.User{
 		superUserID: {Base: model.Base{ID: superUserID}, Role: "admin"},
 	}}
-	svc := NewRoleService(store, users, audit, &fakePermCache{})
+	svc := NewRoleService(store, users, audit, &fakePermCache{}, &fakeAnonymizer{users: users.users})
 
 	if _, err := svc.UpdateRole(ctx, superUserID, customRoleID, dto.UpdateRoleRequest{
 		Permissions: []string{authz.UserView, authz.BillingView},

@@ -3,18 +3,21 @@ package dto
 // UserListItem adalah satu baris di daftar pelanggan admin.
 // Hanya memuat data tingkat 1: tanpa saldo dan tanpa kredensial.
 type UserListItem struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Email          string    `json:"email"`
-	Tier           string    `json:"tier"`
-	Status         string    `json:"status"`
-	Role           string    `json:"role"`
-	RoleCode       string    `json:"role_code,omitempty"`
-	TelegramLinked bool      `json:"telegram_linked"`
-	AccountCount   int64     `json:"account_count"`
-	CreatedAt      TimePair  `json:"created_at"`
-	LastLoginAt    *TimePair `json:"last_login_at,omitempty"`
-	TierExpiresAt  *TimePair `json:"tier_expires_at,omitempty"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Tier           string `json:"tier"`
+	Status         string `json:"status"`
+	Role           string `json:"role"`
+	RoleCode       string `json:"role_code,omitempty"`
+	TelegramLinked bool   `json:"telegram_linked"`
+	// IsProtected menandai akun pengelola utama yang tidak boleh dihapus.
+	// Panel memakai penanda ini untuk mematikan tombol hapus.
+	IsProtected   bool      `json:"is_protected"`
+	AccountCount  int64     `json:"account_count"`
+	CreatedAt     TimePair  `json:"created_at"`
+	LastLoginAt   *TimePair `json:"last_login_at,omitempty"`
+	TierExpiresAt *TimePair `json:"tier_expires_at,omitempty"`
 }
 
 // UserDetail adalah profil lengkap satu pelanggan untuk halaman admin.

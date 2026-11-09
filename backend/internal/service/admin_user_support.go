@@ -122,6 +122,7 @@ func toUserListItem(row repository.UserRow) dto.UserListItem {
 		Role:           row.Role,
 		RoleCode:       row.RoleCode,
 		TelegramLinked: row.TelegramChatID != nil && *row.TelegramChatID != "",
+		IsProtected:    row.IsProtected,
 		AccountCount:   row.AccountCount,
 		CreatedAt:      dto.NewTimePair(row.CreatedAt),
 		LastLoginAt:    dto.NewTimePairPtr(row.LastLoginAt),
