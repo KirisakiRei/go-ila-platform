@@ -60,19 +60,23 @@ export default function SignalsPage() {
     [adaIla3],
   )
 
-  // Gabungkan daftar pair unik dari subscription dan sinyal yang pernah ada
+  // Hanya ambil pair dari subscription aktif di watchlist agar sinkron dengan watchlist
   const allPairs = useMemo(() => {
     const set = new Set<string>()
     for (const sub of subscriptions ?? []) {
-      if (sub.symbol) set.add(sub.symbol.toUpperCase())
-    }
-    for (const sig of signals ?? []) {
-      if (sig.symbol) set.add(sig.symbol.toUpperCase())
+      if (sub.symbol && sub.is_active) {
+        set.add(sub.symbol.toUpperCase())
+      }
     }
     return Array.from(set).sort()
-  }, [subscriptions, signals])
+  }, [subscriptions])
 
-  const activePair = pairParam ? pairParam.toUpperCase() : null
+  // Hanya izinkan pairParam jika pair tersebut ada dalam watchlist aktif
+  const activePair = useMemo(() => {
+    if (!pairParam) return null
+    const upper = pairParam.toUpperCase()
+    return allPairs.includes(upper) ? upper : null
+  }, [pairParam, allPairs])
 
   // Sinyal dan posisi untuk pair yang sedang aktif
   const pairSignals = useMemo(() => {

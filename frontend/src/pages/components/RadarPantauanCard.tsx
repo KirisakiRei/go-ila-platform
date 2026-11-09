@@ -28,12 +28,12 @@ export function RadarPantauanCard() {
   const { data: subscriptions, isLoading: loadingSubs } = useSubscriptions()
   const { data: signals, isLoading: loadingSignals } = useSignals(100)
 
-  // Ambil daftar unik simbol yang dipantau user
+  // Ambil daftar unik simbol yang dipantau aktif oleh user
   const monitoredSymbols = useMemo(() => {
     const list: string[] = []
     const seen = new Set<string>()
     for (const sub of subscriptions ?? []) {
-      if (sub.symbol && !seen.has(sub.symbol.toUpperCase())) {
+      if (sub.symbol && sub.is_active && !seen.has(sub.symbol.toUpperCase())) {
         seen.add(sub.symbol.toUpperCase())
         list.push(sub.symbol.toUpperCase())
       }
