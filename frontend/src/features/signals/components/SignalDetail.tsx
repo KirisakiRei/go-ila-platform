@@ -225,26 +225,22 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                 className={cn(
                   'rounded-xl border p-3.5 transition-all',
                   (ila3Prog?.step ?? 0) >= 1
-                    ? 'border-emerald-500/40 bg-emerald-500/5'
-                    : 'border-amber-500/50 bg-amber-500/5 shadow-sm',
+                    ? 'border-border bg-card'
+                    : 'border-border/80 bg-muted/20',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-semibold text-xs">
                     {(ila3Prog?.step ?? 0) >= 1 ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-foreground" />
                     ) : (
-                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                      <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
                     )}
                     <span>HTF ({signal.htf || 'HTF'})</span>
                   </div>
                   <Badge
-                    variant={(ila3Prog?.step ?? 0) >= 1 ? 'solid' : 'outline'}
-                    className={cn(
-                      'text-[10px]',
-                      (ila3Prog?.step ?? 0) >= 1 && 'bg-emerald-600 text-white',
-                      (ila3Prog?.step ?? 0) < 1 && 'border-amber-500 text-amber-600 dark:text-amber-400',
-                    )}
+                    variant={(ila3Prog?.step ?? 0) >= 1 ? 'default' : 'outline'}
+                    className="text-[10px] font-mono"
                   >
                     {(ila3Prog?.step ?? 0) >= 1 ? 'Valid (Reached)' : 'Monitoring Level'}
                   </Badge>
@@ -269,30 +265,26 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                 className={cn(
                   'rounded-xl border p-3.5 transition-all',
                   (ila3Prog?.step ?? 0) >= 2
-                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    ? 'border-border bg-card'
                     : (ila3Prog?.step ?? 0) === 1
-                      ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
-                      : 'border-border/60 bg-secondary/10 opacity-75',
+                      ? 'border-border/80 bg-muted/20'
+                      : 'border-border/50 bg-muted/10 opacity-60',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-semibold text-xs">
                     {(ila3Prog?.step ?? 0) >= 2 ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-foreground" />
                     ) : (ila3Prog?.step ?? 0) === 1 ? (
-                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                      <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
                     ) : (
                       <Layers className="h-4 w-4 text-muted-foreground" />
                     )}
                     <span>MTF ({ila3Mtf})</span>
                   </div>
                   <Badge
-                    variant={(ila3Prog?.step ?? 0) >= 2 ? 'solid' : 'outline'}
-                    className={cn(
-                      'text-[10px]',
-                      (ila3Prog?.step ?? 0) >= 2 && 'bg-emerald-600 text-white',
-                      (ila3Prog?.step ?? 0) === 1 && 'border-amber-500 text-amber-600 dark:text-amber-400',
-                    )}
+                    variant={(ila3Prog?.step ?? 0) >= 2 ? 'default' : 'outline'}
+                    className="text-[10px] font-mono"
                   >
                     {(ila3Prog?.step ?? 0) >= 2
                       ? 'Valid (Aligned)'
@@ -315,30 +307,26 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                 className={cn(
                   'rounded-xl border p-3.5 transition-all',
                   (ila3Prog?.step ?? 0) >= 3
-                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    ? 'border-border bg-card'
                     : (ila3Prog?.step ?? 0) === 2
-                      ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
-                      : 'border-border/60 bg-secondary/10 opacity-75',
+                      ? 'border-border/80 bg-muted/20'
+                      : 'border-border/50 bg-muted/10 opacity-60',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-semibold text-xs">
                     {(ila3Prog?.step ?? 0) >= 3 ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-foreground" />
                     ) : (ila3Prog?.step ?? 0) === 2 ? (
-                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                      <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
                     ) : (
                       <Layers className="h-4 w-4 text-muted-foreground" />
                     )}
                     <span>LTF ({signal.ltf || 'LTF'})</span>
                   </div>
                   <Badge
-                    variant={(ila3Prog?.step ?? 0) >= 3 ? 'solid' : 'outline'}
-                    className={cn(
-                      'text-[10px]',
-                      (ila3Prog?.step ?? 0) >= 3 && 'bg-emerald-600 text-white',
-                      (ila3Prog?.step ?? 0) === 2 && 'border-amber-500 text-amber-600 dark:text-amber-400',
-                    )}
+                    variant={(ila3Prog?.step ?? 0) >= 3 ? 'default' : 'outline'}
+                    className="text-[10px] font-mono"
                   >
                     {(ila3Prog?.step ?? 0) >= 3
                       ? 'Setup Ready'
@@ -372,25 +360,22 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                 className={cn(
                   'rounded-xl border p-3.5 transition-all',
                   isHtfSweepDone
-                    ? 'border-emerald-500/40 bg-emerald-500/5'
-                    : 'border-border bg-secondary/15',
+                    ? 'border-border bg-card'
+                    : 'border-border/70 bg-muted/20',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-semibold text-xs">
                     {isHtfSweepDone ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-foreground" />
                     ) : (
-                      <Clock className="h-4 w-4 text-muted-foreground animate-spin" />
+                      <Clock className="h-4 w-4 text-muted-foreground" />
                     )}
                     <span>HTF Sweep ({signal.htf || 'HTF'})</span>
                   </div>
                   <Badge
-                    variant={isHtfSweepDone ? 'solid' : 'outline'}
-                    className={cn(
-                      'text-[10px]',
-                      isHtfSweepDone && 'bg-emerald-600 text-white',
-                    )}
+                    variant={isHtfSweepDone ? 'default' : 'outline'}
+                    className="text-[10px] font-mono"
                   >
                     {isHtfSweepDone ? 'Valid (Closed)' : 'Monitoring'}
                   </Badge>
@@ -415,30 +400,26 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                 className={cn(
                   'rounded-xl border p-3.5 transition-all',
                   isReady
-                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    ? 'border-border bg-card'
                     : isWaitLtf
-                      ? 'border-amber-500/50 bg-amber-500/5 shadow-sm'
-                      : 'border-border/60 bg-secondary/10 opacity-75',
+                      ? 'border-border/80 bg-muted/20'
+                      : 'border-border/50 bg-muted/10 opacity-60',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-semibold text-xs">
                     {isReady ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 text-foreground" />
                     ) : isWaitLtf ? (
-                      <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
+                      <Clock className="h-4 w-4 text-muted-foreground animate-pulse" />
                     ) : (
                       <Layers className="h-4 w-4 text-muted-foreground" />
                     )}
                     <span>LTF Trigger ({signal.ltf || 'LTF'})</span>
                   </div>
                   <Badge
-                    variant={isReady ? 'solid' : 'outline'}
-                    className={cn(
-                      'text-[10px]',
-                      isReady && 'bg-emerald-600 text-white',
-                      isWaitLtf && 'border-amber-500 text-amber-600 dark:text-amber-400',
-                    )}
+                    variant={isReady ? 'default' : 'outline'}
+                    className="text-[10px] font-mono"
                   >
                     {isReady ? 'Ready Setup' : isWaitLtf ? 'Waiting CISD Close' : 'Pending HTF'}
                   </Badge>
@@ -506,13 +487,13 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   {points.map((pt) => {
                     const icon =
                       pt.iconType === 'sweep' ? (
-                        <Crosshair className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+                        <Crosshair className="h-3.5 w-3.5 shrink-0 text-foreground mt-0.5" />
                       ) : pt.iconType === 'trigger' ? (
-                        <Zap className="h-3.5 w-3.5 shrink-0 text-emerald-500 mt-0.5" />
+                        <Zap className="h-3.5 w-3.5 shrink-0 text-foreground mt-0.5" />
                       ) : pt.iconType === 'target' ? (
-                        <Target className="h-3.5 w-3.5 shrink-0 text-blue-500 mt-0.5" />
+                        <Target className="h-3.5 w-3.5 shrink-0 text-foreground mt-0.5" />
                       ) : (
-                        <Layers className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+                        <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground mt-0.5" />
                       )
 
                     return (

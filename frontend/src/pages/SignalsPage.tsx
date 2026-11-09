@@ -194,7 +194,7 @@ export default function SignalsPage() {
 
           {/* Sinyal Aktif / Terakhir & Histori Setup Langsung di Atas */}
           <div className="grid gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-7 space-y-6">
+            <div className="lg:col-span-8 space-y-6">
               <Section
                 title="Radar Analisis Timeframe"
                 description={`Pemantauan matriks timeframe multi-tier untuk ${activePair}.`}
@@ -208,7 +208,7 @@ export default function SignalsPage() {
             </div>
 
             {/* Riwayat Setup Sinyal Pair Ini dengan Pagination */}
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-4">
               <Section
                 title="Histori Setup Sinyal"
                 description={`${filteredSignals.length} setup terakhir pada ${activePair}`}

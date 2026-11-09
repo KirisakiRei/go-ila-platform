@@ -35,12 +35,30 @@ export function CallEntryAlertBanner({
   signals: Signal[]
   onSelesai?: () => void
 }) {
-  // Ambil hanya sinyal yang READY_TO_ENTRY atau OPPORTUNITY
+  const [sekarang, setSekarang] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setSekarang(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  // Hanya tampilkan sinyal yang READY_TO_ENTRY atau OPPORTUNITY dan BELUM expired
   const activeEntries = signals
-    .filter((s) => s.status === 'READY_TO_ENTRY' || s.status === 'OPPORTUNITY')
+    .filter((s) => {
+      if (s.status !== 'READY_TO_ENTRY' && s.status !== 'OPPORTUNITY') {
+        return false
+      }
+      const expiredTime = new Date(s.expires_at).getTime()
+      return Number.isFinite(expiredTime) && expiredTime > sekarang
+    })
     .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
 
   const [selectedIndex, setSelectedIndex] = useState(0)
+
+  // Jika tidak ada sinyal aktif yang belum expired, card alert TIDAK ditampilkan
+  if (activeEntries.length === 0) {
+    return null
+  }
 
   // Pastikan index aman bila jumlah sinyal berubah
   const safeIndex = selectedIndex < activeEntries.length ? selectedIndex : 0
@@ -90,8 +108,6 @@ function SingleCallEntryCard({
   const sibuk = issue.isPending || konfirmasi.isPending || tolak.isPending
   const bisaDieksekusi = signal.can_confirm && !sisa.habis
 
-  const isBuy = signal.direction === 'BUY'
-  const isSell = signal.direction === 'SELL'
   const isILA3 = signal.strategy_version === 'ila-3.0'
   const mtf = isILA3 ? getIla3Mtf(signal.htf, signal.ltf) : undefined
   const cycle = isILA3 ? getCycleBadge(signal.strategy_version, signal.htf, signal.ltf) : null
@@ -119,43 +135,19 @@ function SingleCallEntryCard({
   const pesan = konfirmasi.data?.message ?? konfirmasi.error?.message ?? tolak.data?.message ?? tolak.error?.message
 
   return (
-    <Card
-      className={cn(
-        'relative overflow-hidden border-2 shadow-md transition-all',
-        isBuy
-          ? 'border-emerald-500/80 bg-emerald-500/[0.03]'
-          : isSell
-            ? 'border-rose-500/80 bg-rose-500/[0.03]'
-            : 'border-primary/60 bg-card',
-      )}
-    >
+    <Card className="relative overflow-hidden border border-border bg-card shadow-sm">
       {/* Top Banner Alert Bar */}
-      <div
-        className={cn(
-          'flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3',
-          isBuy
-            ? 'border-emerald-500/30 bg-emerald-500/10'
-            : isSell
-              ? 'border-rose-500/30 bg-rose-500/10'
-              : 'border-border bg-secondary/30',
-        )}
-      >
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-xs font-bold tracking-wide',
-              isBuy
-                ? 'bg-emerald-600 text-white'
-                : isSell
-                  ? 'bg-rose-600 text-white'
-                  : 'bg-foreground text-background',
-            )}
+          <Badge
+            variant="default"
+            className="font-mono text-xs font-semibold gap-1.5 px-2.5 py-1 tracking-wider"
           >
             <Zap className="h-3.5 w-3.5 fill-current" />
-            CALL ENTRY {signal.direction}
-          </span>
+            CALL ENTRY · {signal.direction}
+          </Badge>
 
-          <span className="text-base font-bold tracking-tight text-foreground">
+          <span className="text-base font-bold tracking-tight text-foreground font-mono">
             {signal.symbol}
           </span>
 
@@ -166,7 +158,7 @@ function SingleCallEntryCard({
           </Badge>
 
           {cycle && (
-            <Badge variant="outline" className="text-[10px] border-primary/20 bg-primary/5 text-primary">
+            <Badge variant="outline" className="text-[10px]">
               {cycle}
             </Badge>
           )}
@@ -195,31 +187,22 @@ function SingleCallEntryCard({
             </div>
           )}
 
-          {sisa.habis ? (
-            <span className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              Batas waktu habis
-            </span>
-          ) : (
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums',
-                sisa.detik <= 180
-                  ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 animate-pulse'
-                  : 'bg-secondary text-foreground',
-              )}
-            >
-              <Clock className="h-3.5 w-3.5" />
-              Sisa Waktu: {formatSisa(sisa.detik)}
-            </span>
-          )}
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 font-mono text-xs font-medium tabular-nums border border-border bg-background',
+              sisa.detik <= 180 && 'border-foreground font-bold animate-pulse',
+            )}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Sisa Waktu: {formatSisa(sisa.detik)}
+          </span>
         </div>
       </div>
 
       <CardContent className="p-4 sm:p-5 space-y-4">
         {/* Parameter Order Grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
               Entry Price
             </span>
@@ -229,11 +212,11 @@ function SingleCallEntryCard({
             <p className="text-[11px] text-muted-foreground">Harga Pembuka Sinyal</p>
           </div>
 
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
               Stop Loss
             </span>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-rose-600 dark:text-rose-400">
+            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
               {formatNumber(signal.stop_loss, 5)}
             </p>
             <p className="text-[11px] text-muted-foreground">
@@ -241,11 +224,11 @@ function SingleCallEntryCard({
             </p>
           </div>
 
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
               Take Profit (DOL)
             </span>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
               {formatNumber(signal.take_profit, 5)}
             </p>
             <p className="text-[11px] text-muted-foreground">
@@ -253,7 +236,7 @@ function SingleCallEntryCard({
             </p>
           </div>
 
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
               Risk : Reward
             </span>
@@ -265,7 +248,7 @@ function SingleCallEntryCard({
         </div>
 
         {/* Action Controls & Info Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3.5">
           <div className="text-[11.5px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
             <span>Terbit: {formatDualDateTime(signal.published_at)}</span>
             <span>·</span>
@@ -286,16 +269,10 @@ function SingleCallEntryCard({
 
             <Button
               size="sm"
+              variant="default"
               disabled={!bisaDieksekusi || sibuk}
               onClick={() => void eksekusi()}
-              className={cn(
-                'h-8 gap-1.5 text-xs font-semibold px-4 shadow-sm',
-                isBuy
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  : isSell
-                    ? 'bg-rose-600 text-white hover:bg-rose-700'
-                    : '',
-              )}
+              className="h-8 gap-1.5 text-xs font-semibold px-4 shadow-sm"
             >
               {konfirmasi.isPending || issue.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -309,21 +286,14 @@ function SingleCallEntryCard({
 
         {/* Warning / Error Notifications */}
         {blokir && (
-          <div className="flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 border border-amber-500/20">
+          <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-foreground border border-border">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>{blokir}</span>
           </div>
         )}
 
         {pesan && (
-          <div
-            className={cn(
-              'rounded-md px-3 py-2 text-xs border',
-              konfirmasi.isError || tolak.isError
-                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
-                : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
-            )}
-          >
+          <div className="rounded-md bg-muted px-3 py-2 text-xs border border-border text-foreground">
             {pesan}
           </div>
         )}

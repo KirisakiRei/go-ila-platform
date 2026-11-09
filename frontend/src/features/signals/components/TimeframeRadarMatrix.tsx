@@ -40,7 +40,7 @@ export function TimeframeRadarMatrix({
       {/* Header Matrix Controls */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-3">
         {/* Slot Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+        <div className="flex flex-wrap items-center gap-1.5">
           {slots.map((slot) => {
             const isActive = slot.key === currentSlot?.key && viewMode === 'tab'
             const isReady = slot.status === 'READY'
@@ -56,10 +56,10 @@ export function TimeframeRadarMatrix({
                   if (viewMode === 'grid') setViewMode('tab')
                 }}
                 className={cn(
-                  'group flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap border',
+                  'group flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all border',
                   isActive
                     ? 'border-foreground bg-foreground text-background shadow-xs'
-                    : 'border-border bg-card text-foreground hover:bg-secondary/60 hover:border-border',
+                    : 'border-border bg-card text-foreground hover:bg-secondary/60',
                 )}
               >
                 <span className="font-mono">{slot.label}</span>
@@ -69,17 +69,16 @@ export function TimeframeRadarMatrix({
                   <span
                     className={cn(
                       'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-bold font-mono',
-                      isActive ? 'bg-emerald-500 text-white' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+                      isActive ? 'bg-background text-foreground' : 'bg-foreground text-background',
                     )}
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
                     READY
                   </span>
                 ) : isWaitCisd ? (
                   <span
                     className={cn(
                       'inline-flex items-center rounded px-1.5 py-0.5 text-[9.5px] font-mono',
-                      isActive ? 'bg-amber-400 text-black' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+                      isActive ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground',
                     )}
                   >
                     WAIT CISD
@@ -88,7 +87,7 @@ export function TimeframeRadarMatrix({
                   <span
                     className={cn(
                       'inline-flex items-center rounded px-1.5 py-0.5 text-[9.5px] font-mono',
-                      isActive ? 'bg-blue-400 text-black' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+                      isActive ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground',
                     )}
                   >
                     WAIT SWEEP
