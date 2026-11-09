@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { Logo } from '@/components/brand/Logo'
 
 /**
  * AuthLayout memusatkan formulir masuk dan daftar.
@@ -17,15 +18,9 @@ export function AuthLayout({ children, footer }: { children: ReactNode; footer: 
       <div className="w-full max-w-sm">
         <a href="/" className="mb-6 flex flex-col items-center justify-center gap-2 group">
           {/* Garis hitam untuk latar terang, garis putih untuk mode gelap. */}
-          <img
-            src="/logo-light.png"
+          <Logo
             alt="Imaginary Liquidity"
-            className="h-16 w-auto object-contain transition-transform duration-200 group-hover:scale-105 dark:hidden"
-          />
-          <img
-            src="/logo-dark.png"
-            alt="Imaginary Liquidity"
-            className="h-16 w-auto object-contain transition-transform duration-200 group-hover:scale-105 hidden dark:block"
+            className="h-16 w-auto transition-transform duration-200 group-hover:scale-105"
           />
           <span className="text-base font-bold tracking-tight text-foreground">Imaginary Liquidity</span>
         </a>

@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { BarChart3, Bot, CreditCard, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
+import { Logo } from '@/components/brand/Logo'
 import { useSignOut } from '@/features/auth/hooks/use-auth'
 import { UserBanners } from '@/components/layout/UserBanners'
 import { LegalReconsentGate } from '@/features/auth/components/LegalReconsentGate'
@@ -83,9 +84,8 @@ export function AppShell({ user, children }: AppShellProps) {
       <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
         <div className="flex h-14 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2.5">
-            {/* logo-light.png = garis hitam untuk latar terang; logo-dark.png = garis putih untuk latar gelap. */}
-            <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
-            <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
+            {/* Logo bersama memakai turunan 64/128px, bukan berkas 660 KB asli. */}
+            <Logo className="h-7 w-auto" />
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-bold tracking-tight">ILA</span>
               <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">

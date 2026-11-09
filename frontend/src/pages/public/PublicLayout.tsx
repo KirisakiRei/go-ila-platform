@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Menu, X } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { publicContentApi } from '@/lib/system-api'
+import { Logo } from '@/components/brand/Logo'
 import { cn } from '@/lib/utils'
 
 
@@ -205,28 +206,14 @@ export function PublicLayout() {
             className="flex items-center gap-2.5 rounded-md focus-visible:ring-zinc-400"
             onClick={() => setOpen(false)}
           >
-            {/* Dua lapis logo ditumpuk agar pergantian tema berjalan sebagai
-                crossfade halus, bukan pertukaran `src` yang terlihat patah.
-                `logo-light.png` bergaris hitam (latar terang), `logo-dark.png`
-                bergaris putih (latar gelap). */}
-            <span className="relative block h-8 w-8" aria-hidden="true">
-              <img
-                src="/logo-light.png"
-                alt=""
-                className={cn(
-                  'absolute inset-0 h-8 w-8 object-contain transition-opacity duration-300',
-                  isLightHeader ? 'opacity-100' : 'opacity-0',
-                )}
-              />
-              <img
-                src="/logo-dark.png"
-                alt=""
-                className={cn(
-                  'absolute inset-0 h-8 w-8 object-contain transition-opacity duration-300',
-                  isLightHeader ? 'opacity-0' : 'opacity-100',
-                )}
-              />
-            </span>
+            {/* Logo bersama: berkas aslinya 660 KB, diganti turunan 64/128px
+                agar tidak diunduh ulang sebagai gambar raksasa setiap halaman. */}
+            <Logo
+              className={cn(
+                'h-8 w-auto transition-opacity duration-300',
+                isLightHeader ? 'opacity-100' : 'opacity-0',
+              )}
+            />
             <span
               className={cn(
                 'text-sm font-semibold tracking-tight transition-colors',
@@ -384,9 +371,11 @@ export function PublicLayout() {
           {/* Logo & Brand Header Footer */}
           <div className="mb-8 flex items-center gap-3.5 border-b border-zinc-200/80 pb-6">
             <img
-              src="/logo-light.png"
+              src="/brand/logo-light-64.png"
+              srcSet="/brand/logo-light-64.png 1x, /brand/logo-light-128.png 2x"
               alt="Imaginary Liquidity"
               className="h-10 w-auto object-contain"
+              decoding="async"
             />
             <div>
               <p className="text-base font-bold tracking-tight text-[#09090b]">Imaginary Liquidity</p>

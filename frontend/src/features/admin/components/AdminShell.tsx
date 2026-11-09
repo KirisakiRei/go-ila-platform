@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { usePermissions } from '@/features/admin/hooks/use-permissions'
+import { Logo } from '@/components/brand/Logo'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -135,9 +136,8 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
     <div className="flex min-h-full flex-col lg:flex-row">
       <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-4">
-          {/* logo-light.png = garis hitam (latar terang), logo-dark.png = garis putih (mode gelap). */}
-          <img src="/logo-light.png" alt="ILA" className="h-7 w-auto object-contain dark:hidden" />
-          <img src="/logo-dark.png" alt="ILA" className="h-7 w-auto object-contain hidden dark:block" />
+          {/* Logo bersama memakai turunan 64/128px, bukan berkas 660 KB asli. */}
+          <Logo className="h-7 w-auto" />
           <div className="flex items-baseline gap-1">
             <span className="text-sm font-bold tracking-tight">ILA</span>
             <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">

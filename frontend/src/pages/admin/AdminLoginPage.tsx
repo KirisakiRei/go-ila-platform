@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Input, Label } from '@/components/ui'
 import { adminAuthApi, type AdminLoginResult } from '@/lib/admin-api'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
+import { Logo } from '@/components/brand/Logo'
 
 /**
  * AdminLoginPage adalah pintu masuk panel admin.
@@ -80,7 +81,7 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7] px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2.5">
-          <img src="/logo-light.png" alt="ILA Admin" className="h-8 w-auto object-contain" />
+          <Logo alt="ILA Admin" theme="light" className="h-8 w-auto" />
           <span className="text-sm font-bold tracking-tight text-[#09090b]">ILA Admin</span>
         </div>
 

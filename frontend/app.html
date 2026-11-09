@@ -5,7 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Panel pelanggan tidak boleh diindeks mesin pencari. -->
     <meta name="robots" content="noindex, nofollow" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" href="/brand/favicon-64.png" />
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+    <!-- Logo header dipakai tiap halaman; preload memakai dua varian sekaligus
+         agar layar retina langsung memilih berkas yang tepat tanpa menunggu
+         CSS dievaluasi. Berkasnya turunan kecil (7-21 KB), bukan 660 KB. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/brand/logo-light-64.png"
+      imagesrcset="/brand/logo-light-64.png 1x, /brand/logo-light-128.png 2x"
+    />
     <title>Imaginary Liquidity — Dashboard</title>
   </head>
   <body>
