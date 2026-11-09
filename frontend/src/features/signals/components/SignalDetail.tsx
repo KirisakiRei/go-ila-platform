@@ -1,10 +1,14 @@
 import {
   CheckCircle2,
   Clock,
+  Compass,
+  Crosshair,
   Layers,
   Radio,
+  Target,
   TrendingDown,
   TrendingUp,
+  Zap,
 } from 'lucide-react'
 import {
   Badge,
@@ -21,6 +25,71 @@ import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '../lib/status'
 import { TimeframeBadge } from './TimeframeBadge'
 import { TombolEksekusi } from './TombolEksekusi'
+
+type AnalysisPoint = {
+  id: string
+  title: string
+  detail: string
+  iconType: 'sweep' | 'trigger' | 'target' | 'context'
+}
+
+function parseAnalysisSummary(rawSummary: string): AnalysisPoint[] {
+  if (!rawSummary || !rawSummary.trim()) return []
+
+  // Bersihkan emoji chat dan header template broadcast telegram
+  const cleaned = rawSummary.replace(/^💎\s*SETUP[^\n:]+:\s*/gi, '').trim()
+  const rawParts = cleaned
+    .split(/(?:•|\n)+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+  const points: AnalysisPoint[] = []
+
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i]
+    if (!part) continue
+
+    // Abaikan baris redundan "Level: Entry=..." karena sudah ditampilkan di kotak parameter harga
+    if (/^level:\s*entry=/i.test(part) || /^entry=/i.test(part)) {
+      continue
+    }
+
+    const cleanDetail = part.replace(/^[•\s\-_]+/, '').replace(/^💎\s*/, '')
+    if (!cleanDetail) continue
+
+    if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl/i.test(cleanDetail)) {
+      points.push({
+        id: `sweep-${i}`,
+        title: 'Sapuan Struktur (HTF / MTF)',
+        detail: cleanDetail,
+        iconType: 'sweep',
+      })
+    } else if (/cisd|trigger|break|tembus|valid|konfirmasi|reversal/i.test(cleanDetail)) {
+      points.push({
+        id: `trigger-${i}`,
+        title: 'Konfirmasi Pemicu (LTF Trigger)',
+        detail: cleanDetail,
+        iconType: 'trigger',
+      })
+    } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+      points.push({
+        id: `target-${i}`,
+        title: 'Proyeksi Target & Likuiditas',
+        detail: cleanDetail,
+        iconType: 'target',
+      })
+    } else {
+      points.push({
+        id: `point-${i}`,
+        title: 'Konteks Analisis Pasar',
+        detail: cleanDetail,
+        iconType: 'context',
+      })
+    }
+  }
+
+  return points
+}
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -215,14 +284,54 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         )}
 
         {/* Ringkasan Analisis & Aksi Selanjutnya */}
-        {signal.summary && (
-          <div className="flex flex-col gap-1 rounded-xl border border-border/60 bg-card p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Keterangan Analisis
-            </span>
-            <p className="text-[12.5px] leading-relaxed text-foreground/90">{signal.summary}</p>
-          </div>
-        )}
+        {signal.summary && (() => {
+          const points = parseAnalysisSummary(signal.summary)
+          return (
+            <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs">
+              <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Compass className="h-3.5 w-3.5 text-primary" />
+                  Keterangan Analisis
+                </span>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {signal.strategy_version === 'ila-3.0' ? 'ILA 3.0 Sequence' : 'ILA 2.0 Engine'}
+                </span>
+              </div>
+
+              {points.length > 0 ? (
+                <div className="flex flex-col gap-2 pt-1">
+                  {points.map((pt) => {
+                    const icon =
+                      pt.iconType === 'sweep' ? (
+                        <Crosshair className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+                      ) : pt.iconType === 'trigger' ? (
+                        <Zap className="h-3.5 w-3.5 shrink-0 text-emerald-500 mt-0.5" />
+                      ) : pt.iconType === 'target' ? (
+                        <Target className="h-3.5 w-3.5 shrink-0 text-blue-500 mt-0.5" />
+                      ) : (
+                        <Layers className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+                      )
+
+                    return (
+                      <div
+                        key={pt.id}
+                        className="flex items-start gap-2.5 rounded-lg border border-border/50 bg-secondary/15 p-2.5 transition-colors hover:bg-secondary/25"
+                      >
+                        {icon}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[11px] font-semibold text-foreground/90">{pt.title}</span>
+                          <span className="text-[12px] leading-relaxed text-muted-foreground">{pt.detail}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-[12.5px] leading-relaxed text-foreground/90 pt-1">{signal.summary}</p>
+              )}
+            </div>
+          )
+        })()}
 
         {signal.reject_reason && (
           <div className="border-l-2 border-foreground pl-3 py-1">

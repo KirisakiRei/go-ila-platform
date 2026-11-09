@@ -43,10 +43,45 @@ function arahDari(direction: string | undefined): Arah {
   return 'unknown'
 }
 
-const ARAH_TAMPILAN: Record<Arah, { label: string; icon: typeof ArrowUpRight }> = {
-  bullish: { label: 'Kecenderungan naik', icon: ArrowUpRight },
-  bearish: { label: 'Kecenderungan turun', icon: ArrowDownRight },
-  unknown: { label: 'Belum ada arah', icon: Minus },
+const ARAH_TAMPILAN: Record<
+  Arah,
+  {
+    label: string
+    icon: typeof ArrowUpRight
+    cardBorder: string
+    bgClass: string
+    badgeClass: string
+    textClass: string
+    iconClass: string
+  }
+> = {
+  bullish: {
+    label: 'Kecenderungan naik',
+    icon: ArrowUpRight,
+    cardBorder: 'border-emerald-300 hover:border-emerald-400',
+    bgClass: 'bg-emerald-50/40',
+    badgeClass: 'border-emerald-600 bg-emerald-600 text-white',
+    textClass: 'text-emerald-700',
+    iconClass: 'text-emerald-600',
+  },
+  bearish: {
+    label: 'Kecenderungan turun',
+    icon: ArrowDownRight,
+    cardBorder: 'border-rose-300 hover:border-rose-400',
+    bgClass: 'bg-rose-50/40',
+    badgeClass: 'border-rose-600 bg-rose-600 text-white',
+    textClass: 'text-rose-700',
+    iconClass: 'text-rose-600',
+  },
+  unknown: {
+    label: 'Belum ada arah',
+    icon: Minus,
+    cardBorder: 'border-zinc-200 hover:border-zinc-300',
+    bgClass: 'bg-white',
+    badgeClass: 'border-zinc-300 bg-transparent text-[#3f3f46]',
+    textClass: 'text-[#09090b]',
+    iconClass: 'text-[#09090b]',
+  },
 }
 
 /** Baris kecil berlabel di kaki kartu. */
@@ -60,11 +95,19 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 }
 
 /** Penanda keadaan di pojok kanan atas kartu. */
-function StatusTag({ hasSignal, marketOpen }: { hasSignal: boolean; marketOpen: boolean }) {
+function StatusTag({
+  hasSignal,
+  marketOpen,
+  badgeClass,
+}: {
+  hasSignal: boolean
+  marketOpen: boolean
+  badgeClass: string
+}) {
   const gaya = !marketOpen
     ? 'border-zinc-200 bg-transparent text-[#71717a]'
     : hasSignal
-      ? 'border-[#09090b] bg-[#09090b] text-white'
+      ? badgeClass
       : 'border-zinc-300 bg-transparent text-[#3f3f46]'
 
   const teks = !marketOpen ? 'Pasar tutup' : hasSignal ? 'Sinyal Aktif' : 'Dipantau'
@@ -106,7 +149,13 @@ export function SignalOverviewCard({
   const umur = sinyal ? formatRelativeTime(sinyal.published_at, now) : null
 
   return (
-    <article className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-300">
+    <article
+      className={cn(
+        'flex h-full flex-col rounded-xl border p-5 transition-colors',
+        sinyal ? tampilan.cardBorder : 'border-zinc-200 hover:border-zinc-300',
+        sinyal ? tampilan.bgClass : 'bg-white',
+      )}
+    >
       {/* Kepala: simbol, kategori, dan penanda keadaan. */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -118,20 +167,29 @@ export function SignalOverviewCard({
             {kategori && <span className="text-zinc-400"> · {kategori}</span>}
           </p>
         </div>
-        <StatusTag hasSignal={Boolean(sinyal)} marketOpen={marketOpen} />
+        <StatusTag
+          hasSignal={Boolean(sinyal)}
+          marketOpen={marketOpen}
+          badgeClass={tampilan.badgeClass}
+        />
       </header>
 
       {/* Isi: perbedaan utama antara keadaan terisi dan belum terisi. */}
-      <div className="mt-5 flex min-h-[76px] flex-col justify-center border-t border-zinc-100 pt-4">
+      <div className="mt-5 flex min-h-[76px] flex-col justify-center border-t border-zinc-200/60 pt-4">
         {sinyal ? (
           <>
             <div className="flex items-center gap-2">
               <Icon
-                className="h-4 w-4 shrink-0 text-[#09090b]"
+                className={cn('h-4 w-4 shrink-0', tampilan.iconClass)}
                 aria-hidden="true"
                 strokeWidth={2.5}
               />
-              <p className="text-[15px] font-semibold leading-tight tracking-tight text-[#09090b]">
+              <p
+                className={cn(
+                  'text-[15px] font-semibold leading-tight tracking-tight',
+                  tampilan.textClass,
+                )}
+              >
                 {tampilan.label}
               </p>
             </div>
@@ -153,7 +211,7 @@ export function SignalOverviewCard({
       </div>
 
       {/* Kaki: waktu dan keadaan pasar. */}
-      <footer className="mt-5 space-y-1.5 border-t border-zinc-100 pt-4">
+      <footer className="mt-5 space-y-1.5 border-t border-zinc-200/60 pt-4">
         {umur ? (
           <MetaRow label="Diperbarui" value={umur} />
         ) : (

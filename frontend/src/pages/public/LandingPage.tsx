@@ -266,18 +266,16 @@ export default function LandingPage() {
       {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
       <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="max-w-2xl space-y-4">
+          <div className="max-w-2xl space-y-3">
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
               Pantauan Pasar
             </p>
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-              <span className="text-[#09090b]">Arah pasar yang sedang kami amati,</span>{' '}
+              <span className="text-[#09090b]">Arah pasar terkini,</span>{' '}
               <span className="text-[#52525b]">diperbarui sepanjang sesi</span>
             </h2>
-            <p className="text-[14px] leading-relaxed text-[#3f3f46]">
-              Tiga instrumen yang paling aktif kami pantau: emas, euro, dan indeks teknologi
-              Amerika. Ringkasan di bawah menunjukkan arah terakhir yang terbaca dari struktur
-              harga — bukan rekomendasi untuk membuka posisi.
+            <p className="text-[14px] leading-relaxed text-[#52525b]">
+              Pembacaan arah tren dari struktur likuiditas instrumen utama secara real-time.
             </p>
           </div>
 
