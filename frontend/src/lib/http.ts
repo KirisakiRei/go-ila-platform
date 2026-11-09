@@ -11,17 +11,27 @@ const DEFAULT_TIMEOUT_MS = 15_000
  */
 
 export const CSRF_COOKIE = 'ila_csrf'
+export const ADMIN_CSRF_COOKIE = 'ila_admin_csrf'
 export const CSRF_HEADER = 'X-CSRF-Token'
 
-/** Membaca token CSRF dari cookie; kosong berarti sesi belum siap. */
-export function readCsrfToken(): string {
-  const match = document.cookie
-    .split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${CSRF_COOKIE}=`))
+/** Membaca token CSRF dari cookie; memilih cookie admin bila memanggil endpoint admin. */
+export function readCsrfToken(path?: string): string {
+  const isAdminPath = path?.startsWith('/admin') || path?.includes('/admin/')
+  const primaryCookie = isAdminPath ? ADMIN_CSRF_COOKIE : CSRF_COOKIE
+  const fallbackCookie = isAdminPath ? CSRF_COOKIE : ADMIN_CSRF_COOKIE
 
-  if (!match) return ''
-  return decodeURIComponent(match.slice(CSRF_COOKIE.length + 1))
+  const cookies = document.cookie.split(';').map((part) => part.trim())
+  const match = cookies.find((part) => part.startsWith(`${primaryCookie}=`))
+  if (match) {
+    return decodeURIComponent(match.slice(primaryCookie.length + 1))
+  }
+
+  const fallbackMatch = cookies.find((part) => part.startsWith(`${fallbackCookie}=`))
+  if (fallbackMatch) {
+    return decodeURIComponent(fallbackMatch.slice(fallbackCookie.length + 1))
+  }
+
+  return ''
 }
 
 type RequestOptions = {
@@ -107,7 +117,7 @@ async function requestEnvelope<T>(
 
   // Double-submit: header harus sama dengan cookie agar backend menerima.
   if (!SAFE_METHODS.has(method)) {
-    const csrf = readCsrfToken()
+    const csrf = readCsrfToken(path)
     if (csrf) headers.set(CSRF_HEADER, csrf)
   }
 

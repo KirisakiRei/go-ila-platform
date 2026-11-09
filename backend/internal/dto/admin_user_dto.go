@@ -154,6 +154,15 @@ type AdminTrialExtendRequest struct {
 	Reason string `json:"reason" binding:"required,max=255"`
 }
 
+// AdminCreateUserRequest adalah payload pembuatan akun pelanggan baru oleh admin.
+type AdminCreateUserRequest struct {
+	Name     string `json:"name" binding:"required,min=2,max=100"`
+	Email    string `json:"email" binding:"required,email,max=150"`
+	Username string `json:"username" binding:"omitempty,min=3,max=32"`
+	Password string `json:"password" binding:"required,min=8,max=72"`
+	Tier     string `json:"tier" binding:"required,oneof=free basic plus"`
+}
+
 // AdminTrialItem adalah satu baris halaman uji coba admin.
 type AdminTrialItem struct {
 	UserID        string    `json:"user_id"`

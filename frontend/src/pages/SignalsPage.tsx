@@ -122,11 +122,11 @@ export default function SignalsPage() {
   return (
     <>
       <PageHeader
-        title={activePair ? `Sinyal ${activePair}` : 'Sinyal'}
+        title={activePair ? `Signals — ${activePair}` : 'Signals & Radar'}
         description={
           activePair
             ? `Ringkasan sinyal aktif${adaIla3 ? ', analisis per metode (ILA 2.0 & ILA 3.0),' : ''} serta riwayat eksekusi order pada pair ${activePair}.`
-            : 'Ringkasan sinyal pasar terorganisasi per pair instrumen dan per metode analisis.'
+            : 'Pusat sinyal dan radar pergerakan pasar untuk seluruh watchlist pair Anda.'
         }
         actions={
           <div className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export default function SignalsPage() {
             <div className="lg:col-span-7 space-y-6">
               <Section
                 title="Sinyal Terakhir"
-                description={`Setup paling mutakhir yang diterbitkan engine untuk ${activePair}.`}
+                description={`Setup paling mutakhir dari analisis ILA untuk ${activePair}.`}
               >
                 {latestSignal ? (
                   <SignalDetail signal={latestSignal} />
@@ -281,7 +281,7 @@ export default function SignalsPage() {
                         <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
                           <span>Terbit: {formatDateTime(signal.published_at)}</span>
                           {signal.delayed && (
-                            <span className="font-semibold uppercase text-amber-600">Telat</span>
+                            <span className="font-semibold uppercase text-amber-600">Delayed 15m</span>
                           )}
                         </div>
                       </div>
@@ -321,9 +321,9 @@ export default function SignalsPage() {
             </div>
           </div>
 
-          {/* Riwayat Posisi / Eksekusi Tiket */}
+          {/* Riwayat Posisi / Eksekusi Order */}
           <Section
-            title="Riwayat Eksekusi Tiket"
+            title="Riwayat Eksekusi Order"
             description={`Catatan entry posisi riil broker yang dieksekusi dari sinyal ${activePair}.`}
           >
             {loadingPositions ? (
@@ -338,11 +338,11 @@ export default function SignalsPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="border-b border-border bg-secondary/50 text-muted-foreground">
                     <tr>
-                      <th className="px-3.5 py-2.5 font-medium">Tiket / Waktu</th>
+                      <th className="px-3.5 py-2.5 font-medium">Order / Waktu</th>
                       <th className="px-3.5 py-2.5 font-medium">Arah</th>
                       <th className="px-3.5 py-2.5 font-medium">Metode</th>
                       <th className="px-3.5 py-2.5 font-medium">Lot</th>
-                      <th className="px-3.5 py-2.5 font-medium">Harga Open</th>
+                      <th className="px-3.5 py-2.5 font-medium">Open Price</th>
                       <th className="px-3.5 py-2.5 font-medium">Status / PnL</th>
                     </tr>
                   </thead>
@@ -424,14 +424,14 @@ export default function SignalsPage() {
 
             <Section
               title="Metode per Akun"
-              description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Pair tetap dipantau seluruh metode.`}
+              description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Watchlist tetap memantau seluruh metode.`}
             >
               <SaklarMetodeAkun symbol={activePair} />
             </Section>
 
             <Section
               title="Timeframe per Akun"
-              description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}. Pasangan mengikuti aturan trading ILA.`}
+              description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}.`}
             >
               <SaklarTimeframeAkun symbol={activePair} />
             </Section>
@@ -444,14 +444,14 @@ export default function SignalsPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Bot className="mx-auto h-10 w-10 text-muted-foreground/60" />
-                <h3 className="mt-3 text-base font-semibold">Belum Ada Pair Pantauan</h3>
+                <h3 className="mt-3 text-base font-semibold">Watchlist Pair Kosong</h3>
                 <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
-                  Tambahkan simbol instrumen (misal XAUUSD, EURUSD) pada halaman Pair Pantauan agar sinyal trading
+                  Tambahkan simbol instrumen (misal XAUUSD, EURUSD) pada halaman Watchlist Pair agar sinyal trading
                   otomatis muncul di sini.
                 </p>
                 <div className="mt-5">
                   <Button size="sm" asChild>
-                    <Link to="/strategi">Tambah Pair Pantauan Sekarang</Link>
+                    <Link to="/strategi">Kelola Watchlist Pair</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -570,7 +570,7 @@ export default function SignalsPage() {
                       <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <BarChart3 className="h-3.5 w-3.5" />
-                          {pairPos.length} Eksekusi Tiket
+                          {pairPos.length} Eksekusi Order
                         </span>
                         <Button
                           variant="ghost"

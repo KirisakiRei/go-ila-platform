@@ -18,6 +18,7 @@ type AdminGuard func(method, path, permission string) gin.HandlerFunc
 func (h *AdminUserHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 	// Daftar dan profil: tingkat 1, tanpa saldo dan tanpa kredensial.
 	g.GET("/users", guard(http.MethodGet, "/users", authz.UserView), h.List)
+	g.POST("/users", guard(http.MethodPost, "/users", authz.UserEdit), h.Create)
 	g.GET("/users/:id", guard(http.MethodGet, "/users/:id", authz.UserView), h.Detail)
 	g.GET("/users/:id/accounts", guard(http.MethodGet, "/users/:id/accounts", authz.AccountView), h.Accounts)
 	// Saldo adalah pintu terpisah: hanya admin ber-account.balance yang boleh,

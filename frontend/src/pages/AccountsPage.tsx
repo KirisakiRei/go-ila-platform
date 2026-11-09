@@ -77,16 +77,16 @@ export default function AccountsPage() {
   return (
     <>
       <PageHeader
-        title="Akun Broker"
+        title="Broker Accounts"
         description={
           limit === 0
-            ? 'Tier Free belum dapat menghubungkan akun. Tingkatkan ke Basic atau Plus untuk mulai.'
-            : `Tier ${tier} dapat menghubungkan ${limit} akun. Saat ini ${jumlah} terhubung.`
+            ? 'Tier Free belum dapat menghubungkan akun broker. Tingkatkan ke Basic atau Plus untuk mulai.'
+            : `Tier ${tier} dapat menghubungkan ${limit} akun broker. Saat ini ${jumlah} terhubung.`
         }
         actions={
           bisaTambah && !menambah ? (
             <Button size="sm" onClick={() => setMenambah(true)}>
-              Hubungkan akun
+              + Hubungkan Akun
             </Button>
           ) : null
         }
@@ -125,7 +125,7 @@ export default function AccountsPage() {
       )}
 
       {data && data.length > 0 && (
-        <Section title="Akun terhubung" description="Kredensial tersimpan terenkripsi.">
+        <Section title="Akun Terhubung" description="Kredensial tersimpan terenkripsi.">
           <div className="flex flex-col gap-3">
             {data.map((account) => (
               <AccountCard key={account.id} account={account} />

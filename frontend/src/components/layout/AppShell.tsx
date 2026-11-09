@@ -14,17 +14,17 @@ const TIER_LABEL: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: '
 
 /** Nama halaman untuk ditampilkan di bilah atas. */
 const TITLES: Record<string, string> = {
-  '/dashboard': 'Ringkasan',
-  '/': 'Ringkasan',
-  '/sinyal': 'Sinyal',
-  '/posisi': 'Posisi',
-  '/akun': 'Akun Broker',
-  '/strategi': 'Pair Pantauan',
-  '/langganan': 'Langganan',
-  '/langganan/bayar': 'Pembayaran Langganan',
-  '/pengaturan': 'Pengaturan',
-  '/pengaturan/keamanan': 'Keamanan',
-  '/mulai': 'Mulai',
+  '/dashboard': 'Dashboard',
+  '/': 'Dashboard',
+  '/sinyal': 'Signals & Radar',
+  '/posisi': 'Positions',
+  '/akun': 'Broker Accounts',
+  '/strategi': 'Watchlist Pair',
+  '/langganan': 'Subscription & Billing',
+  '/langganan/bayar': 'Checkout Langganan',
+  '/pengaturan': 'Settings',
+  '/pengaturan/keamanan': 'Security Settings',
+  '/mulai': 'Onboarding',
 }
 
 type NavItem = {
@@ -42,26 +42,26 @@ type NavGroup = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Utama',
+    label: 'Menu Utama',
     items: [
-      { to: '/dashboard', label: 'Ringkasan', short: 'Ringkasan', icon: LayoutDashboard, end: true },
-      { to: '/mulai', label: 'Penyiapan Akun', short: 'Mulai', icon: Sparkles },
+      { to: '/dashboard', label: 'Dashboard', short: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/mulai', label: 'Onboarding', short: 'Onboarding', icon: Sparkles },
     ],
   },
   {
-    label: 'Trading & Pantauan',
+    label: 'Trading & Radar',
     items: [
-      { to: '/sinyal', label: 'Sinyal', short: 'Sinyal', icon: Radio },
-      { to: '/posisi', label: 'Riwayat Posisi', short: 'Posisi', icon: BarChart3 },
-      { to: '/akun', label: 'Akun Broker', short: 'Akun', icon: Wallet },
-      { to: '/strategi', label: 'Pair Pantauan', short: 'Pair', icon: Bot },
+      { to: '/sinyal', label: 'Signals & Radar', short: 'Signals', icon: Radio },
+      { to: '/posisi', label: 'Positions', short: 'Positions', icon: BarChart3 },
+      { to: '/akun', label: 'Broker Accounts', short: 'Accounts', icon: Wallet },
+      { to: '/strategi', label: 'Watchlist Pair', short: 'Watchlist', icon: Bot },
     ],
   },
   {
     label: 'Akun & Billing',
     items: [
-      { to: '/langganan', label: 'Paket & Langganan', short: 'Langganan', icon: CreditCard },
-      { to: '/pengaturan', label: 'Pengaturan & Keamanan', short: 'Setelan', icon: Settings },
+      { to: '/langganan', label: 'Subscription & Billing', short: 'Billing', icon: CreditCard },
+      { to: '/pengaturan', label: 'Settings & Security', short: 'Settings', icon: Settings },
     ],
   },
 ]

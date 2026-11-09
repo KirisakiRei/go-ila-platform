@@ -137,7 +137,7 @@ function ModalPilihPair({
       await create.mutateAsync({ symbol: dipilih })
       if (onDone) onDone()
     } catch (err) {
-      setGalat(err instanceof ApiError ? err.message : 'Gagal menambahkan pair pantauan.')
+      setGalat(err instanceof ApiError ? err.message : 'Gagal menambahkan watchlist pair.')
     }
   }
 
@@ -348,19 +348,19 @@ const METODE_INFO: Record<StrategyVersion, {
     judul: 'ILA 2.0',
     tagline: 'Fokus eksternal & internal',
     poin: [
-      'Membaca sisi eksternal: struktur harga yang terlihat pada chart.',
-      'Membaca sisi internal: dorongan yang menggerakkan harga di baliknya.',
-      'Setup diambil saat kedua sisi sepakat, sehingga sinyal lebih jarang tetapi arahnya lebih jelas.',
+      'Membaca struktur harga eksternal pada chart.',
+      'Mengonfirmasi dorongan momentum internal pasar.',
+      'Sinyal terbit saat struktur eksternal dan konfirmasi internal selaras.',
     ],
-    cocok: 'Pasar yang bergerak searah · Timeframe M15–H1 · Pemula sampai menengah',
+    cocok: 'Pasar trending · Timeframe M15–H1 · Pemula sampai menengah',
   },
   'ila-3.0': {
     judul: 'ILA 3.0',
     tagline: 'Multi-konsep lanjutan',
     poin: [
-      'Menggabungkan beberapa konsep analisis sekaligus dalam satu penilaian.',
-      'Termasuk kerangka QT (Quotational Thinking) untuk menilai kualitas setup.',
-      'Lebih selektif: sinyal lebih sedikit, tetapi tiap sinyal melewati lebih banyak saringan.',
+      'Menggabungkan multi-frame confluence dalam satu penilaian.',
+      'Mengintegrasikan kerangka Quotational Thinking (QT) untuk validasi setup.',
+      'Filter ketat dengan akurasi terarah untuk setup berkualitas tinggi.',
     ],
     cocok: 'Trader berpengalaman · Timeframe H1–H4 · Tersedia untuk tier Plus',
   },
@@ -405,12 +405,12 @@ export default function StrategiesPage() {
   return (
     <>
       <PageHeader
-        title="Pair Pantauan"
-        description="Daftar instrumen yang dipantau engine. Setiap pair dipantau oleh kedua metode analisis; metode mana yang dieksekusi diatur per akun trading."
+        title="Watchlist Pair"
+        description="Daftar instrumen yang dipantau sistem. Setiap pair dipantau oleh kedua metode analisis; pengaturan eksekusi ditentukan per akun trading."
         actions={
           canAdd ? (
             <Button size="sm" onClick={() => setModalTambah(true)}>
-              + Tambah Pair Pantauan
+              + Tambah Watchlist Pair
             </Button>
           ) : null
         }
@@ -458,18 +458,18 @@ export default function StrategiesPage() {
       </Section>
 
       <Section
-        title="Daftar Pair Pantauan"
-        description={`Maksimal 8 simbol aktif (${activeCount}/8). Simbol yang ada di sini otomatis muncul di halaman Sinyal.`}
+        title="Daftar Watchlist Pair"
+        description={`Maksimal 8 simbol aktif (${activeCount}/8). Simbol yang ada di sini otomatis muncul di halaman Signals.`}
       >
         {loadingSubs && <Skeleton className="h-16 w-full" />}
 
         {subs?.length === 0 && (
           <EmptyState
-            title="Belum ada pair pantauan"
+            title="Watchlist pair masih kosong"
             description="Pilih instrumen dari katalog pair resmi untuk mulai menerima dan memantau sinyal."
             action={
               <Button size="sm" onClick={() => setModalTambah(true)}>
-                + Tambah Pair Pantauan
+                + Tambah Watchlist Pair
               </Button>
             }
           />
@@ -505,7 +505,7 @@ export default function StrategiesPage() {
                       className="text-xs text-destructive hover:bg-destructive/10"
                       onClick={() => setDeletingSub({ id: sub.id, symbol: sub.symbol })}
                     >
-                      Berhenti Pantau
+                      Hapus
                     </Button>
                   </li>
                 )
@@ -515,12 +515,12 @@ export default function StrategiesPage() {
         )}
       </Section>
 
-      {/* Modal Tambah Pair Pantauan */}
+      {/* Modal Tambah Watchlist Pair */}
       <Modal
         open={modalTambah}
         onClose={() => setModalTambah(false)}
         size="xl"
-        title="Tambah Pair Pantauan"
+        title="Tambah Watchlist Pair"
         description="Cari dan pilih instrumen dari katalog resmi. Pair yang ditambahkan akan dipantau oleh kedua metode analisis."
       >
         <ModalPilihPair
@@ -578,10 +578,10 @@ export default function StrategiesPage() {
       <Modal
         open={Boolean(deletingSub)}
         onClose={() => setDeletingSub(null)}
-        title="Hentikan Pantauan Pair?"
+        title="Hapus dari Watchlist?"
         description={
           deletingSub
-            ? `Engine tidak akan lagi memindai setup sinyal untuk pair ${deletingSub.symbol}.`
+            ? `Sistem tidak lagi memindai setup sinyal untuk pair ${deletingSub.symbol}.`
             : undefined
         }
         footer={

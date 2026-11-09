@@ -54,8 +54,8 @@ export function RadarPantauanCard() {
   if (isLoading) {
     return (
       <Section
-        title="Radar Pair Pantauan"
-        description="Status pemindaian struktur pasar live untuk instrumen pilihan Anda."
+        title="Radar Watchlist Pair"
+        description="Pemindaian struktur pasar real-time untuk instrumen pilihan Anda."
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -69,15 +69,15 @@ export function RadarPantauanCard() {
   if (monitoredSymbols.length === 0) {
     return (
       <Section
-        title="Radar Pair Pantauan"
-        description="Status pemindaian struktur pasar live untuk instrumen pilihan Anda."
+        title="Radar Watchlist Pair"
+        description="Pemindaian struktur pasar real-time untuk instrumen pilihan Anda."
       >
         <EmptyState
-          title="Belum ada pair dipantau"
-          description="Tambahkan simbol instrumen di menu Pair Pantauan untuk mengaktifkan pemindaian engine real-time."
+          title="Watchlist masih kosong"
+          description="Tambahkan instrumen ke Watchlist Pair untuk memantau sinyal dan setup pasar secara real-time."
           action={
             <Button asChild variant="outline" size="sm">
-              <Link to="/pair-pantauan">Kelola Pair Pantauan</Link>
+              <Link to="/strategi">Kelola Watchlist</Link>
             </Button>
           }
         />
@@ -87,8 +87,8 @@ export function RadarPantauanCard() {
 
   return (
     <Section
-      title="Radar Pair Pantauan"
-      description="Status pemindaian struktur pasar live. Klik pair untuk membuka analisa lengkap."
+      title="Radar Watchlist Pair"
+      description="Pemindaian struktur pasar real-time. Klik pair untuk membuka analisa lengkap."
       actions={
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="relative flex h-2 w-2">
@@ -188,9 +188,9 @@ export function RadarPantauanCard() {
               {/* Update Footer */}
               <div className="mt-3 flex items-center justify-between text-[10.5px] text-muted-foreground">
                 <span>
-                  {signal ? `Update ${formatDateTime(signal.published_at)}` : 'Menunggu data lilin'}
+                  {signal ? `Update ${formatDateTime(signal.published_at)}` : 'Menunggu data candle'}
                 </span>
-                <span className="font-medium text-foreground/80 group-hover:underline">Detail</span>
+                <span className="font-medium text-foreground/80 group-hover:underline">Buka Setup</span>
               </div>
             </Card>
           )

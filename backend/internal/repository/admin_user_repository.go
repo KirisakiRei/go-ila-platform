@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -47,6 +48,9 @@ type AdminUserRepository interface {
 	Anonymize(ctx context.Context, id string) error
 	CountActiveAdmins(ctx context.Context) (int64, error)
 	ListAdminIDs(ctx context.Context) ([]string, error)
+	Create(ctx context.Context, user *model.User) error
+	FindByEmail(ctx context.Context, email string) (*model.User, error)
+	FindByUsername(ctx context.Context, username string) (*model.User, error)
 }
 
 type adminUserRepository struct {
@@ -258,9 +262,40 @@ func (r *adminUserRepository) ListAdminIDs(ctx context.Context) ([]string, error
 		Where("role = ? AND deleted_at IS NULL", "admin").
 		Pluck("id", &ids).Error
 	if err != nil {
-		return nil, fmt.Errorf("membaca daftar admin: %w", err)
+		return nil, fmt.Errorf("membaca daftar id admin: %w", err)
 	}
 	return ids, nil
+}
+
+func (r *adminUserRepository) Create(ctx context.Context, user *model.User) error {
+	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
+		return fmt.Errorf("membuat pengguna: %w", err)
+	}
+	return nil
+}
+
+func (r *adminUserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+	var user model.User
+	err := r.db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", email).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, fmt.Errorf("mencari email: %w", err)
+	}
+	return &user, nil
+}
+
+func (r *adminUserRepository) FindByUsername(ctx context.Context, username string) (*model.User, error) {
+	var user model.User
+	err := r.db.WithContext(ctx).Where("username = ? AND deleted_at IS NULL", username).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, fmt.Errorf("mencari username: %w", err)
+	}
+	return &user, nil
 }
 
 // hashEmail menyamarkan email tanpa menyimpan bentuk aslinya.

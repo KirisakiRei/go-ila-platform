@@ -249,6 +249,15 @@ export type UserActionPayload = {
   acknowledge?: boolean
 }
 
+/** Payload pembuatan akun pelanggan baru oleh admin. */
+export type AdminCreateUserPayload = {
+  name: string
+  email: string
+  username?: string
+  password: string
+  tier: Tier
+}
+
 // --- Katalog pair -----------------------------------------------------------
 
 /** Satu pair pada katalog admin, lengkap dengan jumlah pelanggan aktif. */

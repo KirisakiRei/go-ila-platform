@@ -86,6 +86,7 @@ describe('request', () => {
 describe('readCsrfToken', () => {
   afterEach(() => {
     document.cookie = 'ila_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+    document.cookie = 'ila_admin_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
   })
 
   it('mengembalikan string kosong bila cookie tidak ada', () => {
@@ -97,5 +98,13 @@ describe('readCsrfToken', () => {
     document.cookie = 'ila_csrf=token-uji'
 
     expect(readCsrfToken()).toBe('token-uji')
+  })
+
+  it('membaca nilai cookie admin untuk path admin', () => {
+    document.cookie = 'ila_csrf=token-user'
+    document.cookie = 'ila_admin_csrf=token-admin'
+
+    expect(readCsrfToken('/admin/users')).toBe('token-admin')
+    expect(readCsrfToken('/auth/me')).toBe('token-user')
   })
 })

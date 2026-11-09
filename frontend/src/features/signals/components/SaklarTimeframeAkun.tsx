@@ -51,8 +51,8 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
           return (
             <Card key={group.strategy}>
               <CardContent className="py-5 text-center text-xs text-muted-foreground">
-                Pasangan timeframe {group.strategy} belum tersedia. Engine belum mengirim data
-                timeframe untuk metode ini, jadi pilihan belum bisa ditampilkan.
+                Pasangan timeframe {group.strategy} belum tersedia. Data timeframe sedang diselaraskan.
+                Silakan muat ulang sesaat lagi.
               </CardContent>
             </Card>
           )

@@ -59,19 +59,19 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant={account.is_dry_run ? 'muted' : 'solid'}>
-            {account.is_dry_run ? 'Simulasi' : 'Nyata'}
+            {account.is_dry_run ? 'Demo' : 'Live'}
           </Badge>
-          <Badge variant="outline">{account.mode === 'auto' ? 'Otomatis' : 'Manual'}</Badge>
+          <Badge variant="outline">{account.mode === 'auto' ? 'Auto' : 'Manual'}</Badge>
           {!account.is_active && <Badge variant="muted">Nonaktif</Badge>}
         </div>
       </header>
 
       <div className="flex flex-col gap-3 px-4 py-3">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 sm:max-w-xl">
-          <Field label="Saldo" value={formatMoney(account.balance)} />
-          <Field label="Ekuitas" value={formatMoney(account.equity)} />
-          <Field label="Margin bebas" value={formatMoney(account.free_margin)} />
-          <Field label="Risiko" value={`${formatNumber(account.risk_percent, 2)}%`} />
+          <Field label="Balance" value={formatMoney(account.balance)} />
+          <Field label="Equity" value={formatMoney(account.equity)} />
+          <Field label="Free Margin" value={formatMoney(account.free_margin)} />
+          <Field label="Risk / Trade" value={`${formatNumber(account.risk_percent, 2)}%`} />
         </dl>
 
         {account.last_error && (
@@ -113,7 +113,7 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
             className="text-destructive hover:bg-destructive/10"
             onClick={() => setKonfirmasiHapus(true)}
           >
-            Hapus akun
+            Hapus Akun
           </Button>
         </div>
 

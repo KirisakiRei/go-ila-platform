@@ -23,11 +23,11 @@ import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format
 import type { PositionStatus } from '@/types/api'
 
 const LABEL: Record<PositionStatus, string> = {
-  OPEN: 'Terbuka',
-  CLOSED_TP: 'Take profit',
-  CLOSED_SL: 'Stop loss',
-  CLOSED_MANUAL: 'Ditutup manual',
-  UNTRACKED: 'Tanpa catatan',
+  OPEN: 'Open',
+  CLOSED_TP: 'Take Profit',
+  CLOSED_SL: 'Stop Loss',
+  CLOSED_MANUAL: 'Closed Manual',
+  UNTRACKED: 'Untracked',
 }
 
 const TONE: Record<PositionStatus, 'solid' | 'outline' | 'neutral' | 'muted'> = {
@@ -66,8 +66,8 @@ export default function PositionsPage() {
   return (
     <>
       <PageHeader
-        title="Posisi"
-        description="Posisi dikelola broker melalui stop loss dan take profit. Penutupan dilakukan di aplikasi broker Anda."
+        title="Positions"
+        description="Posisi aktif dan riwayat transaksi broker yang dieksekusi dari sinyal ILA."
       />
 
       <Card className="p-3">
@@ -82,12 +82,12 @@ export default function PositionsPage() {
           </div>
           <div className="flex items-end">
             <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
-              {downloading ? 'Menyiapkan…' : 'Unduh riwayat (CSV)'}
+              {downloading ? 'Menyiapkan…' : 'Export CSV'}
             </Button>
           </div>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          Tanggal mengikuti hari akuntansi WIB; di dalam berkas tersedia kolom waktu WIB dan NY.
+          Format waktu ekspor mencakup WIB dan New York (NY).
         </p>
         {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
       </Card>
@@ -109,12 +109,12 @@ export default function PositionsPage() {
               <TableHead>Simbol</TableHead>
               <TableHead>Arah</TableHead>
               <TableHead className="text-right">Lot</TableHead>
-              <TableHead className="text-right">Buka</TableHead>
+              <TableHead className="text-right">Open Price</TableHead>
               <TableHead className="text-right">SL</TableHead>
               <TableHead className="text-right">TP</TableHead>
-              <TableHead className="text-right">Hasil</TableHead>
+              <TableHead className="text-right">PnL</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Dibuka</TableHead>
+              <TableHead className="text-right">Waktu Buka</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,7 +123,7 @@ export default function PositionsPage() {
                 <TableCell className="whitespace-nowrap font-semibold">
                   <span className="flex items-center gap-1.5">
                     {position.symbol}
-                    {position.is_dry_run && <Badge variant="muted">Simulasi</Badge>}
+                    {position.is_dry_run && <Badge variant="muted">Demo</Badge>}
                   </span>
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">

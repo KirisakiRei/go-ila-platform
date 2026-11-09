@@ -78,7 +78,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         </div>
         <CardDescription className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <Radio className="h-3 w-3 animate-pulse text-emerald-500" />
-          Radar Engine: {signal.engine_version || 'ila-engine-v2'} · Terbit{' '}
+          Analisis Pasar: {signal.strategy_version.toUpperCase()} · Terbit{' '}
           {formatDateTime(signal.published_at)}
         </CardDescription>
       </CardHeader>
@@ -127,7 +127,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
               <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
                 {isHtfSweepDone
                   ? 'Struktur pasar timeframe besar terkonfirmasi resmi closed.'
-                  : 'Menunggu penutupan lilin timeframe besar pada batas level pasar.'}
+                  : 'Menunggu penutupan candle timeframe besar pada level kunci.'}
               </p>
               {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
                 <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
@@ -195,11 +195,11 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         {signal.entry_price > 0 ? (
           <div className="rounded-xl border border-border bg-secondary/10 p-4">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Parameter Eksekusi Order
+              Parameter Setup Order
             </span>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-              <Field label="Harga Entry" value={formatNumber(signal.entry_price, 5)} />
-              <Field label="Risk / Reward" value={`1 : ${formatNumber(signal.risk_reward, 2)}`} />
+              <Field label="Entry Price" value={formatNumber(signal.entry_price, 5)} />
+              <Field label="Risk : Reward" value={`1 : ${formatNumber(signal.risk_reward, 2)}`} />
               <Field label="Stop Loss" value={formatNumber(signal.stop_loss, 5)} />
               <Field label="Take Profit" value={formatNumber(signal.take_profit, 5)} />
             </dl>
@@ -208,8 +208,8 @@ export function SignalDetail({ signal }: { signal: Signal }) {
           <div className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-secondary/15 p-3.5 text-xs text-muted-foreground">
             <Clock className="h-4 w-4 shrink-0 text-amber-500" />
             <span>
-              Parameter entry, stop loss, dan target profit akan dihitung dan diterbitkan seketika
-              konfirmasi momentum penutupan lilin tercapai.
+              Parameter entry, stop loss, dan take profit akan dihitung seketika
+              konfirmasi penutupan candle tercapai.
             </span>
           </div>
         )}

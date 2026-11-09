@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"ila/backend/internal/pagination"
 	"ila/backend/internal/repository"
 	"ila/backend/pkg/apperror"
+	"ila/backend/pkg/utils"
 )
 
 // AdminUserService adalah manajemen pelanggan dari panel admin.
@@ -45,6 +47,8 @@ type AdminUserService interface {
 	UpdateAccountLabel(ctx context.Context, actor AdminActor, accountID string, req dto.AdminAccountLabelRequest) error
 	// DeleteAccount menghapus akun broker pelanggan beserta kredensialnya.
 	DeleteAccount(ctx context.Context, actor AdminActor, accountID string, req dto.UserActionRequest) error
+	// Create membuat akun pelanggan baru secara manual dari panel admin.
+	Create(ctx context.Context, actor AdminActor, req dto.AdminCreateUserRequest) (*dto.UserListItem, error)
 	ExportUsers(ctx context.Context, actor AdminActor, filter dto.AdminUserFilter) ([]byte, string, error)
 }
 
@@ -64,6 +68,9 @@ type adminUserStore interface {
 	UpdateTier(ctx context.Context, id, tier string, startedAt, expiresAt *time.Time) error
 	Anonymize(ctx context.Context, id string) error
 	CountActiveAdmins(ctx context.Context) (int64, error)
+	Create(ctx context.Context, user *model.User) error
+	FindByEmail(ctx context.Context, email string) (*model.User, error)
+	FindByUsername(ctx context.Context, username string) (*model.User, error)
 }
 
 type adminUserService struct {
@@ -689,6 +696,103 @@ func appendNote(existing, line string) string {
 
 func nowOf(t time.Time) *time.Time {
 	return &t
+}
+
+func (s *adminUserService) Create(ctx context.Context, actor AdminActor, req dto.AdminCreateUserRequest) (*dto.UserListItem, error) {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if existing, err := s.store.FindByEmail(ctx, email); err == nil && existing != nil {
+		return nil, validation("email sudah terdaftar")
+	} else if err != nil && !errors.Is(err, apperror.ErrNotFound) {
+		return nil, err
+	}
+
+	username := normalizeUsername(req.Username)
+	if username == "" {
+		parts := strings.Split(email, "@")
+		username = sanitizeUsername(parts[0])
+	}
+	if !isValidUsername(username) {
+		return nil, validation("username 3-32 karakter, hanya huruf kecil, angka, titik, garis bawah, atau strip")
+	}
+
+	orig := username
+	for i := 1; i <= 10; i++ {
+		existing, err := s.store.FindByUsername(ctx, username)
+		if errors.Is(err, apperror.ErrNotFound) || existing == nil {
+			break
+		}
+		username = fmt.Sprintf("%s%d", orig, i)
+	}
+
+	hash, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return nil, fmt.Errorf("hashing password: %w", err)
+	}
+
+	now := s.now()
+	user := &model.User{
+		Name:            strings.TrimSpace(req.Name),
+		Username:        username,
+		Email:           email,
+		PasswordHash:    hash,
+		Role:            "user", // Role murni pelanggan
+		RoleID:          nil,    // Tanpa kewenangan admin
+		Tier:            req.Tier,
+		Status:          model.UserStatusActive,
+		TrialUsed:       true,
+		OnboardingDone:  true,
+		EmailVerifiedAt: &now,
+		NotifyEnabled:   true,
+	}
+	if req.Tier != model.TierFree {
+		started := now
+		user.TierStartedAt = &started
+	}
+
+	if err := s.store.Create(ctx, user); err != nil {
+		return nil, err
+	}
+
+	row := repository.UserRow{
+		User:         *user,
+		RoleCode:     "",
+		AccountCount: 0,
+	}
+	item := toUserListItem(row)
+
+	_ = s.audit.Record(ctx, AuditEntry{
+		ActorID:    actor.ID,
+		Action:     audit.UserCreate,
+		TargetType: "user",
+		TargetID:   user.ID,
+		Reason:     "Pembuatan akun pelanggan baru oleh admin",
+		RequestID:  actor.RequestID,
+		After: map[string]any{
+			"email": user.Email,
+			"tier":  user.Tier,
+			"role":  user.Role,
+		},
+	})
+
+	return &item, nil
+}
+
+func sanitizeUsername(raw string) string {
+	raw = strings.ToLower(strings.TrimSpace(raw))
+	var buf strings.Builder
+	for _, r := range raw {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '.' {
+			buf.WriteRune(r)
+		}
+	}
+	res := buf.String()
+	if len(res) < 3 {
+		res = res + "user"
+	}
+	if len(res) > 32 {
+		res = res[:32]
+	}
+	return res
 }
 
 var _ = errors.Join

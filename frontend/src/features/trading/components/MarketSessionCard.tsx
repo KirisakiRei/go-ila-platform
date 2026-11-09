@@ -46,24 +46,24 @@ export function MarketSessionCard() {
         {daily && (
           <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 text-[12px] sm:grid-cols-4">
             <div>
-              <p className="text-muted-foreground">Hari akuntansi</p>
+              <p className="text-muted-foreground">Sesi Trading (WIB)</p>
               <p className="font-medium">{daily.day}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Trade hari ini</p>
+              <p className="text-muted-foreground">Trades Hari Ini</p>
               <p className="font-medium tabular-nums">
                 {daily.total_trades}/{daily.max_trades}
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground">Menang / kalah</p>
+              <p className="text-muted-foreground">Win / Loss</p>
               <p className="font-medium tabular-nums">
                 {daily.win_count} / {daily.loss_count}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Status</p>
-              <p className="font-medium">{daily.locked ? 'Berhenti hari ini' : 'Berjalan'}</p>
+              <p className="font-medium">{daily.locked ? 'Batas Harian Tercapai' : 'Aktif'}</p>
             </div>
           </div>
         )}

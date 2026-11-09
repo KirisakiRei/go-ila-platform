@@ -142,9 +142,9 @@ export default function AccountDetailPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={account.is_dry_run ? 'muted' : 'solid'}>
-                {account.is_dry_run ? 'Simulasi (Dry Run)' : 'Live Trading'}
+                {account.is_dry_run ? 'Demo' : 'Live'}
               </Badge>
-              <Badge variant="outline">{account.mode === 'auto' ? 'Mode Otomatis' : 'Mode Manual'}</Badge>
+              <Badge variant="outline">{account.mode === 'auto' ? 'Auto' : 'Manual'}</Badge>
               {!account.is_active && (
                 <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-600">
                   Nonaktif
@@ -163,7 +163,7 @@ export default function AccountDetailPage() {
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Saldo (Balance)
+                Balance
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                 {formatMoney(account.balance)}
@@ -172,7 +172,7 @@ export default function AccountDetailPage() {
 
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Ekuitas (Equity)
+                Equity
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                 {formatMoney(account.equity)}
@@ -181,7 +181,7 @@ export default function AccountDetailPage() {
 
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Margin Bebas
+                Free Margin
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                 {formatMoney(account.free_margin)}
@@ -190,7 +190,7 @@ export default function AccountDetailPage() {
 
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Risiko per Trade
+                Risk / Trade
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                 {formatNumber(account.risk_percent, 2)}%
@@ -212,7 +212,7 @@ export default function AccountDetailPage() {
           }`}
         >
           <Sliders className="h-3.5 w-3.5" />
-          <span>1. Manajemen Risiko & Pengaturan</span>
+          <span>1. Risk Management & Settings</span>
         </button>
 
         <button
@@ -225,7 +225,7 @@ export default function AccountDetailPage() {
           }`}
         >
           <Settings className="h-3.5 w-3.5" />
-          <span>2. Filter Pair Eksekusi Akun</span>
+          <span>2. Filter Pair Eksekusi</span>
         </button>
 
         <button
@@ -238,7 +238,7 @@ export default function AccountDetailPage() {
           }`}
         >
           <Laptop className="h-3.5 w-3.5" />
-          <span>3. Riwayat Order Akun</span>
+          <span>3. Riwayat Order</span>
         </button>
       </div>
 
@@ -389,15 +389,15 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="account-mode">Mode Eksekusi Order</Label>
+              <Label htmlFor="account-mode">Mode Eksekusi</Label>
               <Select
                 id="account-mode"
                 value={mode}
                 onChange={(e) => setMode(e.target.value as 'manual' | 'auto')}
                 disabled={tier !== 'plus'}
               >
-                <option value="manual">Manual (Perlu Konfirmasi)</option>
-                <option value="auto">Otomatis (Langsung Ditembak)</option>
+                <option value="manual">Manual (Konfirmasi Entry)</option>
+                <option value="auto">Auto (Otomatis)</option>
               </Select>
               {tier !== 'plus' && (
                 <p className="text-[11px] text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
@@ -491,7 +491,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   onChange={(e) => setIsDryRun(e.target.checked)}
                   className="h-4 w-4 rounded accent-foreground"
                 />
-                <span>Jalankan sebagai Simulasi (Dry Run / Tidak mengirim uang nyata)</span>
+                <span>Mode Demo / Dry Run (Order simulasi tanpa dana riil)</span>
               </label>
 
               <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
@@ -501,7 +501,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   onChange={(e) => setIsActive(e.target.checked)}
                   className="h-4 w-4 rounded accent-foreground"
                 />
-                <span>Akun Aktif (Dapat menerima dan memproses sinyal)</span>
+                <span>Akun Aktif (Menerima dan memproses sinyal)</span>
               </label>
             </div>
           </div>
@@ -509,7 +509,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
           <div className="pt-2">
             <Button type="submit" size="sm" isLoading={update.isPending} className="gap-1.5">
               <Save className="h-3.5 w-3.5" />
-              Simpan Perubahan Risiko
+              Simpan Pengaturan
             </Button>
           </div>
         </form>

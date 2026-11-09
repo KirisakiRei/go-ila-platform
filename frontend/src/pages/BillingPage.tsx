@@ -88,7 +88,7 @@ export default function BillingPage() {
   return (
     <>
       <PageHeader
-        title="Paket & Langganan"
+        title="Subscription & Billing"
         description="Kelola paket langganan aktif, bandingkan benefit secara transparan, dan riwayat tagihan resmi."
         actions={
           <div className="flex items-center gap-2">

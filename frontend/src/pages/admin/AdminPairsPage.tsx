@@ -151,7 +151,7 @@ export default function AdminPairsPage() {
     <>
       <PageHeader
         title="Katalog Pair"
-        description="Kamus simbol yang boleh dipilih user. Pair Pantauan hanya menampilkan isi katalog ini, sehingga penulisan simbol bebas tidak dimungkinkan."
+        description="Kamus simbol yang boleh dipilih user. Watchlist Pair hanya menampilkan isi katalog ini, sehingga penulisan simbol bebas tidak dimungkinkan."
         actions={
           tab === 'pair' ? (
             <Button size="sm" onClick={() => setPairForm('baru')} disabled={categories.length === 0}>
@@ -214,7 +214,7 @@ export default function AdminPairsPage() {
               description={
                 categories.length === 0
                   ? 'Buat kategori terlebih dahulu, lalu tambahkan pair ke dalamnya.'
-                  : 'Tambahkan pair pertama agar user dapat memilihnya di halaman Pair Pantauan.'
+                  : 'Tambahkan pair pertama agar user dapat memilihnya di halaman Watchlist Pair.'
               }
               action={
                 categories.length === 0 ? (

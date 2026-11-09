@@ -48,6 +48,21 @@ func (h *AdminUserHandler) List(c *gin.Context) {
 	httpx.OKWithMeta(c, "Daftar pelanggan", items, meta)
 }
 
+// Create menangani POST /api/v1/admin/users.
+func (h *AdminUserHandler) Create(c *gin.Context) {
+	var req dto.AdminCreateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	res, err := h.users.Create(c.Request.Context(), h.actor(c), req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.Created(c, "Pengguna berhasil dibuat", res)
+}
+
 // Detail menangani GET /api/v1/admin/users/:id.
 func (h *AdminUserHandler) Detail(c *gin.Context) {
 	result, err := h.users.Detail(c.Request.Context(), h.actor(c), c.Param("id"))

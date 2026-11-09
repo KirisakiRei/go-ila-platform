@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"ila/backend/internal/model"
 	"ila/backend/internal/pagination"
 	"ila/backend/internal/repository"
+	"ila/backend/pkg/apperror"
 )
 
 // fakeUserStore adalah penyimpanan pelanggan di memori untuk pengujian.
@@ -83,6 +86,78 @@ func (f *fakeUserStore) Anonymize(ctx context.Context, id string) error {
 
 func (f *fakeUserStore) CountActiveAdmins(ctx context.Context) (int64, error) {
 	return f.adminCnt, nil
+}
+
+func (f *fakeUserStore) Create(ctx context.Context, user *model.User) error {
+	if user.ID == "" {
+		user.ID = fmt.Sprintf("u-%d", len(f.rows)+1)
+	}
+	f.rows[user.ID] = &repository.UserRow{
+		User: *user,
+	}
+	f.statuses[user.ID] = user.Status
+	return nil
+}
+
+func (f *fakeUserStore) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+	for _, row := range f.rows {
+		if strings.EqualFold(row.Email, email) {
+			copy := row.User
+			return &copy, nil
+		}
+	}
+	return nil, apperror.ErrNotFound
+}
+
+func (f *fakeUserStore) FindByUsername(ctx context.Context, username string) (*model.User, error) {
+	for _, row := range f.rows {
+		if strings.EqualFold(row.Username, username) {
+			copy := row.User
+			return &copy, nil
+		}
+	}
+	return nil, apperror.ErrNotFound
+}
+
+func TestAdminUserServiceCreateCustomer(t *testing.T) {
+	store := newFakeUserStore()
+	store.put("u1", "existing@rekavia.com", model.UserStatusActive, model.TierFree, "user")
+	auditRec := &fakeAdminAudit{}
+	svc := newTestUserService(store, auditRec)
+
+	actor := AdminActor{ID: "admin-1", RequestID: "req-1"}
+
+	// 1. Email duplikat ditolak
+	_, err := svc.Create(context.Background(), actor, dto.AdminCreateUserRequest{
+		Name:     "Existing User",
+		Email:    "existing@rekavia.com",
+		Password: "password123",
+		Tier:     model.TierBasic,
+	})
+	if err == nil {
+		t.Fatal("harus menolak email duplikat")
+	}
+
+	// 2. Berhasil buat user pelanggan
+	res, err := svc.Create(context.Background(), actor, dto.AdminCreateUserRequest{
+		Name:     "New Customer",
+		Email:    "customer@example.com",
+		Password: "password123",
+		Tier:     model.TierPlus,
+	})
+	if err != nil {
+		t.Fatalf("gagal membuat user: %v", err)
+	}
+
+	if res.Email != "customer@example.com" {
+		t.Errorf("email = %s, ingin customer@example.com", res.Email)
+	}
+	if res.Tier != model.TierPlus {
+		t.Errorf("tier = %s, ingin %s", res.Tier, model.TierPlus)
+	}
+	if res.Role != "user" {
+		t.Errorf("role = %s, ingin user", res.Role)
+	}
 }
 
 func newTestUserService(store *fakeUserStore, rec *fakeAdminAudit) AdminUserService {

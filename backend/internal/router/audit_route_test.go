@@ -26,6 +26,7 @@ var harapanAksiAudit = map[string]audit.Action{
 	"POST /api/v1/admin/users/:id/ban":         audit.UserBan,
 	"POST /api/v1/admin/users/:id/unban":       audit.UserUnban,
 	"POST /api/v1/admin/users/:id/delete":      audit.UserDelete,
+	"POST /api/v1/admin/users":                 audit.UserCreate,
 	"PATCH /api/v1/admin/users/:id/tier":       audit.UserTierChange,
 	"POST /api/v1/admin/users/:id/notes":       audit.UserNoteAdd,
 	"POST /api/v1/admin/accounts/:id/freeze":   audit.AccountFreeze,

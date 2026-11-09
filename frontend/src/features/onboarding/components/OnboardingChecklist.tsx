@@ -23,14 +23,14 @@ const STEP_META: Record<string, StepMeta> = {
   },
   hubungkan_broker: {
     title: 'Hubungkan Akun Broker',
-    hint: 'Gunakan access token Match-Trader Anda untuk eksekusi sinyal.',
+    hint: 'Gunakan cTrader OAuth atau access token broker Anda untuk eksekusi sinyal.',
     actionLabel: 'Buka halaman akun',
     href: '/akun',
   },
   pilih_strategi: {
-    title: 'Pilih Strategi & Simbol',
-    hint: 'Tentukan mesin ILA dan instrumen pasangan pair yang ingin Anda pantau.',
-    actionLabel: 'Pilih strategi',
+    title: 'Pilih Watchlist Pair',
+    hint: 'Tentukan instrumen pair dan metode analisis ILA yang ingin Anda pantau.',
+    actionLabel: 'Pilih pair',
     href: '/strategi',
   },
   hubungkan_telegram: {
@@ -41,7 +41,7 @@ const STEP_META: Record<string, StepMeta> = {
   },
   setel_risiko: {
     title: 'Setel Aturan Risiko',
-    hint: 'Tetapkan persentase risiko per trade (0,1% - 1%) dan kuota order harian.',
+    hint: 'Tetapkan persentase risiko per trade atau ukuran lot untuk akun trading Anda.',
     actionLabel: 'Atur risiko broker',
     href: '/akun',
   },

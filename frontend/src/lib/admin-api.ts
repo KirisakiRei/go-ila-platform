@@ -29,6 +29,7 @@ import type {
   OperationReport,
   RevenueReport,
   UserActionPayload,
+  AdminCreateUserPayload,
 } from '@/types/admin'
 
 /** Envelope daftar: data dan meta dikirim terpisah oleh backend. */
@@ -84,6 +85,8 @@ export const adminAuthApi = {
 export const adminUserApi = {
   list: (query: Record<string, string | number | boolean | undefined>) =>
     requestList<AdminUserListItem>(`${ADMIN}/users`, { query }),
+  create: (payload: AdminCreateUserPayload) =>
+    request<AdminUserListItem>(`${ADMIN}/users`, { method: 'POST', body: payload }),
   detail: (id: string) => request<AdminUserDetail>(`${ADMIN}/users/${id}`),
   accounts: (id: string) => request<AdminAccountItem[]>(`${ADMIN}/users/${id}/accounts`),
   positions: (id: string) => request<AdminPositionItem[]>(`${ADMIN}/users/${id}/positions`),

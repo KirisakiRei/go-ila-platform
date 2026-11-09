@@ -44,8 +44,8 @@ export function SystemHealthCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Kesiapan sistem</CardTitle>
-        <CardDescription>Kondisi pasar, engine, dan sesi broker saat ini.</CardDescription>
+        <CardTitle>Status Sistem</CardTitle>
+        <CardDescription>Kondisi pasar, analisis ILA, dan sesi broker saat ini.</CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="divide-y divide-border">
@@ -55,19 +55,19 @@ export function SystemHealthCard() {
             <Row
               key={engine.strategy}
               state={engine.connected ? 'online' : 'offline'}
-              label={`Engine ${engine.strategy}`}
-              value={engine.connected ? engine.engine_version || 'aktif' : 'tidak terhubung'}
+              label={`Analisis ${engine.strategy}`}
+              value={engine.connected ? (engine.engine_version ? `v${engine.engine_version}` : 'Online') : 'Offline'}
             />
           ))}
 
           {data.engines.length === 0 && (
-            <Row state="idle" label="Engine" value="belum dikonfigurasi" />
+            <Row state="idle" label="Analisis ILA" value="Menunggu koneksi" />
           )}
 
           <Row
             state={brokerState}
-            label="Akun broker"
-            value={`${data.brokers.connected} dari ${data.brokers.total} tersambung`}
+            label="Akun Broker"
+            value={`${data.brokers.connected} dari ${data.brokers.total} aktif`}
           />
         </ul>
       </CardContent>

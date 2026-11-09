@@ -27,29 +27,29 @@ function SummaryStats() {
   if (!data) return null
 
   const market: Record<MarketState, string> = {
-    OPEN: 'Buka',
-    CLOSED: 'Tutup',
+    OPEN: 'Open',
+    CLOSED: 'Closed',
     ROLLOVER: 'Rollover',
-    UNKNOWN: 'Tidak diketahui',
+    UNKNOWN: 'Standby',
   }
 
   return (
     <StatGrid>
-      <Stat label="Pasar" value={market[data.market.state]} hint={data.market.label} />
+      <Stat label="Status Pasar" value={market[data.market.state]} hint={data.market.label} />
       <Stat
-        label="Trade hari ini"
+        label="Trades Hari Ini"
         value={`${data.daily.total_trades} / ${data.daily.max_trades}`}
-        hint={data.daily.day ? `Tanggal ${data.daily.day} (WIB)` : undefined}
+        hint={data.daily.day ? `Sesi ${data.daily.day} WIB` : undefined}
       />
       <Stat
-        label="Menang / Kalah"
+        label="Win / Loss"
         value={`${data.daily.win_count} / ${data.daily.loss_count}`}
-        hint={`${data.daily.open_count} posisi terbuka`}
+        hint={`${data.daily.open_count} posisi aktif`}
       />
       <Stat
-        label="Akun broker"
+        label="Broker Accounts"
         value={`${data.brokers.connected} / ${data.brokers.total}`}
-        hint={data.brokers.any_error ? 'Ada akun bermasalah' : 'Semua tersambung'}
+        hint={data.brokers.any_error ? 'Ada akun perlu sinkronisasi' : 'Semua tersambung'}
       />
     </StatGrid>
   )
@@ -63,11 +63,11 @@ function RecentPositions() {
   if (!data || data.length === 0) {
     return (
       <EmptyState
-        title="Belum ada posisi"
-        description="Posisi muncul setelah sinyal dieksekusi pada akun broker Anda."
+        title="Belum ada posisi trading"
+        description="Posisi akan muncul otomatis setelah sinyal dieksekusi pada akun broker Anda."
         action={
           <Button asChild variant="outline" size="sm">
-            <Link to="/sinyal">Lihat sinyal</Link>
+            <Link to="/sinyal">Buka Signals</Link>
           </Button>
         }
       />
@@ -85,14 +85,14 @@ function RecentPositions() {
           <span className="text-muted-foreground">{position.direction}</span>
           {position.is_dry_run && (
             <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Simulasi
+              Demo
             </span>
           )}
           <span className="ml-auto tabular font-medium">
             {position.pnl_known ? (
               <>
                 {formatMoney(position.profit_loss)}{' '}
-                <span className="text-muted-foreground">({formatR(position.outcome_r)})</span>
+                <span className="text-muted-foreground font-mono">({formatR(position.outcome_r)})</span>
               </>
             ) : (
               // Hasil belum dilaporkan broker: 0 akan terbaca sebagai "impas".
@@ -113,8 +113,8 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Ringkasan"
-        description="Keadaan sistem, batas harian, dan posisi terakhir."
+        title="Dashboard"
+        description="Status operasional pasar, ringkasan performa trading harian, dan posisi aktif."
         actions={<PageHeaderActions />}
       />
 
@@ -135,13 +135,13 @@ export default function DashboardPage() {
       <MarketSessionCard />
 
       <Section
-        title="Posisi terbaru"
+        title="Posisi Terkini"
         description={
           status ? `Waktu server ${formatDateTime(status.server_time)}` : 'Memuat waktu server…'
         }
         actions={
           <Button asChild variant="ghost" size="sm">
-            <Link to="/posisi">Semua posisi</Link>
+            <Link to="/posisi">Semua Posisi</Link>
           </Button>
         }
       >
