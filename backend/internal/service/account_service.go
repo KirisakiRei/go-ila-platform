@@ -342,7 +342,32 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 
 	s.recordAudit(ctx, userID, account, "account.create", "")
 
+	// Pair yang sudah dipantau sebelum akun ini ada belum punya saklar untuknya.
+	// Siapkan sekarang agar metode langsung bisa dipilih di halaman Sinyal.
+	s.seedSaklarUntukLangganan(ctx, userID)
+
 	return ptr(s.toResponse(ctx, account, model.BrokerAccountState{})), nil
+}
+
+// seedSaklarUntukLangganan menyiapkan saklar bawaan untuk semua pair yang sudah
+// dipantau user. Dipanggil setelah akun baru lahir, karena saklar bermakna per
+// akun sehingga pair lama belum punya baris untuk akun yang baru ditambahkan.
+func (s *accountService) seedSaklarUntukLangganan(ctx context.Context, userID string) {
+	if s.seeder == nil {
+		return
+	}
+	subs, err := s.subs.ListActiveByUser(ctx, userID)
+	if err != nil {
+		return
+	}
+	seen := make(map[string]bool, len(subs))
+	for _, sub := range subs {
+		if sub.Symbol == "" || seen[sub.Symbol] {
+			continue
+		}
+		seen[sub.Symbol] = true
+		_ = s.seeder.EnsureDefaults(ctx, userID, sub.Symbol)
+	}
 }
 
 // Update mengubah pengaturan akun; kredensial tidak ikut berubah.
@@ -1137,6 +1162,11 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 		active++
 		s.recordAudit(ctx, userID, newAcc, "account.create", "")
 		connectedResponses = append(connectedResponses, s.toResponse(ctx, newAcc, model.BrokerAccountState{}))
+	}
+
+	if len(connectedResponses) > 0 {
+		// Akun cTrader juga butuh saklar untuk pair yang sudah dipantau.
+		s.seedSaklarUntukLangganan(ctx, userID)
 	}
 
 	return &dto.CTraderCallbackResponse{

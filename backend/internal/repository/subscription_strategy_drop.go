@@ -25,7 +25,10 @@ func DropSubscriptionStrategy(ctx context.Context, db *gorm.DB) (bool, error) {
 		return false, nil
 	}
 
-	// Pastikan setiap langganan aktif punya minimal satu saklar untuk pair-nya.
+	// Pastikan setiap langganan aktif yang punya akun aktif sudah punya saklar
+	// untuk pair-nya. Langganan tanpa akun aktif tidak butuh saklar: saklar
+	// hanya bermakna per akun, dan pair itu akan mendapat saklar bawaan begitu
+	// akun dihubungkan.
 	var belum bool
 	err = db.WithContext(ctx).Raw(`
 		SELECT EXISTS (
@@ -33,6 +36,13 @@ func DropSubscriptionStrategy(ctx context.Context, db *gorm.DB) (bool, error) {
 			FROM subscription s
 			WHERE s.is_active = true
 			  AND s.deleted_at IS NULL
+			  AND EXISTS (
+				SELECT 1 FROM broker_account ba
+				WHERE ba.user_id = s.user_id
+				  AND ba.is_active = true
+				  AND ba.deleted_at IS NULL
+				  AND (s.broker_account_id IS NULL OR s.broker_account_id = ba.id)
+			  )
 			  AND NOT EXISTS (
 				SELECT 1 FROM account_pair_strategy a
 				WHERE a.user_id = s.user_id
@@ -45,7 +55,7 @@ func DropSubscriptionStrategy(ctx context.Context, db *gorm.DB) (bool, error) {
 	}
 	if belum {
 		return false, fmt.Errorf(
-			"kolom subscription.strategy belum bisa dihapus: ada langganan aktif tanpa saklar metode; jalankan BackfillAccountPairStrategy lebih dulu")
+			"kolom subscription.strategy belum bisa dihapus: ada langganan aktif berakun yang belum punya saklar metode; jalankan BackfillAccountPairStrategy lebih dulu")
 	}
 
 	if err := db.WithContext(ctx).Exec("ALTER TABLE subscription DROP COLUMN strategy").Error; err != nil {
