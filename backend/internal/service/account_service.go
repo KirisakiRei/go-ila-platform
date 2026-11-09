@@ -19,7 +19,10 @@ import (
 // Batas risiko per trade yang berlaku untuk semua tier (plans/14 §6).
 const (
 	MinRiskPercent = 0.10
-	MaxRiskPercent = 1.00
+	// MaxRiskPercent adalah pagar per-trade. Nilai di atas 1% tetap diizinkan
+	// tetapi wajib dikonfirmasi user di UI; 5% adalah batas paling agresif yang
+	// masih masuk akal untuk akun retail.
+	MaxRiskPercent = 5.00
 )
 
 // Batas jumlah simbol yang dipantau per user, menjaga beban engine.
@@ -30,6 +33,13 @@ const MaxSubscriptionsPerUser = 8
 type Sealer interface {
 	Seal(plaintext, associatedData []byte) (cryptox.Envelope, error)
 	ActiveVersion() int
+}
+
+// AccountStrategyLister membaca saklar metode per akun milik satu pengguna.
+// Dipersempit agar AccountService tidak bergantung pada seluruh kontrak
+// repository saklar.
+type AccountStrategyLister interface {
+	ListByUser(ctx context.Context, userID string) ([]model.AccountPairStrategy, error)
 }
 
 // AccountService mengelola akun broker user dan langganan simbol.
@@ -77,6 +87,10 @@ type accountService struct {
 	ctrader CTraderOAuthClient
 	// catalog menyajikan katalog pair aktif dan memvalidasi simbol pilihan user.
 	catalog PairCatalogService
+	// seeder menyiapkan saklar metode bawaan saat pair baru dipantau.
+	seeder StrategySwitchService
+	// switches membaca saklar metode per akun untuk laporan status strategi.
+	switches AccountStrategyLister
 }
 
 // CTraderOAuthClient mendefinisikan kontrak komunikasi ke REST API cTrader Spotware.
@@ -134,6 +148,11 @@ type AccountServiceDeps struct {
 	// Catalog dipakai memvalidasi pilihan pair per akun. Bila nil, seluruh
 	// simbol yang lolos normalisasi diterima (kompatibel dengan pemasangan lama).
 	Catalog PairCatalogService
+	// SwitchSeeder menyiapkan saklar metode bawaan saat pair baru dipantau,
+	// sehingga tiap akun langsung punya pilihan metode yang bisa diubah.
+	SwitchSeeder StrategySwitchService
+	// Switches membaca saklar metode per akun untuk laporan status strategi.
+	Switches AccountStrategyLister
 }
 
 // StrategyCatalog melaporkan ketersediaan strategi bagi user.
@@ -164,6 +183,25 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		clock:      clock,
 		ctrader:    deps.CTrader,
 		catalog:    deps.Catalog,
+		seeder:     deps.SwitchSeeder,
+		switches:   deps.Switches,
+	}
+}
+
+// SetStrategySwitchSeeder memasang penyiap saklar metode setelah service saklar
+// jadi. Dipisah karena service saklar membaca hak tier lewat AccountService,
+// sehingga keduanya saling butuh dan tidak bisa dirangkai dalam satu literal.
+func SetStrategySwitchSeeder(target AccountService, seeder StrategySwitchService) {
+	if svc, ok := target.(*accountService); ok {
+		svc.seeder = seeder
+	}
+}
+
+// SetAccountStrategyLister memasang pembaca saklar metode untuk laporan status
+// strategi. Dipisah dengan alasan yang sama seperti SetStrategySwitchSeeder.
+func SetAccountStrategyLister(target AccountService, lister AccountStrategyLister) {
+	if svc, ok := target.(*accountService); ok {
+		svc.switches = lister
 	}
 }
 
@@ -260,6 +298,11 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 		return nil, err
 	}
 
+	riskMode, lotSize, err := s.resolveRiskSettings(req.RiskMode, req.LotSize, riskPercent, "")
+	if err != nil {
+		return nil, err
+	}
+
 	// Total risiko seluruh akun aktif tidak boleh melewati batas tier.
 	existing, err := s.accounts.ListByUser(ctx, userID)
 	if err != nil {
@@ -274,8 +317,9 @@ func (s *accountService) Create(ctx context.Context, userID string, req dto.Crea
 		BrokerType:  brokerType,
 		Label:       strings.TrimSpace(req.Label),
 		Mode:        mode,
-		RiskMode:    "percent",
+		RiskMode:    riskMode,
 		RiskPercent: riskPercent,
+		LotSize:     lotSize,
 		IsActive:    true,
 		IsDryRun:    req.IsDryRun,
 	}
@@ -350,6 +394,25 @@ func (s *accountService) Update(ctx context.Context, userID, accountID string, r
 	}
 	if req.IsDryRun != nil {
 		account.IsDryRun = *req.IsDryRun
+	}
+
+	// Mode risiko dan ukuran lot dapat diubah terpisah dari persentase. Bila
+	// hanya salah satu dikirim, nilai lama dipakai sebagai pasangan.
+	if req.RiskMode != nil || req.LotSize != nil {
+		modeDiminta := account.RiskMode
+		if req.RiskMode != nil {
+			modeDiminta = *req.RiskMode
+		}
+		lotDiminta := account.LotSize
+		if req.LotSize != nil {
+			lotDiminta = *req.LotSize
+		}
+		riskMode, lotSize, riskErr := s.resolveRiskSettings(modeDiminta, lotDiminta, account.RiskPercent, account.ID)
+		if riskErr != nil {
+			return nil, riskErr
+		}
+		account.RiskMode = riskMode
+		account.LotSize = lotSize
 	}
 
 	// Rotasi kredensial: token baru ditulis lalu sesi lama di Runner diputus,
@@ -463,18 +526,18 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 	}
 	symbol = resolved
 
-	strategy := req.Strategy
-	if strategy == "" {
-		strategy = "ila-2.0"
-	}
-	if !knownStrategy(strategy) {
+	// Metode tidak lagi ditentukan saat memantau pair. Satu pair dipantau
+	// seluruh metode; yang memilih metode adalah saklar per akun. Field
+	// req.Strategy tetap diterima (klien lama) tetapi hanya dipakai untuk
+	// memvalidasi hak, tidak disimpan.
+	if req.Strategy != "" && !knownStrategy(req.Strategy) {
 		return nil, fmt.Errorf("%w: strategi tidak dikenal", apperror.ErrBadRequest)
 	}
-	if strategy == "ila-3.0" {
+	if req.Strategy == "ila-3.0" {
 		if tier != "plus" {
 			return nil, fmt.Errorf("%w: ILA 3.0 tersedia untuk tier Plus", apperror.ErrForbidden)
 		}
-		if !s.strategies.StrategySelectable(strategy) {
+		if !s.strategies.StrategySelectable("ila-3.0") {
 			return nil, fmt.Errorf("%w: ILA 3.0 belum tersedia", apperror.ErrForbidden)
 		}
 	}
@@ -484,11 +547,18 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 		return nil, findErr
 	}
 	activeCount := 0
+	seenSymbol := make(map[string]bool)
 	for _, row := range existing {
-		if row.IsActive && row.Symbol == symbol && row.Strategy == strategy {
+		if !row.IsActive {
+			continue
+		}
+		// Satu pair cukup dipantau sekali. Menambah pair yang sudah dipantau
+		// mengembalikan baris lama, bukan menggandakan risiko.
+		if row.Symbol == symbol {
 			return ptr(toSubscriptionResponse(row)), nil
 		}
-		if row.IsActive {
+		if !seenSymbol[row.Symbol] {
+			seenSymbol[row.Symbol] = true
 			activeCount++
 		}
 	}
@@ -501,7 +571,6 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 	sub := &model.Subscription{
 		UserID:   userID,
 		Symbol:   symbol,
-		Strategy: strategy,
 		IsActive: true,
 	}
 	if req.BrokerAccountID != "" {
@@ -516,7 +585,16 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 		return nil, err
 	}
 
-	s.recordStrategyAudit(ctx, userID, strategy, "subscription.enable", symbol)
+	// Audit mencatat bahwa pair mulai dipantau. Metodenya tidak lagi dipilih di
+	// sini, jadi dicatat sebagai ILA 2.0 (metode dasar) agar riwayat tetap terbaca.
+	s.recordStrategyAudit(ctx, userID, "ila-2.0", "subscription.enable", symbol)
+
+	// Siapkan saklar metode bawaan: ILA 2.0 menyala, ILA 3.0 hanya bila
+	// pengguna berhak. Kegagalan di sini tidak membatalkan langganan karena
+	// saklar bisa disusun belakangan saat dibuka di halaman Sinyal.
+	if s.seeder != nil {
+		_ = s.seeder.EnsureDefaults(ctx, userID, symbol)
+	}
 
 	return ptr(toSubscriptionResponse(*sub)), nil
 }
@@ -538,13 +616,17 @@ func (s *accountService) Strategies(ctx context.Context, userID string) ([]dto.S
 	}
 	tier := effectiveTier(user, s.clock())
 
-	active, err := s.subs.ListActiveByUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	selected := make(map[string]bool, len(active))
-	for _, row := range active {
-		selected[row.Strategy] = true
+	// `selected` kini berarti: ada minimal satu akun yang menyalakan metode ini.
+	// Sebelumnya diturunkan dari kolom langganan, yang sudah dihapus.
+	selected := make(map[string]bool, 2)
+	if s.switches != nil {
+		if rows, listErr := s.switches.ListByUser(ctx, userID); listErr == nil {
+			for _, row := range rows {
+				if row.IsEnabled {
+					selected[row.Strategy] = true
+				}
+			}
+		}
 	}
 
 	definitions := []struct {
@@ -665,7 +747,9 @@ func (s *accountService) toResponse(ctx context.Context, account *model.BrokerAc
 		Label:             account.Label,
 		ExternalAccountID: account.ExternalAccountID,
 		Mode:              account.Mode,
+		RiskMode:          account.RiskMode,
 		RiskPercent:       account.RiskPercent,
+		LotSize:           account.LotSize,
 		IsActive:          account.IsActive,
 		IsFrozen:          account.IsFrozen,
 		IsDryRun:          account.IsDryRun,
@@ -825,7 +909,6 @@ func toSubscriptionResponse(sub model.Subscription) dto.SubscriptionResponse {
 	out := dto.SubscriptionResponse{
 		ID:       sub.ID,
 		Symbol:   sub.Symbol,
-		Strategy: sub.Strategy,
 		IsActive: sub.IsActive,
 	}
 	if sub.BrokerAccountID != nil {
@@ -905,6 +988,11 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 	}
 
 	riskPercent, err := s.validateRiskForTier(ctx, tier, req.RiskPercent)
+	if err != nil {
+		return nil, err
+	}
+
+	riskMode, lotSize, err := s.resolveRiskSettings(req.RiskMode, req.LotSize, riskPercent, "")
 	if err != nil {
 		return nil, err
 	}
@@ -993,8 +1081,9 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 			Label:             label,
 			ExternalAccountID: extID,
 			Mode:              mode,
-			RiskMode:          "percent",
+			RiskMode:          riskMode,
 			RiskPercent:       riskPercent,
+			LotSize:           lotSize,
 			IsActive:          true,
 			IsDryRun:          !acc.Live,
 		}

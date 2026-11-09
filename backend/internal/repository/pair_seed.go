@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -114,6 +115,60 @@ func DefaultPairSeeds() (categories []PairSeedCategory, pairs []PairSeedPair) {
 // Seed bersifat aditif dan idempoten: kategori, grup, atau pair yang sudah ada
 // tidak pernah ditimpa, sehingga perubahan admin tidak hilang saat migrasi
 // dijalankan ulang. Nilai yang dihitung adalah jumlah pair baru.
+// PairContract adalah metadata kontrak bawaan sebuah simbol.
+//
+// Dipakai kalkulator risiko untuk mengubah jumlah lot menjadi nominal uang:
+//
+//	risiko_nominal = |entry - sl| x value_per_lot x lots
+//
+// Angka-angkanya adalah nilai umum retail broker. Admin dapat mengubahnya per
+// pair lewat panel katalog, dan spesifikasi broker tetap menimpa saat eksekusi.
+type PairContract struct {
+	ValuePerLot  float64
+	ContractSize float64
+	MinLot       float64
+	MaxLot       float64
+	LotStep      float64
+}
+
+// DefaultContractForCategory mengembalikan metadata kontrak menurut kategori
+// dan simbol. Nilai ini hanya titik awal; tidak pernah menimpa isian admin.
+func DefaultContractForCategory(categoryKey, symbol string) PairContract {
+	base := PairContract{MinLot: 0.01, MaxLot: 10, LotStep: 0.01}
+
+	switch categoryKey {
+	case "forex":
+		base.ContractSize = 100_000
+		base.ValuePerLot = 100_000
+		// Pair ber-quote JPY: nilai 1.0 pergerakan harga sekitar 1/100 dari
+		// pair ber-quote USD, karena harga dinyatakan per 0.01 yen.
+		if strings.HasSuffix(symbol, "JPY") {
+			base.ValuePerLot = 1_000
+		}
+	case "indices":
+		base.ContractSize = 1
+		base.ValuePerLot = 1
+	case "crypto":
+		base.ContractSize = 1
+		base.ValuePerLot = 1
+	case "commodity":
+		switch {
+		case symbol == "XAUUSD", symbol == "XAUEUR":
+			base.ContractSize = 100 // 1 lot = 100 troy ounce
+			base.ValuePerLot = 100
+		case symbol == "XAGUSD":
+			base.ContractSize = 5_000 // 1 lot = 5000 troy ounce
+			base.ValuePerLot = 5_000
+		default:
+			// Energi (USOIL): 1 lot = 1000 barel.
+			base.ContractSize = 1_000
+			base.ValuePerLot = 1_000
+		}
+	}
+
+	return base
+}
+
 func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 	categories, pairs := DefaultPairSeeds()
 
@@ -196,13 +251,24 @@ func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 					// Pair yang sudah dihapus admin tidak dihidupkan kembali.
 					continue
 				}
-				// Korelasi hanya diisi bila masih kosong; nilai yang sudah diubah
-				// admin tidak pernah ditimpa migrasi berikutnya.
+				// Korelasi dan metadata kontrak hanya diisi bila masih kosong;
+				// nilai yang sudah diubah admin tidak pernah ditimpa migrasi.
+				patch := map[string]any{}
 				if existing.CorrelatedSymbols == "" && pair.CorrelatedSymbols != "" {
+					patch["correlated_symbols"] = pair.CorrelatedSymbols
+				}
+				contract := DefaultContractForCategory(pair.CategoryKey, pair.Symbol)
+				if existing.ValuePerLot <= 0 && contract.ValuePerLot > 0 {
+					patch["value_per_lot"] = contract.ValuePerLot
+				}
+				if existing.ContractSize <= 0 && contract.ContractSize > 0 {
+					patch["contract_size"] = contract.ContractSize
+				}
+				if len(patch) > 0 {
 					if err := tx.Model(&model.TradingPair{}).
 						Where("id = ?", existing.ID).
-						Update("correlated_symbols", pair.CorrelatedSymbols).Error; err != nil {
-						return fmt.Errorf("mengisi korelasi %s: %w", pair.Symbol, err)
+						Updates(patch).Error; err != nil {
+						return fmt.Errorf("mengisi metadata %s: %w", pair.Symbol, err)
 					}
 				}
 				continue
@@ -211,6 +277,7 @@ func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 				return fmt.Errorf("memeriksa pair %s: %w", pair.Symbol, err)
 			}
 
+			contract := DefaultContractForCategory(pair.CategoryKey, pair.Symbol)
 			row := &model.TradingPair{
 				Symbol:            pair.Symbol,
 				DisplayName:       pair.DisplayName,
@@ -220,6 +287,11 @@ func SeedPairs(ctx context.Context, db *gorm.DB, at time.Time) (int, error) {
 				SortOrder:         pair.SortOrder,
 				IsEnabled:         true,
 				Description:       pair.Description,
+				ValuePerLot:       contract.ValuePerLot,
+				ContractSize:      contract.ContractSize,
+				MinLot:            contract.MinLot,
+				MaxLot:            contract.MaxLot,
+				LotStep:           contract.LotStep,
 			}
 			if id, ok := groupID[catID+"|"+pair.GroupKey]; ok {
 				gid := id

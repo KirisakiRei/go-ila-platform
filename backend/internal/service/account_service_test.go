@@ -152,7 +152,7 @@ func (f *fakeSubRepo) ReplaceAccountPairs(_ context.Context, userID, accountID s
 		if !found {
 			acc := accountID
 			f.subs = append(f.subs, &model.Subscription{
-				UserID: userID, Symbol: sym, Strategy: "ila-2.0",
+				UserID: userID, Symbol: sym,
 				IsActive: true, BrokerAccountID: &acc,
 			})
 		}
@@ -369,7 +369,7 @@ func TestRisikoDiLuarPagarDitolak(t *testing.T) {
 	user := newTestUser("plus")
 	svc, _, _ := newTestAccountService(t, user, &fakeStrategies{ila3: "general"})
 
-	for _, risk := range []float64{0.05, 1.5} {
+	for _, risk := range []float64{0.05, 5.5} {
 		_, err := svc.Create(context.Background(), userIDTest, dto.CreateAccountRequest{
 			BrokerType: "matchtrader", Token: sampleToken, RiskPercent: risk,
 		})

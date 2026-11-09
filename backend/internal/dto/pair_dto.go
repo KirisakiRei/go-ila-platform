@@ -11,6 +11,13 @@ type PairItem struct {
 	// CorrelatedSymbols adalah instrumen pembanding SMT (bisa lebih dari satu).
 	// Nilainya hanya informasi; evaluasi korelasi tetap milik engine.
 	CorrelatedSymbols []string `json:"correlated_symbols,omitempty"`
+	// Metadata kontrak untuk kalkulator risiko. Nol berarti belum diisi dan
+	// klien wajib memakai nilai bawaan kategori.
+	ValuePerLot  float64 `json:"value_per_lot,omitempty"`
+	ContractSize float64 `json:"contract_size,omitempty"`
+	MinLot       float64 `json:"min_lot,omitempty"`
+	MaxLot       float64 `json:"max_lot,omitempty"`
+	LotStep      float64 `json:"lot_step,omitempty"`
 }
 
 // PairGroupView adalah sub-kategori beserta pair di dalamnya.
@@ -80,18 +87,29 @@ type CreatePairRequest struct {
 	SortOrder         int    `json:"sort_order"`
 	IsEnabled         *bool  `json:"is_enabled"`
 	Description       string `json:"description" binding:"max=255"`
+	// Metadata kontrak; nilai nol berarti mengikuti bawaan kategori.
+	ValuePerLot  float64 `json:"value_per_lot"`
+	ContractSize float64 `json:"contract_size"`
+	MinLot       float64 `json:"min_lot"`
+	MaxLot       float64 `json:"max_lot"`
+	LotStep      float64 `json:"lot_step"`
 }
 
 // UpdatePairRequest mengubah simbol.
 type UpdatePairRequest struct {
-	DisplayName       *string `json:"display_name" binding:"omitempty,max=60"`
-	CategoryID        *string `json:"category_id"`
-	GroupID           *string `json:"group_id"`
-	Aliases           *string `json:"aliases" binding:"omitempty,max=120"`
-	CorrelatedSymbols *string `json:"correlated_symbols" binding:"omitempty,max=120"`
-	SortOrder         *int    `json:"sort_order"`
-	IsEnabled         *bool   `json:"is_enabled"`
-	Description       *string `json:"description" binding:"omitempty,max=255"`
+	DisplayName       *string  `json:"display_name" binding:"omitempty,max=60"`
+	CategoryID        *string  `json:"category_id"`
+	GroupID           *string  `json:"group_id"`
+	Aliases           *string  `json:"aliases" binding:"omitempty,max=120"`
+	CorrelatedSymbols *string  `json:"correlated_symbols" binding:"omitempty,max=120"`
+	SortOrder         *int     `json:"sort_order"`
+	IsEnabled         *bool    `json:"is_enabled"`
+	Description       *string  `json:"description" binding:"omitempty,max=255"`
+	ValuePerLot       *float64 `json:"value_per_lot"`
+	ContractSize      *float64 `json:"contract_size"`
+	MinLot            *float64 `json:"min_lot"`
+	MaxLot            *float64 `json:"max_lot"`
+	LotStep           *float64 `json:"lot_step"`
 }
 
 // AdminPairView menampilkan pair lengkap untuk panel admin.
@@ -112,6 +130,12 @@ type AdminPairView struct {
 	// Subscribers adalah jumlah langganan aktif yang memakai simbol ini.
 	// Admin perlu melihatnya sebelum menonaktifkan atau menghapus pair.
 	Subscribers int64 `json:"subscribers"`
+	// Metadata kontrak untuk kalkulator risiko dan pratinjau lot.
+	ValuePerLot  float64 `json:"value_per_lot"`
+	ContractSize float64 `json:"contract_size"`
+	MinLot       float64 `json:"min_lot"`
+	MaxLot       float64 `json:"max_lot"`
+	LotStep      float64 `json:"lot_step"`
 }
 
 // AdminPairCatalogResponse adalah seluruh katalog untuk admin.

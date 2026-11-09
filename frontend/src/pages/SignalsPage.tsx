@@ -26,6 +26,7 @@ import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format
 import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
+import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
 
 export default function SignalsPage() {
   const [params, setParams] = useSearchParams()
@@ -171,6 +172,15 @@ export default function SignalsPage() {
               Menampilkan {filteredSignals.length} sinyal · {filteredPositions.length} posisi
             </div>
           </div>
+
+          {/* Saklar metode per akun untuk pair ini. Pair dipantau seluruh metode,
+              tetapi tiap akun bebas memilih mana yang dieksekusi. */}
+          <Section
+            title="Metode per Akun"
+            description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Pair tetap dipantau seluruh metode.`}
+          >
+            <SaklarMetodeAkun symbol={activePair} />
+          </Section>
 
           {/* Sinyal Aktif / Terakhir */}
           <div className="grid gap-6 lg:grid-cols-12">

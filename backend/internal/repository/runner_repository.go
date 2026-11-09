@@ -70,6 +70,17 @@ type RunnerRepository interface {
 	// satu simbol. Satu user dapat menyumbang lebih dari satu akun, karena
 	// pilihan pair kini berada di level akun.
 	ListAccountsBySymbol(ctx context.Context, symbol string) ([]model.SubscriptionAccount, error)
+	// EnabledAccountStrategies mengembalikan saklar metode untuk satu simbol,
+	// dipetakan dari akun ke himpunan nama metode yang MENYALA, beserta daftar
+	// akun yang sudah pernah diatur.
+	//
+	// Akun yang sudah diatur tetapi seluruh metodenya dimatikan tidak muncul di
+	// peta saklar; itulah sebabnya ConfiguredAccounts ikut dikembalikan agar
+	// pemanggil tidak salah menganggapnya "belum pernah diatur".
+	EnabledAccountStrategies(ctx context.Context, symbol string) (map[string]map[string]bool, error)
+	// ConfiguredAccounts melaporkan akun yang sudah punya baris saklar untuk
+	// simbol tertentu. Akun di luar daftar ini memakai saklar bawaan.
+	ConfiguredAccounts(ctx context.Context, symbol string) (map[string]bool, error)
 	// EnabledPairSymbols mengembalikan simbol kanonik yang masih diaktifkan
 	// admin. Symbol lain tidak boleh diminta ke engine.
 	EnabledPairSymbols(ctx context.Context) ([]string, error)
@@ -633,6 +644,53 @@ func (r *runnerRepository) ListAccountsBySymbol(ctx context.Context, symbol stri
 			continue
 		}
 		out = append(out, model.SubscriptionAccount{User: owner, Account: acc})
+	}
+	return out, nil
+}
+
+// EnabledAccountStrategies membaca saklar metode yang menyala untuk satu simbol.
+//
+// Hasilnya akun -> himpunan metode yang aktif. Hanya baris yang benar-benar
+// menyala yang dilaporkan. Untuk membedakan "belum pernah diatur" dari
+// "sudah diatur tetapi semuanya dimatikan", pasangkan dengan ConfiguredAccounts.
+func (r *runnerRepository) EnabledAccountStrategies(ctx context.Context, symbol string) (map[string]map[string]bool, error) {
+	var rows []model.AccountPairStrategy
+	err := r.db.WithContext(ctx).
+		Where("symbol = ? AND is_enabled = ? AND deleted_at IS NULL", symbol, true).
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca saklar metode akun: %w", err)
+	}
+
+	out := make(map[string]map[string]bool, len(rows))
+	for _, row := range rows {
+		if out[row.BrokerAccountID] == nil {
+			out[row.BrokerAccountID] = make(map[string]bool, 2)
+		}
+		out[row.BrokerAccountID][row.Strategy] = true
+	}
+	return out, nil
+}
+
+// ConfiguredAccounts melaporkan akun yang sudah punya baris saklar untuk satu
+// simbol, termasuk yang saklarnya mati.
+//
+// Tanpa daftar ini, akun yang seluruh metodenya dimatikan akan terlihat sama
+// dengan akun yang belum pernah diatur, sehingga saklar mati bisa diabaikan.
+func (r *runnerRepository) ConfiguredAccounts(ctx context.Context, symbol string) (map[string]bool, error) {
+	var accountIDs []string
+	err := r.db.WithContext(ctx).
+		Model(&model.AccountPairStrategy{}).
+		Where("symbol = ? AND deleted_at IS NULL", symbol).
+		Distinct().
+		Pluck("broker_account_id", &accountIDs).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca akun dengan saklar metode: %w", err)
+	}
+
+	out := make(map[string]bool, len(accountIDs))
+	for _, id := range accountIDs {
+		out[id] = true
 	}
 	return out, nil
 }

@@ -27,6 +27,8 @@ const (
 	RejectSlippage     RejectReason = "Harga sudah bergerak terlalu jauh dari level entry."
 	RejectEntitlement  RejectReason = "Mode eksekusi ini tidak tersedia pada tier Anda."
 	RejectStrategyTier RejectReason = "Strategi ini belum tersedia untuk tier Anda."
+	// Metode ini memang dimatikan pemilik akun, bukan soal tier.
+	RejectStrategyDisabled RejectReason = "Metode analisis ini sedang dimatikan untuk akun tersebut. Nyalakan di halaman Sinyal bila ingin dipantau."
 	// Pesan penolakan dibaca pengguna, jadi menyebut langkah berikutnya.
 	RejectLegalPending  RejectReason = "Ada dokumen wajib yang belum Anda setujui. Buka dashboard untuk menyetujuinya; setup tetap dipantau."
 	RejectAccountFrozen RejectReason = "Eksekusi di akun broker Anda sedang dibekukan. Hubungi dukungan untuk membukanya; setup dan notifikasi tetap berjalan."

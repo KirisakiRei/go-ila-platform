@@ -58,7 +58,9 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 			model.FeatureStrategies:   "ila-2.0",
 			model.FeatureILA3Status:   "coming_soon",
 			model.FeatureReasonAI:     "false",
-			model.FeatureMaxTotalRisk: "1",
+			// Pagar risiko kini 5% per trade; batas total ikut dinaikkan agar
+			// nilai di atas 1% benar-benar dapat dipakai.
+			model.FeatureMaxTotalRisk: "5",
 		},
 		model.TierPlus: {
 			model.FeatureAccountLimit: "2",
@@ -70,7 +72,7 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 			model.FeatureILA3Status: "coming_soon",
 			model.FeatureReasonAI:   "true",
 			// Batas total risiko seluruh akun aktif milik satu pengguna (persen).
-			model.FeatureMaxTotalRisk: "2",
+			model.FeatureMaxTotalRisk: "5",
 		},
 	}
 

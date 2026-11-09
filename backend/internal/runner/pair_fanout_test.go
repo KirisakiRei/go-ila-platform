@@ -89,10 +89,10 @@ func TestComputeRequirements_FilteredByPairGate(t *testing.T) {
 	pub := &fakePublisher{}
 
 	// User Plus memantau XAUUSD dan EURUSD.
-	store.users["u1"] = &model.User{Base: model.Base{ID: "u1"}, Tier: "plus", Status: "active"}
+	tambahAkun(store, "u1", "plus", "XAUUSD", "ila-2.0", "ila-3.0")
 	store.subs = append(store.subs,
-		model.Subscription{UserID: "u1", Symbol: "XAUUSD", Strategy: "ila-2.0", IsActive: true},
-		model.Subscription{UserID: "u1", Symbol: "EURUSD", Strategy: "ila-2.0", IsActive: true},
+		model.Subscription{UserID: "u1", Symbol: "XAUUSD", IsActive: true},
+		model.Subscription{UserID: "u1", Symbol: "EURUSD", IsActive: true},
 	)
 
 	// Gate hanya mengaktifkan XAUUSD; EURUSD dinonaktifkan admin.
@@ -150,7 +150,7 @@ func TestSignalFannedOutPerAccount_MultipleAccountsForSameUser(t *testing.T) {
 
 	// Langganan tanpa broker_account_id (berlaku untuk seluruh akun aktif user).
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u-plus", Symbol: "XAUUSD", Strategy: "ila-2.0", IsActive: true,
+		UserID: "u-plus", Symbol: "XAUUSD", IsActive: true,
 	})
 
 	svc := newService(store, pub)
@@ -255,9 +255,14 @@ func newCorrelationService(store *fakeStore, gate runner.CorrelationGate) *runne
 func TestComputeRequirements_Ila3MintaKorelasi(t *testing.T) {
 	store := newFakeStore()
 	store.users["u1"] = &model.User{Base: model.Base{ID: "u1"}, Tier: "plus", Status: "active"}
+	store.accounts["acct-u1"] = &model.BrokerAccount{
+		Base: model.Base{ID: "acct-u1"}, UserID: "u1", BrokerType: "paper", IsActive: true,
+	}
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u1", Symbol: "XAUUSD", Strategy: "ila-3.0", IsActive: true,
+		UserID: "u1", Symbol: "XAUUSD", IsActive: true,
 	})
+	// Metode dipilih per akun; korelasi diuji lewat saklar ILA 3.0.
+	store.switches["XAUUSD|acct-u1"] = map[string]bool{"ila-2.0": true, "ila-3.0": true}
 	store.correlations["XAUUSD"] = []string{"XAGUSD", "XAUEUR"}
 
 	svc := newCorrelationService(store, runner.NewCachedCorrelationGate(store, time.Minute))
@@ -296,9 +301,13 @@ func TestComputeRequirements_Ila2TidakMintaKorelasi(t *testing.T) {
 func TestComputeRequirements_KorelasiNonaktifDisaring(t *testing.T) {
 	store := newFakeStore()
 	store.users["u1"] = &model.User{Base: model.Base{ID: "u1"}, Tier: "plus", Status: "active"}
+	store.accounts["acct-u1"] = &model.BrokerAccount{
+		Base: model.Base{ID: "acct-u1"}, UserID: "u1", BrokerType: "paper", IsActive: true,
+	}
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u1", Symbol: "XAUUSD", Strategy: "ila-3.0", IsActive: true,
+		UserID: "u1", Symbol: "XAUUSD", IsActive: true,
 	})
+	store.switches["XAUUSD|acct-u1"] = map[string]bool{"ila-2.0": true, "ila-3.0": true}
 	store.correlations["XAUUSD"] = []string{"XAGUSD", "XAUEUR"}
 
 	// Gate hanya mengaktifkan XAUUSD dan XAUEUR; XAGUSD disembunyikan admin.
@@ -350,8 +359,8 @@ func TestSignalFannedOutPerAccount_SelectivePairPerAccount(t *testing.T) {
 	acc1 := "acc-1"
 	acc2 := "acc-2"
 	store.subs = append(store.subs,
-		model.Subscription{UserID: "u-plus", Symbol: "EURUSD", Strategy: "ila-2.0", IsActive: true, BrokerAccountID: &acc1},
-		model.Subscription{UserID: "u-plus", Symbol: "XAUUSD", Strategy: "ila-2.0", IsActive: true, BrokerAccountID: &acc2},
+		model.Subscription{UserID: "u-plus", Symbol: "EURUSD", IsActive: true, BrokerAccountID: &acc1},
+		model.Subscription{UserID: "u-plus", Symbol: "XAUUSD", IsActive: true, BrokerAccountID: &acc2},
 	)
 
 	svc := newService(store, pub)

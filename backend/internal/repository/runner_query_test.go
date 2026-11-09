@@ -54,7 +54,7 @@ func TestPemantauSimbolPostgres(t *testing.T) {
 
 	sub := &model.Subscription{
 		Base:   model.Base{ID: uuid.NewString(), CreatedAt: now, UpdatedAt: now},
-		UserID: userID, Symbol: "XAUUSD", Strategy: "ila-2.0", IsActive: true,
+		UserID: userID, Symbol: "XAUUSD", IsActive: true,
 	}
 	if err := db.Create(sub).Error; err != nil {
 		t.Fatalf("buat langganan: %v", err)
@@ -103,7 +103,7 @@ func TestPemantauSimbolMengabaikanYangNonaktif(t *testing.T) {
 
 	sub := &model.Subscription{
 		Base:   model.Base{ID: uuid.NewString(), CreatedAt: now, UpdatedAt: now},
-		UserID: userID, Symbol: "EURUSD", Strategy: "ila-2.0", IsActive: false,
+		UserID: userID, Symbol: "EURUSD", IsActive: false,
 	}
 	if err := db.Create(sub).Error; err != nil {
 		t.Fatalf("buat langganan: %v", err)

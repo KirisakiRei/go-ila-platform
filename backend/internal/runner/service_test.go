@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -36,6 +37,8 @@ type fakeStore struct {
 	events      []model.SignalEvent
 	// correlations adalah peta korelasi SMT yang disajikan ke Runner.
 	correlations map[string][]string
+	// switches menyimpan saklar metode per akun × pair untuk pengujian.
+	switches map[string]map[string]bool
 	// staleClaims menandai klaim yang dianggap tertinggal pada pengujian.
 	staleClaims map[string]struct{}
 }
@@ -50,6 +53,7 @@ func newFakeStore() *fakeStore {
 		users:        map[string]*model.User{},
 		accounts:     map[string]*model.BrokerAccount{},
 		correlations: map[string][]string{},
+		switches:     map[string]map[string]bool{},
 	}
 }
 
@@ -380,6 +384,38 @@ func (s *fakeStore) ListAccountsBySymbol(_ context.Context, symbol string) ([]mo
 	return out, nil
 }
 
+// EnabledAccountStrategies mengembalikan saklar metode yang menyala untuk satu
+// simbol, dalam bentuk akun -> himpunan metode.
+func (s *fakeStore) EnabledAccountStrategies(_ context.Context, symbol string) (map[string]map[string]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]map[string]bool{}
+	prefix := symbol + "|"
+	for key, metode := range s.switches {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		accountID := strings.TrimPrefix(key, prefix)
+		out[accountID] = metode
+	}
+	return out, nil
+}
+
+// ConfiguredAccounts melaporkan akun yang punya baris saklar untuk simbol ini,
+// termasuk yang saklarnya mati.
+func (s *fakeStore) ConfiguredAccounts(_ context.Context, symbol string) (map[string]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]bool{}
+	prefix := symbol + "|"
+	for key := range s.switches {
+		if strings.HasPrefix(key, prefix) {
+			out[strings.TrimPrefix(key, prefix)] = true
+		}
+	}
+	return out, nil
+}
+
 // EnabledPairSymbols mengembalikan seluruh simbol yang dikenal; fake store
 // tidak punya katalog, jadi semua simbol dianggap aktif.
 func (s *fakeStore) EnabledPairSymbols(_ context.Context) ([]string, error) {
@@ -520,6 +556,30 @@ func readySignal(symbol string, ttl time.Duration) *enginev1.Signal {
 	}
 }
 
+// tambahAkun membuat user + akun aktif tanpa langganan, lalu menyalakan saklar
+// metode sesuai daftar. Dipakai tes ComputeRequirements yang kini membaca
+// metode dari saklar, bukan dari kolom langganan.
+func tambahAkun(store *fakeStore, id, tier, symbol string, metode ...string) string {
+	accountID := "acct-" + id
+	store.users[id] = &model.User{Base: model.Base{ID: id}, Name: id, Tier: tier, Status: "active"}
+	store.accounts[accountID] = &model.BrokerAccount{
+		Base:        model.Base{ID: accountID},
+		UserID:      id,
+		BrokerType:  "paper",
+		Mode:        "manual",
+		IsActive:    true,
+		IsDryRun:    true,
+		RiskPercent: 0.5,
+	}
+	saklar := make(map[string]bool, len(metode))
+	for _, m := range metode {
+		saklar[m] = true
+	}
+	store.switches[symbol+"|"+accountID] = saklar
+	return accountID
+}
+
+// addUser membuat user beserta akun dan langganan XAUUSD.
 func addUser(store *fakeStore, id, tier, mode string, dryRun bool) {
 	store.users[id] = &model.User{Base: model.Base{ID: id}, Name: id, Tier: tier, Status: "active"}
 	store.accounts["acct-"+id] = &model.BrokerAccount{
@@ -532,7 +592,7 @@ func addUser(store *fakeStore, id, tier, mode string, dryRun bool) {
 		RiskPercent: 0.5,
 	}
 	store.subs = append(store.subs, model.Subscription{
-		UserID: id, Symbol: "XAUUSD", Strategy: "ila-2.0", IsActive: true,
+		UserID: id, Symbol: "XAUUSD", IsActive: true,
 	})
 }
 
@@ -981,7 +1041,7 @@ func TestSignalFannedOutPerUser(t *testing.T) {
 		Mode: "manual", IsActive: true, IsDryRun: true, RiskPercent: 0.5,
 	}
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u2", Symbol: "XAUUSD", Strategy: "ila-2.0", IsActive: true,
+		UserID: "u2", Symbol: "XAUUSD", IsActive: true,
 	})
 
 	svc := newService(store, pub)
@@ -1023,9 +1083,10 @@ func TestComputeRequirements(t *testing.T) {
 
 	addUser(store, "u1", "basic", "manual", true)
 	addUser(store, "u2", "basic", "manual", true)
-	store.users["u3"] = &model.User{Base: model.Base{ID: "u3"}, Tier: "plus", Status: "active"}
+	// u3 Plus memantau EURUSD dengan ILA 3.0 menyala.
+	tambahAkun(store, "u3", "plus", "EURUSD", "ila-2.0", "ila-3.0")
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u3", Symbol: "EURUSD", Strategy: "ila-3.0", IsActive: true,
+		UserID: "u3", Symbol: "EURUSD", IsActive: true,
 	})
 
 	svc := newService(store, pub)
@@ -1037,22 +1098,25 @@ func TestComputeRequirements(t *testing.T) {
 		t.Fatalf("ComputeRequirements: %v", err)
 	}
 
-	// Dua user Basic memantau XAUUSD tetap menghasilkan satu entri.
-	if got := reqs["ila-2.0"]; len(got) != 1 || got[0] != "XAUUSD" {
-		t.Fatalf("ila-2.0 = %v, ingin [XAUUSD]", got)
+	// Dua user Basic memantau XAUUSD tetap menghasilkan satu entri, sementara
+	// u3 Plus menambah EURUSD ke kedua metode yang dinyalakannya.
+	if got := reqs["ila-2.0"]; strings.Join(got, ",") != "EURUSD,XAUUSD" {
+		t.Fatalf("ila-2.0 = %v, ingin [EURUSD XAUUSD]", got)
 	}
 	if got := reqs["ila-3.0"]; len(got) != 1 || got[0] != "EURUSD" {
 		t.Fatalf("ila-3.0 = %v, ingin [EURUSD]", got)
 	}
 }
 
-// User Basic tidak boleh memicu perhitungan ILA 3.0.
+// User Basic tidak boleh memicu perhitungan ILA 3.0 walau saklarnya diminta
+// menyala. Hak tier tetap menang atas pilihan akun.
 func TestComputeRequirementsBlocksIla3ForBasic(t *testing.T) {
 	store := newFakeStore()
 	pub := &fakePublisher{}
 
 	addUser(store, "u1", "basic", "manual", true)
-	store.subs[0].Strategy = "ila-3.0"
+	// Akun Basic mencoba menyalakan ILA 3.0 untuk XAUUSD.
+	store.switches["XAUUSD|acct-u1"] = map[string]bool{"ila-2.0": true, "ila-3.0": true}
 
 	svc := newService(store, pub)
 	reqs, err := svc.ComputeRequirements(context.Background(), []runner.StrategyLocation{
@@ -1061,7 +1125,6 @@ func TestComputeRequirementsBlocksIla3ForBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComputeRequirements: %v", err)
 	}
-
 	if _, ok := reqs["ila-3.0"]; ok {
 		t.Fatal("basic tidak boleh memicu ILA 3.0")
 	}

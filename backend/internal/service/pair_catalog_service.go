@@ -146,6 +146,11 @@ func buildPairCatalog(categories []model.PairCategory, groups []model.PairGroup,
 			Description:       p.Description,
 			Aliases:           p.Aliases,
 			CorrelatedSymbols: filterVisible(splitCSV(p.CorrelatedSymbols), visible),
+			ValuePerLot:       p.ValuePerLot,
+			ContractSize:      p.ContractSize,
+			MinLot:            p.MinLot,
+			MaxLot:            p.MaxLot,
+			LotStep:           p.LotStep,
 		})
 	}
 

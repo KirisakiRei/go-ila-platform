@@ -39,6 +39,10 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 	now := s.opts.Clock()
 	byStrategy := make(map[string]map[string]bool)
 
+	// Kebutuhan engine selalu berasal dari saklar metode per akun, karena kolom
+	// subscription.strategy sudah dihapus. Engine hanya diminta menghitung metode
+	// yang benar-benar akan dipakai salah satu akun.
+
 	// PairGate memastikan simbol yang dinonaktifkan admin tidak pernah diminta
 	// ke engine. Kegagalan membaca gate tidak boleh mematikan trading: simbol
 	// tetap dianggap aktif agar tidak ada posisi yang kehilangan pengawasan.
@@ -66,23 +70,30 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 		}
 
 		tier := EffectiveTier(user.Tier, user.TrialExpiresAt, user.TierExpiresAt, now)
-		if !StrategyAllowed(tier, sub.Strategy) {
-			continue
-		}
-		// Strategi yang belum dirilis tidak boleh membuat engine dijalankan.
-		if sub.Strategy == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
+
+		// Simbol dinonaktifkan admin: tidak diminta ke engine. Posisi yang
+		// sudah terbuka tetap dikelola lewat pemantauan posisi.
+		if enabled != nil && !enabled[sub.Symbol] {
 			continue
 		}
 
-		if byStrategy[sub.Strategy] == nil {
-			byStrategy[sub.Strategy] = make(map[string]bool)
+		// Langganan hanya menyumbang daftar pair. Metode yang dihitung dibaca
+		// dari saklar per akun, karena kolom subscription.strategy sudah dihapus.
+		metode := s.metodeMenyala(ctx, sub.UserID, sub.Symbol)
+
+		for _, strategy := range metode {
+			if !StrategyAllowed(tier, strategy) {
+				continue
+			}
+			// Strategi yang belum dirilis tidak boleh membuat engine dijalankan.
+			if strategy == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
+				continue
+			}
+			if byStrategy[strategy] == nil {
+				byStrategy[strategy] = make(map[string]bool)
+			}
+			byStrategy[strategy][sub.Symbol] = true
 		}
-		if enabled != nil && !enabled[sub.Symbol] {
-			// Simbol dinonaktifkan admin: tidak diminta ke engine. Posisi yang
-			// sudah terbuka tetap dikelola lewat pemantauan posisi.
-			continue
-		}
-		byStrategy[sub.Strategy][sub.Symbol] = true
 	}
 
 	// Strategi SMT butuh lilin instrumen pembanding. Tanpa feed itu engine
@@ -106,6 +117,64 @@ func (s *Service) ComputeRequirements(ctx context.Context, available []StrategyL
 	}
 
 	return out, nil
+}
+
+// metodeMenyala mengumpulkan metode yang menyala untuk satu user pada satu
+// simbol, digabung dari seluruh akun aktif miliknya.
+//
+// Pair pantauan bersifat global, tetapi metode bisa berbeda antar akun. Yang
+// dibutuhkan engine hanyalah gabungan metode: bila satu akun masih menyalakan
+// ILA 3.0, engine tetap harus menghitungnya.
+func (s *Service) metodeMenyala(ctx context.Context, userID, symbol string) []string {
+	accounts, err := s.store.ListBrokerAccountsByUser(ctx, userID)
+	if err != nil {
+		// Gagal membaca akun: jatuhkan ke metode bawaan agar engine tetap
+		// mendapat feed dan tidak kehilangan sinkronisasi.
+		s.logger.Warn("gagal membaca akun untuk saklar metode",
+			"user_id", userID, "symbol", symbol, "error", err.Error())
+		return []string{"ila-2.0"}
+	}
+
+	saklar, err := s.store.EnabledAccountStrategies(ctx, symbol)
+	if err != nil {
+		s.logger.Warn("gagal membaca saklar metode",
+			"user_id", userID, "symbol", symbol, "error", err.Error())
+		return []string{"ila-2.0"}
+	}
+
+	menyala := make(map[string]bool, 2)
+	adaAkunAktif := false
+	for _, account := range accounts {
+		if !account.IsActive {
+			continue
+		}
+		adaAkunAktif = true
+		metode, diatur := saklar[account.ID]
+		if !diatur {
+			// Belum pernah diatur: bawaan ILA 2.0 menyala.
+			menyala["ila-2.0"] = true
+			continue
+		}
+		for strategy, aktif := range metode {
+			if aktif {
+				menyala[strategy] = true
+			}
+		}
+	}
+
+	// Tidak ada akun aktif: tetap minta feed metode bawaan supaya dasbor tetap
+	// punya data saat akun baru ditambahkan.
+	if !adaAkunAktif {
+		menyala["ila-2.0"] = true
+	}
+
+	out := make([]string, 0, len(menyala))
+	for _, strategy := range []string{"ila-2.0", "ila-3.0"} {
+		if menyala[strategy] {
+			out = append(out, strategy)
+		}
+	}
+	return out
 }
 
 // expandCorrelations menambahkan instrumen pembanding SMT ke kebutuhan engine.

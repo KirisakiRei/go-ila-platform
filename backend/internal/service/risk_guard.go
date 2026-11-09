@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -10,13 +11,62 @@ import (
 	"ila/backend/pkg/apperror"
 )
 
+// Batas lot untuk mode risiko "lot".
+//
+// 0.01 adalah lot terkecil yang diterima hampir semua broker retail; 10 adalah
+// pagar kewajaran platform agar satu klik tidak membuka posisi raksasa.
+const (
+	MinLotSize = 0.01
+	MaxLotSize = 10.00
+)
+
+// validasiLot memastikan ukuran lot sah dan kelipatan 0,01.
+func validasiLot(value float64) (float64, error) {
+	if value < MinLotSize-1e-9 || value > MaxLotSize+1e-9 {
+		return 0, fmt.Errorf("%w: ukuran lot harus %.2f sampai %.2f",
+			apperror.ErrBadRequest, MinLotSize, MaxLotSize)
+	}
+	bulat := math.Round(value*100) / 100
+	if math.Abs(bulat-value) > 1e-9 {
+		return 0, fmt.Errorf("%w: ukuran lot harus kelipatan 0,01", apperror.ErrBadRequest)
+	}
+	return bulat, nil
+}
+
+// resolveRiskSettings menormalkan pasangan mode risiko dan ukuran lot.
+//
+// Aturan:
+//   - mode kosong dianggap "percent" agar data lama tetap sah.
+//   - mode "lot" wajib punya lot sah (0,01–10, kelipatan 0,01); kosong berarti 0,01.
+//   - mode "percent" tetap menyimpan lot terakhir untuk dipakai saat berpindah mode.
+func (s *accountService) resolveRiskSettings(rawMode string, rawLot, _ float64, _ string) (string, float64, error) {
+	mode := strings.TrimSpace(rawMode)
+	if mode == "" {
+		mode = model.RiskModePercent
+	}
+	if mode != model.RiskModePercent && mode != model.RiskModeLot {
+		return "", 0, fmt.Errorf("%w: mode risiko harus percent atau lot", apperror.ErrBadRequest)
+	}
+
+	lot := rawLot
+	if lot == 0 {
+		lot = MinLotSize
+	}
+	lot, err := validasiLot(lot)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return mode, lot, nil
+}
+
 // Batas total risiko seluruh akun aktif. Nilai dipakai sebagai fallback bila
 // katalog paket tidak menyediakan feature max_total_risk.
 const (
 	// Total risk default free sengaja nol: free tidak boleh punya akun nyata.
 	defaultMaxTotalRiskFree  = 0.0
-	defaultMaxTotalRiskBasic = 1.0
-	defaultMaxTotalRiskPlus  = 2.0
+	defaultMaxTotalRiskBasic = 5.0
+	defaultMaxTotalRiskPlus  = 5.0
 )
 
 // maxRiskPerTradeByTier mengembalikan batas risk per trade menurut tier.
@@ -76,6 +126,12 @@ func (s *accountService) validateTotalRisk(ctx context.Context, tier string, acc
 			continue
 		}
 		if acc.ID == candidateAccountID {
+			continue
+		}
+		if acc.RiskMode == model.RiskModeLot {
+			// Akun bermode lot tidak dijumlahkan di pagar persen: risiko
+			// sesungguhnya baru diketahui saat harga dan SL sinyal ada. Akun
+			// seperti ini dijaga oleh batas 0,01–10 lot dan peringatan di UI.
 			continue
 		}
 		total += acc.RiskPercent

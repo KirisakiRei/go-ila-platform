@@ -134,6 +134,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	// Katalog pair: sumber kebenaran simbol yang boleh dipilih user.
 	pairRepo := repository.NewPairRepository(db)
 	pairCatalogService := service.NewPairCatalogService(pairRepo)
+	accountPairStrategyRepo := repository.NewAccountPairStrategyRepository(db)
 
 	accountService := service.NewAccountService(service.AccountServiceDeps{
 		Users:         userRepo,
@@ -155,6 +156,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Katalog pair dikelola admin; user hanya memilih dari daftar itu.
 		Catalog: pairCatalogService,
 	})
+	// Saklar metode butuh daftar akun dan hak tier, sedangkan AccountService butuh
+	// saklar untuk menyiapkan bawaan saat pair baru dipantau. Siklus ini diputus
+	// dengan pemasangan setter setelah keduanya jadi.
+	strategySwitchService := service.NewStrategySwitchService(accountRepo, accountPairStrategyRepo, pairCatalogService, accountService)
+	service.SetStrategySwitchSeeder(accountService, strategySwitchService)
+	service.SetAccountStrategyLister(accountService, accountPairStrategyRepo)
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
 	systemService := service.NewSystemService(service.SystemServiceDeps{
 		Accounts:  accountRepo,
@@ -249,6 +256,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
 	accountHandler := handler.NewAccountHandler(accountService)
 	pairHandler := handler.NewPairHandler(pairCatalogService, accountService)
+	riskHandler := handler.NewRiskHandler(service.NewRiskSimulator(accountService, pairCatalogService, nil))
+	strategySwitchHandler := handler.NewStrategySwitchHandler(strategySwitchService)
 	adminPairHandler := handler.NewAdminPairHandler(service.NewPairAdminService(pairRepo, auditRepo))
 	tradingHandler := handler.NewTradingHandler(tradingService)
 	systemHandler := handler.NewSystemHandler(systemService)
@@ -403,6 +412,13 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		// Katalog pair & checklist per akun. Simbol hanya dipilih dari katalog
 		// yang dikelola admin, tidak pernah diketik bebas oleh user.
 		pairHandler.Register(me)
+
+		// Simulasi risiko: satu tempat hitungan lot untuk pratinjau dashboard.
+		riskHandler.Register(me)
+
+		// Saklar metode per akun × pair. Pair pantauan global; metode dipilih
+		// per akun lewat saklar ini.
+		strategySwitchHandler.Register(me)
 
 		// Penghubungan Telegram.
 		me.POST("/telegram/link", telegramHandler.CreateLink)

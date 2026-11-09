@@ -59,6 +59,17 @@ type TradingPair struct {
 	SortOrder         int    `gorm:"not null;default:0" json:"sort_order"`
 	IsEnabled         bool   `gorm:"not null;default:true" json:"is_enabled"`
 	Description       string `gorm:"type:varchar(255)" json:"description"`
+
+	// Metadata kontrak dipakai kalkulator risiko untuk mengubah lot menjadi
+	// nominal uang. Nilai nol berarti belum diisi: kalkulator memakai nilai
+	// bawaan kategori, lalu ditimpa spesifikasi broker saat eksekusi.
+	//
+	// ValuePerLot adalah nilai uang untuk pergerakan harga 1.0 pada 1 lot.
+	ValuePerLot  float64 `gorm:"not null;default:0" json:"value_per_lot"`
+	ContractSize float64 `gorm:"not null;default:0" json:"contract_size"`
+	MinLot       float64 `gorm:"not null;default:0.01" json:"min_lot"`
+	MaxLot       float64 `gorm:"not null;default:10" json:"max_lot"`
+	LotStep      float64 `gorm:"not null;default:0.01" json:"lot_step"`
 }
 
 // TableName menetapkan nama tabel.

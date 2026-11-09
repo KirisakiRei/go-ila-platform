@@ -28,6 +28,9 @@ const (
 	KeyStopAfterWin   = "STOP_AFTER_WIN"
 	KeyMarketOpenOnly = "MARKET_OPEN_ONLY"
 	KeyLegalGate      = "LEGAL_GATE"
+	// KeyPairSwitch mengaktifkan saklar metode per akun × pair di Runner.
+	// Bawaan mati agar perilaku lama tidak berubah sampai data saklar lengkap.
+	KeyPairSwitch = "PAIR_SWITCH_ENABLED"
 )
 
 // Kind menjelaskan cara nilai dibaca dan ditampilkan.
@@ -60,6 +63,7 @@ var Catalog = []Definition{
 	{KeyStopAfterWin, "Berhenti setelah menang", "Satu kemenangan mengakhiri hari perdagangan.", KindBool, 0, 0, false},
 	{KeyMarketOpenOnly, "Hanya saat pasar buka", "Menolak entry ketika pasar tutup.", KindBool, 0, 0, false},
 	{KeyLegalGate, "Tahan bila dokumen belum disetujui", "Entry baru ditolak sampai dokumen wajib disetujui.", KindBool, 0, 0, false},
+	{KeyPairSwitch, "Saklar metode per akun", "Bila nyala, Runner hanya menjalankan metode yang dinyalakan akun pada pair tersebut.", KindBool, 0, 0, true},
 }
 
 // Definition mencari flag berdasarkan kunci.

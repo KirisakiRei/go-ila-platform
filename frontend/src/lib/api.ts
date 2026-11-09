@@ -8,9 +8,12 @@ import type {
   CreateSubscriptionPayload,
   PairCatalogResponse,
   Position,
+  RiskSimRequest,
+  RiskSimResult,
   Session,
   Signal,
   Strategy,
+  StrategySwitchMatrix,
   Subscription,
   SystemStatus,
   TelegramLink,
@@ -42,6 +45,28 @@ export const accountApi = {
 
 export const pairApi = {
   catalog: () => request<PairCatalogResponse>('/pairs'),
+}
+
+/** Simulasi risiko: satu tempat hitungan lot, dipakai pratinjau di detail akun. */
+export const riskApi = {
+  simulate: (payload: RiskSimRequest) =>
+    request<RiskSimResult>('/calc/risk-sim', { method: 'POST', body: payload }),
+}
+
+/**
+ * Saklar metode analisis per akun × pair.
+ *
+ * Pair pantauan bersifat global, sedangkan metode yang benar-benar dieksekusi
+ * ditentukan per akun lewat saklar ini.
+ */
+export const strategySwitchApi = {
+  matrix: (symbol: string) =>
+    request<StrategySwitchMatrix>(`/pairs/${encodeURIComponent(symbol)}/strategies`),
+  set: (accountID: string, symbol: string, strategies: Record<string, boolean>) =>
+    request<StrategySwitchMatrix>(
+      `/accounts/${accountID}/pairs/${encodeURIComponent(symbol)}/strategies`,
+      { method: 'PUT', body: { strategies } },
+    ),
 }
 
 export const subscriptionApi = {

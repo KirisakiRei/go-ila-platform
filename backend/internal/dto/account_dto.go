@@ -8,9 +8,11 @@ type CreateAccountRequest struct {
 	BrokerType  string  `json:"broker_type" binding:"required,oneof=matchtrader ctrader"`
 	Label       string  `json:"label" binding:"max=60"`
 	Mode        string  `json:"mode" binding:"omitempty,oneof=manual auto"`
-	RiskMode    string  `json:"risk_mode" binding:"omitempty,oneof=percent"`
+	RiskMode    string  `json:"risk_mode" binding:"omitempty,oneof=percent lot"`
 	RiskPercent float64 `json:"risk_percent"`
-	IsDryRun    bool    `json:"is_dry_run"`
+	// LotSize dipakai bila RiskMode=lot. Kosong berarti bawaan 0.01.
+	LotSize  float64 `json:"lot_size"`
+	IsDryRun bool    `json:"is_dry_run"`
 
 	// Token hanya untuk Match-Trader; disimpan terenkripsi.
 	Token string `json:"token"`
@@ -22,9 +24,12 @@ type CreateAccountRequest struct {
 type UpdateAccountRequest struct {
 	Label       *string  `json:"label" binding:"omitempty,max=60"`
 	Mode        *string  `json:"mode" binding:"omitempty,oneof=manual auto"`
+	RiskMode    *string  `json:"risk_mode" binding:"omitempty,oneof=percent lot"`
 	RiskPercent *float64 `json:"risk_percent"`
-	IsActive    *bool    `json:"is_active"`
-	IsDryRun    *bool    `json:"is_dry_run"`
+	// LotSize dipakai bila RiskMode=lot.
+	LotSize  *float64 `json:"lot_size"`
+	IsActive *bool    `json:"is_active"`
+	IsDryRun *bool    `json:"is_dry_run"`
 	// Token bersifat opsional: diisi hanya saat kredensial broker berganti
 	// (mis. token MatchTrader kedaluwarsa). Kosong berarti token lama dipakai.
 	Token   *string `json:"token" binding:"omitempty,max=4000"`
@@ -39,7 +44,9 @@ type AccountResponse struct {
 	Label             string     `json:"label"`
 	ExternalAccountID string     `json:"external_account_id"`
 	Mode              string     `json:"mode"`
+	RiskMode          string     `json:"risk_mode"`
 	RiskPercent       float64    `json:"risk_percent"`
+	LotSize           float64    `json:"lot_size"`
 	IsActive          bool       `json:"is_active"`
 	IsFrozen          bool       `json:"is_frozen"`
 	IsDryRun          bool       `json:"is_dry_run"`
@@ -63,10 +70,13 @@ type CreateSubscriptionRequest struct {
 }
 
 // SubscriptionResponse adalah tampilan langganan simbol user.
+//
+// Metode analisis tidak lagi dilaporkan di sini: satu pair dipantau seluruh
+// metode, dan pilihan per akun dibaca lewat matriks saklar
+// GET /pairs/:symbol/strategies.
 type SubscriptionResponse struct {
 	ID              string `json:"id"`
 	Symbol          string `json:"symbol"`
-	Strategy        string `json:"strategy"`
 	BrokerAccountID string `json:"broker_account_id,omitempty"`
 	IsActive        bool   `json:"is_active"`
 }
@@ -91,7 +101,9 @@ type CTraderAuthURLResponse struct {
 type CTraderCallbackRequest struct {
 	Code        string  `json:"code" binding:"required"`
 	Mode        string  `json:"mode" binding:"omitempty,oneof=manual auto"`
+	RiskMode    string  `json:"risk_mode" binding:"omitempty,oneof=percent lot"`
 	RiskPercent float64 `json:"risk_percent"`
+	LotSize     float64 `json:"lot_size"`
 }
 
 // CTraderCallbackResponse mengembalikan ringkasan akun cTrader yang terhubung.

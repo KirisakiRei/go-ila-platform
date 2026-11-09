@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, type FormEvent } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -45,7 +45,8 @@ import {
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { ApiError } from '@/lib/api-error'
-import type { BrokerAccount, PairItem } from '@/types/api'
+import { RiskSimulatorPanel } from '@/features/accounts/components/RiskSimulatorPanel'
+import type { BrokerAccount, PairItem, RiskMode } from '@/types/api'
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -289,13 +290,19 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
   const update = useUpdateAccount()
   const [label, setLabel] = useState(account.label)
   const [mode, setMode] = useState(account.mode)
+  const [riskMode, setRiskMode] = useState<RiskMode>(account.risk_mode ?? 'percent')
   const [riskPercent, setRiskPercent] = useState(account.risk_percent)
+  const [lotSize, setLotSize] = useState(account.lot_size ?? 0.01)
   const [isDryRun, setIsDryRun] = useState(account.is_dry_run)
   const [isActive, setIsActive] = useState(account.is_active)
   const [notice, setNotice] = useState<string | null>(null)
+  const [konfirmasiRisiko, setKonfirmasiRisiko] = useState(false)
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Risiko di atas 1% tetap disimpan, tetapi wajib dikonfirmasi lebih dulu.
+  const risikoAgresif = riskMode === 'percent' && riskPercent > 1
+  const lotTidakSah = riskMode === 'lot' && (lotSize < 0.01 || lotSize > 10)
+
+  const simpan = async () => {
     setNotice(null)
     try {
       await update.mutateAsync({
@@ -303,7 +310,9 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
         payload: {
           label: label.trim(),
           mode,
+          risk_mode: riskMode,
           risk_percent: Number(riskPercent),
+          lot_size: Number(lotSize),
           is_dry_run: Boolean(isDryRun),
           is_active: Boolean(isActive),
         },
@@ -314,10 +323,25 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
     }
   }
 
+  const handleSave = async (e: FormEvent) => {
+    e.preventDefault()
+    if (lotTidakSah) {
+      setNotice('Ukuran lot harus 0,01 sampai 10,00.')
+      return
+    }
+    if (risikoAgresif) {
+      setKonfirmasiRisiko(true)
+      return
+    }
+    await simpan()
+  }
+
   // Tombol Terapkan Default Template
   const handleResetToDefault = () => {
     setMode('manual')
+    setRiskMode('percent')
     setRiskPercent(0.5)
+    setLotSize(0.01)
     setIsDryRun(true)
     setIsActive(true)
     setNotice('Pengaturan disetel ke template default sistem (Manual, Risk 0,5%, Simulasi). Jangan lupa klik Simpan.')
@@ -383,23 +407,83 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="risk-percent">Batas Risiko per Transaksi (%)</Label>
-              <Input
-                id="risk-percent"
-                type="number"
-                step="0.05"
-                min="0.1"
-                max="1"
-                value={riskPercent}
-                onChange={(e) => setRiskPercent(Number(e.target.value))}
-                className="text-xs"
-              />
+              <Label>Metode Risiko</Label>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={riskMode === 'percent' ? 'default' : 'outline'}
+                  className="text-xs"
+                  onClick={() => setRiskMode('percent')}
+                >
+                  Persen Ekuitas
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={riskMode === 'lot' ? 'default' : 'outline'}
+                  className="text-xs"
+                  onClick={() => setRiskMode('lot')}
+                >
+                  Lot Tetap
+                </Button>
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                Batas proteksi aman: 0,10% sampai 1,00% dari total ekuitas per trade.
+                {riskMode === 'percent'
+                  ? 'Ukuran posisi dihitung dari persentase ekuitas dan jarak stop loss.'
+                  : 'Ukuran posisi tetap memakai lot pilihan Anda; risiko mengikuti jarak stop loss.'}
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 justify-center pt-2">
+            {riskMode === 'percent' ? (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="risk-percent">Batas Risiko per Transaksi (%)</Label>
+                <Input
+                  id="risk-percent"
+                  type="number"
+                  step="0.05"
+                  min="0.1"
+                  max="5"
+                  value={riskPercent}
+                  onChange={(e) => setRiskPercent(Number(e.target.value))}
+                  className="text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Sah 0,10% sampai 5,00%. Di atas 1% akan ada peringatan sebelum disimpan.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="risk-lot">Ukuran Lot per Transaksi</Label>
+                <Input
+                  id="risk-lot"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="10"
+                  value={lotSize}
+                  onChange={(e) => setLotSize(Number(e.target.value))}
+                  className="text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {lotTidakSah
+                    ? 'Ukuran lot harus 0,01 sampai 10,00.'
+                    : 'Terendah 0,01 lot, tertinggi 10,00 lot.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <RiskSimulatorPanel
+            accountId={account.id}
+            defaultEquity={account.equity}
+            riskMode={riskMode}
+            riskPercent={Number(riskPercent)}
+            lotSize={Number(lotSize)}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-3 justify-center">
               <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
                 <input
                   type="checkbox"
@@ -430,6 +514,41 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
           </div>
         </form>
       </CardContent>
+
+      {/* Konfirmasi risiko agresif: disimpan hanya setelah user menyetujui. */}
+      <Modal
+        open={konfirmasiRisiko}
+        onClose={() => setKonfirmasiRisiko(false)}
+        title="Risiko di atas 1%"
+        description="Setelan ini masih dapat disimpan, tetapi tergolong agresif untuk akun nyata."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setKonfirmasiRisiko(false)}>
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              isLoading={update.isPending}
+              onClick={() => {
+                setKonfirmasiRisiko(false)
+                void simpan()
+              }}
+            >
+              Saya Mengerti, Simpan
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
+          <p>
+            Anda memilih risiko <strong className="text-foreground">{formatNumber(riskPercent, 2)}%</strong>{' '}
+            per transaksi. Sepuluh kerugian beruntun pada tingkat ini akan menggerus sekitar{' '}
+            <strong className="text-foreground">{formatNumber(Math.min(riskPercent * 10, 100), 0)}%</strong>{' '}
+            ekuitas.
+          </p>
+          <p>Gunakan simulasi di atas untuk melihat padanan lot dan nominal risikonya.</p>
+        </div>
+      </Modal>
     </Card>
   )
 }
@@ -439,22 +558,21 @@ function TabPairFilter({ accountId }: { accountId: string }) {
   const { data, isLoading, isError, error } = useAccountPairs(accountId)
   const updatePairs = useUpdateAccountPairs()
 
-  const [selectedSymbols, setSelectedSymbols] = useState<string[]>([])
+  const [pilihanLokal, setPilihanLokal] = useState<string[] | null>(null)
   const [search, setSearch] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
-  // Inisialisasi daftar terpilih dari server
-  useEffect(() => {
-    if (data?.selected) {
-      setSelectedSymbols(data.selected)
-    }
-  }, [data?.selected])
+  // Pilihan diambil langsung dari server sampai user mengubahnya sendiri,
+  // sehingga tidak perlu sinkronisasi lewat effect (yang memicu render ganda).
+  const selectedSymbols = pilihanLokal ?? data?.selected ?? []
+  const setSelectedSymbols = setPilihanLokal
 
   // Kumpulkan seluruh item pair dari katalog
   const allPairs = useMemo(() => {
-    if (!data?.catalog?.categories) return []
+    const categories = data?.catalog?.categories
+    if (!categories) return []
     const pairs: PairItem[] = []
-    for (const cat of data.catalog.categories) {
+    for (const cat of categories) {
       for (const grp of cat.groups) {
         for (const p of grp.pairs) {
           pairs.push(p)
@@ -462,7 +580,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
       }
     }
     return pairs
-  }, [data?.catalog])
+  }, [data?.catalog?.categories])
 
   const filteredPairs = useMemo(() => {
     if (!search.trim()) return allPairs
@@ -476,9 +594,12 @@ function TabPairFilter({ accountId }: { accountId: string }) {
   }, [allPairs, search])
 
   const toggleSymbol = (symbol: string) => {
-    setSelectedSymbols((prev) =>
-      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol],
-    )
+    setSelectedSymbols((prev) => {
+      const current = prev ?? []
+      return current.includes(symbol)
+        ? current.filter((s) => s !== symbol)
+        : [...current, symbol]
+    })
   }
 
   const selectAll = () => {

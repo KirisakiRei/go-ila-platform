@@ -123,6 +123,11 @@ func toAdminPairView(p model.TradingPair, category model.PairCategory, groups ma
 		SortOrder:         p.SortOrder,
 		IsEnabled:         p.IsEnabled,
 		Description:       p.Description,
+		ValuePerLot:       p.ValuePerLot,
+		ContractSize:      p.ContractSize,
+		MinLot:            p.MinLot,
+		MaxLot:            p.MaxLot,
+		LotStep:           p.LotStep,
 	}
 	if p.GroupID != nil {
 		view.GroupID = *p.GroupID
@@ -344,6 +349,9 @@ func (s *pairAdminService) CreatePair(ctx context.Context, actorID string, req d
 		IsEnabled:         enabled,
 		Description:       strings.TrimSpace(req.Description),
 	}
+	pair.ValuePerLot, pair.ContractSize, pair.MinLot, pair.MaxLot, pair.LotStep = normalizeContract(
+		req.ValuePerLot, req.ContractSize, req.MinLot, req.MaxLot, req.LotStep,
+	)
 	if err := s.pairs.CreatePair(ctx, pair); err != nil {
 		return nil, err
 	}
@@ -406,6 +414,32 @@ func (s *pairAdminService) UpdatePair(ctx context.Context, actorID, id string, r
 		pair.IsEnabled = *req.IsEnabled
 	}
 
+	// Metadata kontrak boleh disunting sebagian: field yang tidak dikirim
+	// dipertahankan, lalu dinormalkan bersama aturan konsistensi.
+	valuePerLot := pair.ValuePerLot
+	contractSize := pair.ContractSize
+	minLot := pair.MinLot
+	maxLot := pair.MaxLot
+	lotStep := pair.LotStep
+	if req.ValuePerLot != nil {
+		valuePerLot = *req.ValuePerLot
+	}
+	if req.ContractSize != nil {
+		contractSize = *req.ContractSize
+	}
+	if req.MinLot != nil {
+		minLot = *req.MinLot
+	}
+	if req.MaxLot != nil {
+		maxLot = *req.MaxLot
+	}
+	if req.LotStep != nil {
+		lotStep = *req.LotStep
+	}
+	pair.ValuePerLot, pair.ContractSize, pair.MinLot, pair.MaxLot, pair.LotStep = normalizeContract(
+		valuePerLot, contractSize, minLot, maxLot, lotStep,
+	)
+
 	if err := s.pairs.UpdatePair(ctx, pair); err != nil {
 		return err
 	}
@@ -435,6 +469,33 @@ func (s *pairAdminService) DeletePair(ctx context.Context, actorID, id string) e
 // --- Pembantu ---------------------------------------------------------------
 
 // normalizeKey membersihkan kunci kategori/grup menjadi huruf kecil.
+// normalizeContract merapikan metadata kontrak pair.
+//
+// Nilai tidak masuk akal dikembalikan sebagai nol agar pemanggil memakai
+// bawaan kategori. Aturan konsistensi: nilai tidak negatif, step positif,
+// dan min <= max.
+func normalizeContract(valuePerLot, contractSize, minLot, maxLot, lotStep float64) (float64, float64, float64, float64, float64) {
+	if valuePerLot < 0 {
+		valuePerLot = 0
+	}
+	if contractSize < 0 {
+		contractSize = 0
+	}
+	if lotStep <= 0 {
+		lotStep = 0.01
+	}
+	if minLot <= 0 {
+		minLot = 0.01
+	}
+	if maxLot <= 0 {
+		maxLot = 10
+	}
+	if minLot > maxLot {
+		minLot, maxLot = maxLot, minLot
+	}
+	return valuePerLot, contractSize, minLot, maxLot, lotStep
+}
+
 func normalizeKey(raw string) string {
 	s := strings.ToLower(strings.TrimSpace(raw))
 	s = strings.ReplaceAll(s, " ", "-")

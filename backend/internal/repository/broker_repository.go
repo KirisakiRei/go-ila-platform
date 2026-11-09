@@ -268,7 +268,6 @@ func (r *subscriptionRepository) ReplaceAccountPairs(ctx context.Context, userID
 			sub := &model.Subscription{
 				UserID:          userID,
 				Symbol:          canonical,
-				Strategy:        "ila-2.0",
 				IsActive:        true,
 				BrokerAccountID: strPtr(accountID),
 			}

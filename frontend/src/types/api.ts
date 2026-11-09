@@ -85,13 +85,70 @@ export type VerifyTwoFactorResult = LoginResult & { step: 'complete' }
 export type BrokerType = 'matchtrader' | 'ctrader'
 export type AccountMode = 'manual' | 'auto'
 
+/** Mode risiko per akun: persentase ekuitas atau ukuran lot tetap. */
+export type RiskMode = 'percent' | 'lot'
+
+/** Permintaan simulasi risiko ke server. */
+export type RiskSimRequest = {
+  account_id?: string
+  symbol: string
+  entry_price: number
+  stop_loss: number
+  equity?: number
+  mode?: RiskMode
+  risk_percent?: number
+  lot_size?: number
+}
+
+/** Satu baris tabel padanan persen (1%–5%). */
+export type RiskTabelPersen = {
+  risk_percent: number
+  lots: number
+  risk_amount: number
+  warning: boolean
+}
+
+/** Satu baris tabel padanan lot. */
+export type RiskTabelLot = {
+  lots: number
+  risk_amount: number
+  risk_percent: number
+  warning: boolean
+}
+
+/** Hasil simulasi risiko dari server. */
+export type RiskSimResult = {
+  /** Asal nilai per lot: "broker" | "katalog" | "kategori". */
+  sumber_nilai: 'broker' | 'katalog' | 'kategori'
+  value_per_lot: number
+  contract_size: number
+  min_lot: number
+  max_lot: number
+  lot_step: number
+  equity: number
+  stop_distance: number
+  mode: RiskMode
+  hasil: {
+    lots: number
+    risk_amount: number
+    risk_percent: number
+    stop_distance: number
+    warning: boolean
+  }
+  tabel: RiskTabelPersen[]
+  tabel_lot: RiskTabelLot[]
+  peringatan: string[]
+}
+
 export type BrokerAccount = {
   id: string
   broker_type: BrokerType
   label: string
   external_account_id: string
   mode: AccountMode
+  risk_mode: RiskMode
   risk_percent: number
+  lot_size: number
   is_active: boolean
   is_frozen: boolean
   is_dry_run: boolean
@@ -118,7 +175,9 @@ export type CreateAccountPayload = {
 export type UpdateAccountPayload = {
   label?: string
   mode?: AccountMode
+  risk_mode?: RiskMode
   risk_percent?: number
+  lot_size?: number
   is_active?: boolean
   is_dry_run?: boolean
   /** Diisi hanya saat token broker diganti; kosong berarti token lama dipakai. */
@@ -128,11 +187,38 @@ export type UpdateAccountPayload = {
 
 export type StrategyVersion = 'ila-2.0' | 'ila-3.0'
 
+/** Satu baris matriks saklar metode: satu akun dan status saklar tiap metode. */
+export type StrategySwitchAccount = {
+  account_id: string
+  label: string
+  broker_type: BrokerType
+  is_active: boolean
+  is_dry_run: boolean
+  /** Nama metode -> saklar menyala. */
+  strategies: Record<string, boolean>
+  /** Nama metode -> apakah tier pengguna berhak. Metode tanpa hak disembunyikan. */
+  allowed: Record<string, boolean>
+}
+
+/** Matriks saklar metode untuk satu pair. */
+export type StrategySwitchMatrix = {
+  symbol: string
+  accounts: StrategySwitchAccount[]
+}
+
 export type PairItem = {
   symbol: string
   name: string
   description?: string
   aliases?: string
+  /** Simbol pembanding SMT, hanya informasi. */
+  correlated_symbols?: string[]
+  /** Metadata kontrak untuk kalkulator risiko; 0 berarti belum diisi. */
+  value_per_lot?: number
+  contract_size?: number
+  min_lot?: number
+  max_lot?: number
+  lot_step?: number
 }
 
 export type PairGroupView = {
@@ -162,7 +248,6 @@ export type AccountPairSelectionResponse = {
 export type Subscription = {
   id: string
   symbol: string
-  strategy: StrategyVersion
   broker_account_id: string | null
   is_active: boolean
 }
@@ -170,14 +255,13 @@ export type Subscription = {
 /**
  * Pair pantauan bersifat global.
  *
- * `strategy` tidak lagi dikirim: satu pair dipantau oleh kedua metode analisis,
- * dan metode mana yang dieksekusi ditentukan per akun trading. Server memakai
- * `ila-2.0` sebagai nilai bawaan bila field ini kosong.
+ * Metode analisis tidak lagi dipilih saat memantau pair: satu pair dipantau
+ * oleh kedua metode, dan metode mana yang dieksekusi ditentukan per akun
+ * trading lewat matriks saklar (`GET /pairs/:symbol/strategies`).
  * `broker_account_id` juga opsional dan tidak dipakai halaman Pair Pantauan.
  */
 export type CreateSubscriptionPayload = {
   symbol: string
-  strategy?: StrategyVersion
   broker_account_id?: string
 }
 

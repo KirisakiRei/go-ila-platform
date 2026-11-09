@@ -378,6 +378,10 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 	if signal.StrategyVersion == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
 		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectStrategyTier)
 	}
+	// [2b] Akun ini mematikan metode tersebut untuk pair ini?
+	if !s.akunMengizinkanMetode(ctx, account.ID, signal.Symbol, signal.StrategyVersion) {
+		return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, RejectStrategyDisabled)
+	}
 
 	// [3] Akun ini sendiri boleh menerima order?
 	if !account.IsActive || account.IsFrozen {

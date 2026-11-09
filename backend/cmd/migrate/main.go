@@ -92,6 +92,7 @@ func main() {
 		&model.PairCategory{},
 		&model.PairGroup{},
 		&model.TradingPair{},
+		&model.AccountPairStrategy{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
@@ -122,6 +123,24 @@ func main() {
 	pairsSeeded, err := repository.SeedPairs(ctx, db, time.Now().UTC())
 	if err != nil {
 		logger.Error("katalog pair awal gagal disiapkan", "error", err.Error())
+		os.Exit(1)
+	}
+
+	// Tahap 1 penggantian subscription.strategy: salin pilihan metode lama ke
+	// saklar per akun. Kolom lama sengaja TIDAK dihapus di sini agar rollback
+	// masih mungkin; penghapusan menyusul setelah saklar terbukti stabil.
+	saklarDisalin, err := repository.BackfillAccountPairStrategy(ctx, db)
+	if err != nil {
+		logger.Error("salin saklar metode gagal", "error", err.Error())
+		os.Exit(1)
+	}
+
+	// Tahap 2: kolom lama dihapus setelah dipastikan seluruh langganan aktif
+	// punya saklar. Bila belum, fungsi menolak dan migrasi berhenti sebelum
+	// ada data preferensi yang hilang.
+	kolomDihapus, err := repository.DropSubscriptionStrategy(ctx, db)
+	if err != nil {
+		logger.Error("hapus kolom subscription.strategy gagal", "error", err.Error())
 		os.Exit(1)
 	}
 
@@ -160,5 +179,7 @@ func main() {
 		"dokumen_legal_diterbitkan", seeded,
 		"halaman_disiapkan", pagesSeeded,
 		"pair_disiapkan", pairsSeeded,
+		"saklar_metode_disalin", saklarDisalin,
+		"kolom_strategy_dihapus", kolomDihapus,
 	)
 }

@@ -13,9 +13,9 @@ func TestComputeRequirementsIgnoresIla3WhenOff(t *testing.T) {
 	store := newFakeStore()
 	pub := &fakePublisher{}
 
-	store.users["u1"] = &model.User{Base: model.Base{ID: "u1"}, Tier: "plus", Status: "active"}
+	tambahAkun(store, "u1", "plus", "EURUSD", "ila-2.0", "ila-3.0")
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u1", Symbol: "EURUSD", Strategy: "ila-3.0", IsActive: true,
+		UserID: "u1", Symbol: "EURUSD", IsActive: true,
 	})
 
 	svc := newServiceWithSettings(store, pub, runner.NewSettings(runner.ILA3Off))
@@ -36,9 +36,9 @@ func TestComputeRequirementsIla3Beta(t *testing.T) {
 	store := newFakeStore()
 	pub := &fakePublisher{}
 
-	store.users["u1"] = &model.User{Base: model.Base{ID: "u1"}, Tier: "plus", Status: "active"}
+	tambahAkun(store, "u1", "plus", "EURUSD", "ila-2.0", "ila-3.0")
 	store.subs = append(store.subs, model.Subscription{
-		UserID: "u1", Symbol: "EURUSD", Strategy: "ila-3.0", IsActive: true,
+		UserID: "u1", Symbol: "EURUSD", IsActive: true,
 	})
 
 	svc := newServiceWithSettings(store, pub, runner.NewSettings(runner.ILA3Beta))

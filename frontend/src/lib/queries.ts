@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accountApi,
   pairApi,
+  riskApi,
   securityApi,
   sessionApi,
   strategyApi,
+  strategySwitchApi,
   subscriptionApi,
   systemApi,
   telegramApi,
@@ -22,6 +24,7 @@ export const queryKeys = {
   accounts: ['accounts'] as const,
   subscriptions: ['subscriptions'] as const,
   strategies: ['strategies'] as const,
+  strategySwitch: (symbol: string) => ['strategy-switch', symbol] as const,
   signals: (limit: number) => ['signals', limit] as const,
   positions: (limit: number) => ['positions', limit] as const,
   systemStatus: ['system', 'status'] as const,
@@ -91,6 +94,42 @@ export function usePairCatalog() {
   return useQuery({
     queryKey: queryKeys.pairCatalog,
     queryFn: pairApi.catalog,
+  })
+}
+
+/**
+ * useRiskSimulation menghitung pratinjau risiko di server.
+ *
+ * Sengaja berupa mutation, bukan query: hasilnya bergantung pada isian formulir
+ * yang belum tentu valid, dan tidak perlu di-cache.
+ */
+export function useRiskSimulation() {
+  return useMutation({ mutationFn: riskApi.simulate })
+}
+
+/** Matriks saklar metode per akun untuk satu pair. */
+export function useStrategySwitchMatrix(symbol: string | null) {
+  return useQuery({
+    queryKey: queryKeys.strategySwitch(symbol ?? ''),
+    queryFn: () => strategySwitchApi.matrix(symbol ?? ''),
+    enabled: Boolean(symbol),
+  })
+}
+
+/**
+ * useSetStrategySwitch mengubah saklar satu akun lalu menyegarkan matriks.
+ *
+ * Respons server sudah berisi matriks terbaru, jadi cache langsung ditimpa agar
+ * saklar terasa seketika tanpa menunggu permintaan ulang.
+ */
+export function useSetStrategySwitch(symbol: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { accountID: string; strategies: Record<string, boolean> }) =>
+      strategySwitchApi.set(vars.accountID, symbol, vars.strategies),
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.strategySwitch(symbol), data)
+    },
   })
 }
 
