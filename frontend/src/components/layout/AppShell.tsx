@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { BarChart3, Bot, CreditCard, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,9 @@ import { useSignOut } from '@/features/auth/hooks/use-auth'
 import { UserBanners } from '@/components/layout/UserBanners'
 import { LegalReconsentGate } from '@/features/auth/components/LegalReconsentGate'
 import { OnboardingModal } from '@/features/onboarding'
+import { MobileTopBar } from '@/components/layout/MobileTopBar'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
+import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
 import type { Tier, User } from '@/types/api'
 
 const TIER_LABEL: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
@@ -75,13 +78,19 @@ type AppShellProps = { user: User; children: ReactNode }
 export function AppShell({ user, children }: AppShellProps) {
   const signOut = useSignOut()
   const { pathname } = useLocation()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const title = TITLES[pathname] ?? 'ILA Bot'
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
       <LegalReconsentGate />
       <OnboardingModal />
-      <aside className="shrink-0 border-b border-border lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
+
+      {/* Top Bar khusus tampilan Mobile (< lg) */}
+      <MobileTopBar user={user} onOpenMenu={() => setMobileMenuOpen(true)} />
+
+      {/* Sidebar tetap di kiri untuk layar Desktop (>= lg) */}
+      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border">
         <div className="flex h-14 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2.5">
             {/* Logo bersama memakai turunan 64/128px, bukan berkas 660 KB asli. */}
@@ -93,21 +102,21 @@ export function AppShell({ user, children }: AppShellProps) {
               </span>
             </div>
           </div>
-          <Badge variant="muted" className="hidden lg:inline-flex text-[10px]">
+          <Badge variant="muted" className="inline-flex text-[10px]">
             {TIER_LABEL[user.tier]}
           </Badge>
         </div>
 
         <nav
           aria-label="Navigasi utama"
-          className="flex gap-1 overflow-x-auto scrollbar-thin p-2 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:p-3"
+          className="flex flex-1 flex-col overflow-y-auto p-3 scrollbar-thin"
         >
           {NAV_GROUPS.map((group, groupIndex) => (
-            <div key={group.label} className={cn('flex gap-1 lg:flex-col', groupIndex > 0 && 'lg:mt-3')}>
-              <p className="hidden px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 lg:block">
+            <div key={group.label} className={cn('flex flex-col', groupIndex > 0 && 'mt-3')}>
+              <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
                 {group.label}
               </p>
-              {group.items.map(({ to, label, short, icon: Icon, end }) => (
+              {group.items.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -115,23 +124,22 @@ export function AppShell({ user, children }: AppShellProps) {
                   aria-current={pathname === to ? 'page' : undefined}
                   className={({ isActive }) =>
                     cn(
-                      'flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] transition-colors',
+                      'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors',
                       isActive
-                        ? 'bg-secondary font-semibold text-foreground shadow-sm'
+                        ? 'bg-secondary font-semibold text-foreground shadow-xs'
                         : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
                     )
                   }
                 >
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span className="lg:hidden">{short}</span>
-                  <span className="hidden lg:inline">{label}</span>
+                  <span>{label}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
 
-        <div className="hidden flex-col gap-2.5 border-t border-border p-3.5 lg:flex">
+        <div className="flex flex-col gap-2.5 border-t border-border p-3.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-[12.5px] font-semibold">{user.name}</p>
@@ -146,26 +154,35 @@ export function AppShell({ user, children }: AppShellProps) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-14 items-center justify-between gap-3 border-b border-border px-4 lg:px-6">
+        {/* Desktop Header Bar (>= lg) */}
+        <div className="hidden h-14 items-center justify-between gap-3 border-b border-border px-6 lg:flex">
           <h2 className="truncate text-[13px] font-semibold">{title}</h2>
           <div className="flex items-center gap-2">
-            <span className="hidden text-[12px] text-muted-foreground sm:inline">{user.email}</span>
-            <Badge variant="muted" className="sm:hidden">
-              {TIER_LABEL[user.tier]}
-            </Badge>
-            <Button variant="ghost" size="sm" className="lg:hidden" onClick={signOut}>
+            <span className="text-[12px] text-muted-foreground">{user.email}</span>
+            <Badge variant="muted">{TIER_LABEL[user.tier]}</Badge>
+            <Button variant="ghost" size="sm" onClick={signOut}>
               Keluar
             </Button>
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 px-4 py-5 lg:px-6 lg:py-6">
+        <main className="min-w-0 flex-1 px-4 py-4 pb-24 lg:px-6 lg:py-6 lg:pb-6">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
             <UserBanners />
             <div className="flex flex-col gap-6">{children}</div>
           </div>
         </main>
       </div>
+
+      {/* Navigasi Bawah Sticky khusus Mobile */}
+      <MobileBottomNav />
+
+      {/* Drawer menu penuh ketika hamburger atau menu Lainnya dibuka */}
+      <MobileMoreDrawer
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        user={user}
+      />
     </div>
   )
 }

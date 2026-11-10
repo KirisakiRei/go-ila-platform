@@ -1,59 +1,24 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, PageHeader, Section, Skeleton, Stat, StatGrid } from '@/components/ui'
+import { Button, PageHeader, Section, Skeleton } from '@/components/ui'
 import { EmptyState } from '@/components/ui'
 import { usePositions, useSystemStatus } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatR } from '@/lib/format'
-import type { MarketState } from '@/types/api'
+import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { PageHeaderActions } from './components/PageHeaderActions'
 import { DailyLimitCard } from './components/DailyLimitCard'
 import { SystemHealthCard } from './components/SystemHealthCard'
 import { MarketSessionCard } from '@/features/trading/components/MarketSessionCard'
-import { OnboardingCard } from '@/features/onboarding'
+import { OnboardingCard, OnboardingModal } from '@/features/onboarding'
 import { AccountStatusCard } from './components/AccountStatusCard'
-import { RadarPantauanCard } from './components/RadarPantauanCard'
+import { DashboardGreetingBar } from './components/DashboardGreetingBar'
+import { DashboardRadarHero } from './components/DashboardRadarHero'
+import { DashboardQuickActions } from './components/DashboardQuickActions'
+import { DashboardSummaryMetrics } from './components/DashboardSummaryMetrics'
+import { DashboardOnboardingWidget } from './components/DashboardOnboardingWidget'
+import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
 
-function SummaryStats() {
-  const { data, isLoading } = useSystemStatus()
 
-  if (isLoading) {
-    return (
-      <StatGrid>
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-24 w-full" />
-        ))}
-      </StatGrid>
-    )
-  }
-  if (!data) return null
-
-  const market: Record<MarketState, string> = {
-    OPEN: 'Open',
-    CLOSED: 'Closed',
-    ROLLOVER: 'Rollover',
-    UNKNOWN: 'Standby',
-  }
-
-  return (
-    <StatGrid>
-      <Stat label="Status Pasar" value={market[data.market.state]} hint={data.market.label} />
-      <Stat
-        label="Trades Hari Ini"
-        value={`${data.daily.total_trades} / ${data.daily.max_trades}`}
-        hint={data.daily.day ? `Sesi ${data.daily.day} WIB` : undefined}
-      />
-      <Stat
-        label="Win / Loss"
-        value={`${data.daily.win_count} / ${data.daily.loss_count}`}
-        hint={`${data.daily.open_count} posisi aktif`}
-      />
-      <Stat
-        label="Broker Accounts"
-        value={`${data.brokers.connected} / ${data.brokers.total}`}
-        hint={data.brokers.any_error ? 'Ada akun perlu sinkronisasi' : 'Semua tersambung'}
-      />
-    </StatGrid>
-  )
-}
 
 function RecentPositions() {
   const { data, isLoading } = usePositions(5)
@@ -108,45 +73,100 @@ function RecentPositions() {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuthContext()
   const { data: status } = useSystemStatus()
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const [moreDrawerOpen, setMoreDrawerOpen] = useState(false)
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description="Status operasional pasar, ringkasan performa trading harian, dan posisi aktif."
-        actions={<PageHeaderActions />}
-      />
+      {/* ============================================================ */}
+      {/* 1. TAMPILAN KHUSUS MOBILE (< lg) — Persis screen.png         */}
+      {/* ============================================================ */}
+      <div className="flex flex-col gap-4 lg:hidden">
+        {/* 2.a Greeting & Status Live Broker */}
+        <DashboardGreetingBar />
 
-      <AccountStatusCard />
+        {/* 2.b Card Sinyal Radar Pasar (Top Priority) */}
+        <DashboardRadarHero />
 
-      <OnboardingCard />
+        {/* 2.c Akses Cepat (SuperApp Grid 4x2) */}
+        <DashboardQuickActions
+          onOpenMore={() => setMoreDrawerOpen(true)}
+          onOpenOnboarding={() => setOnboardingOpen(true)}
+        />
 
-      <SummaryStats />
+        {/* 2.d Ringkasan Trading Hari Ini (Grid 2x2) */}
+        <DashboardSummaryMetrics />
 
-      {/* Radar Pair Pantauan Real-Time */}
-      <RadarPantauanCard />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DailyLimitCard />
-        <SystemHealthCard />
+        {/* 2.e Widget Tipis Penyiapan Akun */}
+        <DashboardOnboardingWidget onOpenOnboarding={() => setOnboardingOpen(true)} />
       </div>
 
-      <MarketSessionCard />
+      {/* ============================================================ */}
+      {/* 2. TAMPILAN DESKTOP (>= lg)                                  */}
+      {/* ============================================================ */}
+      <div className="hidden lg:flex lg:flex-col lg:gap-6">
+        <PageHeader
+          title="Dashboard"
+          description="Status operasional pasar, ringkasan performa trading harian, dan posisi aktif."
+          actions={<PageHeaderActions />}
+        />
 
-      <Section
-        title="Posisi Terkini"
-        description={
-          status ? `Waktu server ${formatDateTime(status.server_time)}` : 'Memuat waktu server…'
-        }
-        actions={
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/posisi">Semua Posisi</Link>
-          </Button>
-        }
-      >
-        <RecentPositions />
-      </Section>
+        <AccountStatusCard />
+
+        <OnboardingCard />
+
+        {/* Hero Radar Pasar & Quick Action Grid di Desktop */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <DashboardRadarHero />
+          </div>
+          <div className="lg:col-span-5 space-y-4">
+            <DashboardQuickActions
+              onOpenMore={() => setMoreDrawerOpen(true)}
+              onOpenOnboarding={() => setOnboardingOpen(true)}
+            />
+            <DashboardSummaryMetrics />
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <DailyLimitCard />
+          <SystemHealthCard />
+        </div>
+
+        <MarketSessionCard />
+
+        <Section
+          title="Posisi Terkini"
+          description={
+            status ? `Waktu server ${formatDateTime(status.server_time)}` : 'Memuat waktu server…'
+          }
+          actions={
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/posisi">Semua Posisi</Link>
+            </Button>
+          }
+        >
+          <RecentPositions />
+        </Section>
+      </div>
+
+      {/* Modal Onboarding jika diklik dari Checklist Akses Cepat / Widget */}
+      <OnboardingModal
+        forceOpen={onboardingOpen}
+        onCloseForce={() => setOnboardingOpen(false)}
+      />
+
+      {/* Bottom Sheet Drawer jika dibuka dari tombol Lainnya */}
+      {user && (
+        <MobileMoreDrawer
+          open={moreDrawerOpen}
+          onClose={() => setMoreDrawerOpen(false)}
+          user={user}
+        />
+      )}
     </>
   )
 }
