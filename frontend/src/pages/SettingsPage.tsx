@@ -7,6 +7,7 @@ import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/l
 import { accountFlowApi } from '@/lib/auth-api'
 import { ApiError } from '@/lib/api-error'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { SettingsMobileView } from '@/pages/components/SettingsMobileView'
 
 function TrialSection() {
   const { data, isLoading, isError, error } = useTrial()
@@ -185,30 +186,36 @@ function TelegramSection() {
 export default function SettingsPage() {
   return (
     <>
-      <PageHeader
-        title="Pengaturan"
-        description="Uji coba, saluran notifikasi, dan keamanan akun."
-      />
-      <TrialSection />
-      <TelegramSection />
+      {/* Tampilan Mobile (< lg) */}
+      <SettingsMobileView />
 
-      <Section
-        title="Keamanan"
-        description="Kata sandi, verifikasi email, 2FA, dan perangkat yang sedang masuk."
-      >
-        <div className="flex flex-col gap-3 border border-border p-4">
-          <p className="text-[13px] text-muted-foreground">
-            Pengaturan keamanan lengkap dipisah ke halaman sendiri agar tidak tercampur dengan uji coba
-            dan notifikasi.
-          </p>
-          <Link
-            to="/pengaturan/keamanan"
-            className="inline-flex w-fit rounded-md border border-border px-3 py-1.5 text-[13px] font-medium hover:bg-secondary"
-          >
-            Buka pengaturan keamanan
-          </Link>
-        </div>
-      </Section>
+      {/* Tampilan Desktop (>= lg) */}
+      <div className="hidden flex-col gap-6 lg:flex">
+        <PageHeader
+          title="Pengaturan"
+          description="Uji coba, saluran notifikasi, dan keamanan akun."
+        />
+        <TrialSection />
+        <TelegramSection />
+
+        <Section
+          title="Keamanan"
+          description="Kata sandi, verifikasi email, 2FA, dan perangkat yang sedang masuk."
+        >
+          <div className="flex flex-col gap-3 border border-border p-4">
+            <p className="text-[13px] text-muted-foreground">
+              Pengaturan keamanan lengkap dipisah ke halaman sendiri agar tidak tercampur dengan uji coba
+              dan notifikasi.
+            </p>
+            <Link
+              to="/pengaturan/keamanan"
+              className="inline-flex w-fit rounded-md border border-border px-3 py-1.5 text-[13px] font-medium hover:bg-secondary"
+            >
+              Buka pengaturan keamanan
+            </Link>
+          </div>
+        </Section>
+      </div>
     </>
   )
 }

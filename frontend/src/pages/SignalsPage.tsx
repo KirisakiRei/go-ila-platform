@@ -30,6 +30,7 @@ import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRad
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
 import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
+import { SignalsMobileView } from './components/SignalsMobileView'
 
 export default function SignalsPage() {
   const [params, setParams] = useSearchParams()
@@ -123,33 +124,59 @@ export default function SignalsPage() {
 
   return (
     <>
-      <PageHeader
-        title={activePair ? `Signals — ${activePair}` : 'Signals & Radar'}
-        description={
-          activePair
-            ? `Ringkasan sinyal aktif${adaIla3 ? ', analisis per metode (ILA 2.0 & ILA 3.0),' : ''} serta riwayat eksekusi order pada pair ${activePair}.`
-            : 'Pusat sinyal dan radar pergerakan pasar untuk seluruh watchlist pair Anda.'
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            {activePair && (
-              <Button variant="outline" size="sm" onClick={handleBackToPairs} className="gap-1.5 text-xs">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Semua Pair
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refetch()}
-              isLoading={isFetching}
-              className="text-xs"
-            >
-              Muat Ulang
-            </Button>
-          </div>
-        }
+      {/* ============================================================ */}
+      {/* 1. TAMPILAN KHUSUS MOBILE (< lg) — Persis signals_radar_mobile */}
+      {/* ============================================================ */}
+      <SignalsMobileView
+        signals={signals}
+        allPairs={allPairs}
+        activePair={activePair}
+        onSelectPair={handleSelectPair}
+        onBackToPairs={handleBackToPairs}
+        isLoading={isLoading}
+        isFetching={isFetching}
+        refetch={refetch}
+        adaIla3={adaIla3}
+        activeStrategyFilter={activeStrategyFilter}
+        onSelectStrategy={(strat) => {
+          setActiveStrategyFilter(strat)
+          setHistoryPage(1)
+        }}
+        filteredSignals={filteredSignals}
+        filteredPositions={filteredPositions}
       />
+
+      {/* ============================================================ */}
+      {/* 2. TAMPILAN DESKTOP (>= lg) — Struktur lama, aman 100%       */}
+      {/* ============================================================ */}
+      <div className="hidden lg:block space-y-6">
+        <PageHeader
+          title={activePair ? `Signals — ${activePair}` : 'Signals & Radar'}
+          description={
+            activePair
+              ? `Ringkasan sinyal aktif${adaIla3 ? ', analisis per metode (ILA 2.0 & ILA 3.0),' : ''} serta riwayat eksekusi order pada pair ${activePair}.`
+              : 'Pusat sinyal dan radar pergerakan pasar untuk seluruh watchlist pair Anda.'
+          }
+          actions={
+            <div className="flex items-center gap-2">
+              {activePair && (
+                <Button variant="outline" size="sm" onClick={handleBackToPairs} className="gap-1.5 text-xs">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Semua Pair
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refetch()}
+                isLoading={isFetching}
+                className="text-xs"
+              >
+                Muat Ulang
+              </Button>
+            </div>
+          }
+        />
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -591,6 +618,7 @@ export default function SignalsPage() {
           )}
         </div>
       )}
+      </div>
     </>
   )
 }

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui'
 import { accountFlowApi } from '@/lib/auth-api'
 import { OnboardingChecklist } from '@/features/onboarding'
+import { OnboardingMobileView } from '@/pages/components/OnboardingMobileView'
 
 /**
  * OnboardingPage memandu lima langkah pertama penyiapan akun.
@@ -47,143 +48,159 @@ export default function OnboardingPage() {
 
   return (
     <>
-      <PageHeader
-        title="Mulai"
-        description="Lima langkah singkat agar sistem mengenal akun, broker, dan preferensi risiko Anda."
-        actions={
-          data && !data.done && completed < total ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={skipAll.isPending}
-              onClick={() => skipAll.mutate()}
-            >
-              {skipAll.isPending ? 'Menyimpan...' : 'Tandai Selesai / Lewati'}
-            </Button>
-          ) : null
-        }
+      {/* Tampilan Mobile (< lg) */}
+      <OnboardingMobileView
+        data={data}
+        isLoading={isLoading}
+        completed={completed}
+        total={total}
+        percentage={percentage}
+        onSkip={() => skipAll.mutate()}
+        isSkipping={skipAll.isPending}
+        canSkip={Boolean(data && !data.done && completed < total)}
+        onNavigate={invalidate}
       />
 
-      {isLoading && <Skeleton className="h-64 w-full" />}
+      {/* Tampilan Desktop (>= lg) */}
+      <div className="hidden flex-col gap-6 lg:flex">
+        <PageHeader
+          title="Mulai"
+          description="Lima langkah singkat agar sistem mengenal akun, broker, dan preferensi risiko Anda."
+          actions={
+            data && !data.done && completed < total ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={skipAll.isPending}
+                onClick={() => skipAll.mutate()}
+              >
+                {skipAll.isPending ? 'Menyimpan...' : 'Tandai Selesai / Lewati'}
+              </Button>
+            ) : null
+          }
+        />
 
-      {data && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
-                      <Sparkles className="h-3.5 w-3.5" />
-                    </span>
-                    <CardTitle className="text-sm font-semibold">Progres Penyiapan Akun</CardTitle>
+        {isLoading && <Skeleton className="h-64 w-full" />}
+
+        {data && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
+                        <Sparkles className="h-3.5 w-3.5" />
+                      </span>
+                      <CardTitle className="text-sm font-semibold">Progres Penyiapan Akun</CardTitle>
+                    </div>
+                    <CardDescription className="mt-1 text-xs">
+                      {completed === total
+                        ? 'Semua langkah penyiapan sudah selesai!'
+                        : `${completed} dari ${total} langkah selesai (${percentage}%). Posisi tersimpan otomatis.`}
+                    </CardDescription>
                   </div>
-                  <CardDescription className="mt-1 text-xs">
-                    {completed === total
-                      ? 'Semua langkah penyiapan sudah selesai!'
-                      : `${completed} dari ${total} langkah selesai (${percentage}%). Posisi tersimpan otomatis.`}
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {percentage}% Selesai
+                  </span>
+                </div>
+                <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500 ease-out"
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <OnboardingChecklist data={data} onNavigate={invalidate} />
+
+                {!data.email_verified && (
+                  <Alert variant="warning" className="text-xs">
+                    Beberapa fitur terkunci sampai email terverifikasi: uji coba simulasi,
+                    menghubungkan akun broker, dan pembayaran langganan.
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Navigasi Cepat Pusat Bantuan, FAQ, dan Legal */}
+            <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-3">
+              <Card className="flex flex-col justify-between">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
+                      <BookOpen className="h-4 w-4" />
+                    </span>
+                    <CardTitle className="text-sm font-semibold">Pusat Bantuan</CardTitle>
+                  </div>
+                  <CardDescription className="mt-2 text-xs leading-relaxed">
+                    Panduan langkah awal, cara mendapatkan token Match-Trader, dan pengaturan bot Telegram.
                   </CardDescription>
-                </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {percentage}% Selesai
-                </span>
-              </div>
-              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-500 ease-out"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <OnboardingChecklist data={data} onNavigate={invalidate} />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <a
+                    href="/bantuan"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:underline"
+                  >
+                    Buka Panduan & Tutorial <ArrowRight className="h-3 w-3" />
+                  </a>
+                </CardContent>
+              </Card>
 
-              {!data.email_verified && (
-                <Alert variant="warning" className="text-xs">
-                  Beberapa fitur terkunci sampai email terverifikasi: uji coba simulasi,
-                  menghubungkan akun broker, dan pembayaran langganan.
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
+              <Card className="flex flex-col justify-between">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
+                      <HelpCircle className="h-4 w-4" />
+                    </span>
+                    <CardTitle className="text-sm font-semibold">Tanya Jawab (FAQ)</CardTitle>
+                  </div>
+                  <CardDescription className="mt-2 text-xs leading-relaxed">
+                    Jawaban cepat seputar sesi pasar New York vs WIB, batasan risiko, dan eksekusi order.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <a
+                    href="/bantuan#faq-bantuan"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:underline"
+                  >
+                    Lihat Pertanyaan Umum <ArrowRight className="h-3 w-3" />
+                  </a>
+                </CardContent>
+              </Card>
 
-          {/* Navigasi Cepat Pusat Bantuan, FAQ, dan Legal */}
-          <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-3">
-            <Card className="flex flex-col justify-between">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
-                    <BookOpen className="h-4 w-4" />
-                  </span>
-                  <CardTitle className="text-sm font-semibold">Pusat Bantuan</CardTitle>
-                </div>
-                <CardDescription className="mt-2 text-xs leading-relaxed">
-                  Panduan langkah awal, cara mendapatkan token Match-Trader, dan pengaturan bot Telegram.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <a
-                  href="/bantuan"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:underline"
-                >
-                  Buka Panduan & Tutorial <ArrowRight className="h-3 w-3" />
-                </a>
-              </CardContent>
-            </Card>
-
-            <Card className="flex flex-col justify-between">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
-                    <HelpCircle className="h-4 w-4" />
-                  </span>
-                  <CardTitle className="text-sm font-semibold">Tanya Jawab (FAQ)</CardTitle>
-                </div>
-                <CardDescription className="mt-2 text-xs leading-relaxed">
-                  Jawaban cepat seputar sesi pasar New York vs WIB, batasan risiko, dan eksekusi order.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <a
-                  href="/bantuan#faq-bantuan"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:underline"
-                >
-                  Lihat Pertanyaan Umum <ArrowRight className="h-3 w-3" />
-                </a>
-              </CardContent>
-            </Card>
-
-            <Card className="flex flex-col justify-between">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
-                    <ShieldAlert className="h-4 w-4" />
-                  </span>
-                  <CardTitle className="text-sm font-semibold">Legal & Risiko</CardTitle>
-                </div>
-                <CardDescription className="mt-2 text-xs leading-relaxed">
-                  Ketentuan Layanan, Kebijakan Privasi, dan Pernyataan Disclaimer Risiko Trading.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <a
-                  href="/legal"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:underline"
-                >
-                  Baca Dokumen Legal <ArrowRight className="h-3 w-3" />
-                </a>
-              </CardContent>
-            </Card>
+              <Card className="flex flex-col justify-between">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
+                      <ShieldAlert className="h-4 w-4" />
+                    </span>
+                    <CardTitle className="text-sm font-semibold">Legal & Risiko</CardTitle>
+                  </div>
+                  <CardDescription className="mt-2 text-xs leading-relaxed">
+                    Ketentuan Layanan, Kebijakan Privasi, dan Pernyataan Disclaimer Risiko Trading.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <a
+                    href="/legal"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:underline"
+                  >
+                    Baca Dokumen Legal <ArrowRight className="h-3 w-3" />
+                  </a>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+    </div>
     </>
   )
 }
