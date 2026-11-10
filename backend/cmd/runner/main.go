@@ -44,6 +44,8 @@ const (
 	symbolSyncInterval = 2 * time.Minute
 	// Sesi yang bertahan selama ini dianggap sehat, bukan kegagalan berulang.
 	backoffResetAfter = 30 * time.Second
+	// Jeda minimum antar penulisan status engine dari heartbeat.
+	engineStateWriteInterval = 30 * time.Second
 )
 
 func main() {
@@ -127,6 +129,12 @@ func main() {
 
 	// --- Runner ---------------------------------------------------------------
 	runner.SetDailyTimezone(cfg.DailyTimezone)
+	// Tahap strategi dipakai untuk gerbang ComputeRequirements. Nilainya harus
+	// sama dengan yang dipakai engineTargets, jadi keduanya dibaca dari katalog
+	// paket yang sama.
+	strategySettings := runner.NewSettings(cfg.ILA3Availability)
+	strategySettings.Reload(ctx, features)
+
 	opts := runner.Options{
 		Policy: runner.DailyPolicy{
 			MaxTrades:    cfg.MaxDailyTrades,
@@ -156,6 +164,9 @@ func main() {
 		// CorrelationGate meneruskan pasangan SMT (mis. XAUUSD → XAGUSD) agar
 		// engine ikut menarik lilin instrumen pembanding.
 		CorrelationGate: runner.NewCachedCorrelationGate(store, time.Minute),
+		// Tanpa ini gerbang strategi memakai env saja dan seluruh permintaan
+		// ILA 3.0 tersaring habis walau engine-nya sudah berjalan.
+		Settings: strategySettings,
 	}
 
 	svc := runner.NewService(store, registry, publisher, logger, opts)
@@ -183,6 +194,9 @@ func main() {
 	// Rekonsiliasi jalan sebelum sinyal baru diterima, agar selisih posisi
 	// ditemukan saat sistem masih tenang.
 	svc.Reconcile(ctx)
+	// Sisa sinyal kedaluwarsa dari proses sebelumnya dibersihkan lebih dulu
+	// agar radar tidak menampilkan baris mati sejak awal.
+	svc.ExpireStaleSignals(ctx)
 
 	var wg sync.WaitGroup
 
@@ -299,6 +313,9 @@ func runMonitor(ctx context.Context, svc *runner.Service, logger *slog.Logger) {
 			return
 		case <-ticker.C:
 			svc.MonitorPositions(ctx)
+			// Sinyal yang TTL-nya habis tidak akan pernah menerima status dari
+			// engine; penyapu ini yang menutupnya.
+			svc.ExpireStaleSignals(ctx)
 		}
 	}
 }
@@ -361,7 +378,7 @@ func runEngineLoop(
 	for ctx.Err() == nil {
 		mulai := time.Now()
 		err := streamOnce(ctx, target, svc, store, logger)
-		recordEngineState(ctx, store, stateID, target.Strategy, err, logger)
+		recordEngineState(ctx, store, stateID, target.Strategy, svc.EngineVersion(), err, logger)
 
 		// Sesi yang bertahan cukup lama dianggap sehat: jeda antar percobaan
 		// dikembalikan ke awal agar koneksi berikutnya tidak menunggu lama.
@@ -415,6 +432,21 @@ func streamOnce(
 
 	subscriberID := subscriberFor(target.Strategy)
 
+	// Penulisan status engine dibatasi: heartbeat datang jauh lebih sering
+	// daripada kebutuhan dashboard, sedangkan setiap tulis adalah UPDATE tabel.
+	var stateMu sync.Mutex
+	var lastStateWrite time.Time
+	catatState := func(version string, cause error) {
+		stateMu.Lock()
+		if cause == nil && !lastStateWrite.IsZero() && time.Since(lastStateWrite) < engineStateWriteInterval {
+			stateMu.Unlock()
+			return
+		}
+		lastStateWrite = time.Now()
+		stateMu.Unlock()
+		recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, version, cause, logger)
+	}
+
 	// Trace khusus stream: satu koneksi = satu rangkaian log yang bisa dicari.
 	streamCtx := engineclient.DenganTrace(ctx, logkit.Trace())
 
@@ -434,7 +466,7 @@ func streamOnce(
 				// stream berakhir. Sebelumnya status hanya ditulis saat putus,
 				// sehingga yang tersimpan selalu "tidak terhubung" padahal
 				// engine sedang berjalan.
-				recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, nil, logger)
+				recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, svc.EngineVersion(), nil, logger)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
 				svc.SetAckSender(ackSender(client, subscriberID))
 				svc.SetSymbolSync(symbolSync(client, subscriberID, target, svc, logger))
@@ -458,6 +490,11 @@ func streamOnce(
 			},
 			OnHeartbeat: func(hb *enginev1.Heartbeat) {
 				svc.SetEngineVersion(hb.GetEngineVersion())
+				// Heartbeat adalah satu-satunya bukti engine masih hidup saat
+				// tidak ada sinyal. Tanpa penulisan ini last_seen_at hanya
+				// berubah ketika koneksi dibuka atau ditutup, sehingga panel
+				// kesehatan menandai engine sehat sebagai stale.
+				catatState(hb.GetEngineVersion(), nil)
 			},
 			OnDisconnected: func(err error) {
 				logger.Warn("stream engine berakhir",
@@ -654,15 +691,16 @@ func subscriberFor(strategy string) string {
 
 // recordEngineState mencatat status koneksi agar dashboard bisa menampilkan
 // apakah engine sedang terjangkau.
-func recordEngineState(ctx context.Context, store repository.RunnerRepository, id, strategy string, cause error, logger *slog.Logger) {
+func recordEngineState(ctx context.Context, store repository.RunnerRepository, id, strategy, version string, cause error, logger *slog.Logger) {
 	now := time.Now().UTC()
 
 	state := &model.EngineState{
-		ID:         id,
-		Strategy:   strategy,
-		Connected:  cause == nil,
-		LastError:  truncateText(errorText(cause), 255),
-		LastSeenAt: &now,
+		ID:            id,
+		Strategy:      strategy,
+		EngineVersion: version,
+		Connected:     cause == nil,
+		LastError:     truncateText(errorText(cause), 255),
+		LastSeenAt:    &now,
 	}
 
 	if err := store.UpsertEngineState(ctx, state); err != nil {

@@ -54,9 +54,28 @@ func SystemOps(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.Adm
 	return service.NewSystemOpsService(repository.NewSystemRepository(db), repository.NewRunnerRepository(db), flags, service.NewAuditRecorder(repository.NewAuditRepository(db)))
 }
 
+// OpsiBackendAPI menyesuaikan perakitan endpoint tanpa mengubah pemanggil lama.
+type OpsiBackendAPI func(*konfigurasiBackendAPI)
+
+type konfigurasiBackendAPI struct {
+	strategi *runner.Settings
+}
+
+// DenganStrategi memakai pengaturan strategi yang sudah dimuat pemanggil.
+// Pemanggil yang menyegarkan pengaturan secara berkala (mis. dari katalog
+// paket) harus memakai opsi ini agar panel user melihat tahap yang sama.
+func DenganStrategi(s *runner.Settings) OpsiBackendAPI {
+	return func(k *konfigurasiBackendAPI) { k.strategi = s }
+}
+
 // NewBackendAPI merangkai seluruh endpoint backend-api.
 // Wiring sengaja dikumpulkan di satu tempat agar alur dependensi terlihat utuh.
-func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.Engine {
+func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ...OpsiBackendAPI) *gin.Engine {
+	pilihan := konfigurasiBackendAPI{}
+	for _, f := range opsi {
+		f(&pilihan)
+	}
+
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -137,6 +156,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 	accountPairStrategyRepo := repository.NewAccountPairStrategyRepository(db)
 	accountPairTimeframeRepo := repository.NewAccountPairTimeframeRepository(db)
 
+	// Katalog paket adalah sumber kebenaran tahap strategi. Nilai env hanya
+	// cadangan bila katalog belum punya barisnya.
+	strategiSettings := pilihan.strategi
+	if strategiSettings == nil {
+		strategiSettings = runner.LoadSettings()
+		strategiSettings.Reload(context.Background(), repository.NewTierFeatureReader(db))
+	}
+
 	accountService := service.NewAccountService(service.AccountServiceDeps{
 		Users:         userRepo,
 		Accounts:      accountRepo,
@@ -145,7 +172,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger) *gin.En
 		States:        stateRepo,
 		Audit:         auditRepo,
 		Sealer:        keyring,
-		Strategies:    runner.LoadSettings(),
+		Strategies:    strategiSettings,
 		Revoker:       runnerAPI,
 		Legal:         legalService,
 		// Batas akun & simbol dibaca dari katalog paket, bukan dari kode.

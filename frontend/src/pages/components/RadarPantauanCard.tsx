@@ -188,7 +188,9 @@ export function RadarPantauanCard() {
               {/* Update Footer */}
               <div className="mt-3 flex items-center justify-between text-[10.5px] text-muted-foreground">
                 <span>
-                  {signal ? `Update ${formatDateTime(signal.published_at)}` : 'Menunggu data candle'}
+                  {signal
+                    ? `Update ${formatDateTime(signal.updated_at ?? signal.published_at)}`
+                    : 'Menunggu data candle'}
                 </span>
                 <span className="font-medium text-foreground/80 group-hover:underline">Buka Setup</span>
               </div>

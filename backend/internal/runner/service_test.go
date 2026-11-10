@@ -67,9 +67,21 @@ func newFakeStore() *fakeStore {
 func userSignalKey(userID, signalID string) string { return userID + "|" + signalID }
 func dailyKey(userID, day string) string           { return userID + "|" + day }
 
+// UpsertSignal meniru repository asli: baris yang sudah ada hanya diperbarui
+// pada kolom ringkasan dan masa berlaku. Kolom status sengaja tidak ditimpa
+// agar status lokal (ACKED) tidak hilang oleh kiriman ulang engine.
 func (s *fakeStore) UpsertSignal(_ context.Context, signal *model.Signal) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if ada, ok := s.signals[signal.SignalID]; ok {
+		ada.Summary = signal.Summary
+		ada.NextAction = signal.NextAction
+		ada.ExpiresAt = signal.ExpiresAt
+		ada.UpdatedAt = signal.UpdatedAt
+		return nil
+	}
+
 	copySignal := *signal
 	s.signals[signal.SignalID] = &copySignal
 	return nil
@@ -107,6 +119,26 @@ func (s *fakeStore) MarkSuperseded(_ context.Context, signalID, newSignalID, rea
 }
 
 func (s *fakeStore) TouchSignal(_ context.Context, _ string, _ time.Time) error { return nil }
+
+// ExpireStaleSignals meniru penyapu database: hanya READY_TO_ENTRY dan
+// OPPORTUNITY yang lewat masa berlaku yang ditutup.
+func (s *fakeStore) ExpireStaleSignals(_ context.Context, now time.Time) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var jumlah int64
+	for _, sig := range s.signals {
+		if sig.Status != model.SignalStatusReadyToEntry && sig.Status != model.SignalStatusOpportunity {
+			continue
+		}
+		if now.Before(sig.ExpiresAt) {
+			continue
+		}
+		sig.Status = model.SignalStatusExpired
+		jumlah++
+	}
+	return jumlah, nil
+}
 
 func (s *fakeStore) UpsertUserSignal(_ context.Context, us *model.UserSignal) error {
 	s.mu.Lock()

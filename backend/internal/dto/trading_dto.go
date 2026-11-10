@@ -47,9 +47,13 @@ type SignalResponse struct {
 	HtfSweep     *SignalHtfSweep `json:"htf_sweep,omitempty"`
 	Cisd         *SignalCISD     `json:"cisd,omitempty"`
 	PublishedAt  time.Time       `json:"published_at"`
-	ExpiresAt    time.Time       `json:"expires_at"`
-	CanConfirm   bool            `json:"can_confirm"`
-	Delayed      bool            `json:"delayed"`
+	// UpdatedAt adalah kapan baris sinyal terakhir diperbarui (mis. ringkasan
+	// dan masa berlaku disegarkan engine). UI memakainya untuk label "Update"
+	// agar tidak tampak macet pada waktu terbit pertama.
+	UpdatedAt  time.Time `json:"updated_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	CanConfirm bool      `json:"can_confirm"`
+	Delayed    bool      `json:"delayed"`
 }
 
 // PositionResponse adalah posisi hidup atau tertutup milik user.

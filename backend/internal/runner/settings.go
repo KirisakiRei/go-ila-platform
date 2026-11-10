@@ -101,9 +101,14 @@ type ILA3StatusReader interface {
 }
 
 // Reload menurunkan tahap ILA 3.0 dari katalog paket.
-// Semua paket yang menawarkan strategi ini harus menyetujui tahap yang sama;
-// bila berbeda, tahap paling konservatif dipakai agar tidak ada paket yang
-// mendapat fitur lebih cepat dari yang lain.
+//
+// Hanya paket yang benar-benar menawarkan strategi ini yang ikut dihitung.
+// Sebelumnya paket Free/Basic dengan nilai "coming_soon" ikut dinilai sebagai
+// tahap off dan menahan paket Plus, sehingga menaikkan tahap di database tidak
+// pernah berpengaruh.
+//
+// Bila tidak ada paket yang menawarkan strategi ini, tahap yang berlaku tidak
+// diubah: env (ILA3_AVAILABILITY) tetap menjadi cadangan.
 func (s *Settings) Reload(ctx context.Context, reader ILA3StatusReader) {
 	if s == nil || reader == nil {
 		return
@@ -111,6 +116,9 @@ func (s *Settings) Reload(ctx context.Context, reader ILA3StatusReader) {
 
 	stage := ""
 	for _, tier := range []string{model.TierFree, model.TierBasic, model.TierPlus} {
+		if !offersStrategy(reader.Feature(ctx, tier, model.FeatureStrategies, ""), strategyILA3) {
+			continue
+		}
 		value := normalizeStage(reader.Feature(ctx, tier, model.FeatureILA3Status, ""))
 		if value == "" {
 			continue
@@ -123,6 +131,19 @@ func (s *Settings) Reload(ctx context.Context, reader ILA3StatusReader) {
 		return
 	}
 	s.ila3.Store(stage)
+}
+
+// strategyILA3 adalah nama strategi pada katalog paket.
+const strategyILA3 = "ila-3.0"
+
+// offersStrategy memeriksa daftar strategi berformat "ila-2.0,ila-3.0".
+func offersStrategy(daftar, strategi string) bool {
+	for _, item := range strings.Split(daftar, ",") {
+		if strings.EqualFold(strings.TrimSpace(item), strategi) {
+			return true
+		}
+	}
+	return false
 }
 
 // normalizeStage menerjemahkan nilai katalog paket ke tahap internal.

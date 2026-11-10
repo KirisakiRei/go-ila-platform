@@ -257,6 +257,15 @@ func (s *Service) SetEngineVersion(version string) {
 	s.mu.Unlock()
 }
 
+// EngineVersion mengembalikan versi engine terakhir yang dilaporkan.
+// Dipakai Runner saat mencatat status koneksi agar kolom engine_version tidak
+// kosong di panel kesehatan.
+func (s *Service) EngineVersion() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.engineVer
+}
+
 func (s *Service) marketOpen() bool {
 	s.mu.Lock()
 	state := s.market
@@ -279,12 +288,25 @@ func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
 		return
 	}
 
-	if existing, err := s.store.FindSignal(ctx, signal.SignalID); err == nil && IsTerminal(existing.Status) {
+	existing, findErr := s.store.FindSignal(ctx, signal.SignalID)
+	if findErr == nil && IsTerminal(existing.Status) {
 		// Sinyal terminal tidak boleh dihidupkan kembali oleh kiriman ulang.
 		s.logger.Info("sinyal sudah final, dilewati",
 			"evt", "signal.skip.final",
 			"signal_id", signal.SignalID, "status", existing.Status)
 		return
+	}
+
+	// Baris status radar memakai identitas tetap per slot, sedangkan UpsertSignal
+	// sengaja tidak menimpa kolom status agar status lokal (ACKED) tidak hilang.
+	// Tanpa pembaruan khusus ini status menunggu macet di nilai pertama
+	// selamanya, sehingga radar tampak tidak pernah bergerak.
+	if findErr == nil && model.IsWaitingSignalStatus(existing.Status) && existing.Status != signal.Status {
+		if err := s.store.UpdateSignalStatus(ctx, signal.SignalID, signal.Status, ""); err != nil {
+			s.logger.Warn("gagal memperbarui status menunggu",
+				"evt", "signal.status.gagal",
+				"signal_id", signal.SignalID, "error", err.Error())
+		}
 	}
 
 	if err := s.store.UpsertSignal(ctx, signal); err != nil {

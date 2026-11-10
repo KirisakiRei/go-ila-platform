@@ -125,6 +125,7 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 			Summary:         signal.Summary,
 			NextAction:      signal.NextAction,
 			PublishedAt:     signal.PublishedAt,
+			UpdatedAt:       signal.UpdatedAt,
 			ExpiresAt:       signal.ExpiresAt,
 			Delayed:         delayed,
 		}

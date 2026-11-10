@@ -8,9 +8,11 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 
 	logkitv1 "ila/backend/gen/logkit/v1"
 	"ila/backend/internal/logingest"
@@ -44,7 +46,16 @@ func jalankanPenerimaLog(addr, dir, certFile, keyFile, caFile string, log *slog.
 		log.Warn("penerima log tanpa mTLS", "evt", "log.server.tanpa-mtls", "addr", addr)
 	}
 
-	srv := grpc.NewServer(opsi...)
+	srv := grpc.NewServer(append(opsi,
+		// Engine mengirim ping keepalive tiap 30 detik. Tanpa kebijakan ini
+		// gRPC menolak ping lebih cepat dari 5 menit (ENHANCE_YOUR_CALM /
+		// too_many_pings) sehingga stream log terputus lalu tersambung lagi
+		// setiap ~2 menit.
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             10 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	)...)
 	penyimpan := logingest.Baru(dir, log)
 	logkitv1.RegisterLogServiceServer(srv, penyimpan)
 

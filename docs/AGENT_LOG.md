@@ -35,6 +35,66 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-10 — Sinyal macet, status engine tidak jujur, dan ILA 3.0 disiapkan
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug + integrase strategi
+**Status:** 🟢 SELESAI (kode), ⏳ menunggu deploy
+
+**Ringkasan:**
+
+1. **Penyapu sinyal kedaluwarsa.** Engine hanya mengirim status terminal lewat
+   `SignalUpdate`, sehingga `READY_TO_ENTRY` yang tidak pernah dieksekusi
+   tertinggal selamanya (163 baris di produksi). `ExpireStaleSignals` kini
+   berjalan saat Runner mulai dan setiap siklus monitor. Sengaja hanya
+   menyasar `READY_TO_ENTRY`/`OPPORTUNITY`: baris `WAIT_*` memakai identitas
+   tetap dan dikirim ulang engine, jadi menandainya `EXPIRED` akan mematikan
+   radar satu slot secara permanen (`HandleSignal` melewati status terminal).
+2. **Status engine jujur.** `last_seen_at` dan `engine_version` kini ditulis
+   dari heartbeat (dibatasi 30 detik), bukan hanya saat koneksi dibuka/ditutup.
+   Panel kesehatan tidak lagi menandai engine sehat sebagai stale.
+3. **Label "Update" radar.** `dto.SignalResponse` menyertakan `updated_at`
+   (waktu baris terakhir diperbarui) terpisah dari `published_at` (waktu
+   terbit). UI memakai `updated_at` dengan cadangan `published_at`.
+4. **Keepalive penerima log.** Ditambahkan `EnforcementPolicy` (min 10 detik,
+   izin tanpa stream) karena engine mengirim ping tiap 30 detik. Sebelumnya
+   gRPC menolaknya dengan `too_many_pings` dan stream log terputus tiap ~2
+   menit.
+5. **Tahap strategi dari katalog.** `Settings.Reload` kini hanya menghitung
+   paket yang benar-benar menawarkan strategi (`strategies` memuat
+   `ila-3.0`); sebelumnya `coming_soon` di Free/Basic menahan semuanya ke
+   `off`. Backend-api memuat ulang tiap menit sehingga perubahan katalog
+   berlaku tanpa restart. Runner memakai pengaturan yang sama agar gerbang
+   `ComputeRequirements` tidak menyaring habis permintaan ILA 3.0.
+6. **Seed paket Plus** memuat `ila-3.0` dengan `ila3_status=general`
+   (`DoNothing`, jadi instalasi lama tidak tertimpa).
+7. **Topologi ILA 3.0.** `deploy/docker-compose.yml` runner menerima
+   `ENGINE3_*`; di sisi engine ditambahkan service `engine3` (port 9444,
+   sertifikat sama, nama layanan log `engine3` agar berkas log tidak
+   bertabrakan dengan engine ILA 2.0).
+
+**File terdampak:**
+- `backend/internal/repository/runner_repository.go` — `ExpireStaleSignals`
+- `backend/internal/runner/expiry.go`, `expiry_test.go`
+- `backend/cmd/runner/main.go` — sapu saat mulai + siklus monitor, heartbeat
+- `backend/internal/runner/service.go` — `EngineVersion()`
+- `backend/cmd/runner/logserver.go` — keepalive
+- `backend/internal/dto/trading_dto.go`, `trading_service.go` — `updated_at`
+- `backend/internal/runner/settings.go`, `settings_reload_test.go`
+- `backend/internal/router/router.go`, `cmd/backend-api/main.go` — reloader
+- `backend/internal/repository/billing_seed.go`
+- `deploy/docker-compose.yml`
+- `frontend/src/types/api.ts`, `pages/components/RadarPantauanCard.tsx`
+
+**Catatan deploy:**
+- Urutan: engine (ILA 2.0 tetap) → platform → `engine3` + `ENGINE3_GRPC_ADDR`
+  pada runner → ubah katalog (`plus.strategies` memuat `ila-3.0` dan
+  `plus.ila3_status=general`) → restart runner.
+- Runner membaca daftar engine saat mulai, jadi perubahan alamat/tahap butuh
+  restart runner; backend-api tidak.
+
+---
+
 ### 2026-11-08 (audit) — Dua bug yang ditemukan saat mengaudit sendiri pekerjaan S8
 
 **Pelaku:** Claude

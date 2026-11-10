@@ -383,6 +383,11 @@ export type Signal = {
   htf_sweep?: SignalHtfSweep
   cisd?: SignalCISD
   published_at: string
+  /**
+   * Kapan baris sinyal terakhir diperbarui (ringkasan/masa berlaku disegarkan
+   * engine). Dipakai label "Update" agar tidak tampak macet pada waktu terbit.
+   */
+  updated_at?: string
   expires_at: string
   can_confirm: boolean
   delayed: boolean

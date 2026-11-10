@@ -115,6 +115,14 @@ services:
       # Nama di sertifikat engine, bukan nama host jaringan: Runner menyambung
       # ke IP, sedangkan sertifikat menyebutkan beberapa IP sekaligus.
       ENGINE_SERVER_NAME: ""
+      # Engine ILA 3.0 berjalan sebagai proses terpisah dengan kontrak gRPC yang
+      # sama. Kosong berarti strategi ini tidak dijalankan. Sertifikatnya sama
+      # dengan ILA 2.0 karena SAN memakai IP, bukan port.
+      ENGINE3_GRPC_ADDR: ${ENGINE3_GRPC_ADDR:-}
+      ENGINE3_MTLS_CERT: /certs/engine-client.crt
+      ENGINE3_MTLS_KEY: /certs/engine-client.key
+      ENGINE3_MTLS_CA: /certs/ca.crt
+      ENGINE3_SERVER_NAME: ""
     mem_limit: 160m
     cpus: "0.8"
     pids_limit: 200

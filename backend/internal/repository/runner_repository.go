@@ -23,6 +23,11 @@ type RunnerRepository interface {
 	UpdateSignalStatus(ctx context.Context, signalID, status, reason string) error
 	MarkSuperseded(ctx context.Context, signalID, newSignalID, reason string) error
 	TouchSignal(ctx context.Context, signalID string, seenAt time.Time) error
+	// ExpireStaleSignals menutup sinyal yang masa berlakunya sudah lewat.
+	// Engine hanya mengirim status terminal lewat SignalUpdate, sehingga tanpa
+	// penyapu ini baris READY_TO_ENTRY lama tertinggal selamanya di database
+	// dan ikut tampil di radar.
+	ExpireStaleSignals(ctx context.Context, now time.Time) (int64, error)
 
 	// Status sinyal per user.
 	UpsertUserSignal(ctx context.Context, us *model.UserSignal) error
@@ -186,6 +191,32 @@ func (r *runnerRepository) TouchSignal(ctx context.Context, signalID string, see
 		return fmt.Errorf("memperbarui waktu sinyal: %w", res.Error)
 	}
 	return nil
+}
+
+// ExpireStaleSignals menandai EXPIRED sinyal yang belum dieksekusi tetapi
+// sudah melewati expires_at.
+//
+// Sengaja HANYA menyasar READY_TO_ENTRY dan OPPORTUNITY. Baris status menunggu
+// (WAIT_*) memakai identitas tetap per slot dan terus dikirim ulang engine;
+// menandainya EXPIRED akan membuat Runner menganggapnya final selamanya
+// (HandleSignal melewati status terminal), sehingga radar satu slot mati
+// permanen. Status ACKED/CONSUMED juga tidak disentuh agar jejak eksekusi
+// tidak tersamarkan. Query ini idempotent dan tidak menyentuh tabel posisi.
+func (r *runnerRepository) ExpireStaleSignals(ctx context.Context, now time.Time) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&model.Signal{}).
+		Where("expires_at < ?", now).
+		Where("status IN ?", []string{
+			model.SignalStatusReadyToEntry,
+			model.SignalStatusOpportunity,
+		}).
+		Updates(map[string]any{
+			"status":        model.SignalStatusExpired,
+			"cancel_reason": "masa berlaku habis",
+		})
+	if res.Error != nil {
+		return 0, fmt.Errorf("menyapu sinyal kedaluwarsa: %w", res.Error)
+	}
+	return res.RowsAffected, nil
 }
 
 func (r *runnerRepository) UpsertUserSignal(ctx context.Context, us *model.UserSignal) error {

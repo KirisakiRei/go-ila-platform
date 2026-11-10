@@ -67,9 +67,10 @@ func SeedPlans(ctx context.Context, db *gorm.DB) error {
 			model.FeatureMaxSymbols:   "8",
 			model.FeatureAutoExecute:  "true",
 			model.FeatureSignalDelay:  "0",
-			model.FeatureStrategies:   "ila-2.0",
-			// ILA 3.0 masih penelitian: tampil di daftar tapi belum bisa dipilih.
-			model.FeatureILA3Status: "coming_soon",
+			// ILA 3.0 sudah dirilis untuk tier Plus. Paket lain tetap
+			// "coming_soon" sehingga tidak menahan tahap rilis paket ini.
+			model.FeatureStrategies: "ila-2.0,ila-3.0",
+			model.FeatureILA3Status: "general",
 			model.FeatureReasonAI:   "true",
 			// Batas total risiko seluruh akun aktif milik satu pengguna (persen).
 			model.FeatureMaxTotalRisk: "5",

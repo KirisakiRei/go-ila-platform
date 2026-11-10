@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Status sinyal mengikuti state machine di plans/07 dan disimpan apa adanya
 // di kolom signal.status.
@@ -37,6 +40,18 @@ func IsTerminalSignal(status string) bool {
 	default:
 		return false
 	}
+}
+
+// IsWaitingSignalStatus menandai status yang hanya untuk menampilkan kemajuan
+// radar. Baris dengan status ini memakai identitas tetap per slot (bukan satu
+// ID per terbitan), sehingga nilainya wajar diperbarui setiap kali engine
+// mengirim kemajuan baru.
+func IsWaitingSignalStatus(status string) bool {
+	switch status {
+	case SignalStatusWaitHTFSweep, SignalStatusWaitHTFCandleClose, SignalStatusWaitLTFCISD:
+		return true
+	}
+	return strings.HasPrefix(status, "WAIT_ILA3_") || strings.HasPrefix(status, "ILA3_")
 }
 
 // Signal adalah sinyal yang diterima dari engine.

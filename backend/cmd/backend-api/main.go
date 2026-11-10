@@ -98,9 +98,27 @@ func main() {
 		logger.Info("peringatan admin aktif", "penerima", cfg.TelegramAdminChatID)
 	}
 
+	// Tahap strategi dibaca dari katalog paket dan disegarkan berkala agar
+	// perubahan admin langsung terlihat di panel user tanpa restart. Nilai dari
+	// env (ILA3_AVAILABILITY) hanya cadangan bila katalog belum punya barisnya.
+	strategiSettings := runner.LoadSettings()
+	strategiSettings.Reload(ctx, repository.NewTierFeatureReader(db))
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				strategiSettings.Reload(ctx, repository.NewTierFeatureReader(db))
+			}
+		}
+	}()
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
-		Handler:           router.NewBackendAPI(cfg, db, logger),
+		Handler:           router.NewBackendAPI(cfg, db, logger, router.DenganStrategi(strategiSettings)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
