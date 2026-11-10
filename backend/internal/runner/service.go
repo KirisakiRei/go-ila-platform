@@ -124,20 +124,17 @@ type Service struct {
 	logger  *slog.Logger
 	opts    Options
 
-	mu        sync.Mutex
-	market    enginev1.MarketState
-	engineVer string
-	ack       AckSender
-	// symbolSync dan symbolsSent menjaga agar engine hanya memantau simbol
-	// yang benar-benar dibutuhkan pengguna saat ini.
-	symbolSync  SymbolSync
-	symbolsSent map[string]struct{}
-	// pairsSent adalah sidik pasangan timeframe terakhir yang dikirim.
-	// Perubahan saklar timeframe tidak mengubah daftar simbol, jadi tanpa
-	// pembanding ini perubahan saklar tidak pernah sampai ke engine.
-	pairsSent string
-	clients   map[string]broker.Client
-	keyring   *cryptox.Keyring
+	mu     sync.Mutex
+	market enginev1.MarketState
+	// engineVers, acks, dan syncStates dipisah per strategi karena satu Runner
+	// melayani lebih dari satu engine (ila-2.0 dan ila-3.0) sekaligus. Bila
+	// state-nya digabung, penyelarasan satu engine akan memakai daftar simbol
+	// engine lain sehingga keduanya saling mencabut langganan.
+	engineVers map[string]string
+	acks       map[string]AckSender
+	syncStates map[string]*strategySyncState
+	clients    map[string]broker.Client
+	keyring    *cryptox.Keyring
 	// schedule mengawasi kecocokan status pasar dengan jadwal NY.
 	schedule *ScheduleWatch
 }
@@ -251,19 +248,22 @@ func marketStateLabel(state enginev1.MarketState) string {
 }
 
 // SetEngineVersion mencatat build engine yang sedang terhubung.
-func (s *Service) SetEngineVersion(version string) {
+func (s *Service) SetEngineVersion(strategy, version string) {
 	s.mu.Lock()
-	s.engineVer = version
+	if s.engineVers == nil {
+		s.engineVers = make(map[string]string, 2)
+	}
+	s.engineVers[strategy] = version
 	s.mu.Unlock()
 }
 
-// EngineVersion mengembalikan versi engine terakhir yang dilaporkan.
-// Dipakai Runner saat mencatat status koneksi agar kolom engine_version tidak
-// kosong di panel kesehatan.
-func (s *Service) EngineVersion() string {
+// EngineVersion mengembalikan versi engine terakhir yang dilaporkan untuk satu
+// strategi. Dipakai Runner saat mencatat status koneksi agar kolom
+// engine_version tidak kosong di panel kesehatan.
+func (s *Service) EngineVersion(strategy string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.engineVer
+	return s.engineVers[strategy]
 }
 
 func (s *Service) marketOpen() bool {
@@ -330,7 +330,7 @@ func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
 		return
 	}
 
-	if err := s.ackSignal(ctx, signal.SignalID); err != nil {
+	if err := s.ackSignal(ctx, signal.StrategyVersion, signal.SignalID); err != nil {
 		// ACK gagal bukan alasan membuang sinyal: engine boleh mengulang.
 		s.logger.Warn("ACK sinyal gagal", "evt", "signal.ack.gagal",
 			"signal_id", signal.SignalID, "error", err.Error())
@@ -1123,9 +1123,9 @@ func (s *Service) Skip(ctx context.Context, userID, signalID string) error {
 // Bantuan internal
 // ---------------------------------------------------------------------------
 
-func (s *Service) ackSignal(ctx context.Context, signalID string) error {
+func (s *Service) ackSignal(ctx context.Context, strategy, signalID string) error {
 	s.mu.Lock()
-	ack := s.ack
+	ack := s.acks[strategy]
 	s.mu.Unlock()
 
 	if ack == nil {
@@ -1141,16 +1141,46 @@ type AckSender func(ctx context.Context, signalID string) error
 // Hanya selisih yang dikirim agar engine tidak menerima beban penuh tiap menit.
 type SymbolSync func(ctx context.Context, add, remove []string) error
 
+// strategySyncState menyimpan penyelaras langganan dan sidik terakhir untuk
+// satu strategi.
+type strategySyncState struct {
+	sync SymbolSync
+	// generation bertambah setiap stream tersambung ulang. Penulisan sidik dari
+	// sesi lama diabaikan agar tidak menandai terkirim pada koneksi baru.
+	generation  uint64
+	symbolsSent map[string]struct{}
+	// pairsSent adalah sidik pasangan timeframe terakhir yang dikirim.
+	// Perubahan saklar timeframe tidak mengubah daftar simbol, jadi tanpa
+	// pembanding ini perubahan saklar tidak pernah sampai ke engine.
+	pairsSent string
+}
+
+// syncStateLocked mengembalikan state sinkronisasi satu strategi.
+// Wajib dipanggil dengan s.mu terkunci.
+func (s *Service) syncStateLocked(strategy string) *strategySyncState {
+	if s.syncStates == nil {
+		s.syncStates = make(map[string]*strategySyncState, 2)
+	}
+	state := s.syncStates[strategy]
+	if state == nil {
+		state = &strategySyncState{}
+		s.syncStates[strategy] = state
+	}
+	return state
+}
+
 // SetSymbolSync memasang penyelaras langganan dan mengosongkan daftar terkirim.
 // Dipanggil saat stream terhubung: engine bisa sudah lupa setelah putus,
 // sehingga seluruh kebutuhan dikirim ulang.
-func (s *Service) SetSymbolSync(sync SymbolSync) {
+func (s *Service) SetSymbolSync(strategy string, sync SymbolSync) {
 	s.mu.Lock()
-	s.symbolSync = sync
-	s.symbolsSent = nil
+	state := s.syncStateLocked(strategy)
+	state.sync = sync
+	state.generation++
+	state.symbolsSent = nil
 	// Engine bisa sudah lupa pasangan setelah putus, sehingga sidik lama harus
 	// dibuang agar penyelarasan berikutnya mengirim ulang.
-	s.pairsSent = ""
+	state.pairsSent = ""
 	s.mu.Unlock()
 }
 
@@ -1163,16 +1193,19 @@ func (s *Service) SetSymbolSync(sync SymbolSync) {
 // Pasangan timeframe ikut diperiksa: mengubah saklar di dashboard tidak
 // mengubah daftar simbol, jadi tanpa perbandingan ini engine akan terus
 // memakai pasangan lama sampai stream terputus.
-func (s *Service) SyncSubscriptions(ctx context.Context, desired []string) error {
-	return s.syncDenganSidik(ctx, desired, s.hitungPasangan(ctx, desired))
+func (s *Service) SyncSubscriptions(ctx context.Context, strategy string, desired []string) error {
+	return s.syncDenganSidik(ctx, strategy, desired, s.hitungPasangan(ctx, strategy, desired))
 }
 
 // syncDenganSidik menjalankan penyelarasan dengan sidik pasangan yang sudah
 // dihitung. Dipisahkan agar bisa diuji tanpa basis data.
-func (s *Service) syncDenganSidik(ctx context.Context, desired []string, sidik string) error {
+func (s *Service) syncDenganSidik(ctx context.Context, strategy string, desired []string, sidik string) error {
 	s.mu.Lock()
-	sync := s.symbolSync
-	sent := s.symbolsSent
+	state := s.syncStateLocked(strategy)
+	sync := state.sync
+	generasi := state.generation
+	sent := state.symbolsSent
+	pasanganLama := state.pairsSent
 	s.mu.Unlock()
 
 	if sync == nil {
@@ -1181,10 +1214,7 @@ func (s *Service) syncDenganSidik(ctx context.Context, desired []string, sidik s
 
 	add, remove := diffSymbols(sent, desired)
 	daftarBerubah := len(add) > 0 || len(remove) > 0
-
-	s.mu.Lock()
-	pasanganBerubah := sidik != s.pairsSent
-	s.mu.Unlock()
+	pasanganBerubah := sidik != pasanganLama
 
 	if !daftarBerubah && !pasanganBerubah {
 		return nil
@@ -1198,31 +1228,39 @@ func (s *Service) syncDenganSidik(ctx context.Context, desired []string, sidik s
 	}
 
 	s.mu.Lock()
-	s.symbolsSent = toSymbolSet(desired)
-	s.pairsSent = sidik
+	if state.generation == generasi {
+		state.symbolsSent = toSymbolSet(desired)
+		state.pairsSent = sidik
+	}
 	s.mu.Unlock()
 
 	if daftarBerubah {
 		s.logger.Info("langganan engine diselaraskan",
+			"strategy", strategy,
 			"ditambah", add, "dicabut", remove, "total", len(desired))
 	} else {
 		s.logger.Info("pasangan timeframe engine diselaraskan",
-			"simbol", len(desired))
+			"strategy", strategy, "simbol", len(desired))
 	}
 	return nil
 }
 
 // hitungPasangan menyusun sidik pasangan timeframe dari seluruh simbol.
-func (s *Service) hitungPasangan(ctx context.Context, symbols []string) string {
+func (s *Service) hitungPasangan(ctx context.Context, strategy string, symbols []string) string {
 	semua := make([]string, 0, len(symbols))
 	for _, symbol := range symbols {
 		reqs, err := s.ComputeTimeframeRequirements(ctx, symbol)
 		if err != nil {
 			continue
 		}
-		for strategy, list := range reqs {
+		for nama, list := range reqs {
+			// Hanya pasangan strategi ini yang relevan bagi engine tujuan;
+			// pasangan strategi lain tidak boleh memicu kirim ulang.
+			if nama != strategy {
+				continue
+			}
 			for _, p := range list {
-				semua = append(semua, strategy+":"+p.Htf+"/"+p.Ltf)
+				semua = append(semua, nama+":"+p.Htf+"/"+p.Ltf)
 			}
 		}
 	}
@@ -1242,12 +1280,17 @@ func (s *Service) hitungPasangan(ctx context.Context, symbols []string) string {
 	return b.String()
 }
 
-// SymbolsSent mengembalikan salinan simbol yang sudah dikirim ke engine.
-func (s *Service) SymbolsSent() []string {
+// SymbolsSent mengembalikan salinan simbol yang sudah dikirim ke engine untuk
+// satu strategi.
+func (s *Service) SymbolsSent(strategy string) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make([]string, 0, len(s.symbolsSent))
-	for sym := range s.symbolsSent {
+	state := s.syncStates[strategy]
+	if state == nil {
+		return nil
+	}
+	out := make([]string, 0, len(state.symbolsSent))
+	for sym := range state.symbolsSent {
 		out = append(out, sym)
 	}
 	return out
@@ -1281,10 +1324,14 @@ func diffSymbols(sent map[string]struct{}, desired []string) (add, remove []stri
 	return add, remove
 }
 
-// SetAckSender memasang pengirim ACK. Dipanggil saat stream terhubung.
-func (s *Service) SetAckSender(sender AckSender) {
+// SetAckSender memasang pengirim ACK untuk satu strategi. Dipanggil saat stream
+// terhubung. ACK harus dikembalikan ke engine asal sinyal, bukan ke engine lain.
+func (s *Service) SetAckSender(strategy string, sender AckSender) {
 	s.mu.Lock()
-	s.ack = sender
+	if s.acks == nil {
+		s.acks = make(map[string]AckSender, 2)
+	}
+	s.acks[strategy] = sender
 	s.mu.Unlock()
 }
 

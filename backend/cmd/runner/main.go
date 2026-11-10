@@ -378,7 +378,7 @@ func runEngineLoop(
 	for ctx.Err() == nil {
 		mulai := time.Now()
 		err := streamOnce(ctx, target, svc, store, logger)
-		recordEngineState(ctx, store, stateID, target.Strategy, svc.EngineVersion(), err, logger)
+		recordEngineState(ctx, store, stateID, target.Strategy, svc.EngineVersion(target.Strategy), err, logger)
 
 		// Sesi yang bertahan cukup lama dianggap sehat: jeda antar percobaan
 		// dikembalikan ke awal agar koneksi berikutnya tidak menunggu lama.
@@ -466,17 +466,17 @@ func streamOnce(
 				// stream berakhir. Sebelumnya status hanya ditulis saat putus,
 				// sehingga yang tersimpan selalu "tidak terhubung" padahal
 				// engine sedang berjalan.
-				recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, svc.EngineVersion(), nil, logger)
+				recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, svc.EngineVersion(target.Strategy), nil, logger)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
-				svc.SetAckSender(ackSender(client, subscriberID))
-				svc.SetSymbolSync(symbolSync(client, subscriberID, target, svc, logger))
+				svc.SetAckSender(target.Strategy, ackSender(client, subscriberID))
+				svc.SetSymbolSync(target.Strategy, symbolSync(client, subscriberID, target, svc, logger))
 				// Selaraskan segera: antara hitung kebutuhan dan koneksi
 				// terbuka, langganan pengguna bisa sudah berubah.
 				syncNow(ctx, target, svc, logger)
 				go syncLoop(connCtx, target, svc, logger)
 			},
 			OnSignal: func(signal *enginev1.Signal) {
-				svc.SetEngineVersion(signal.GetEngineVersion())
+				svc.SetEngineVersion(target.Strategy, signal.GetEngineVersion())
 				svc.HandleSignal(ctx, signal)
 			},
 			OnUpdate: func(update *enginev1.SignalUpdate) {
@@ -489,7 +489,7 @@ func streamOnce(
 					"state", state.GetState().String(), "detail", state.GetDetail())
 			},
 			OnHeartbeat: func(hb *enginev1.Heartbeat) {
-				svc.SetEngineVersion(hb.GetEngineVersion())
+				svc.SetEngineVersion(target.Strategy, hb.GetEngineVersion())
 				// Heartbeat adalah satu-satunya bukti engine masih hidup saat
 				// tidak ada sinyal. Tanpa penulisan ini last_seen_at hanya
 				// berubah ketika koneksi dibuka atau ditutup, sehingga panel
@@ -549,7 +549,7 @@ func symbolSync(client enginev1.EngineServiceClient, subscriberID string, target
 // percobaan berikutnya akan mengulang dengan daftar terbaru.
 func syncNow(ctx context.Context, target engineTarget, svc *runner.Service, logger *slog.Logger) {
 	desired := subscribedSymbols(ctx, target, svc)
-	if err := svc.SyncSubscriptions(ctx, desired); err != nil {
+	if err := svc.SyncSubscriptions(ctx, target.Strategy, desired); err != nil {
 		logger.Warn("gagal menyelaraskan langganan engine",
 			"strategy", target.Strategy, "error", errorText(err))
 	}
@@ -592,7 +592,7 @@ func applySnapshot(
 		return
 	}
 
-	svc.SetEngineVersion(snapshot.GetEngineVersion())
+	svc.SetEngineVersion(strategy, snapshot.GetEngineVersion())
 	if state := snapshot.GetMarketState(); state != nil {
 		svc.SetMarketState(state.GetState())
 	}

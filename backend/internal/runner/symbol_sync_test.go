@@ -32,15 +32,15 @@ func TestDiffSymbolsSelisih(t *testing.T) {
 func TestSyncTidakMengirimBilaSama(t *testing.T) {
 	var dipanggil int
 	svc := &Service{logger: silent()}
-	svc.SetSymbolSync(func(context.Context, []string, []string) error {
+	svc.SetSymbolSync("ila-2.0", func(context.Context, []string, []string) error {
 		dipanggil++
 		return nil
 	})
 
-	if err := svc.SyncSubscriptions(context.Background(), []string{"XAUUSD"}); err != nil {
+	if err := svc.SyncSubscriptions(context.Background(), "ila-2.0", []string{"XAUUSD"}); err != nil {
 		t.Fatalf("sinkron pertama: %v", err)
 	}
-	if err := svc.SyncSubscriptions(context.Background(), []string{"XAUUSD"}); err != nil {
+	if err := svc.SyncSubscriptions(context.Background(), "ila-2.0", []string{"XAUUSD"}); err != nil {
 		t.Fatalf("sinkron kedua: %v", err)
 	}
 
@@ -56,7 +56,7 @@ func TestSyncGagalMengulang(t *testing.T) {
 	var terakhirAdd []string
 
 	svc := &Service{logger: silent()}
-	svc.SetSymbolSync(func(_ context.Context, add, _ []string) error {
+	svc.SetSymbolSync("ila-2.0", func(_ context.Context, add, _ []string) error {
 		panggilan++
 		terakhirAdd = add
 		if panggilan == 1 {
@@ -66,14 +66,14 @@ func TestSyncGagalMengulang(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	if err := svc.SyncSubscriptions(ctx, []string{"XAUUSD"}); err == nil {
+	if err := svc.SyncSubscriptions(ctx, "ila-2.0", []string{"XAUUSD"}); err == nil {
 		t.Fatal("kegagalan harus dikembalikan")
 	}
-	if len(svc.SymbolsSent()) != 0 {
+	if len(svc.SymbolsSent("ila-2.0")) != 0 {
 		t.Fatal("gagal kirim tidak boleh dianggap terkirim")
 	}
 
-	if err := svc.SyncSubscriptions(ctx, []string{"XAUUSD"}); err != nil {
+	if err := svc.SyncSubscriptions(ctx, "ila-2.0", []string{"XAUUSD"}); err != nil {
 		t.Fatalf("percobaan kedua: %v", err)
 	}
 	if len(terakhirAdd) != 1 || terakhirAdd[0] != "XAUUSD" {
@@ -85,13 +85,13 @@ func TestSyncGagalMengulang(t *testing.T) {
 // mungkin sudah lupa) menerima seluruh kebutuhan sekali lagi.
 func TestSetSymbolSyncMengulangSetelahReconnect(t *testing.T) {
 	svc := &Service{logger: silent()}
-	svc.SetSymbolSync(func(context.Context, []string, []string) error { return nil })
-	if err := svc.SyncSubscriptions(context.Background(), []string{"XAUUSD"}); err != nil {
+	svc.SetSymbolSync("ila-2.0", func(context.Context, []string, []string) error { return nil })
+	if err := svc.SyncSubscriptions(context.Background(), "ila-2.0", []string{"XAUUSD"}); err != nil {
 		t.Fatalf("sinkron: %v", err)
 	}
 
-	svc.SetSymbolSync(func(context.Context, []string, []string) error { return nil })
-	if got := svc.SymbolsSent(); len(got) != 0 {
+	svc.SetSymbolSync("ila-2.0", func(context.Context, []string, []string) error { return nil })
+	if got := svc.SymbolsSent("ila-2.0"); len(got) != 0 {
 		t.Fatalf("setelah reconnect daftar harus kosong, dapat %v", got)
 	}
 }
@@ -100,16 +100,16 @@ func TestSetSymbolSyncMengulangSetelahReconnect(t *testing.T) {
 func TestSyncMencabutSimbolYangTidakDibutuhkan(t *testing.T) {
 	svc := &Service{logger: silent()}
 	var removed []string
-	svc.SetSymbolSync(func(_ context.Context, _, remove []string) error {
+	svc.SetSymbolSync("ila-2.0", func(_ context.Context, _, remove []string) error {
 		removed = append(removed, remove...)
 		return nil
 	})
 
 	ctx := context.Background()
-	if err := svc.SyncSubscriptions(ctx, []string{"XAUUSD", "EURUSD"}); err != nil {
+	if err := svc.SyncSubscriptions(ctx, "ila-2.0", []string{"XAUUSD", "EURUSD"}); err != nil {
 		t.Fatalf("sinkron awal: %v", err)
 	}
-	if err := svc.SyncSubscriptions(ctx, []string{"XAUUSD"}); err != nil {
+	if err := svc.SyncSubscriptions(ctx, "ila-2.0", []string{"XAUUSD"}); err != nil {
 		t.Fatalf("sinkron kedua: %v", err)
 	}
 
@@ -122,7 +122,53 @@ func TestSyncMencabutSimbolYangTidakDibutuhkan(t *testing.T) {
 // Tanpa engine terhubung, penyelarasan tidak melakukan apa pun dan tidak panik.
 func TestSyncTanpaEngineAman(t *testing.T) {
 	svc := &Service{logger: silent()}
-	if err := svc.SyncSubscriptions(context.Background(), []string{"XAUUSD"}); err != nil {
+	if err := svc.SyncSubscriptions(context.Background(), "ila-2.0", []string{"XAUUSD"}); err != nil {
 		t.Fatalf("tanpa engine harus aman: %v", err)
+	}
+}
+
+// Dua engine berjalan bersamaan dan masing-masing punya daftar simbol sendiri.
+// Sebelumnya state sinkronisasi dipakai bersama, sehingga menyelaraskan satu
+// engine mencabut langganan engine lain dan engine kembali tidak pernah
+// menerima pembaruan.
+func TestSyncTerpisahPerStrategi(t *testing.T) {
+	svc := &Service{logger: silent()}
+
+	var kiriman20, kiriman30 []string
+	svc.SetSymbolSync("ila-2.0", func(_ context.Context, add, remove []string) error {
+		kiriman20 = append(kiriman20, add...)
+		kiriman20 = append(kiriman20, remove...)
+		return nil
+	})
+	svc.SetSymbolSync("ila-3.0", func(_ context.Context, add, remove []string) error {
+		kiriman30 = append(kiriman30, add...)
+		kiriman30 = append(kiriman30, remove...)
+		return nil
+	})
+
+	ctx := context.Background()
+	if err := svc.SyncSubscriptions(ctx, "ila-2.0", []string{"EURUSD", "XAUUSD"}); err != nil {
+		t.Fatalf("sinkron ila-2.0: %v", err)
+	}
+	if err := svc.SyncSubscriptions(ctx, "ila-3.0", []string{"XAUUSD", "XAGUSD"}); err != nil {
+		t.Fatalf("sinkron ila-3.0: %v", err)
+	}
+
+	// Kiriman engine ILA 2.0 tidak boleh berisi simbol khas ILA 3.0.
+	sort.Strings(kiriman20)
+	if len(kiriman20) != 2 || kiriman20[0] != "EURUSD" || kiriman20[1] != "XAUUSD" {
+		t.Fatalf("engine ila-2.0 menerima %v, ingin [EURUSD XAUUSD]", kiriman20)
+	}
+	sort.Strings(kiriman30)
+	if len(kiriman30) != 2 || kiriman30[0] != "XAGUSD" || kiriman30[1] != "XAUUSD" {
+		t.Fatalf("engine ila-3.0 menerima %v, ingin [XAGUSD XAUUSD]", kiriman30)
+	}
+
+	// Siklus berikutnya yang sama persis tidak boleh mengirim apa pun lagi.
+	if err := svc.SyncSubscriptions(ctx, "ila-2.0", []string{"EURUSD", "XAUUSD"}); err != nil {
+		t.Fatalf("sinkron ulang ila-2.0: %v", err)
+	}
+	if len(kiriman20) != 2 {
+		t.Fatalf("sinkron ulang tidak boleh mengirim lagi, dapat %v", kiriman20)
 	}
 }

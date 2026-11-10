@@ -29,13 +29,13 @@ func sidikDari(daftar ...string) string {
 func TestPasanganBerubahMemicuKirimUlang(t *testing.T) {
 	var panggilan int32
 	svc := &Service{logger: silent()}
-	svc.SetSymbolSync(func(context.Context, []string, []string) error {
+	svc.SetSymbolSync("ila-2.0", func(context.Context, []string, []string) error {
 		atomic.AddInt32(&panggilan, 1)
 		return nil
 	})
 
 	// Panggilan pertama: simbol terkirim, sidik pasangan dikunci.
-	err := svc.syncDenganSidik(context.Background(), []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15"))
+	err := svc.syncDenganSidik(context.Background(), "ila-2.0", []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15"))
 	if err != nil {
 		t.Fatalf("sinkron pertama: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestPasanganBerubahMemicuKirimUlang(t *testing.T) {
 	}
 
 	// Sama persis: tidak boleh mengirim apa pun.
-	if err := svc.syncDenganSidik(context.Background(), []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15")); err != nil {
+	if err := svc.syncDenganSidik(context.Background(), "ila-2.0", []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15")); err != nil {
 		t.Fatalf("sinkron kedua: %v", err)
 	}
 	if got := atomic.LoadInt32(&panggilan); got != 1 {
@@ -52,7 +52,7 @@ func TestPasanganBerubahMemicuKirimUlang(t *testing.T) {
 	}
 
 	// Simbol sama tetapi pasangan berubah: wajib dikirim ulang.
-	if err := svc.syncDenganSidik(context.Background(), []string{"XAUUSD"}, sidikDari("ila-2.0:W/H4")); err != nil {
+	if err := svc.syncDenganSidik(context.Background(), "ila-2.0", []string{"XAUUSD"}, sidikDari("ila-2.0:W/H4")); err != nil {
 		t.Fatalf("sinkron ketiga: %v", err)
 	}
 	if got := atomic.LoadInt32(&panggilan); got != 2 {
@@ -63,23 +63,23 @@ func TestPasanganBerubahMemicuKirimUlang(t *testing.T) {
 func TestReconnectMengirimUlangPasangan(t *testing.T) {
 	var panggilan int32
 	svc := &Service{logger: silent()}
-	svc.SetSymbolSync(func(context.Context, []string, []string) error {
+	svc.SetSymbolSync("ila-2.0", func(context.Context, []string, []string) error {
 		atomic.AddInt32(&panggilan, 1)
 		return nil
 	})
 
-	if err := svc.syncDenganSidik(context.Background(), []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15")); err != nil {
+	if err := svc.syncDenganSidik(context.Background(), "ila-2.0", []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15")); err != nil {
 		t.Fatalf("sinkron pertama: %v", err)
 	}
 
 	// Engine bisa lupa setelah putus: memasang ulang penyelaras harus
 	// membuang sidik, bukan menganggap semuanya sudah terkirim.
-	svc.SetSymbolSync(func(context.Context, []string, []string) error {
+	svc.SetSymbolSync("ila-2.0", func(context.Context, []string, []string) error {
 		atomic.AddInt32(&panggilan, 1)
 		return nil
 	})
 
-	if err := svc.syncDenganSidik(context.Background(), []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15")); err != nil {
+	if err := svc.syncDenganSidik(context.Background(), "ila-2.0", []string{"XAUUSD"}, sidikDari("ila-2.0:H4/M15")); err != nil {
 		t.Fatalf("sinkron setelah reconnect: %v", err)
 	}
 	if got := atomic.LoadInt32(&panggilan); got != 2 {
