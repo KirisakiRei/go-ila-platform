@@ -9,7 +9,7 @@ import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 import { TombolEksekusi } from '@/features/signals/components/TombolEksekusi'
 import { formatDateTime, formatNumber, formatR } from '@/lib/format'
-import { SIGNAL_LABEL, isFinal } from '@/features/signals/lib/status'
+import { SIGNAL_LABEL, SIGNAL_TONE, isFinal } from '@/features/signals/lib/status'
 import type { Signal } from '@/types/api'
 
 function renderWithProviders(ui: ReactNode) {
@@ -89,6 +89,26 @@ describe('status sinyal', () => {
   it('punya label untuk setiap status', () => {
     expect(SIGNAL_LABEL.READY_TO_ENTRY).toBe('Siap entry')
     expect(SIGNAL_LABEL.CONSUMED).toBe('Sudah dieksekusi')
+  })
+
+  // Engine ILA 3.0 mengirim tahapan sendiri. Sebelum labelnya didaftarkan,
+  // badge status tampil kosong sehingga radar terlihat rusak.
+  it('punya label dan tone untuk seluruh tahapan ILA 3.0', () => {
+    const tahapan = [
+      'WAIT_ILA3_HTF_KEY_LEVEL',
+      'WAIT_ILA3_MTF_REVERSAL',
+      'WAIT_ILA3_LTF_CISD_1',
+      'ILA3_EXPANSION_1_ACTIVE',
+      'WAIT_ILA3_MTF_FVG_RETR',
+      'WAIT_ILA3_LTF_CISD_2',
+      'ILA3_EXPANSION_2_ACTIVE',
+      'ILA3_TARGET_REACHED',
+    ] as const
+
+    for (const status of tahapan) {
+      expect(SIGNAL_LABEL[status]).toBeTruthy()
+      expect(SIGNAL_TONE[status]).toBeTruthy()
+    }
   })
 })
 
