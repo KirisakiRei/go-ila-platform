@@ -196,6 +196,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	// dengan pemasangan setter setelah keduanya jadi.
 	strategySwitchService := service.NewStrategySwitchService(accountRepo, accountPairStrategyRepo, pairCatalogService, accountService)
 	service.SetStrategySwitchSeeder(accountService, strategySwitchService)
+	service.WithSignupSubscriber(authService, accountService)
 
 	// Saklar timeframe: pasangan datang dari data sinyal nyata, sedangkan hak
 	// auto-eksekusi dibaca dari katalog paket (auto_execute), sumber yang sama

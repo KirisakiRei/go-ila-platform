@@ -764,3 +764,44 @@ func TestSubscription_HapusDanReaktivasiTanpaDuplikasi(t *testing.T) {
 		t.Fatalf("expected active XAUUSD, got %+v", resp3)
 	}
 }
+
+func TestSubscribeDefaults_CreatesActiveSubscriptions(t *testing.T) {
+	users := newFakeUserRepo()
+	user := newTestUser("plus")
+	users.users[user.Email] = user
+
+	subs := &fakeSubRepo{}
+	svc := NewAccountService(AccountServiceDeps{
+		Users:         users,
+		Accounts:      &fakeAccountRepo{accounts: map[string]*model.BrokerAccount{}},
+		Credentials:   &fakeCredRepo{creds: map[string]*model.Credential{}},
+		Subscriptions: subs,
+		Audit:         &fakeAuditRepo{},
+		Sealer:        testKeyring(t),
+		Strategies:    &fakeStrategies{},
+	})
+
+	ctx := context.Background()
+	if err := svc.SubscribeDefaults(ctx, user.ID); err != nil {
+		t.Fatalf("SubscribeDefaults: %v", err)
+	}
+
+	list, err := svc.ListSubscriptions(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("ListSubscriptions: %v", err)
+	}
+
+	if len(list) != len(DefaultWatchlistSymbols) {
+		t.Fatalf("expected %d default subscriptions, got %d", len(DefaultWatchlistSymbols), len(list))
+	}
+
+	symbols := make(map[string]bool)
+	for _, s := range list {
+		symbols[s.Symbol] = true
+	}
+	for _, expected := range DefaultWatchlistSymbols {
+		if !symbols[expected] {
+			t.Errorf("expected default symbol %s not found in subscriptions", expected)
+		}
+	}
+}

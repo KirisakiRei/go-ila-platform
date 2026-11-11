@@ -1,6 +1,6 @@
 module ila/backend
 
-go 1.24.1
+go 1.23.6
 
 require (
 	gorm.io/driver/postgres v1.5.11

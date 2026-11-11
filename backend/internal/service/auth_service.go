@@ -42,6 +42,8 @@ type authService struct {
 	sessions    SessionRecorder
 	// legal memvalidasi centang Syarat & Ketentuan dan mencatat persetujuan.
 	legal LegalSignupRecorder
+	// signupSubscriber menyiapkan langganan default saat pendaftaran baru.
+	signupSubscriber UserSignupSubscriber
 	// gate & challenges membuat 2FA opsional untuk user.
 	gate       TwoFactorGate
 	challenges *challengeService
@@ -62,6 +64,11 @@ func NewAuthService(userRepo UserRepository, auditRepo AuditRepository, tokenIss
 type LegalSignupRecorder interface {
 	RequireSignup(req dto.RegisterRequest) error
 	AcceptSignup(ctx context.Context, userID string, meta AcceptanceMeta) error
+}
+
+// UserSignupSubscriber menyiapkan langganan pair bawaan saat pendaftaran.
+type UserSignupSubscriber interface {
+	SubscribeDefaults(ctx context.Context, userID string) error
 }
 
 // WithTwoFactor menambahkan 2FA opsional ke pintu masuk user.
@@ -87,6 +94,14 @@ func WithLegal(s AuthService, recorder LegalSignupRecorder) AuthService {
 func WithSessionRecorder(s AuthService, recorder SessionRecorder) AuthService {
 	if svc, ok := s.(*authService); ok {
 		svc.sessions = recorder
+	}
+	return s
+}
+
+// WithSignupSubscriber menghubungkan layanan langganan bawaan ke alur pendaftaran.
+func WithSignupSubscriber(s AuthService, subscriber UserSignupSubscriber) AuthService {
+	if svc, ok := s.(*authService); ok {
+		svc.signupSubscriber = subscriber
 	}
 	return s
 }
@@ -166,6 +181,13 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 	if s.legal != nil {
 		if err := s.legal.AcceptSignup(ctx, user.ID, AcceptanceMeta{}); err != nil {
 			s.recordAudit(ctx, user.ID, "auth.legal_record_failed", "user", user.ID)
+		}
+	}
+
+	// Siapkan langganan pair utama bawaan agar dashboard radar langsung aktif
+	if s.signupSubscriber != nil {
+		if err := s.signupSubscriber.SubscribeDefaults(ctx, user.ID); err != nil {
+			s.recordAudit(ctx, user.ID, "auth.signup_subscription_failed", "user", user.ID)
 		}
 	}
 

@@ -172,6 +172,34 @@ func TestRegisterRejectsDuplicateEmail(t *testing.T) {
 	}
 }
 
+type fakeSignupSubscriber struct {
+	subscribedUsers []string
+}
+
+func (f *fakeSignupSubscriber) SubscribeDefaults(_ context.Context, userID string) error {
+	f.subscribedUsers = append(f.subscribedUsers, userID)
+	return nil
+}
+
+func TestRegisterSeedsDefaultSubscriptions(t *testing.T) {
+	svc, _, _ := newTestAuth()
+	sub := &fakeSignupSubscriber{}
+	WithSignupSubscriber(svc, sub)
+
+	got, err := svc.Register(context.Background(), dto.RegisterRequest{
+		Name:     "Budi",
+		Email:    "budi.defaults@example.com",
+		Password: "rahasia-panjang-123",
+	})
+	if err != nil {
+		t.Fatalf("register gagal: %v", err)
+	}
+
+	if len(sub.subscribedUsers) != 1 || sub.subscribedUsers[0] != got.ID {
+		t.Fatalf("seharusnya default subscription di-seed untuk user %s, dapat %v", got.ID, sub.subscribedUsers)
+	}
+}
+
 func TestLoginWithWrongPasswordIsUnauthorized(t *testing.T) {
 	svc, _, _ := newTestAuth()
 	ctx := context.Background()
