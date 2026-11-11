@@ -18,7 +18,8 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** entri teratas di bawah (gateway pembayaran)
+> **Commit terakhir saat log ini ditulis:** `769c1d6` — entri teratas di bagian
+> **DARI CLAUDE** adalah catatan terbaru
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
 
@@ -34,6 +35,58 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-11 — PR Hermes digabung, `go 1.24.1` dipulihkan, platform live di VPS 2
+
+**Pelaku:** Claude
+**Tipe:** Integrasi PR + perbaikan build + deploy
+**Status:** 🟢 SELESAI — live di VPS 2 pada commit `769c1d6`
+
+**Ringkasan:**
+
+1. **PR Hermes digabung ke `main`.** Branch
+   `fix/signals-radar-and-default-subscription` masuk lewat merge `482b0eb`.
+   Isinya: status radar `WAIT_*` dikecualikan dari `FreeTierDelay` 15 menit,
+   auto-seed watchlist default saat registrasi, dan `.env.example` diselaraskan
+   ke port engine `9443` / `9444`.
+2. **Directive `go 1.24.1` dipulihkan.** PR membawa `backend/go.mod` turun ke
+   `go 1.23.6`, padahal `deploy/Dockerfile.backend` memakai `golang:1.24-alpine`.
+   Kalau dibiarkan, build image di VPS gagal. Directive dikembalikan ke `1.24.1`.
+3. **`go-playground/locales` naik `v0.14.1` → `v0.14.2`.** Ini konsekuensi
+   langsung dari directive `1.24.1`: resolver menolak `v0.14.1` dengan pesan
+   `no required module provides package github.com/go-playground/locales`,
+   sehingga enam paket (`cmd/backend-api`, `internal/handler`,
+   `internal/middleware`, `internal/router`, `internal/session`, `pkg/httpx`)
+   gagal di tahap *setup* test. Setelah naik ke `v0.14.2`, semua paket lolos.
+4. **Verifikasi lokal.** `go vet ./...` bersih; `go test ./...` seluruh paket
+   PASS; `vitest` frontend 19 berkas / 104 test PASS.
+5. **Deploy VPS 2 (`3.27.205.21`).** `git pull` fast-forward ke `769c1d6`,
+   `docker compose build backend-api runner` sukses, container dibuat ulang dan
+   keduanya berstatus `Up (healthy)`. `https://rekavia.com/ready` dan
+   `/health` membalas `200`.
+
+**Bukti runtime dari log runner pasca-deploy:**
+
+- `terhubung ke engine` → `172.26.1.188:9443` (ila-2.0) dan `:9444` (ila-3.0)
+- `langganan engine diselaraskan` → ila-2.0 total 3 (`EURUSD`, `USTEC`,
+  `XAUUSD`), ila-3.0 total 8
+- `signal.terima` → `WAIT_ILA3_LTF_CISD_1` untuk `GBPUSD`, `XAGUSD`, `XAUEUR`,
+  `XAUUSD`; radar bergerak dan tidak lagi tertahan delay free tier
+
+**File terdampak:**
+
+- `backend/go.mod`
+- `backend/go.sum`
+- `docs/AGENT_LOG.md`
+
+**Aksi yang diminta (untuk Hermes):**
+
+- Jangan menurunkan directive `go` di `backend/go.mod` di bawah `1.24.1`;
+  builder Docker memakai `golang:1.24-alpine`.
+- Jangan mem-pin `github.com/go-playground/locales` kembali ke `v0.14.1`;
+  kombinasi itu gagal resolve pada directive `go 1.24.1`.
+
+---
 
 ### 2026-11-10 — Sinyal macet, status engine tidak jujur, dan ILA 3.0 disiapkan
 
