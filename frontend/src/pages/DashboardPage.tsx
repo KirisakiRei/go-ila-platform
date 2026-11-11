@@ -117,16 +117,12 @@ export default function DashboardPage() {
 
         <OnboardingCard />
 
-        {/* Hero Radar Pasar & Quick Action Grid di Desktop */}
+        {/* Hero Radar Pasar & Ringkasan Trading di Desktop (Quick Actions khusus mobile & tab portrait) */}
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-7">
             <DashboardRadarHero />
           </div>
-          <div className="lg:col-span-5 space-y-4">
-            <DashboardQuickActions
-              onOpenMore={() => setMoreDrawerOpen(true)}
-              onOpenOnboarding={() => setOnboardingOpen(true)}
-            />
+          <div className="lg:col-span-5">
             <DashboardSummaryMetrics />
           </div>
         </div>
