@@ -35,11 +35,13 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	}
 
 	// Notifikasi hanya untuk status yang punya arti bagi user.
+	// Status standby/idle (WAIT_HTF_SWEEP dan WAIT_ILA3_HTF_KEY_LEVEL) tidak dikirim
+	// ke Telegram agar tidak menyampah saat belum ada reaksi harga aktif.
 	switch status {
 	case model.SignalStatusReadyToEntry, model.SignalStatusRejected,
 		model.SignalStatusOpportunity,
-		model.SignalStatusWaitHTFSweep, model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_HTF_KEY_LEVEL",
-		model.SignalStatusWaitLTFCISD, "WAIT_ILA3_MTF_REVERSAL", "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2",
+		model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_MTF_REVERSAL",
+		model.SignalStatusWaitLTFCISD, "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2",
 		model.SignalStatusConsumed,
 		model.SignalStatusCancelled, model.SignalStatusExpired,
 		model.SignalStatusSuperseded:
@@ -53,7 +55,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 		_ = chatID
 
 		switch status {
-		case model.SignalStatusWaitHTFSweep, model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_HTF_KEY_LEVEL":
+		case model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_MTF_REVERSAL":
 			dashboardLink := telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
 			var htfSweep dto.SignalHtfSweep
 			if signal.HtfSweepJSON != "" {
@@ -80,7 +82,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 				DashboardLink:   dashboardLink,
 			})
 
-		case model.SignalStatusWaitLTFCISD, "WAIT_ILA3_MTF_REVERSAL", "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2":
+		case model.SignalStatusWaitLTFCISD, "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2":
 			dashboardLink := telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
 			var cisd dto.SignalCISD
 			if signal.CisdJSON != "" {
