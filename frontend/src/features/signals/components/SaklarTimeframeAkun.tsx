@@ -1,6 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { Badge, Card, CardContent, Skeleton } from '@/components/ui'
-import { getCycleBadge } from '@/features/signals/lib/status'
+import { getCycleBadge, getIla3Mtf } from '@/features/signals/lib/status'
 import { useSetTimeframeSwitch, useTimeframeSwitchMatrix } from '@/lib/queries'
 import type { StrategyVersion, TimeframeSwitchItem } from '@/types/api'
 import { cn } from '@/lib/utils'
@@ -104,7 +104,13 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                           <td className="px-3.5 py-2.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-mono text-[11.5px] font-medium text-foreground">
-                                {pair.htf} · {pair.ltf}
+                                {(() => {
+                                  if (group.strategy === 'ila-3.0') {
+                                    const mtf = getIla3Mtf(pair.htf, pair.ltf)
+                                    return `${pair.htf} · ${mtf} · ${pair.ltf}`
+                                  }
+                                  return `${pair.htf} · ${pair.ltf}`
+                                })()}
                               </span>
                               {(() => {
                                 const cycle = getCycleBadge(group.strategy, pair.htf, pair.ltf)

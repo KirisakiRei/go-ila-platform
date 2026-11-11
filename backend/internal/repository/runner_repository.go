@@ -782,9 +782,32 @@ func (r *runnerRepository) ConfiguredAccounts(ctx context.Context, symbol string
 }
 
 // TimeframeKey adalah pasangan timeframe sebagai kunci peta.
+// TimeframeKey memegang pasangan timeframe untuk pemetaan saklar akun.
 type TimeframeKey struct {
 	Htf string
 	Ltf string
+}
+
+// CanonTimeframe membakukan penulisan timeframe agar bentuk alias saling cocok
+// ("4H" vs "H4", "1H" vs "H1", "M15" vs "15M", "M5" vs "5M", "D1" vs "D", "W1" vs "W").
+func CanonTimeframe(s string) string {
+	clean := strings.ToUpper(strings.TrimSpace(s))
+	switch clean {
+	case "H4", "4H":
+		return "4H"
+	case "H1", "1H":
+		return "1H"
+	case "M15", "15M":
+		return "15M"
+	case "M5", "5M":
+		return "5M"
+	case "D1", "1D", "D":
+		return "D"
+	case "W1", "1W", "W":
+		return "W"
+	default:
+		return clean
+	}
 }
 
 // TimeframeState adalah saklar satu pasangan timeframe untuk satu akun.

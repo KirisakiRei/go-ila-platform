@@ -70,20 +70,33 @@ func (s *Service) putuskanTimeframe(ctx context.Context, accountID, symbol, stra
 	}
 	pasangan, ada := perMetode[strategy]
 	if !ada {
-		// Metode ini belum punya saklar timeframe untuk akun ini.
-		return TimeframeIkuti
+		// Akun sudah mengatur saklar timeframe untuk pair ini (misal pada metode lain),
+		// tetapi metode ini belum punya saklar yang dinyalakan di UI.
+		// Di UI, saklar yang belum disimpan berstatus nonaktif (watch: false).
+		// Jadi jika akun sudah mengonfigurasi pair ini, strategi yang tidak punya
+		// konfigurasi aktif dianggap abaikan.
+		return TimeframeAbaikan
 	}
 
-	state, ada := pasangan[repository.TimeframeKey{Htf: htf, Ltf: ltf}]
-	if !ada {
+	canonHtf := repository.CanonTimeframe(htf)
+	canonLtf := repository.CanonTimeframe(ltf)
+	var matchedState *repository.TimeframeState
+	for k, st := range pasangan {
+		if repository.CanonTimeframe(k.Htf) == canonHtf && repository.CanonTimeframe(k.Ltf) == canonLtf {
+			stCopy := st
+			matchedState = &stCopy
+			break
+		}
+	}
+	if matchedState == nil {
 		// Akun sudah mengatur metode ini, tetapi pasangan ini tidak termasuk
 		// yang dipantau. Sinyalnya bukan untuk akun ini.
 		return TimeframeAbaikan
 	}
-	if !state.Watch {
+	if !matchedState.Watch {
 		return TimeframeAbaikan
 	}
-	if !state.Auto {
+	if !matchedState.Auto {
 		return TimeframePeluang
 	}
 	return TimeframeIkuti

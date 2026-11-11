@@ -13,7 +13,7 @@ import {
 import { Badge, Button, EmptyState, Skeleton, StatusPill } from '@/components/ui'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { SIGNAL_LABEL, SIGNAL_TONE, isFinal } from '@/features/signals/lib/status'
+import { SIGNAL_LABEL, SIGNAL_TONE, getIla3Mtf, isFinal } from '@/features/signals/lib/status'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
@@ -370,7 +370,11 @@ export function SignalsMobileView({
                         <span className="font-bold text-sm tracking-tight text-foreground">
                           {signal.symbol}
                         </span>
-                        <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
+                        <TimeframeBadge
+                          htf={signal.htf}
+                          mtf={signal.strategy_version === 'ila-3.0' ? getIla3Mtf(signal.htf, signal.ltf) : undefined}
+                          ltf={signal.ltf}
+                        />
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                         <Badge variant="outline" className="text-[9.5px] px-1.5 py-0">

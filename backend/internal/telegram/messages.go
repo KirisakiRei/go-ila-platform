@@ -75,7 +75,12 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 	fmt.Fprintf(&b, "Arah: %s  |  Strategi: %s\n", strings.ToUpper(p.Direction), strategy)
 
 	if p.Htf != "" && p.Ltf != "" {
-		fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n", p.Htf, p.Ltf)
+		if p.StrategyVersion == "ila-3.0" {
+			mtf := getILA3MTF(p.Htf, p.Ltf)
+			fmt.Fprintf(&b, "Timeframe: %s ➔ %s ➔ %s\n", p.Htf, mtf, p.Ltf)
+		} else {
+			fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n", p.Htf, p.Ltf)
+		}
 	}
 
 	b.WriteString("\nTahap: 3/4 — Setup Sempurna (Ready to Entry)\n")
@@ -157,7 +162,12 @@ func FormatRadarHTFMessage(p RadarHTFParams) Message {
 	if ltf == "" {
 		ltf = "LTF"
 	}
-	fmt.Fprintf(&b, "Timeframe: %s (HTF) ➔ %s (LTF)\n\n", htf, ltf)
+	if p.StrategyVersion == "ila-3.0" {
+		mtf := getILA3MTF(htf, ltf)
+		fmt.Fprintf(&b, "Timeframe: %s (HTF) ➔ %s (MTF) ➔ %s (LTF)\n\n", htf, mtf, ltf)
+	} else {
+		fmt.Fprintf(&b, "Timeframe: %s (HTF) ➔ %s (LTF)\n\n", htf, ltf)
+	}
 
 	fmt.Fprintf(&b, "Tahap: 1/4 — Pemantauan Struktur Timeframe Besar (%s)\n", htf)
 	fmt.Fprintf(&b, "Status: Menunggu Penutupan Candle %s\n\n", htf)
@@ -232,7 +242,12 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 	if ltf == "" {
 		ltf = "LTF"
 	}
-	fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n\n", htf, ltf)
+	if p.StrategyVersion == "ila-3.0" {
+		mtf := getILA3MTF(htf, ltf)
+		fmt.Fprintf(&b, "Timeframe: %s ➔ %s ➔ %s\n\n", htf, mtf, ltf)
+	} else {
+		fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n\n", htf, ltf)
+	}
 
 	fmt.Fprintf(&b, "Tahap: 2/4 — Menunggu Konfirmasi Timeframe Kecil (%s)\n", ltf)
 	fmt.Fprintf(&b, "Status: %s Valid! Menunggu Trigger Entry di %s\n\n", htf, ltf)
@@ -368,7 +383,12 @@ func FormatOpportunityMessage(symbol, side, strategy, htf, ltf string, entry, sl
 
 	pasangan := htf
 	if ltf != "" {
-		pasangan = htf + "-" + ltf
+		if strategy == "ila-3.0" {
+			mtf := getILA3MTF(htf, ltf)
+			pasangan = fmt.Sprintf("%s ➔ %s ➔ %s", htf, mtf, ltf)
+		} else {
+			pasangan = htf + "-" + ltf
+		}
 	}
 	if pasangan != "" {
 		fmt.Fprintf(&b, "Timeframe: %s\n", pasangan)
@@ -446,6 +466,25 @@ func formatMoney(v float64) string {
 		v = -v
 	}
 	return sign + "$" + formatThousands(v, 2)
+}
+
+// getILA3MTF menentukan timeframe medium (MTF) dari ILA 3.0 berdasarkan HTF dan LTF.
+func getILA3MTF(htf, ltf string) string {
+	h := strings.ToUpper(strings.TrimSpace(htf))
+	l := strings.ToUpper(strings.TrimSpace(ltf))
+	if (h == "4H" || h == "H4") && (l == "5M" || l == "M5") {
+		return "1H"
+	}
+	if (h == "D" || h == "D1" || h == "1D") && (l == "15M" || l == "M15") {
+		return "4H"
+	}
+	if (h == "1H" || h == "H1") && (l == "5M" || l == "M5") {
+		return "15M"
+	}
+	if (h == "W" || h == "W1" || h == "1W") && (l == "1H" || l == "H1") {
+		return "4H"
+	}
+	return "MTF"
 }
 
 func formatFrom(v float64) string {

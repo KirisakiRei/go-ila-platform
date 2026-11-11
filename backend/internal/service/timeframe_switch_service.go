@@ -222,10 +222,10 @@ var DefaultTimeframeCatalog = map[string][]dto.TimeframePair{
 		{Htf: "H1", Ltf: "M5", Label: "H1 · M5"},
 	},
 	"ila-3.0": {
-		{Htf: "4H", Ltf: "5M", Label: "4H · 5M"},
-		{Htf: "D", Ltf: "15M", Label: "D · 15M"},
-		{Htf: "1H", Ltf: "5M", Label: "1H · 5M"},
-		{Htf: "W", Ltf: "1H", Label: "W · 1H"},
+		{Htf: "4H", Ltf: "5M", Label: "4H · 1H · 5M"},
+		{Htf: "D", Ltf: "15M", Label: "D · 4H · 15M"},
+		{Htf: "1H", Ltf: "5M", Label: "1H · 15M · 5M"},
+		{Htf: "W", Ltf: "1H", Label: "W · 4H · 1H"},
 	},
 }
 

@@ -347,9 +347,55 @@ func (s *Service) fanOutIntermediate(ctx context.Context, signal *model.Signal) 
 	}
 
 	for _, user := range users {
+		if !s.userWantsSignal(ctx, user.ID, signal) {
+			continue
+		}
 		s.recordUserSignal(ctx, user.ID, signal.SignalID, signal.Status, "", nil)
 		s.pub.PublishSignal(ctx, user.ID, signal.SignalID, signal.Status, "")
 	}
+}
+
+// userWantsSignal menentukan apakah user menginginkan notifikasi atau pencatatan
+// untuk sinyal ini berdasarkan hak tier, saklar metode per akun, dan saklar timeframe.
+func (s *Service) userWantsSignal(ctx context.Context, userID string, signal *model.Signal) bool {
+	user, err := s.store.FindUserByID(ctx, userID)
+	if err != nil || user == nil {
+		return false
+	}
+
+	now := s.opts.Clock()
+	tier := EffectiveTier(user.Tier, user.TrialExpiresAt, user.TierExpiresAt, now)
+
+	// User berhak atas strategi ini?
+	if !StrategyAllowed(tier, signal.StrategyVersion) {
+		return false
+	}
+	if signal.StrategyVersion == "ila-3.0" && !s.opts.Settings.StrategySelectable("ila-3.0") {
+		return false
+	}
+
+	accounts, err := s.store.ListBrokerAccountsByUser(ctx, userID)
+	if err != nil || len(accounts) == 0 {
+		// Pengguna tanpa akun broker tetap menerima sinyal sesuai langganan simbolnya.
+		return true
+	}
+
+	// Jika pengguna memiliki akun broker, periksa apakah ada minimal satu akun aktif
+	// yang mengizinkan metode dan memantau timeframe sinyal ini.
+	for _, acc := range accounts {
+		if !acc.IsActive || acc.IsFrozen {
+			continue
+		}
+		if !s.akunMengizinkanMetode(ctx, acc.ID, signal.Symbol, signal.StrategyVersion) {
+			continue
+		}
+		tindakan := s.putuskanTimeframe(ctx, acc.ID, signal.Symbol, signal.StrategyVersion, signal.Htf, signal.Ltf)
+		if tindakan != TimeframeAbaikan {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *Service) fanOutReady(ctx context.Context, signal *model.Signal) {
@@ -1030,6 +1076,10 @@ func (s *Service) HandleUpdate(ctx context.Context, in *enginev1.SignalUpdate) {
 		if _, posErr := s.store.FindOpenPositionBySignal(ctx, user.ID, signal.SignalID); posErr == nil {
 			s.logger.Info("pembaruan diabaikan karena posisi sudah ada",
 				"user_id", user.ID, "signal_id", signal.SignalID, "action", status)
+			continue
+		}
+
+		if !s.userWantsSignal(ctx, user.ID, signal) {
 			continue
 		}
 
