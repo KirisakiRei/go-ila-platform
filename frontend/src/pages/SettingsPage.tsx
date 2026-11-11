@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
 import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/lib/queries'
@@ -137,9 +137,17 @@ function TrialSection() {
 }
 
 function TelegramSection() {
+  const queryClient = useQueryClient()
   const link = useTelegramLink()
   const unlink = useTelegramUnlink()
   const [galat, setGalat] = useState<string | null>(null)
+
+  const { data: onboarding, isLoading } = useQuery({
+    queryKey: ['me', 'onboarding'],
+    queryFn: accountFlowApi.onboarding,
+  })
+
+  const isConnected = Boolean(onboarding?.telegram_linked)
 
   const onLink = async () => {
     setGalat(null)
@@ -152,32 +160,84 @@ function TelegramSection() {
     }
   }
 
+  const onUnlink = async () => {
+    setGalat(null)
+    try {
+      await unlink.mutateAsync()
+      await queryClient.invalidateQueries({ queryKey: ['me', 'onboarding'] })
+      await queryClient.invalidateQueries({ queryKey: ['trial'] })
+    } catch (err) {
+      setGalat(err instanceof ApiError ? err.message : 'Gagal memutuskan Telegram.')
+    }
+  }
+
   return (
     <Section
       title="Notifikasi Telegram"
       description="Bot hanya mengirim pemberitahuan. Bot tidak pernah mengakses kredensial akun Anda."
     >
       <div className="flex flex-col gap-3 border border-border p-4">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" isLoading={link.isPending} onClick={() => void onLink()}>
-            Hubungkan Telegram
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            isLoading={unlink.isPending}
-            onClick={() => void unlink.mutateAsync()}
-          >
-            Putuskan
-          </Button>
-        </div>
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-muted-foreground">Status Bot:</span>
+              {isConnected ? (
+                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Terhubung
+                </span>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">
+                  Belum Terhubung
+                </Badge>
+              )}
+            </div>
 
-        <p className="text-[11px] text-muted-foreground">
-          Tautan berlaku 5 menit dan hanya bisa dipakai sekali.
-        </p>
+            <p className="text-[12px] text-muted-foreground">
+              {isConnected
+                ? 'Akun Anda sudah terhubung ke bot resmi (@imaginaryliquiditybot). Notifikasi sinyal trading, alert risiko, dan konfirmasi entry akan otomatis dikirim ke chat ini.'
+                : 'Hubungkan akun dengan bot Telegram (@imaginaryliquiditybot) untuk menerima sinyal setup, konfirmasi entry, dan peringatan darurat secara real-time.'}
+            </p>
 
-        {galat && <Alert variant="destructive">{galat}</Alert>}
-        {unlink.isSuccess && <Alert variant="success">Chat Telegram sudah diputus.</Alert>}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {isConnected ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    isLoading={unlink.isPending}
+                    onClick={() => void onUnlink()}
+                  >
+                    Putuskan
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    isLoading={link.isPending}
+                    onClick={() => void onLink()}
+                  >
+                    Hubungkan Ulang / Akun Lain
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" isLoading={link.isPending} onClick={() => void onLink()}>
+                  Hubungkan Telegram
+                </Button>
+              )}
+            </div>
+
+            {!isConnected && (
+              <p className="text-[11px] text-muted-foreground">
+                Tautan berlaku 5 menit dan hanya bisa dipakai sekali.
+              </p>
+            )}
+
+            {galat && <Alert variant="destructive">{galat}</Alert>}
+            {unlink.isSuccess && <Alert variant="success">Chat Telegram sudah diputus.</Alert>}
+          </>
+        )}
       </div>
     </Section>
   )

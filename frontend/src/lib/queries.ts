@@ -306,5 +306,12 @@ export function useTelegramLink() {
 }
 
 export function useTelegramUnlink() {
-  return useMutation({ mutationFn: telegramApi.unlink })
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: telegramApi.unlink,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me', 'onboarding'] })
+      queryClient.invalidateQueries({ queryKey: ['trial'] })
+    },
+  })
 }

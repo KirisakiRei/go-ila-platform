@@ -118,7 +118,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
-		Handler:           router.NewBackendAPI(cfg, db, logger, router.DenganStrategi(strategiSettings)),
+		Handler:           router.NewBackendAPI(cfg, db, logger, router.DenganStrategi(strategiSettings), router.DenganTelegramClient(tgClient)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

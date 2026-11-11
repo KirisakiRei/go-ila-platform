@@ -17,11 +17,11 @@ import {
   User as UserIcon,
   Wallet,
 } from 'lucide-react'
-import { Badge, Button, Skeleton } from '@/components/ui'
+import { Alert, Badge, Button, Modal, Skeleton } from '@/components/ui'
 import { useSignOut, useAuthContext } from '@/features/auth/hooks/use-auth'
-import { useStartTrial, useTelegramLink, useTrial } from '@/lib/queries'
+import { useStartTrial, useTelegramLink, useTelegramUnlink, useTrial } from '@/lib/queries'
 import { accountFlowApi } from '@/lib/auth-api'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api-error'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -53,7 +53,7 @@ function MenuRow({ icon: Icon, label, description, to, onClick, trailing, disabl
         <span
           className={cn(
             'shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide',
-            trailing === 'Terverifikasi'
+            trailing === 'Terverifikasi' || trailing === 'Terhubung'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'border-border bg-secondary text-muted-foreground',
           )}
@@ -246,8 +246,18 @@ function TrialCard() {
 export function SettingsMobileView() {
   const { user } = useAuthContext()
   const signOut = useSignOut()
+  const queryClient = useQueryClient()
   const telegramLink = useTelegramLink()
+  const telegramUnlink = useTelegramUnlink()
   const [telegramNotice, setTelegramNotice] = useState<string | null>(null)
+  const [telegramSuccess, setTelegramSuccess] = useState<string | null>(null)
+  const [showTelegramModal, setShowTelegramModal] = useState(false)
+
+  const { data: onboarding } = useQuery({
+    queryKey: ['me', 'onboarding'],
+    queryFn: accountFlowApi.onboarding,
+  })
+  const isTelegramConnected = Boolean(onboarding?.telegram_linked)
 
   const profile: User | null = user ?? null
   const initial = (profile?.name || profile?.email || 'I').trim().charAt(0).toUpperCase()
@@ -255,11 +265,25 @@ export function SettingsMobileView() {
 
   const onConnectTelegram = async () => {
     setTelegramNotice(null)
+    setTelegramSuccess(null)
     try {
       const hasil = await telegramLink.mutateAsync()
       window.open(hasil.url, '_blank', 'noopener,noreferrer')
     } catch (err) {
       setTelegramNotice(err instanceof ApiError ? err.message : 'Gagal membuat tautan Telegram.')
+    }
+  }
+
+  const onDisconnectTelegram = async () => {
+    setTelegramNotice(null)
+    setTelegramSuccess(null)
+    try {
+      await telegramUnlink.mutateAsync()
+      await queryClient.invalidateQueries({ queryKey: ['me', 'onboarding'] })
+      await queryClient.invalidateQueries({ queryKey: ['trial'] })
+      setTelegramSuccess('Koneksi Telegram berhasil diputus.')
+    } catch (err) {
+      setTelegramNotice(err instanceof ApiError ? err.message : 'Gagal memutuskan Telegram.')
     }
   }
 
@@ -346,15 +370,20 @@ export function SettingsMobileView() {
       <Group title="Notifikasi">
         <MenuRow
           icon={Bell}
-          label="Hubungkan Bot Telegram"
-          description="Peringatan sinyal dan konfirmasi entry"
-          onClick={() => void onConnectTelegram()}
-          disabled={telegramLink.isPending}
+          label="Bot Telegram"
+          description={
+            isTelegramConnected
+              ? 'Terhubung — notifikasi sinyal & alert aktif'
+              : 'Peringatan sinyal dan konfirmasi entry'
+          }
+          trailing={isTelegramConnected ? 'Terhubung' : 'Belum'}
+          onClick={() => {
+            setTelegramNotice(null)
+            setTelegramSuccess(null)
+            setShowTelegramModal(true)
+          }}
         />
       </Group>
-      {telegramNotice && (
-        <p className="-mt-2 px-1 text-[10.5px] font-medium text-destructive">{telegramNotice}</p>
-      )}
 
       {/* Grup Keamanan */}
       <Group title="Keamanan">
@@ -402,6 +431,70 @@ export function SettingsMobileView() {
       <p className="pb-1 text-center text-[10px] text-muted-foreground">
         ILA Trading Platform · Sinyal, radar, dan eksekusi terpandu
       </p>
+
+      {/* Modal Pengaturan Telegram Mobile */}
+      <Modal
+        open={showTelegramModal}
+        onClose={() => setShowTelegramModal(false)}
+        title="Notifikasi Telegram"
+        description="Peringatan sinyal, peluang entry, dan status trading."
+      >
+        <div className="flex flex-col gap-3.5 py-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-medium text-muted-foreground">Status:</span>
+            {isTelegramConnected ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-3 w-3" />
+                Terhubung
+              </span>
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground">
+                Belum Terhubung
+              </Badge>
+            )}
+          </div>
+
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            {isTelegramConnected
+              ? 'Akun Anda sudah terhubung ke bot resmi (@imaginaryliquiditybot). Notifikasi setup valid, peluang entry, dan status trading akan otomatis dikirimkan ke chat Telegram Anda.'
+              : 'Hubungkan akun Anda dengan bot Telegram (@imaginaryliquiditybot) untuk menerima sinyal setup dan konfirmasi entry secara langsung.'}
+          </p>
+
+          {telegramNotice && <Alert variant="destructive">{telegramNotice}</Alert>}
+          {telegramSuccess && <Alert variant="success">{telegramSuccess}</Alert>}
+
+          <div className="flex flex-col gap-2 pt-2">
+            {isTelegramConnected ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="w-full text-destructive hover:text-destructive"
+                  isLoading={telegramUnlink.isPending}
+                  onClick={() => void onDisconnectTelegram()}
+                >
+                  Putuskan Koneksi
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  isLoading={telegramLink.isPending}
+                  onClick={() => void onConnectTelegram()}
+                >
+                  Hubungkan Ulang / Akun Lain
+                </Button>
+              </>
+            ) : (
+              <Button
+                className="w-full"
+                isLoading={telegramLink.isPending}
+                onClick={() => void onConnectTelegram()}
+              >
+                Hubungkan ke Bot Telegram
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

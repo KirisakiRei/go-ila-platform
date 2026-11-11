@@ -24,6 +24,7 @@ import (
 	"ila/backend/internal/service"
 	"ila/backend/internal/session"
 	"ila/backend/internal/settings"
+	"ila/backend/internal/telegram"
 	"ila/backend/pkg/cryptox"
 )
 
@@ -59,6 +60,7 @@ type OpsiBackendAPI func(*konfigurasiBackendAPI)
 
 type konfigurasiBackendAPI struct {
 	strategi *runner.Settings
+	tgClient *telegram.Client
 }
 
 // DenganStrategi memakai pengaturan strategi yang sudah dimuat pemanggil.
@@ -66,6 +68,11 @@ type konfigurasiBackendAPI struct {
 // paket) harus memakai opsi ini agar panel user melihat tahap yang sama.
 func DenganStrategi(s *runner.Settings) OpsiBackendAPI {
 	return func(k *konfigurasiBackendAPI) { k.strategi = s }
+}
+
+// DenganTelegramClient memakai klien telegram yang sudah disiapkan pemanggil.
+func DenganTelegramClient(c *telegram.Client) OpsiBackendAPI {
+	return func(k *konfigurasiBackendAPI) { k.tgClient = c }
 }
 
 // NewBackendAPI merangkai seluruh endpoint backend-api.
@@ -305,7 +312,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	adminPairHandler := handler.NewAdminPairHandler(service.NewPairAdminService(pairRepo, auditRepo))
 	tradingHandler := handler.NewTradingHandler(tradingService)
 	systemHandler := handler.NewSystemHandler(systemService)
-	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret)
+	tgClient := pilihan.tgClient
+	if tgClient == nil {
+		tgClient = telegram.NewClient(telegram.Config{
+			BotToken: cfg.TelegramBotToken,
+			Timeout:  cfg.TelegramTimeout,
+		}, logger)
+	}
+	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret, tgClient)
 	trialHandler := handler.NewTrialHandler(trialService)
 	adminAuthHandler := handler.NewAdminAuthHandler(
 		adminAuthService,
