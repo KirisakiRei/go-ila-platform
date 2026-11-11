@@ -1768,6 +1768,32 @@ backend/internal/service/credentials.go
 
 ## ⬆️ DARI HERMES KE HUMAN
 
-> Bagian ini hanya diisi oleh Hermes.
+### [2026-11-11] PERBAIKAN — Pengecualian Radar dari Delay Free Tier, Auto-Seed Watchlist Baru, dan Penyelarasan Port Engine
+- **Pelaku:** Hermes
+- **Tipe:** PERBAIKAN
+- **Status:** 🟢 SELESAI
 
-_(belum ada entri)_
+#### Ringkasan Temuan & Perbaikan:
+1. **Radar Menunggu Dikecualikan dari Delay 15 Menit Free Tier (`trading_service.go`):**
+   - **Akar Masalah:** Logika `FreeTierDelay` (15m) sebelumnya memfilter seluruh sinyal secara buta. Karena status radar (`WAIT_HTF_SWEEP`, `WAIT_LTF_CISD`) dan setup M5/M15 memiliki TTL pendek (5 s.d. 15 menit), sinyal ditahan saat < 15 menit, lalu langsung di-drop karena sudah kedaluwarsa setelah 15 menit. Akibatnya pengguna Free (dan user baru) tidak pernah melihat progres radar.
+   - **Perbaikan:** Menambahkan pengecualian `!model.IsWaitingSignalStatus(signal.Status)` pada filter Free delay. Sinyal radar/progres pasar kini tampil real-time bagi seluruh pengguna, sementara penundaan 15 menit tetap ditegakkan hanya untuk sinyal eksekusi entri (`READY_TO_ENTRY` / `OPPORTUNITY`).
+   - **Uji:** Ditambahkan unit test `TestFreeRadarStatusTidakTertunda` di `trading_service_test.go` (PASS).
+
+2. **Auto-Seed Watchlist Default untuk Pendaftaran Baru (`auth_service.go`, `account_service.go`, `router.go`):**
+   - **Akar Masalah:** Endpoint `GET /api/v1/signals` mewajibkan join ke tabel `subscription`. Saat user mendaftar, belum ada pair yang dilanggan sehingga backend mengembalikan `[]` dan frontend menampilkan layar kosong ("Watchlist Pair Kosong"). Di saat yang sama, Runner mengirim daftar simbol kosong ke Engine sehingga Engine berhenti memindai pasar.
+   - **Perbaikan:** Menambahkan `UserSignupSubscriber` pada alur `authService.Register` dan method `SubscribeDefaults` di `AccountService`. Pengguna baru otomatis didaftarkan ke pair utama (`XAUUSD`, `EURUSD`, `USTEC`), memicu Runner meminta data ke Engine dan dashboard radar langsung terisi.
+   - **Uji:** Ditambahkan unit test `TestRegisterSeedsDefaultSubscriptions` dan `TestSubscribeDefaults_CreatesActiveSubscriptions` (PASS).
+
+3. **Penyelarasan Port gRPC Engine di `.env.example`:**
+   - Menyesuaikan default `ENGINE_GRPC_ADDR` ke port `9443` dan `ENGINE3_GRPC_ADDR` ke port `9444` sesuai konfigurasi `docker-compose.yml` di `go-trade` (mencegah tabrakan dengan port 9090 penerima log platform).
+
+#### File Terdampak:
+- `backend/internal/service/trading_service.go`
+- `backend/internal/service/trading_service_test.go`
+- `backend/internal/service/account_service.go`
+- `backend/internal/service/account_service_test.go`
+- `backend/internal/service/auth_service.go`
+- `backend/internal/service/auth_service_test.go`
+- `backend/internal/router/router.go`
+- `.env.example`
+- `docs/AGENT_LOG.md`

@@ -92,6 +92,27 @@ func TestFreeDelayMenahanSinyalBaru(t *testing.T) {
 	}
 }
 
+// TestFreeRadarStatusTidakTertunda memastikan status pemantauan radar (WAIT_*)
+// langsung tampil untuk pengguna Free tanpa tertahan jeda 15 menit.
+func TestFreeRadarStatusTidakTertunda(t *testing.T) {
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	radarSig := newSignal("sig-radar", now.Add(-time.Minute), now.Add(4*time.Minute))
+	radarSig.Status = model.SignalStatusWaitHTFSweep
+
+	svc := newTradingServiceFor(t, newTestUser("free"), []model.Signal{radarSig}, now)
+
+	list, err := svc.Signals(context.Background(), userIDTest, 0)
+	if err != nil {
+		t.Fatalf("signals: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("status radar seharusnya langsung tampil untuk Free, dapat %d", len(list))
+	}
+	if list[0].Delayed {
+		t.Error("status radar tidak boleh bertanda delayed")
+	}
+}
+
 // TestFreeMenampilkanSetelahDelay memastikan sinyal muncul setelah jeda lewat.
 func TestFreeMenampilkanSetelahDelay(t *testing.T) {
 	published := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)

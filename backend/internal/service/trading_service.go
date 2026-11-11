@@ -97,8 +97,10 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 
 		// Sinyal Free baru terlihat setelah jeda; yang TTL-nya habis sebelum
 		// jeda selesai tidak ditampilkan sama sekali.
+		// Pengecualian: status pemantauan radar (WAIT_*) dikecualikan dari jeda
+		// agar dashboard radar tetap bergerak real-time untuk seluruh pengguna.
 		delayed := false
-		if tier == "free" {
+		if tier == "free" && !model.IsWaitingSignalStatus(signal.Status) {
 			visibleAt := signal.PublishedAt.Add(FreeTierDelay)
 			if now.Before(visibleAt) {
 				continue

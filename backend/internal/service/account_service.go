@@ -54,6 +54,7 @@ type AccountService interface {
 
 	ListSubscriptions(ctx context.Context, userID string) ([]dto.SubscriptionResponse, error)
 	Subscribe(ctx context.Context, userID string, req dto.CreateSubscriptionRequest) (*dto.SubscriptionResponse, error)
+	SubscribeDefaults(ctx context.Context, userID string) error
 	Unsubscribe(ctx context.Context, userID, subscriptionID string) error
 	Strategies(ctx context.Context, userID string) ([]dto.StrategyResponse, error)
 
@@ -514,6 +515,28 @@ func (s *accountService) Delete(ctx context.Context, userID, accountID string) e
 	}
 
 	s.recordAudit(ctx, userID, account, "account.disconnect", "")
+	return nil
+}
+
+// DefaultWatchlistSymbols adalah daftar simbol bawaan yang dipantau saat akun baru dibuat.
+var DefaultWatchlistSymbols = []string{"XAUUSD", "EURUSD", "USTEC"}
+
+// SubscribeDefaults mengaktifkan pair bawaan untuk pengguna baru.
+func (s *accountService) SubscribeDefaults(ctx context.Context, userID string) error {
+	for _, sym := range DefaultWatchlistSymbols {
+		sub := &model.Subscription{
+			UserID:   userID,
+			Symbol:   sym,
+			IsActive: true,
+		}
+		if err := s.subs.Create(ctx, sub); err != nil {
+			continue
+		}
+		s.recordStrategyAudit(ctx, userID, "ila-2.0", "subscription.enable", sym)
+		if s.seeder != nil {
+			_ = s.seeder.EnsureDefaults(ctx, userID, sym)
+		}
+	}
 	return nil
 }
 
