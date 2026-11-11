@@ -532,6 +532,12 @@ func (s *fakeStore) CorrelationMap(_ context.Context) (map[string][]string, erro
 	return out, nil
 }
 
+// PairFeeds mengembalikan peta feed kosong: pengujian Runner tidak bergantung
+// pada feed broker tertentu.
+func (s *fakeStore) PairFeeds(context.Context) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func (s *fakeStore) UpsertEngineState(_ context.Context, _ *model.EngineState) error { return nil }
 
 func (s *fakeStore) ListEngines(_ context.Context) ([]model.EngineState, error) { return nil, nil }

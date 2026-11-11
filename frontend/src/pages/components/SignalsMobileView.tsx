@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   ArrowLeft,
+  BarChart3,
   ChevronRight,
   Clock,
   Layers,
@@ -19,6 +20,7 @@ import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRad
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
 import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
+import { TradingRadarChart } from '@/features/charts/TradingRadarChart'
 import type { Position, Signal } from '@/types/api'
 
 type TabFilter = 'all' | 'ready' | 'monitoring' | 'history'
@@ -55,6 +57,9 @@ export function SignalsMobileView({
   filteredPositions,
 }: SignalsMobileViewProps) {
   const [activeTab, setActiveTab] = useState<TabFilter>('all')
+  // Chart dilipat secara bawaan agar daftar sinyal tetap jadi fokus utama di
+  // layar kecil; trader membukanya saat butuh melihat struktur.
+  const [chartOpen, setChartOpen] = useState(false)
 
   // Base list of signals: if activePair is chosen, filter by activePair; else use all signals matching active watchlist pairs
   const baseSignals = useMemo(() => {
@@ -320,6 +325,47 @@ export function SignalsMobileView({
 
       {/* 5. Call Entry Alert Banner (Pinned jika ada sinyal siap eksekusi) */}
       <CallEntryAlertBanner signals={baseSignals} />
+
+      {/* 5b. Chart setup ringkas untuk pair yang sedang dipilih */}
+      {activePair && (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+          <button
+            type="button"
+            onClick={() => setChartOpen((open) => !open)}
+            aria-expanded={chartOpen}
+            className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left"
+          >
+            <span className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-secondary">
+                <BarChart3 className="h-4 w-4 text-foreground" />
+              </span>
+              <span>
+                <span className="block text-xs font-bold text-foreground">Chart Setup</span>
+                <span className="block text-[10.5px] text-muted-foreground">
+                  Lilin, sweep, FVG, dan level order {activePair}
+                </span>
+              </span>
+            </span>
+            <ChevronRight
+              className={cn(
+                'h-4 w-4 text-muted-foreground transition-transform',
+                chartOpen && 'rotate-90',
+              )}
+            />
+          </button>
+
+          {chartOpen && (
+            <div className="border-t border-border p-3">
+              <TradingRadarChart
+                symbol={activePair}
+                signals={filteredSignals}
+                strategy={activeStrategyFilter}
+                enabled={chartOpen}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 6. List Sinyal (Card "PRIORITAS ILA" dkk) */}
       {isLoading ? (

@@ -104,6 +104,9 @@ type RunnerRepository interface {
 	// Hanya pair aktif yang punya korelasi yang ikut, sehingga engine tidak
 	// pernah diminta menarik feed instrumen yang sudah dinonaktifkan admin.
 	CorrelationMap(ctx context.Context) (map[string][]string, error)
+	// PairFeeds mengembalikan peta simbol ke feed candle pilihan admin.
+	// Simbol tanpa nilai memakai pemetaan bawaan engine.
+	PairFeeds(ctx context.Context) (map[string]string, error)
 
 	// Status engine.
 	UpsertEngineState(ctx context.Context, state *model.EngineState) error
@@ -132,7 +135,7 @@ func (r *runnerRepository) UpsertSignal(ctx context.Context, signal *model.Signa
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "signal_id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
-				"summary", "next_action", "expires_at", "updated_at",
+				"summary", "next_action", "expires_at", "feed_source", "updated_at",
 			}),
 		}).
 		Create(signal).Error
@@ -912,6 +915,41 @@ func (r *runnerRepository) CorrelationMap(ctx context.Context) (map[string][]str
 		if len(correlations) > 0 {
 			out[symbol] = correlations
 		}
+	}
+	return out, nil
+}
+
+// PairFeeds membaca feed candle pilihan admin untuk setiap pair aktif.
+// Nilai kosong dilewati agar engine tetap memakai pemetaan bawaannya.
+func (r *runnerRepository) PairFeeds(ctx context.Context) (map[string]string, error) {
+	type row struct {
+		Symbol     string
+		FeedSource string
+	}
+
+	var rows []row
+	// Table() tidak mengenal model, jadi filter soft delete ditulis eksplisit.
+	err := r.db.WithContext(ctx).
+		Table("trading_pair AS p").
+		Select("p.symbol, p.feed_source").
+		Joins("JOIN pair_category c ON c.id = p.category_id AND c.is_enabled = ? AND c.deleted_at IS NULL", true).
+		Joins("LEFT JOIN pair_group g ON g.id = p.group_id AND g.deleted_at IS NULL").
+		Where("p.is_enabled = ? AND p.deleted_at IS NULL", true).
+		Where("g.id IS NULL OR g.is_enabled = ?", true).
+		Where("p.feed_source <> ''").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca feed pair: %w", err)
+	}
+
+	out := make(map[string]string, len(rows))
+	for _, item := range rows {
+		symbol := strings.ToUpper(strings.TrimSpace(item.Symbol))
+		feed := strings.ToUpper(strings.TrimSpace(item.FeedSource))
+		if symbol == "" || feed == "" {
+			continue
+		}
+		out[symbol] = feed
 	}
 	return out, nil
 }

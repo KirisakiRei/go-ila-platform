@@ -56,9 +56,14 @@ type TradingPair struct {
 	// koma, mis. "XAGUSD,XAUEUR". Nilainya hanya data: cara memakainya
 	// (mis. SMT divergence) sepenuhnya milik engine.
 	CorrelatedSymbols string `gorm:"type:varchar(120)" json:"correlated_symbols"`
-	SortOrder         int    `gorm:"not null;default:0" json:"sort_order"`
-	IsEnabled         bool   `gorm:"not null;default:true" json:"is_enabled"`
-	Description       string `gorm:"type:varchar(255)" json:"description"`
+	// FeedSource adalah sumber candle yang dipakai engine untuk simbol ini,
+	// mis. "FOREXCOM" atau "ICMARKETS". Hanya admin yang menetapkannya; user
+	// tidak pernah memilih broker data. Nilai kosong berarti pemetaan bawaan
+	// engine (FOREXCOM untuk forex/logam/indeks, BINANCE untuk kripto).
+	FeedSource  string `gorm:"type:varchar(30);not null;default:''" json:"feed_source"`
+	SortOrder   int    `gorm:"not null;default:0" json:"sort_order"`
+	IsEnabled   bool   `gorm:"not null;default:true" json:"is_enabled"`
+	Description string `gorm:"type:varchar(255)" json:"description"`
 
 	// Metadata kontrak dipakai kalkulator risiko untuk mengubah lot menjadi
 	// nominal uang. Nilai nol berarti belum diisi: kalkulator memakai nilai

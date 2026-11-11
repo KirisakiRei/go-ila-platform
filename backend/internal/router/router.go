@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -15,6 +16,7 @@ import (
 	"ila/backend/internal/config"
 	"ila/backend/internal/ctraderapi"
 	"ila/backend/internal/handler"
+	"ila/backend/internal/market"
 	"ila/backend/internal/middleware"
 	"ila/backend/internal/model"
 	"ila/backend/internal/payment"
@@ -312,6 +314,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	timeframeSwitchHandler := handler.NewTimeframeSwitchHandler(timeframeSwitchService)
 	adminPairHandler := handler.NewAdminPairHandler(service.NewPairAdminService(pairRepo, auditRepo))
 	tradingHandler := handler.NewTradingHandler(tradingService)
+
+	// Data candle untuk chart dashboard. Cache pendek disimpan di proses ini
+	// agar satu halaman yang terus diperbarui tidak menembak feed untuk setiap
+	// permintaan.
+	marketService := market.NewService(market.NewTradingViewProvider(), 10*time.Second)
+	marketHandler := handler.NewMarketHandler(marketService, pairRepo)
 	systemHandler := handler.NewSystemHandler(systemService)
 	tgClient := pilihan.tgClient
 	if tgClient == nil {
@@ -513,6 +521,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		me.GET("/signals", tradingHandler.Signals)
 		me.GET("/positions", tradingHandler.Positions)
 		me.GET("/positions/export", tradingHandler.ExportPositions)
+
+		// Candle untuk chart radar sinyal dan peninjau posisi. Feed mengikuti
+		// pair yang dipilih admin agar selaras dengan evaluasi engine.
+		me.GET("/market/candles", marketHandler.Candles)
 
 		// Persetujuan dokumen legal. `blocked` pada balasan berarti eksekusi
 		// dan pembayaran ditahan sampai dokumen wajib disetujui.

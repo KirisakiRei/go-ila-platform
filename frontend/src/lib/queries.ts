@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accountApi,
   approvalApi,
+  marketApi,
   pairApi,
   riskApi,
   securityApi,
@@ -31,6 +32,8 @@ export const queryKeys = {
   strategySwitch: (symbol: string) => ['strategy-switch', symbol] as const,
   timeframeSwitch: (symbol: string) => ['timeframe-switch', symbol] as const,
   signals: (limit: number) => ['signals', limit] as const,
+  marketCandles: (symbol: string, timeframe: string, limit: number) =>
+    ['market', 'candles', symbol, timeframe, limit] as const,
   positions: (limit: number) => ['positions', limit] as const,
   systemStatus: ['system', 'status'] as const,
   trial: ['trial'] as const,
@@ -255,6 +258,28 @@ export function usePositions(limit = 100) {
     queryKey: queryKeys.positions(limit),
     queryFn: () => tradingApi.positions(limit),
     refetchInterval: 30_000,
+  })
+}
+
+/**
+ * Candle untuk chart dashboard.
+ *
+ * Segarkan berkala dipakai sebagai pengganti streaming: cache server sudah
+ * menahan beban feed, sehingga interval pendek tetap ringan.
+ */
+export function useMarketCandles(
+  symbol: string | null,
+  timeframe: string,
+  limit = 200,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.marketCandles(symbol ?? '', timeframe, limit),
+    queryFn: () => marketApi.candles(symbol ?? '', timeframe, limit),
+    enabled: Boolean(symbol) && enabled,
+    staleTime: 8_000,
+    refetchInterval: 20_000,
+    retry: 1,
   })
 }
 

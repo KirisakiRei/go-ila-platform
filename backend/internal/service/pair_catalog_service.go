@@ -151,6 +151,7 @@ func buildPairCatalog(categories []model.PairCategory, groups []model.PairGroup,
 			MinLot:            p.MinLot,
 			MaxLot:            p.MaxLot,
 			LotStep:           p.LotStep,
+			FeedSource:        p.FeedSource,
 		})
 	}
 

@@ -137,27 +137,24 @@ export function CheckoutMobileView({
   onOpenDashboard,
   invoice,
 }: CheckoutMobileViewProps) {
+  const expiresAtUtc = invoice?.expires_at?.utc ?? null
   const expiresAt = useMemo(() => {
-    if (!invoice?.expires_at?.utc) return null
-    const parsed = new Date(invoice.expires_at.utc).getTime()
+    if (!expiresAtUtc) return null
+    const parsed = new Date(expiresAtUtc).getTime()
     return Number.isFinite(parsed) ? parsed : null
-  }, [invoice?.expires_at?.utc])
+  }, [expiresAtUtc])
 
-  const [remainingMs, setRemainingMs] = useState(() =>
-    expiresAt ? Math.max(0, expiresAt - Date.now()) : FALLBACK_WINDOW_MS,
-  )
+  // Waktu berjalan disimpan sebagai state "sekarang", bukan sisa waktu: nilai
+  // turunan dihitung saat render sehingga tidak ada setState di badan effect.
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!expiresAt) {
-      setRemainingMs(FALLBACK_WINDOW_MS)
-      return
-    }
-    setRemainingMs(Math.max(0, expiresAt - Date.now()))
-    const timer = window.setInterval(() => {
-      setRemainingMs(Math.max(0, expiresAt - Date.now()))
-    }, 1000)
+    if (!expiresAt) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [expiresAt])
+
+  const remainingMs = expiresAt ? Math.max(0, expiresAt - now) : FALLBACK_WINDOW_MS
 
   const isVoucherApplied = Boolean(appliedCoupon)
 

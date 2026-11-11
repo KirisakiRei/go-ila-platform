@@ -275,6 +275,8 @@ export type AdminPairItem = {
   is_enabled: boolean
   description?: string
   subscribers: number
+  /** Sumber candle pilihan admin, mis. "ICMARKETS". Kosong = bawaan engine. */
+  feed_source?: string
 }
 
 /** Sub-kategori (grup) di dalam sebuah kategori pair. */

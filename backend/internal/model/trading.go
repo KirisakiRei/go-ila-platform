@@ -62,6 +62,10 @@ type Signal struct {
 	Symbol          string `gorm:"type:varchar(20);index;not null" json:"symbol"`
 	StrategyVersion string `gorm:"type:varchar(20);not null" json:"strategy_version"`
 	EngineVersion   string `gorm:"type:varchar(40)" json:"engine_version"`
+	// FeedSource adalah sumber candle yang dipakai engine saat sinyal ini
+	// dihitung, mis. "FOREXCOM" atau "ICMARKETS". Dashboard memakai nilai ini
+	// agar chart yang digambar berasal dari feed yang sama.
+	FeedSource string `gorm:"type:varchar(30);not null;default:''" json:"feed_source"`
 	// Htf dan Ltf adalah pasangan timeframe yang menerbitkan sinyal ini, mis.
 	// H4/M15. Kosong berarti engine belum mengirimkannya (kontrak menyusul),
 	// sehingga konsumen wajib memperlakukannya sebagai tidak diketahui —

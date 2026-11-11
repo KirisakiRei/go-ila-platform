@@ -2,26 +2,53 @@ package dto
 
 import "time"
 
+// SignalCandle adalah satu lilin yang menyertai rincian sweep/CISD.
+//
+// Chart memakai ini untuk menempatkan garis dan panah tepat pada lilin yang
+// dimaksud engine, tanpa perlu menebak dari waktu.
+type SignalCandle struct {
+	Timestamp time.Time `json:"timestamp"`
+	Open      float64   `json:"open"`
+	High      float64   `json:"high"`
+	Low       float64   `json:"low"`
+	Close     float64   `json:"close"`
+	IsClosed  bool      `json:"is_closed"`
+}
+
+// SignalFairValueGap adalah area FVG yang terbentuk pada sweep HTF.
+type SignalFairValueGap struct {
+	Type      string     `json:"type,omitempty"`
+	Top       float64    `json:"top"`
+	Bottom    float64    `json:"bottom"`
+	Candle3At *time.Time `json:"candle3_time,omitempty"`
+	Mitigated bool       `json:"mitigated"`
+}
+
 // SignalHtfSweep adalah rincian sweep timeframe besar untuk tampilan radar.
 type SignalHtfSweep struct {
-	Detected        bool       `json:"detected"`
-	SweepInProgress bool       `json:"sweep_in_progress"`
-	Direction       string     `json:"direction"`
-	StopLoss        float64    `json:"stop_loss"`
-	TargetDOL       float64    `json:"target_dol"`
-	Details         string     `json:"details"`
-	SweepTime       *time.Time `json:"sweep_time,omitempty"`
+	Detected        bool                `json:"detected"`
+	SweepInProgress bool                `json:"sweep_in_progress"`
+	Direction       string              `json:"direction"`
+	FVG             *SignalFairValueGap `json:"fvg,omitempty"`
+	SweepCandle     *SignalCandle       `json:"sweep_candle,omitempty"`
+	SweptCandle     *SignalCandle       `json:"swept_candle,omitempty"`
+	StopLoss        float64             `json:"stop_loss"`
+	TargetDOL       float64             `json:"target_dol"`
+	Details         string              `json:"details"`
+	SweepTime       *time.Time          `json:"sweep_time,omitempty"`
 }
 
 // SignalCISD adalah rincian konfirmasi momentum timeframe kecil untuk tampilan radar.
 type SignalCISD struct {
-	Detected   bool       `json:"detected"`
-	Direction  string     `json:"direction"`
-	CISDLevel  float64    `json:"cisd_level"`
-	ExtremeSL  float64    `json:"extreme_sl"`
-	EntryPrice float64    `json:"entry_price"`
-	Details    string     `json:"details"`
-	BreakTime  *time.Time `json:"break_time,omitempty"`
+	Detected    bool          `json:"detected"`
+	Direction   string        `json:"direction"`
+	RefCandle   *SignalCandle `json:"ref_candle,omitempty"`
+	BreakCandle *SignalCandle `json:"break_candle,omitempty"`
+	CISDLevel   float64       `json:"cisd_level"`
+	ExtremeSL   float64       `json:"extreme_sl"`
+	EntryPrice  float64       `json:"entry_price"`
+	Details     string        `json:"details"`
+	BreakTime   *time.Time    `json:"break_time,omitempty"`
 }
 
 // SignalResponse adalah satu sinyal seperti yang dilihat user.
@@ -33,8 +60,12 @@ type SignalResponse struct {
 	EngineVersion   string `json:"engine_version"`
 	// Htf/Ltf adalah pasangan timeframe sumber sinyal. Kosong bila engine belum
 	// mengirimkannya; UI tidak boleh menampilkan apa pun dalam kasus itu.
-	Htf          string          `json:"htf"`
-	Ltf          string          `json:"ltf"`
+	Htf string `json:"htf"`
+	Ltf string `json:"ltf"`
+	// FeedSource adalah sumber candle yang dipakai engine saat sinyal ini
+	// dihitung, mis. "FOREXCOM". Dashboard memakai nilai ini sebagai label
+	// broker pada chart.
+	FeedSource   string          `json:"feed_source,omitempty"`
 	Direction    string          `json:"direction"`
 	EntryPrice   float64         `json:"entry_price"`
 	StopLoss     float64         `json:"stop_loss"`

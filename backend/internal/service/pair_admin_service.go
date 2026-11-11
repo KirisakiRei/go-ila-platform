@@ -128,6 +128,7 @@ func toAdminPairView(p model.TradingPair, category model.PairCategory, groups ma
 		MinLot:            p.MinLot,
 		MaxLot:            p.MaxLot,
 		LotStep:           p.LotStep,
+		FeedSource:        p.FeedSource,
 	}
 	if p.GroupID != nil {
 		view.GroupID = *p.GroupID
@@ -348,6 +349,7 @@ func (s *pairAdminService) CreatePair(ctx context.Context, actorID string, req d
 		SortOrder:         req.SortOrder,
 		IsEnabled:         enabled,
 		Description:       strings.TrimSpace(req.Description),
+		FeedSource:        normalizeFeedSource(req.FeedSource),
 	}
 	pair.ValuePerLot, pair.ContractSize, pair.MinLot, pair.MaxLot, pair.LotStep = normalizeContract(
 		req.ValuePerLot, req.ContractSize, req.MinLot, req.MaxLot, req.LotStep,
@@ -439,6 +441,9 @@ func (s *pairAdminService) UpdatePair(ctx context.Context, actorID, id string, r
 	pair.ValuePerLot, pair.ContractSize, pair.MinLot, pair.MaxLot, pair.LotStep = normalizeContract(
 		valuePerLot, contractSize, minLot, maxLot, lotStep,
 	)
+	if req.FeedSource != nil {
+		pair.FeedSource = normalizeFeedSource(*req.FeedSource)
+	}
 
 	if err := s.pairs.UpdatePair(ctx, pair); err != nil {
 		return err
@@ -494,6 +499,16 @@ func normalizeContract(valuePerLot, contractSize, minLot, maxLot, lotStep float6
 		minLot, maxLot = maxLot, minLot
 	}
 	return valuePerLot, contractSize, minLot, maxLot, lotStep
+}
+
+// normalizeFeedSource menyeragamkan nama feed broker menjadi huruf besar.
+// Nilai kosong berarti simbol memakai pemetaan bawaan engine.
+func normalizeFeedSource(raw string) string {
+	feed := strings.ToUpper(strings.TrimSpace(raw))
+	if len(feed) > 30 {
+		feed = feed[:30]
+	}
+	return feed
 }
 
 func normalizeKey(raw string) string {

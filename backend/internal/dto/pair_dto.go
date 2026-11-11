@@ -18,6 +18,9 @@ type PairItem struct {
 	MinLot       float64 `json:"min_lot,omitempty"`
 	MaxLot       float64 `json:"max_lot,omitempty"`
 	LotStep      float64 `json:"lot_step,omitempty"`
+	// FeedSource adalah sumber candle pilihan admin, mis. "FOREXCOM".
+	// Dipakai dashboard untuk menampilkan label broker pada chart.
+	FeedSource string `json:"feed_source,omitempty"`
 }
 
 // PairGroupView adalah sub-kategori beserta pair di dalamnya.
@@ -93,6 +96,9 @@ type CreatePairRequest struct {
 	MinLot       float64 `json:"min_lot"`
 	MaxLot       float64 `json:"max_lot"`
 	LotStep      float64 `json:"lot_step"`
+	// FeedSource adalah sumber candle untuk simbol ini, mis. "ICMARKETS".
+	// Kosong berarti mengikuti pemetaan bawaan engine.
+	FeedSource string `json:"feed_source" binding:"max=30"`
 }
 
 // UpdatePairRequest mengubah simbol.
@@ -110,6 +116,8 @@ type UpdatePairRequest struct {
 	MinLot            *float64 `json:"min_lot"`
 	MaxLot            *float64 `json:"max_lot"`
 	LotStep           *float64 `json:"lot_step"`
+	// FeedSource kosong mengembalikan simbol ke pemetaan bawaan engine.
+	FeedSource *string `json:"feed_source" binding:"omitempty,max=30"`
 }
 
 // AdminPairView menampilkan pair lengkap untuk panel admin.
@@ -136,6 +144,8 @@ type AdminPairView struct {
 	MinLot       float64 `json:"min_lot"`
 	MaxLot       float64 `json:"max_lot"`
 	LotStep      float64 `json:"lot_step"`
+	// FeedSource adalah sumber candle pilihan admin, mis. "ICMARKETS".
+	FeedSource string `json:"feed_source"`
 }
 
 // AdminPairCatalogResponse adalah seluruh katalog untuk admin.

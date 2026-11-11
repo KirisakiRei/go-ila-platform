@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
+import { TradingRadarChart } from '@/features/charts/TradingRadarChart'
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
 import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
@@ -230,6 +231,18 @@ export default function SignalsPage() {
                   signals={filteredSignals}
                   strategy={activeStrategyFilter}
                   symbol={activePair}
+                />
+              </Section>
+
+              {/* Chart setup: lilin, sweep, FVG, CISD, dan level order. */}
+              <Section
+                title="Chart Setup"
+                description={`Lilin ${activePair} dari feed yang sama dengan evaluasi engine.`}
+              >
+                <TradingRadarChart
+                  symbol={activePair}
+                  signals={filteredSignals}
+                  strategy={activeStrategyFilter}
                 />
               </Section>
             </div>

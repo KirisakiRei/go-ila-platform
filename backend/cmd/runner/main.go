@@ -450,11 +450,16 @@ func streamOnce(
 	// Trace khusus stream: satu koneksi = satu rangkaian log yang bisa dicari.
 	streamCtx := engineclient.DenganTrace(ctx, logkit.Trace())
 
+	// Daftar simbol dihitung sekali: dipakai untuk langganan dan peta feed agar
+	// keduanya tidak pernah berbeda isi.
+	symbolsAwal := subscribedSymbols(ctx, target, svc)
+
 	return engineclient.Run(streamCtx, conn,
 		&enginev1.SubscribeRequest{
 			SubscriberId:      subscriberID,
-			Symbols:           subscribedSymbols(ctx, target, svc),
+			Symbols:           symbolsAwal,
 			Pairs:             timeframePairs(ctx, target, svc, logger),
+			SymbolFeeds:       pairFeeds(ctx, store, symbolsAwal, logger),
 			WantStatusUpdates: true,
 		},
 		engineclient.Events{
@@ -469,7 +474,7 @@ func streamOnce(
 				recordEngineState(ctx, store, engineStateID(target.Strategy), target.Strategy, svc.EngineVersion(target.Strategy), nil, logger)
 				applySnapshot(ctx, client, svc, subscriberID, target.Strategy, logger)
 				svc.SetAckSender(target.Strategy, ackSender(client, subscriberID))
-				svc.SetSymbolSync(target.Strategy, symbolSync(client, subscriberID, target, svc, logger))
+				svc.SetSymbolSync(target.Strategy, symbolSync(client, subscriberID, target, svc, store, logger))
 				// Selaraskan segera: antara hitung kebutuhan dan koneksi
 				// terbuka, langganan pengguna bisa sudah berubah.
 				syncNow(ctx, target, svc, logger)
@@ -514,7 +519,7 @@ func streamOnce(
 // Pasangan ikut dikirim setiap kali agar perubahan saklar timeframe di
 // dashboard langsung berlaku, tanpa menunggu stream terputus dan tersambung
 // ulang.
-func symbolSync(client enginev1.EngineServiceClient, subscriberID string, target engineTarget, svc *runner.Service, logger *slog.Logger) runner.SymbolSync {
+func symbolSync(client enginev1.EngineServiceClient, subscriberID string, target engineTarget, svc *runner.Service, store repository.RunnerRepository, logger *slog.Logger) runner.SymbolSync {
 	return func(ctx context.Context, _, _ []string) error {
 		syncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
@@ -531,6 +536,7 @@ func symbolSync(client enginev1.EngineServiceClient, subscriberID string, target
 			SubscriberId:      subscriberID,
 			Symbols:           symbols,
 			Pairs:             timeframePairs(syncCtx, target, svc, logger),
+			SymbolFeeds:       pairFeeds(syncCtx, store, symbols, logger),
 			WantStatusUpdates: true,
 		})
 		if err != nil {
@@ -687,6 +693,33 @@ func timeframePairs(ctx context.Context, target engineTarget, svc *runner.Servic
 // tidak saling mengira sebagai pelanggan yang sama.
 func subscriberFor(strategy string) string {
 	return "runner-" + strategy
+}
+
+// pairFeeds menyusun peta simbol ke feed candle pilihan admin untuk simbol yang
+// benar-benar dipantau. Simbol di luar daftar langganan tidak perlu dikirim.
+func pairFeeds(ctx context.Context, store repository.RunnerRepository, symbols []string, logger *slog.Logger) map[string]string {
+	if len(symbols) == 0 {
+		return nil
+	}
+
+	all, err := store.PairFeeds(ctx)
+	if err != nil {
+		// Gagal membaca feed bukan alasan menolak langganan: engine tetap
+		// memakai pemetaan bawaannya, dan penyelarasan berikutnya mengulang.
+		logger.Warn("gagal membaca feed pair", "error", errorText(err))
+		return nil
+	}
+
+	out := make(map[string]string, len(symbols))
+	for _, symbol := range symbols {
+		if feed, ok := all[strings.ToUpper(symbol)]; ok {
+			out[symbol] = feed
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // recordEngineState mencatat status koneksi agar dashboard bisa menampilkan

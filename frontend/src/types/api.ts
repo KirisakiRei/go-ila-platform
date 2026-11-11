@@ -260,6 +260,8 @@ export type PairItem = {
   min_lot?: number
   max_lot?: number
   lot_step?: number
+  /** Sumber candle pilihan admin, mis. "FOREXCOM" atau "ICMARKETS". */
+  feed_source?: string
 }
 
 export type PairGroupView = {
@@ -356,6 +358,31 @@ export type SignalHtfSweep = {
   target_dol: number
   details: string
   sweep_time?: string
+  /** Area FVG yang terbentuk pada sweep; digambar sebagai kotak di chart. */
+  fvg?: SignalFairValueGap
+  /** Lilin yang menyapu likuiditas. */
+  sweep_candle?: SignalCandle
+  /** Lilin yang ekornya tersapu; high/low-nya menjadi level sweep. */
+  swept_candle?: SignalCandle
+}
+
+/** Satu lilin pendukung rincian sweep/CISD. */
+export type SignalCandle = {
+  timestamp: string
+  open: number
+  high: number
+  low: number
+  close: number
+  is_closed: boolean
+}
+
+/** Fair Value Gap: area antara harga atas dan bawah. */
+export type SignalFairValueGap = {
+  type?: string
+  top: number
+  bottom: number
+  candle3_time?: string
+  mitigated: boolean
 }
 
 export type SignalCISD = {
@@ -366,6 +393,8 @@ export type SignalCISD = {
   entry_price: number
   details: string
   break_time?: string
+  ref_candle?: SignalCandle
+  break_candle?: SignalCandle
 }
 
 export type Signal = {
@@ -391,6 +420,12 @@ export type Signal = {
   reject_reason: string
   htf_sweep?: SignalHtfSweep
   cisd?: SignalCISD
+  /**
+   * Sumber candle yang dipakai engine saat sinyal ini dihitung, mis.
+   * "FOREXCOM" atau "ICMARKETS". Chart dashboard memakai nilai ini sebagai
+   * acuan agar garis setup jatuh pada lilin yang sama.
+   */
+  feed_source?: string
   published_at: string
   /**
    * Kapan baris sinyal terakhir diperbarui (ringkasan/masa berlaku disegarkan
@@ -403,6 +438,24 @@ export type Signal = {
 }
 
 export type PositionStatus = 'OPEN' | 'CLOSED_TP' | 'CLOSED_SL' | 'CLOSED_MANUAL' | 'UNTRACKED'
+
+/** Satu lilin pada chart. `time` adalah Unix detik UTC. */
+export type MarketCandle = {
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+/** Balasan endpoint candle: feed efektif ikut dikirim agar bisa dilabeli. */
+export type MarketCandlesResponse = {
+  symbol: string
+  feed: string
+  timeframe: string
+  candles: MarketCandle[]
+}
 
 export type Position = {
   id: string

@@ -238,16 +238,6 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
   const [tier, setTier] = useState<Tier>(user.tier)
   const [notice, setNotice] = useState<string | null>(null)
 
-  if (user.status === 'deleted') {
-    return (
-      <Section title="Tindakan" description="Akun ini telah dihapus.">
-        <div className="rounded-md border border-border bg-muted/40 p-3 text-[13px] text-muted-foreground">
-          Akun ini sudah dihapus dan dianonimkan. Tidak ada tindakan lebih lanjut yang dapat dijalankan.
-        </div>
-      </Section>
-    )
-  }
-
   const mutation = useMutation({
     mutationFn: async (action: string) => {
       const payload: UserActionPayload = { reason, category }
@@ -285,6 +275,18 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
       setNotice(error instanceof Error ? error.message : 'Tindakan gagal.')
     },
   })
+
+  // Akun terhapus tetap dirender sebagai pemberitahuan; early-return diletakkan
+  // setelah seluruh hook agar urutan hook tidak berubah antar render.
+  if (user.status === 'deleted') {
+    return (
+      <Section title="Tindakan" description="Akun ini telah dihapus.">
+        <div className="rounded-md border border-border bg-muted/40 p-3 text-[13px] text-muted-foreground">
+          Akun ini sudah dihapus dan dianonimkan. Tidak ada tindakan lebih lanjut yang dapat dijalankan.
+        </div>
+      </Section>
+    )
+  }
 
   const needsReason = pending !== null
   const needsEmail = pending === 'ban' || pending === 'delete'

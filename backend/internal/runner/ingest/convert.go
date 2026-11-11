@@ -60,6 +60,7 @@ func ConvertSignal(in *enginev1.Signal) (*model.Signal, bool) {
 		Symbol:          in.GetSymbol(),
 		StrategyVersion: in.GetStrategyVersion(),
 		EngineVersion:   in.GetEngineVersion(),
+		FeedSource:      in.GetFeedSource(),
 		Htf:             NormalizeTimeframe(in.GetHtf()),
 		Ltf:             NormalizeTimeframe(in.GetLtf()),
 		Direction:       direction,

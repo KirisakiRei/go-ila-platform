@@ -38,6 +38,9 @@ const TABS: { key: Tab; label: string; hint: string }[] = [
 const mesinGalat = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback
 
+/** Pilihan feed yang biasa dipakai; admin tetap boleh menulis feed lain. */
+const FEED_OPTIONS = ['FOREXCOM', 'ICMARKETS', 'OANDA', 'BINANCE']
+
 /** adminPairKey adalah kunci tunggal katalog admin; satu kali muat, dipakai tiga tab. */
 const adminPairKey = ['admin', 'pairs'] as const
 
@@ -236,6 +239,7 @@ export default function AdminPairsPage() {
                   <TableHead>Nama Tampilan</TableHead>
                   <TableHead>Kategori / Sub</TableHead>
                   <TableHead>Alias</TableHead>
+                  <TableHead>Feed</TableHead>
                   <TableHead className="text-right">Pelanggan</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
@@ -251,6 +255,11 @@ export default function AdminPairsPage() {
                       {pair.group_key ? ` · ${labelGroup(categories, pair)}` : ''}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{pair.aliases || '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {pair.feed_source || 'Bawaan'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right tabular">{pair.subscribers}</TableCell>
                     <TableCell>
                       <Badge variant={pair.is_enabled ? 'outline' : 'muted'}>
@@ -610,6 +619,7 @@ function PairFormModal({
   const [groupId, setGroupId] = useState(initial?.group_id ?? '')
   const [aliases, setAliases] = useState(initial?.aliases ?? '')
   const [correlated, setCorrelated] = useState(initial?.correlated_symbols ?? '')
+  const [feedSource, setFeedSource] = useState(initial?.feed_source ?? '')
   const [sortOrder, setSortOrder] = useState(String(initial?.sort_order ?? 0))
   const [enabled, setEnabled] = useState(initial?.is_enabled ?? true)
   const [error, setError] = useState<string | null>(null)
@@ -629,6 +639,7 @@ function PairFormModal({
         group_id: groupId,
         aliases: aliases.trim(),
         correlated_symbols: correlated.trim(),
+        feed_source: feedSource.trim().toUpperCase(),
         sort_order: Number(sortOrder) || 0,
         is_enabled: enabled,
       }
@@ -759,6 +770,26 @@ function PairFormModal({
             onChange={(event) => setSortOrder(event.target.value)}
           />
           <p className="text-[11px] text-muted-foreground">Angka kecil tampil lebih dulu.</p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="pair-feed">Data Feed Broker</Label>
+          <Input
+            id="pair-feed"
+            list="pair-feed-options"
+            value={feedSource}
+            placeholder="FOREXCOM"
+            onChange={(event) => setFeedSource(event.target.value.toUpperCase())}
+          />
+          <datalist id="pair-feed-options">
+            {FEED_OPTIONS.map((feed) => (
+              <option key={feed} value={feed} />
+            ))}
+          </datalist>
+          <p className="text-[11px] text-muted-foreground">
+            Sumber candle yang dibaca engine dan chart. Kosongkan untuk memakai bawaan
+            (FOREXCOM untuk forex/logam/indeks, BINANCE untuk kripto).
+          </p>
         </div>
 
         <div className="flex flex-col gap-1.5">

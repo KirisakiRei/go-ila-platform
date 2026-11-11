@@ -7,6 +7,7 @@ import type {
   BrokerAccount,
   CreateAccountPayload,
   CreateSubscriptionPayload,
+  MarketCandlesResponse,
   PairCatalogResponse,
   Position,
   RiskSimRequest,
@@ -108,6 +109,19 @@ export const strategyApi = {
 export const tradingApi = {
   signals: (limit = 50) => request<Signal[]>('/signals', { query: { limit } }),
   positions: (limit = 100) => request<Position[]>('/positions', { query: { limit } }),
+}
+
+/**
+ * Data candle untuk chart dashboard.
+ *
+ * Feed tidak dikirim dari klien: server memakai feed milik pair yang dipilih
+ * admin, lalu mengembalikan feed yang benar-benar dipakai.
+ */
+export const marketApi = {
+  candles: (symbol: string, tf: string, limit = 200) =>
+    request<MarketCandlesResponse>('/market/candles', {
+      query: { symbol, tf, limit },
+    }),
 }
 
 export const systemApi = {
