@@ -58,11 +58,23 @@ func NewClient(cfg Config, logger *slog.Logger) *Client {
 	}
 }
 
+// InlineButton adalah tombol tautan URL pada inline keyboard Telegram.
+type InlineButton struct {
+	Text string `json:"text"`
+	URL  string `json:"url,omitempty"`
+}
+
+// InlineKeyboardMarkup menyusun tombol-tombol pada inline keyboard.
+type InlineKeyboardMarkup struct {
+	InlineKeyboard [][]InlineButton `json:"inline_keyboard"`
+}
+
 type sendMessageRequest struct {
-	ChatID         string `json:"chat_id"`
-	Text           string `json:"text"`
-	DisablePreview bool   `json:"disable_web_page_preview"`
-	ParseMode      string `json:"parse_mode,omitempty"`
+	ChatID         string                `json:"chat_id"`
+	Text           string                `json:"text"`
+	DisablePreview bool                  `json:"disable_web_page_preview"`
+	ParseMode      string                `json:"parse_mode,omitempty"`
+	ReplyMarkup    *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
 type apiResponse struct {
@@ -70,9 +82,13 @@ type apiResponse struct {
 	Description string `json:"description"`
 }
 
-// Send mengirim satu pesan teks ke chat. Panggilan boleh gagal: kegagalan
-// Telegram tidak boleh dianggap persetujuan atau menghalangi trading.
+// Send mengirim satu pesan teks sederhana ke chat (kompatibilitas mundur).
 func (c *Client) Send(ctx context.Context, chatID, text string) error {
+	return c.SendMessage(ctx, chatID, Message{Text: text})
+}
+
+// SendMessage mengirim pesan Telegram lengkap dengan teks dan tombol inline keyboard.
+func (c *Client) SendMessage(ctx context.Context, chatID string, msg Message) error {
 	if !c.cfg.Enabled() {
 		return nil
 	}
@@ -85,11 +101,19 @@ func (c *Client) Send(ctx context.Context, chatID, text string) error {
 		return err
 	}
 
-	body, err := json.Marshal(sendMessageRequest{
+	reqPayload := sendMessageRequest{
 		ChatID:         chatID,
-		Text:           text,
+		Text:           msg.Text,
 		DisablePreview: true,
-	})
+	}
+
+	if len(msg.Buttons) > 0 {
+		reqPayload.ReplyMarkup = &InlineKeyboardMarkup{
+			InlineKeyboard: msg.Buttons,
+		}
+	}
+
+	body, err := json.Marshal(reqPayload)
 	if err != nil {
 		return fmt.Errorf("menyusun pesan: %w", err)
 	}

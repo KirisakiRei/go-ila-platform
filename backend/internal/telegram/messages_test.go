@@ -58,8 +58,8 @@ func TestFormatSetupMessageNumbers(t *testing.T) {
 	if !strings.Contains(msg.Text, "2,30") {
 		t.Fatalf("RR tidak diformat:\n%s", msg.Text)
 	}
-	if !strings.Contains(msg.Text, "https://app.test/approve/abc") {
-		t.Fatalf("deep-link tidak ada:\n%s", msg.Text)
+	if len(msg.Buttons) == 0 || len(msg.Buttons[0]) == 0 || msg.Buttons[0][0].URL != "https://app.test/approve/abc" {
+		t.Fatalf("tombol deep-link tidak ada atau salah: %v", msg.Buttons)
 	}
 }
 
@@ -69,8 +69,8 @@ func TestFormatSetupWithoutLink(t *testing.T) {
 	if strings.Contains(msg.Text, "](http") {
 		t.Fatal("tautan kosong tidak boleh membentuk markdown link")
 	}
-	if !strings.Contains(msg.Text, "dashboard") {
-		t.Fatalf("harus mengarahkan ke dashboard:\n%s", msg.Text)
+	if len(msg.Buttons) != 0 {
+		t.Fatalf("tanpa link tidak boleh ada tombol, dapat: %v", msg.Buttons)
 	}
 }
 
@@ -128,10 +128,13 @@ func TestFormatRadarHTFMessage(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
 	}
-	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "BUY", "H4 (HTF) ➔ M15 (LTF)", "1/4", "2.765,50", "2.738,20", "https://rekavia.com/app/sinyal?pair=XAUUSD"} {
+	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "BUY", "H4 (HTF) ➔ M15 (LTF)", "1/4", "2.765,50", "2.738,20"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("pesan HTF tidak memuat %q:\n%s", want, msg.Text)
 		}
+	}
+	if len(msg.Buttons) == 0 || msg.Buttons[0][0].URL != "https://rekavia.com/app/sinyal?pair=XAUUSD" {
+		t.Fatalf("tombol dashboard HTF tidak ada: %v", msg.Buttons)
 	}
 }
 
@@ -154,10 +157,13 @@ func TestFormatRadarLTFMessage(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
 	}
-	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "2/4", "H4 ➔ M15", "2.747,50", "2.737,80", "2.765,50", "2,85", "https://rekavia.com/app/sinyal?pair=XAUUSD"} {
+	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "2/4", "H4 ➔ M15", "2.747,50", "2.737,80", "2.765,50", "2,85"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("pesan LTF tidak memuat %q:\n%s", want, msg.Text)
 		}
+	}
+	if len(msg.Buttons) == 0 || msg.Buttons[0][0].URL != "https://rekavia.com/app/sinyal?pair=XAUUSD" {
+		t.Fatalf("tombol dashboard LTF tidak ada: %v", msg.Buttons)
 	}
 }
 
@@ -180,10 +186,13 @@ func TestFormatPositionOpenedMessage(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
 	}
-	for _, want := range []string{"POSISI TERPASANG — XAUUSD", "BUY #8492015", "cTrader Live", "4/4", "0,10 Lot", "2.748,15", "2.737,80", "2.765,50", "+2,72R", "https://rekavia.com/app/posisi"} {
+	for _, want := range []string{"POSISI TERPASANG — XAUUSD", "BUY #8492015", "cTrader Live", "4/4", "0,10 Lot", "2.748,15", "2.737,80", "2.765,50", "+2,72R"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("pesan posisi terpasang tidak memuat %q:\n%s", want, msg.Text)
 		}
+	}
+	if len(msg.Buttons) == 0 || msg.Buttons[0][0].URL != "https://rekavia.com/app/posisi" {
+		t.Fatalf("tombol posisi tidak ada: %v", msg.Buttons)
 	}
 }
 
@@ -220,10 +229,13 @@ func TestFormatOpportunityMessageMenyebutTimeframe(t *testing.T) {
 	msg := FormatOpportunityMessage("XAUUSD", "BUY", "ila-2.0", "W1", "H4",
 		4120.5, 4112.3, 4149.2, 2.3, "https://rekavia.com/approve/abc")
 
-	for _, ingin := range []string{"PELUANG ENTRY", "XAUUSD", "W1-H4", "Eksekusi Manual"} {
+	for _, ingin := range []string{"PELUANG ENTRY", "XAUUSD", "W1-H4"} {
 		if !strings.Contains(msg.Text, ingin) {
 			t.Errorf("pesan tidak memuat %q:\n%s", ingin, msg.Text)
 		}
+	}
+	if len(msg.Buttons) == 0 || msg.Buttons[0][0].URL != "https://rekavia.com/approve/abc" {
+		t.Fatalf("tombol peluang tidak ada: %v", msg.Buttons)
 	}
 	if strings.Contains(msg.Text, "Tidak dieksekusi:") {
 		t.Error("pesan peluang tidak boleh memakai kalimat penolakan")
@@ -239,7 +251,7 @@ func TestFormatOpportunityTanpaTimeframe(t *testing.T) {
 	if strings.Contains(msg.Text, "Timeframe:") {
 		t.Errorf("baris timeframe tidak boleh muncul saat kosong:\n%s", msg.Text)
 	}
-	if !strings.Contains(msg.Text, "Buka dashboard") {
-		t.Errorf("harus ada arahan tanpa link:\n%s", msg.Text)
+	if len(msg.Buttons) != 0 {
+		t.Errorf("tanpa link tidak boleh ada tombol, dapat: %v", msg.Buttons)
 	}
 }

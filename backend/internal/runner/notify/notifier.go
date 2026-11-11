@@ -128,7 +128,7 @@ func (n *Notifier) deliver(j job) {
 		message.Text = telegram.Sanitize(message.Text)
 	}
 
-	if err := n.tg.Send(ctx, *user.TelegramChatID, message.Text); err != nil {
+	if err := n.tg.SendMessage(ctx, *user.TelegramChatID, message); err != nil {
 		// Teks error disaring dahulu: kegagalan jaringan bisa memuat URL yang
 		// berisi token bot, dan nilainya ikut tercatat di log serta database.
 		safeError := redact.Error(err)

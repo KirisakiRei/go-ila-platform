@@ -45,6 +45,8 @@ type Message struct {
 	Text string
 	// Key mencegah pesan yang sama terkirim dua kali.
 	Key string
+	// Buttons memuat tombol tautan inline keyboard di bawah pesan.
+	Buttons [][]InlineButton
 }
 
 // SetupMessageParams memuat parameter lengkap notifikasi setup valid.
@@ -97,14 +99,16 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 	}
 	b.WriteString("\n")
 
-	b.WriteString("⚠️ Pintu konfirmasi terbuka maksimal 5 menit:\n")
+	b.WriteString("⚠️ Pintu konfirmasi terbuka maksimal 5 menit dari sekarang.\n")
+
+	var buttons [][]InlineButton
 	if p.ApprovalLink != "" {
-		fmt.Fprintf(&b, "[ ⚡ EKSEKUSI ORDER SEKARANG ](%s)\n", p.ApprovalLink)
-	} else {
-		b.WriteString("Buka dashboard untuk mengonfirmasi order.\n")
+		buttons = append(buttons, []InlineButton{
+			{Text: "⚡ EKSEKUSI ORDER SEKARANG", URL: p.ApprovalLink},
+		})
 	}
 
-	return Message{Text: b.String()}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // FormatSetupMessage menyusun pesan "setup valid" untuk mode manual (kompatibilitas mundur).
@@ -193,13 +197,15 @@ func FormatRadarHTFMessage(p RadarHTFParams) Message {
 		b.WriteString("\n")
 	}
 
+	var buttons [][]InlineButton
 	if p.DashboardLink != "" {
-		fmt.Fprintf(&b, "[ 🔍 Pantau Candle %s di Dashboard ](%s)\n", htf, p.DashboardLink)
-	} else {
-		b.WriteString("Pantau perkembangan langsung di dashboard.\n")
+		label := fmt.Sprintf("🔍 Buka Chart %s di Dashboard", htf)
+		buttons = append(buttons, []InlineButton{
+			{Text: label, URL: p.DashboardLink},
+		})
 	}
 
-	return Message{Text: b.String()}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // RadarLTFParams adalah masukan untuk notifikasi radar tahap 2 (Cek LTF).
@@ -281,13 +287,15 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 		b.WriteString("\n")
 	}
 
+	var buttons [][]InlineButton
 	if p.DashboardLink != "" {
-		fmt.Fprintf(&b, "[ 🔍 Pantau Radar %s di Dashboard ](%s)\n", ltf, p.DashboardLink)
-	} else {
-		b.WriteString("Pantau perkembangan langsung di dashboard.\n")
+		label := fmt.Sprintf("🔍 Pantau Radar %s di Dashboard", ltf)
+		buttons = append(buttons, []InlineButton{
+			{Text: label, URL: p.DashboardLink},
+		})
 	}
 
-	return Message{Text: b.String()}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // PositionOpenedParams adalah masukan untuk notifikasi order yang sudah live di pasar (Tahap 4).
@@ -349,13 +357,14 @@ func FormatPositionOpenedMessage(p PositionOpenedParams) Message {
 	b.WriteString("Catatan Risiko:\n")
 	b.WriteString("Order dilindungi pengaman trailing / target otomatis. Jangan geser Stop Loss melewati batas risiko terukur.\n\n")
 
+	var buttons [][]InlineButton
 	if p.PosisiLink != "" {
-		fmt.Fprintf(&b, "[ 📊 Pantau Live PnL di Dashboard ](%s)\n", p.PosisiLink)
-	} else {
-		b.WriteString("Pantau posisi langsung di dashboard.\n")
+		buttons = append(buttons, []InlineButton{
+			{Text: "📊 Kelola Posisi di Dashboard", URL: p.PosisiLink},
+		})
 	}
 
-	return Message{Text: b.String()}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // FormatHeldMessage menyusun pesan untuk sinyal yang tertahan aturan harian.
@@ -399,13 +408,15 @@ func FormatOpportunityMessage(symbol, side, strategy, htf, ltf string, entry, sl
 	fmt.Fprintf(&b, "SL: %s  |  TP: %s  (RR 1:%s)\n\n", formatPrice(sl), formatPrice(tp), formatFrom(rr))
 
 	b.WriteString("Eksekusi otomatis tidak aktif untuk pasangan ini pada akun Anda.\n")
+
+	var buttons [][]InlineButton
 	if link != "" {
-		fmt.Fprintf(&b, "[ Eksekusi Manual ](%s)\n", link)
-	} else {
-		b.WriteString("Buka dashboard untuk memutuskan.\n")
+		buttons = append(buttons, []InlineButton{
+			{Text: "⚡ Eksekusi Manual di Dashboard", URL: link},
+		})
 	}
 
-	return Message{Text: b.String()}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // FormatFinishedMessage memberi tahu bahwa setup berakhir sebelum entry.
@@ -425,12 +436,14 @@ func FormatRadarStepMessage(symbol, strategy, htf, ltf, stepName, link string) M
 	}
 	fmt.Fprintf(&b, "Tahap: %s\n", stepName)
 	b.WriteString("Menunggu konfirmasi penutupan harga.\n\n")
+	var buttons [][]InlineButton
 	if link != "" {
-		fmt.Fprintf(&b, "[ Buka Radar Dashboard ](%s)\n", link)
-	} else {
-		b.WriteString("Pantau perkembangan langsung di dashboard.\n")
+		buttons = append(buttons, []InlineButton{
+			{Text: "🔍 Buka Radar Dashboard", URL: link},
+		})
 	}
-	return Message{Text: b.String()}
+
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // FormatClosedMessage merangkum posisi yang sudah ditutup.
@@ -440,10 +453,15 @@ func FormatClosedMessage(symbol, result string, entry, exit, pnl, outcomeR float
 		symbol, result, formatFrom(outcomeR), formatPrice(entry), formatPrice(exit),
 		formatMoney(pnl), dailyNote,
 	)
+
+	var buttons [][]InlineButton
 	if len(link) > 0 && link[0] != "" {
-		fmt.Fprintf(&b, "\n[ 📊 Riwayat Posisi di Dashboard ](%s)\n", link[0])
+		buttons = append(buttons, []InlineButton{
+			{Text: "📊 Riwayat Posisi di Dashboard", URL: link[0]},
+		})
 	}
-	return Message{Text: b.String()}
+
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // Sanitize mengganti teks yang membocorkan istilah internal dengan versi aman.
