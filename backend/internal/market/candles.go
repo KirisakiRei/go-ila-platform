@@ -67,6 +67,33 @@ func DefaultFeed(symbol string) string {
 	return "FOREXCOM"
 }
 
+// feedAliases menerjemahkan simbol katalog ILA ke nama simbol yang benar-benar
+// dipakai feed tersebut.
+//
+// Pemetaan ini WAJIB sama dengan yang dipakai engine (pkg/marketfeed di
+// go-trade). Contoh: katalog memakai USTEC dan US500, sedangkan FOREX.com di
+// TradingView menamainya NAS100 dan SPX500 — sementara IC Markets justru
+// memakai USTEC dan US500, tapi menyebut GER40 sebagai DE40 dan USOIL sebagai
+// XTIUSD. Tanpa alias, TradingView tidak pernah mengirim bar sehingga chart
+// tidak pernah tampil.
+//
+// Semua pasangan di bawah sudah diuji langsung ke feed TradingView, bukan
+// tebakan.
+var feedAliases = map[string]map[string]string{
+	"FOREXCOM": {
+		"USTEC": "NAS100",
+		"US100": "NAS100",
+		"NDX":   "NAS100",
+		"US500": "SPX500",
+		"SPX":   "SPX500",
+	},
+	"ICMARKETS": {
+		"GER40": "DE40",
+		"USOIL": "XTIUSD",
+		"WTI":   "XTIUSD",
+	},
+}
+
 // MapSymbol memetakan simbol kanonik ke "FEED:SIMBOL".
 func MapSymbol(symbol, feed string) string {
 	sym := strings.ToUpper(strings.TrimSpace(symbol))
@@ -79,6 +106,16 @@ func MapSymbol(symbol, feed string) string {
 	if f == "" {
 		f = DefaultFeed(sym)
 	}
+
+	// Binance memakai pasangan USDT, sedangkan katalog ILA memakai akhiran USD.
+	if f == "BINANCE" && strings.HasSuffix(sym, "USD") && !strings.HasSuffix(sym, "USDT") {
+		sym += "T"
+	}
+
+	if alias, ok := feedAliases[f][sym]; ok {
+		sym = alias
+	}
+
 	return f + ":" + sym
 }
 
@@ -122,6 +159,21 @@ func formatMsg(funcName string, params []any) string {
 	return fmt.Sprintf("~m~%d~m~%s", len(payload), payload)
 }
 
+// tvErrorText menyusun keterangan galat dari payload protokol TradingView.
+func tvErrorText(raw map[string]any) string {
+	params, _ := raw["p"].([]any)
+	parts := make([]string, 0, len(params))
+	for _, param := range params {
+		if text, ok := param.(string); ok && text != "" {
+			parts = append(parts, text)
+		}
+	}
+	if len(parts) == 0 {
+		return "tanpa keterangan"
+	}
+	return strings.Join(parts, " ")
+}
+
 // FetchCandles mengambil candle terbaru dari TradingView.
 func (p *TradingViewProvider) FetchCandles(ctx context.Context, symbol, feed, timeframe string, limit int) ([]Candle, error) {
 	resolution := MapResolution(timeframe)
@@ -150,7 +202,9 @@ func (p *TradingViewProvider) FetchCandles(ctx context.Context, symbol, feed, ti
 	_ = conn.WriteMessage(websocket.TextMessage, []byte(formatMsg("resolve_symbol", []any{chartSession, "sds_sym_1", "=" + string(symSpec)})))
 	_ = conn.WriteMessage(websocket.TextMessage, []byte(formatMsg("create_series", []any{chartSession, "sds_1", "s1", "sds_sym_1", resolution, limit, ""})))
 
-	_ = conn.SetReadDeadline(time.Now().Add(8 * time.Second))
+	// Batas waktu per baca, bukan batas total: selama feed masih mengirim
+	// pesan, koneksi tidak diputus.
+	const batasBaca = 12 * time.Second
 
 	for {
 		select {
@@ -158,6 +212,8 @@ func (p *TradingViewProvider) FetchCandles(ctx context.Context, symbol, feed, ti
 			return nil, ctx.Err()
 		default:
 		}
+
+		_ = conn.SetReadDeadline(time.Now().Add(batasBaca))
 
 		_, msgBytes, err := conn.ReadMessage()
 		if err != nil {
@@ -179,6 +235,17 @@ func (p *TradingViewProvider) FetchCandles(ctx context.Context, symbol, feed, ti
 				continue
 			}
 			method, _ := raw["m"].(string)
+
+			// Simbol yang tidak ada di feed dilaporkan sebagai pesan protokol,
+			// bukan sebagai bar kosong. Tanpa deteksi ini permintaan menggantung
+			// sampai batas waktu lalu berakhir sebagai galat 500 tanpa sebab jelas.
+			switch method {
+			case "symbol_error":
+				return nil, fmt.Errorf("simbol %s tidak tersedia pada feed (%s)", tvSymbol, tvErrorText(raw))
+			case "series_error", "critical_error", "protocol_error":
+				return nil, fmt.Errorf("feed menolak permintaan %s (%s)", tvSymbol, tvErrorText(raw))
+			}
+
 			if method != "timescale_update" && method != "du" {
 				continue
 			}

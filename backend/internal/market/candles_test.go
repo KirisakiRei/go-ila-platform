@@ -13,11 +13,48 @@ func TestMapSymbolMemakaiFeedAdmin(t *testing.T) {
 		feed   string
 		want   string
 	}{
-		{"NAS100", "ICMARKETS", "ICMARKETS:NAS100"},
+		{"US30", "ICMARKETS", "ICMARKETS:US30"},
 		{"xauusd", "forexcom", "FOREXCOM:XAUUSD"},
 		{"EUR/USD", "OANDA", "OANDA:EURUSD"},
-		{"BTCUSD", "", "BINANCE:BTCUSD"},
+		{"BTCUSD", "", "BINANCE:BTCUSDT"},
 		{"XAUUSD", "", "FOREXCOM:XAUUSD"},
+	}
+
+	for _, c := range cases {
+		if got := MapSymbol(c.symbol, c.feed); got != c.want {
+			t.Errorf("MapSymbol(%q, %q) = %q, ingin %q", c.symbol, c.feed, got, c.want)
+		}
+	}
+}
+
+// TestMapSymbolAliasFeed menutup kasus yang pernah membuat chart kosong: katalog
+// memakai nama yang tidak dikenal feed, sehingga TradingView tidak pernah
+// mengirim bar dan permintaan berakhir sebagai galat 500.
+//
+// Setiap pasangan di bawah sudah diverifikasi langsung ke feed TradingView.
+func TestMapSymbolAliasFeed(t *testing.T) {
+	cases := []struct {
+		symbol string
+		feed   string
+		want   string
+	}{
+		// FOREX.com memakai NAS100/SPX500.
+		{"USTEC", "FOREXCOM", "FOREXCOM:NAS100"},
+		{"USTEC", "", "FOREXCOM:NAS100"},
+		{"US500", "FOREXCOM", "FOREXCOM:SPX500"},
+		// IC Markets justru memakai USTEC/US500, tapi DE40 dan XTIUSD.
+		{"USTEC", "ICMARKETS", "ICMARKETS:USTEC"},
+		{"US500", "ICMARKETS", "ICMARKETS:US500"},
+		{"GER40", "ICMARKETS", "ICMARKETS:DE40"},
+		{"USOIL", "ICMARKETS", "ICMARKETS:XTIUSD"},
+		// Simbol yang memang sama di kedua feed.
+		{"GER40", "FOREXCOM", "FOREXCOM:GER40"},
+		{"USOIL", "FOREXCOM", "FOREXCOM:USOIL"},
+		{"US30", "FOREXCOM", "FOREXCOM:US30"},
+		{"XAUEUR", "FOREXCOM", "FOREXCOM:XAUEUR"},
+		// Kripto hanya memakai pasangan USDT di Binance.
+		{"BTCUSD", "BINANCE", "BINANCE:BTCUSDT"},
+		{"BTCUSD", "ICMARKETS", "ICMARKETS:BTCUSD"},
 	}
 
 	for _, c := range cases {
