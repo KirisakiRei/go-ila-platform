@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
@@ -36,7 +38,9 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	switch status {
 	case model.SignalStatusReadyToEntry, model.SignalStatusRejected,
 		model.SignalStatusOpportunity,
-		model.SignalStatusWaitLTFCISD,
+		model.SignalStatusWaitHTFSweep, model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_HTF_KEY_LEVEL",
+		model.SignalStatusWaitLTFCISD, "WAIT_ILA3_MTF_REVERSAL", "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2",
+		model.SignalStatusConsumed,
 		model.SignalStatusCancelled, model.SignalStatusExpired,
 		model.SignalStatusSuperseded:
 	default:
@@ -49,13 +53,106 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 		_ = chatID
 
 		switch status {
+		case model.SignalStatusWaitHTFSweep, model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_HTF_KEY_LEVEL":
+			dashboardLink := telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
+			var htfSweep dto.SignalHtfSweep
+			if signal.HtfSweepJSON != "" {
+				_ = json.Unmarshal([]byte(signal.HtfSweepJSON), &htfSweep)
+			}
+			targetDOL := htfSweep.TargetDOL
+			stopLoss := htfSweep.StopLoss
+			if stopLoss == 0 {
+				stopLoss = signal.StopLoss
+			}
+			details := htfSweep.Details
+			if details == "" {
+				details = signal.Summary
+			}
+			return telegram.FormatRadarHTFMessage(telegram.RadarHTFParams{
+				Symbol:          signal.Symbol,
+				Direction:       signal.Direction,
+				StrategyVersion: signal.StrategyVersion,
+				Htf:             signal.Htf,
+				Ltf:             signal.Ltf,
+				TargetDOL:       targetDOL,
+				StopLoss:        stopLoss,
+				Details:         details,
+				DashboardLink:   dashboardLink,
+			})
+
+		case model.SignalStatusWaitLTFCISD, "WAIT_ILA3_MTF_REVERSAL", "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2":
+			dashboardLink := telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
+			var cisd dto.SignalCISD
+			if signal.CisdJSON != "" {
+				_ = json.Unmarshal([]byte(signal.CisdJSON), &cisd)
+			}
+			details := cisd.Details
+			if details == "" {
+				details = signal.Summary
+			}
+			return telegram.FormatRadarLTFMessage(telegram.RadarLTFParams{
+				Symbol:          signal.Symbol,
+				Direction:       signal.Direction,
+				StrategyVersion: signal.StrategyVersion,
+				Htf:             signal.Htf,
+				Ltf:             signal.Ltf,
+				EntryPrice:      signal.EntryPrice,
+				StopLoss:        signal.StopLoss,
+				TakeProfit:      signal.TakeProfit,
+				RiskReward:      signal.RiskReward,
+				CISDLevel:       cisd.CISDLevel,
+				Details:         details,
+				DashboardLink:   dashboardLink,
+			})
+
 		case model.SignalStatusReadyToEntry:
 			link := p.approveLink(ctx, userID, signalID)
-			return telegram.FormatSetupMessage(
-				signal.Symbol, signal.Direction, signal.StrategyVersion,
-				signal.EntryPrice, signal.StopLoss, signal.TakeProfit,
-				signal.RiskReward, defaultRiskPercent, 0, link,
-			)
+			return telegram.FormatSetupDetailedMessage(telegram.SetupMessageParams{
+				Symbol:          signal.Symbol,
+				Direction:       signal.Direction,
+				StrategyVersion: signal.StrategyVersion,
+				Htf:             signal.Htf,
+				Ltf:             signal.Ltf,
+				EntryPrice:      signal.EntryPrice,
+				StopLoss:        signal.StopLoss,
+				TakeProfit:      signal.TakeProfit,
+				RiskReward:      signal.RiskReward,
+				RiskPercent:     defaultRiskPercent,
+				RiskAmount:      0,
+				ApprovalLink:    link,
+			})
+
+		case model.SignalStatusConsumed:
+			posisiLink := telegram.AppURL(p.baseURL, "/posisi")
+			pos, _ := p.store.FindOpenPositionBySignal(ctx, userID, signalID)
+			if pos != nil {
+				return telegram.FormatPositionOpenedMessage(telegram.PositionOpenedParams{
+					Symbol:       pos.Symbol,
+					Direction:    pos.Direction,
+					TicketNumber: pos.TicketNumber,
+					BrokerType:   "",
+					LotSize:      pos.LotSize,
+					OpenPrice:    pos.OpenPrice,
+					StopLoss:     pos.StopLoss,
+					TakeProfit:   pos.TakeProfit,
+					OutcomeR:     pos.OutcomeR,
+					OpenedAt:     pos.OpenedAt,
+					PosisiLink:   posisiLink,
+				})
+			}
+			return telegram.FormatPositionOpenedMessage(telegram.PositionOpenedParams{
+				Symbol:       signal.Symbol,
+				Direction:    signal.Direction,
+				TicketNumber: "",
+				BrokerType:   "",
+				LotSize:      0,
+				OpenPrice:    signal.EntryPrice,
+				StopLoss:     signal.StopLoss,
+				TakeProfit:   signal.TakeProfit,
+				OutcomeR:     signal.RiskReward,
+				OpenedAt:     time.Now(),
+				PosisiLink:   posisiLink,
+			})
 
 		case model.SignalStatusRejected:
 			return telegram.FormatHeldMessage(
@@ -66,20 +163,14 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 		case model.SignalStatusOpportunity:
 			// Peluang bukan penolakan: pesannya menawarkan langkah berikutnya.
 			dashboardLink := p.approveLink(ctx, userID, signalID)
+			if dashboardLink == "" {
+				dashboardLink = telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
+			}
 			return telegram.FormatOpportunityMessage(
 				signal.Symbol, signal.Direction, signal.StrategyVersion,
 				signal.Htf, signal.Ltf,
 				signal.EntryPrice, signal.StopLoss, signal.TakeProfit,
 				signal.RiskReward, dashboardLink,
-			)
-
-		case model.SignalStatusWaitLTFCISD:
-			dashboardLink := p.baseURL + "/sinyal?pair=" + signal.Symbol
-			return telegram.FormatRadarStepMessage(
-				signal.Symbol, signal.StrategyVersion,
-				signal.Htf, signal.Ltf,
-				"Struktur Timeframe Besar Terkonfirmasi",
-				dashboardLink,
 			)
 
 		default:
@@ -111,6 +202,7 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 
 	p.notifier.Enqueue(pos.UserID, messageKey, func(chatID string) telegram.Message {
 		_ = chatID
+		posisiLink := telegram.AppURL(p.baseURL, "/posisi")
 		return telegram.FormatClosedMessage(
 			pos.Symbol,
 			positionResultLabel(pos.Status),
@@ -119,6 +211,7 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 			pos.ProfitLoss,
 			pos.OutcomeR,
 			dailyNote,
+			posisiLink,
 		)
 	})
 }

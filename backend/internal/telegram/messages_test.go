@@ -86,14 +86,104 @@ func TestFormatHeldMessageAlwaysExplainsReason(t *testing.T) {
 }
 
 func TestDeepLink(t *testing.T) {
-	if got := DeepLink("https://app.test/", "tok"); got != "https://app.test/approve/tok" {
+	if got := DeepLink("https://app.test/", "tok"); got != "https://app.test/app/approve/tok" {
 		t.Fatalf("DeepLink = %q", got)
+	}
+	if got := DeepLink("https://app.test/app", "tok"); got != "https://app.test/app/approve/tok" {
+		t.Fatalf("DeepLink with existing /app = %q", got)
 	}
 	if DeepLink("", "tok") != "" {
 		t.Fatal("tanpa base URL harus kosong")
 	}
 	if DeepLink("https://app.test", "") != "" {
 		t.Fatal("tanpa token harus kosong")
+	}
+}
+
+func TestAppURL(t *testing.T) {
+	if got := AppURL("https://rekavia.com", "/sinyal?pair=XAUUSD"); got != "https://rekavia.com/app/sinyal?pair=XAUUSD" {
+		t.Fatalf("AppURL = %q", got)
+	}
+	if got := AppURL("https://rekavia.com/app", "/posisi"); got != "https://rekavia.com/app/posisi" {
+		t.Fatalf("AppURL with existing /app = %q", got)
+	}
+	if AppURL("", "/posisi") != "" {
+		t.Fatal("tanpa base URL harus kosong")
+	}
+}
+
+func TestFormatRadarHTFMessage(t *testing.T) {
+	msg := FormatRadarHTFMessage(RadarHTFParams{
+		Symbol:          "XAUUSD",
+		Direction:       "BUY",
+		StrategyVersion: "ILA 2.0",
+		Htf:             "H4",
+		Ltf:             "M15",
+		TargetDOL:       2765.50,
+		StopLoss:        2738.20,
+		Details:         "Area likuiditas telah disentuh.",
+		DashboardLink:   "https://rekavia.com/app/sinyal?pair=XAUUSD",
+	})
+
+	if ContainsForbiddenTerms(msg.Text) {
+		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
+	}
+	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "BUY", "H4 (HTF) ➔ M15 (LTF)", "1/4", "2.765,50", "2.738,20", "https://rekavia.com/app/sinyal?pair=XAUUSD"} {
+		if !strings.Contains(msg.Text, want) {
+			t.Errorf("pesan HTF tidak memuat %q:\n%s", want, msg.Text)
+		}
+	}
+}
+
+func TestFormatRadarLTFMessage(t *testing.T) {
+	msg := FormatRadarLTFMessage(RadarLTFParams{
+		Symbol:          "XAUUSD",
+		Direction:       "BUY",
+		StrategyVersion: "ILA 2.0",
+		Htf:             "H4",
+		Ltf:             "M15",
+		EntryPrice:      2747.50,
+		StopLoss:        2737.80,
+		TakeProfit:      2765.50,
+		RiskReward:      2.85,
+		CISDLevel:       2746.80,
+		Details:         "",
+		DashboardLink:   "https://rekavia.com/app/sinyal?pair=XAUUSD",
+	})
+
+	if ContainsForbiddenTerms(msg.Text) {
+		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
+	}
+	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "2/4", "H4 ➔ M15", "2.747,50", "2.737,80", "2.765,50", "2,85", "https://rekavia.com/app/sinyal?pair=XAUUSD"} {
+		if !strings.Contains(msg.Text, want) {
+			t.Errorf("pesan LTF tidak memuat %q:\n%s", want, msg.Text)
+		}
+	}
+}
+
+func TestFormatPositionOpenedMessage(t *testing.T) {
+	openedAt := time.Date(2026, 11, 11, 7, 15, 2, 0, time.UTC)
+	msg := FormatPositionOpenedMessage(PositionOpenedParams{
+		Symbol:       "XAUUSD",
+		Direction:    "BUY",
+		TicketNumber: "8492015",
+		BrokerType:   "cTrader Live",
+		LotSize:      0.10,
+		OpenPrice:    2748.15,
+		StopLoss:     2737.80,
+		TakeProfit:   2765.50,
+		OutcomeR:     2.72,
+		OpenedAt:     openedAt,
+		PosisiLink:   "https://rekavia.com/app/posisi",
+	})
+
+	if ContainsForbiddenTerms(msg.Text) {
+		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
+	}
+	for _, want := range []string{"POSISI TERPASANG — XAUUSD", "BUY #8492015", "cTrader Live", "4/4", "0,10 Lot", "2.748,15", "2.737,80", "2.765,50", "+2,72R", "https://rekavia.com/app/posisi"} {
+		if !strings.Contains(msg.Text, want) {
+			t.Errorf("pesan posisi terpasang tidak memuat %q:\n%s", want, msg.Text)
+		}
 	}
 }
 

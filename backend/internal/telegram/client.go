@@ -149,13 +149,32 @@ func (c *Client) throttle(ctx context.Context, chatID string) {
 	c.mu.Unlock()
 }
 
-// DeepLink menyusun tautan konfirmasi entry.
+// DeepLink menyusun tautan konfirmasi entry dengan awalan /app bila belum ada.
 // Token tidak memuat rahasia; halaman tujuan tetap mewajibkan sesi login.
 func DeepLink(baseURL, token string) string {
 	if baseURL == "" || token == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s/approve/%s", trimSlash(baseURL), url.PathEscape(token))
+	base := trimSlash(baseURL)
+	if !strings.HasSuffix(base, "/app") {
+		base += "/app"
+	}
+	return fmt.Sprintf("%s/approve/%s", base, url.PathEscape(token))
+}
+
+// AppURL menyusun tautan ke halaman panel aplikasi (dengan awalan /app bila belum ada).
+func AppURL(baseURL, path string) string {
+	if baseURL == "" {
+		return ""
+	}
+	base := trimSlash(baseURL)
+	if !strings.HasSuffix(base, "/app") {
+		base += "/app"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return base + path
 }
 
 func trimSlash(raw string) string {
