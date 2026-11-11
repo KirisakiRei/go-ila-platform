@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, getIla3Mtf, isFinal } from '@/features/signals/lib/status'
 import { PriceChart, type ChartMarkerSpec, type PriceLineSpec } from './PriceChart'
+import { arahBearish } from './lib/direction'
 import { chartTheme } from './lib/theme'
 import type { ZoneSpec } from './lib/zonePrimitive'
 
@@ -136,7 +137,9 @@ export function TradingRadarChart({
 
     // --- Timeframe besar: level sweep dan kotak FVG -------------------------
     if (tabIndex === 0) {
-      if (sweep?.detected) {
+      // Sweep yang masih berjalan pun sudah punya lilin nyata dari engine, jadi
+      // ikut digambar: trader perlu melihat level yang sedang diuji.
+      if (sweep && (sweep.detected || sweep.sweep_in_progress)) {
         const level = sweepLevel(sweep)
         if (level > 0) {
           lines.push({
@@ -148,14 +151,37 @@ export function TradingRadarChart({
           })
         }
 
-        const candle = sweep.swept_candle ?? sweep.sweep_candle
-        if (candle) {
+        // Penanda diletakkan pada lilin yang menyapu (sweep candle), bukan pada
+        // lilin yang tersapu: sweep terjadi ketika candle itu ditutup.
+        const waktuSweep = waktuSweepDetik(sweep)
+        if (waktuSweep > 0) {
           marks.push({
-            time: Math.floor(new Date(candle.timestamp).getTime() / 1000),
-            position: sweep.direction === 'SELL' ? 'aboveBar' : 'belowBar',
+            time: waktuSweep,
+            position: arahBearish(sweep.direction) ? 'aboveBar' : 'belowBar',
             color: theme.sweep,
             shape: 'circle',
             text: 'Sweep',
+          })
+        }
+
+        // Batas risiko dan target yang dihitung engine ikut ditampilkan agar
+        // angka di chart sama dengan angka yang dipakai untuk entry nanti.
+        if (sweep.stop_loss > 0) {
+          lines.push({
+            price: sweep.stop_loss,
+            color: theme.stopLoss,
+            title: `SL Sweep ${formatNumber(sweep.stop_loss, 2)}`,
+            style: 'dotted',
+            width: 1,
+          })
+        }
+        if (sweep.target_dol > 0) {
+          lines.push({
+            price: sweep.target_dol,
+            color: theme.takeProfit,
+            title: `Target DOL ${formatNumber(sweep.target_dol, 2)}`,
+            style: 'dotted',
+            width: 1,
           })
         }
       }
@@ -187,13 +213,16 @@ export function TradingRadarChart({
         })
 
         if (cisd.break_candle) {
-          marks.push({
-            time: Math.floor(new Date(cisd.break_candle.timestamp).getTime() / 1000),
-            position: cisd.direction === 'SELL' ? 'aboveBar' : 'belowBar',
-            color: theme.cisd,
-            shape: 'circle',
-            text: 'CISD',
-          })
+          const waktuBreak = Math.floor(new Date(cisd.break_candle.timestamp).getTime() / 1000)
+          if (Number.isFinite(waktuBreak)) {
+            marks.push({
+              time: waktuBreak,
+              position: arahBearish(cisd.direction) ? 'aboveBar' : 'belowBar',
+              color: theme.cisd,
+              shape: 'circle',
+              text: 'CISD',
+            })
+          }
         }
       }
 
@@ -320,7 +349,7 @@ export function TradingRadarChart({
               <LegendItem color={theme.cisd} label="CISD" />
               <LegendItem color={theme.entry} label="Entry" />
               <LegendItem color={theme.stopLoss} label="SL" />
-              <LegendItem color={theme.takeProfit} label="TP" />
+              <LegendItem color={theme.takeProfit} label="TP / DOL" />
               <span className="ml-auto tabular">
                 {symbol} · {activeTab?.timeframe ?? '-'}
               </span>
@@ -342,13 +371,34 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 }
 
 /**
- * sweepLevel menentukan harga yang tersapu.
+ * sweepLevel menentukan harga likuiditas yang tersapu, persis seperti yang
+ * dihitung engine: high lilin sebelumnya untuk struktur BEARISH, low-nya untuk
+ * BULLISH.
  *
- * Arah SELL berarti likuiditas di atas harga yang disapu, sehingga levelnya
- * adalah high lilin yang tersapu; arah BUY memakai low.
+ * Semua angka diambil dari payload engine; tidak ada harga yang diturunkan
+ * ulang di browser.
  */
 function sweepLevel(sweep: NonNullable<Signal['htf_sweep']>): number {
-  const candle = sweep.swept_candle ?? sweep.sweep_candle
-  if (!candle) return 0
-  return sweep.direction === 'SELL' ? candle.high : candle.low
+  const bearish = arahBearish(sweep.direction)
+  const swept = sweep.swept_candle
+
+  const level = bearish ? (swept?.high ?? 0) : (swept?.low ?? 0)
+  return Number.isFinite(level) && level > 0 ? level : 0
+}
+
+/**
+ * waktuSweepDetik memilih waktu lilin sweep dari payload engine.
+ *
+ * Engine mengisi sweep_time sama dengan timestamp lilin penyapu; keduanya bisa
+ * dipakai, sedangkan lilin tersapu waktunya lebih awal dan membuat penanda
+ * tampak mundur satu candle.
+ */
+function waktuSweepDetik(sweep: NonNullable<Signal['htf_sweep']>): number {
+  const kandidat = [sweep.sweep_time, sweep.sweep_candle?.timestamp]
+  for (const nilai of kandidat) {
+    if (!nilai) continue
+    const ms = new Date(nilai).getTime()
+    if (Number.isFinite(ms)) return Math.floor(ms / 1000)
+  }
+  return 0
 }
