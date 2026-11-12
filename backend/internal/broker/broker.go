@@ -45,6 +45,45 @@ type AccountSnapshot struct {
 	Leverage   int
 }
 
+// Quote adalah harga dua arah dari broker beserta waktu kutipannya.
+//
+// Bid dan Ask dipisahkan karena spread akun adalah informasi yang dibutuhkan
+// gerbang eksekusi: akun dengan spread lebar wajar bergerak lebih jauh dari
+// level entry sebelum order terkirim. Tanpa bid/ask, toleransi hanya bisa
+// menebak dari karakter instrumen.
+type Quote struct {
+	// Bid adalah harga jual terbaik yang tersedia.
+	Bid float64
+	// Ask adalah harga beli terbaik yang tersedia.
+	Ask float64
+	// At adalah waktu kutipan dalam unix detik menurut broker.
+	// Nol berarti broker tidak melaporkan waktu.
+	At int64
+}
+
+// Mid mengembalikan harga tengah bid/ask.
+func (q Quote) Mid() float64 { return (q.Bid + q.Ask) / 2 }
+
+// Spread mengembalikan selisih bid/ask, dibulatkan agar tidak membawa derau
+// float64 ke perhitungan batas. Adapter yang tidak punya bid/ask mengembalikan
+// Quote dengan Bid==Ask, sehingga spread-nya nol.
+func (q Quote) Spread() float64 {
+	d := q.Ask - q.Bid
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
+// QuoteSource adalah kemampuan opsional adapter membaca harga dua arah.
+//
+// Sengaja dipisahkan dari Client agar adapter yang belum mendukung bid/ask
+// tidak wajib berubah. Pemanggil memeriksa dukungan lewat type assertion dan
+// jatuh ke CurrentPrice bila tidak tersedia.
+type QuoteSource interface {
+	Quote(ctx context.Context, symbol string) (Quote, error)
+}
+
 // OpenRequest adalah permintaan membuka posisi dengan SL/TP sejak awal.
 // SL dan TP wajib ikut dikirim agar proteksi terpasang di sisi broker.
 type OpenRequest struct {

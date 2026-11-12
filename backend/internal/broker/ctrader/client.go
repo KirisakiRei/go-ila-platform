@@ -301,6 +301,21 @@ func (c *Client) CurrentPrice(ctx context.Context, symbol string) (float64, erro
 	return 0, nil
 }
 
+// Quote mengembalikan harga dua arah untuk cTrader.
+//
+// Adapter cTrader belum melaporkan bid/ask dari feed harganya, jadi Bid dan Ask
+// dibuat sama: spread nol. Gerbang eksekusi lalu memakai tabel pair dan
+// persentase jarak SL, persis seperti sebelum fitur spread akun ada. Begitu
+// feed bid/ask tersedia, cukup isi kedua nilai ini - tidak ada pemanggil yang
+// perlu berubah.
+func (c *Client) Quote(ctx context.Context, symbol string) (broker.Quote, error) {
+	price, err := c.CurrentPrice(ctx, symbol)
+	if err != nil {
+		return broker.Quote{}, err
+	}
+	return broker.Quote{Bid: price, Ask: price}, nil
+}
+
 func (c *Client) OpenPosition(ctx context.Context, req broker.OpenRequest) (broker.OpenResult, error) {
 	c.mu.Lock()
 	client := c.client

@@ -200,6 +200,15 @@ func main() {
 
 	var wg sync.WaitGroup
 
+	// Pekerja antrean sinyal: memisahkan pembacaan stream engine dari
+	// pemrosesan, dan mendahulukan sinyal siap entry. Tanpa pekerja ini,
+	// sinyal hanya menumpuk di antrean dan tidak pernah disimpan.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		svc.RunSignalWorkers(ctx)
+	}()
+
 	// Pemantau posisi: selalu jalan walau engine belum tersambung, karena
 	// posisi user tetap butuh pelaporan.
 	wg.Add(1)
@@ -483,7 +492,9 @@ func streamOnce(
 			},
 			OnSignal: func(signal *enginev1.Signal) {
 				svc.SetEngineVersion(target.Strategy, signal.GetEngineVersion())
-				svc.HandleSignal(ctx, signal)
+				// Async: pembacaan stream tidak boleh tertahan pemrosesan.
+				// Sinyal siap entry didahulukan agar entry tidak telat.
+				svc.HandleSignalAsync(ctx, signal)
 			},
 			OnUpdate: func(update *enginev1.SignalUpdate) {
 				svc.HandleUpdate(ctx, update)

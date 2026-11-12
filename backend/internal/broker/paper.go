@@ -100,6 +100,16 @@ func (c *PaperClient) Symbol(_ context.Context, symbol string) (SymbolSpec, erro
 	}
 }
 
+// Quote mengembalikan harga simulasi dua arah.
+//
+// Simulasi tidak punya spread sungguhan, jadi Bid dan Ask dibuat sama. Akibatnya
+// spread nol dan toleransi slippage kembali ke tabel pair + persentase SL,
+// sehingga simulasi tidak ditolak oleh spread karangan.
+func (c *PaperClient) Quote(_ context.Context, symbol string) (Quote, error) {
+	price := referencePrice(symbol)
+	return Quote{Bid: price, Ask: price}, nil
+}
+
 // CurrentPrice mengembalikan harga simulasi berbasis harga acuan simbol.
 // Nilainya sengaja stabil agar simulasi tidak menolak karena slippage palsu.
 func (c *PaperClient) CurrentPrice(_ context.Context, symbol string) (float64, error) {

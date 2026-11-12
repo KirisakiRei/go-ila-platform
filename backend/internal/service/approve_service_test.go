@@ -111,7 +111,12 @@ func freshSignal() *model.Signal {
 		TakeProfit:      4149.20,
 		RiskReward:      2.30,
 		Status:          model.SignalStatusReadyToEntry,
-		ExpiresAt:       time.Now().UTC().Add(15 * time.Minute),
+		// PublishedAt wajib terisi: batas keras eksekusi manual dihitung dari
+		// rentang ExpiresAt-PublishedAt. Tanpa ini, TTL menjadi negatif dan
+		// semua sinyal uji akan ditolak - perilaku yang benar, tetapi bukan
+		// yang ingin diuji di sini.
+		PublishedAt: time.Now().UTC(),
+		ExpiresAt:   time.Now().UTC().Add(15 * time.Minute),
 	}
 }
 
@@ -242,9 +247,12 @@ func TestPreviewBlocksCancelledSignal(t *testing.T) {
 }
 
 func TestPreviewBlocksExpiredSignal(t *testing.T) {
+	// Sinyal tanpa rentang waktu sah (PublishedAt nol) tidak diberi
+	// perpanjangan: menebak batas lebih berbahaya daripada menolak.
 	h := newHarness()
 	h.tokens.token = freshToken("u1")
 	signal := freshSignal()
+	signal.PublishedAt = time.Time{}
 	signal.ExpiresAt = time.Now().UTC().Add(-time.Second)
 	h.signals.signal = signal
 
@@ -253,7 +261,50 @@ func TestPreviewBlocksExpiredSignal(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if preview.CanConfirm || preview.BlockedReason == "" {
-		t.Fatal("sinyal kedaluwarsa harus nonaktif dengan alasan")
+		t.Fatal("sinyal kedaluwarsa tanpa rentang waktu harus nonaktif dengan alasan")
+	}
+}
+
+// Sinyal yang baru lewat masa berlaku MASIH boleh dikonfirmasi selama belum
+// melewati batas keras. Inilah yang diminta: keputusan user tidak dibunuh oleh
+// jam dinding ketika harganya belum bergerak.
+func TestPreviewMengizinkanSinyalLewatMasaBerlaku(t *testing.T) {
+	h := newHarness()
+	h.tokens.token = freshToken("u1")
+	signal := freshSignal()
+	now := time.Now().UTC()
+	// TTL 5 menit; baru lewat 2 menit -> masih di dalam 4x TTL (20 menit).
+	signal.PublishedAt = now.Add(-7 * time.Minute)
+	signal.ExpiresAt = now.Add(-2 * time.Minute)
+	h.signals.signal = signal
+
+	preview, err := h.svc.Resolve(context.Background(), "u1", rawToken)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if !preview.CanConfirm {
+		t.Fatalf("sinyal dalam batas keras harus tetap bisa dikonfirmasi, alasan: %q",
+			preview.BlockedReason)
+	}
+}
+
+// Lewat batas keras 4x TTL: tombol wajib mati.
+func TestPreviewMenolakSinyalLewatBatasKeras(t *testing.T) {
+	h := newHarness()
+	h.tokens.token = freshToken("u1")
+	signal := freshSignal()
+	now := time.Now().UTC()
+	// TTL 5 menit; sudah 25 menit sejak terbit -> lewat 4x TTL (20 menit).
+	signal.PublishedAt = now.Add(-25 * time.Minute)
+	signal.ExpiresAt = now.Add(-20 * time.Minute)
+	h.signals.signal = signal
+
+	preview, err := h.svc.Resolve(context.Background(), "u1", rawToken)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if preview.CanConfirm || preview.BlockedReason == "" {
+		t.Fatal("sinyal lewat batas keras harus nonaktif dengan alasan")
 	}
 }
 
@@ -420,7 +471,10 @@ func TestIssuePadaPeluangTetapBisaDikonfirmasi(t *testing.T) {
 func TestIssueDitolakSaatKedaluwarsa(t *testing.T) {
 	h := newHarness()
 	sig := freshSignal()
-	sig.ExpiresAt = time.Now().UTC().Add(-time.Minute)
+	// Sudah 6x TTL (melewati batas keras 4x).
+	now := time.Now().UTC()
+	sig.PublishedAt = now.Add(-30 * time.Minute)
+	sig.ExpiresAt = now.Add(-25 * time.Minute)
 	h.signals.signal = sig
 
 	hasil, err := h.svc.Issue(context.Background(), "u1", "sig-1")

@@ -111,31 +111,127 @@ func TestDayStartIsMidnightWIB(t *testing.T) {
 }
 
 func TestSlippageCheckUsesSymbolTolerance(t *testing.T) {
-	// XAUUSD toleransi 0.50; jarak SL 8.20 memberi 10% = 0.82.
+	// XAUUSD toleransi dasar 0.75; jarak SL 8.20 memberi 15% = 1.23 sehingga
+	// persentase SL yang berlaku (lebih longgar daripada tabel pair).
 	ok, drift, limit := SlippageCheck("XAUUSD", 4120.50, 4120.90, 4112.30)
 	if !ok {
 		t.Fatalf("drift %v seharusnya masih dalam batas %v", drift, limit)
 	}
-	if limit < 0.8 || limit > 0.83 {
-		t.Fatalf("limit = %v, ingin sekitar 0.82", limit)
+	if limit < 1.22 || limit > 1.24 {
+		t.Fatalf("limit = %v, ingin sekitar 1.23", limit)
 	}
 
+	// 1.5 masih di dalam batas 1.23? Tidak: 1.5 > 1.23, harus ditolak.
 	ok, _, _ = SlippageCheck("XAUUSD", 4120.50, 4122.00, 4112.30)
 	if ok {
 		t.Fatal("pergerakan 1.5 seharusnya ditolak")
 	}
+
+	// 1.0 masih lolos: bukti toleransi benar-benar dilonggarkan.
+	ok, _, _ = SlippageCheck("XAUUSD", 4120.50, 4121.50, 4112.30)
+	if !ok {
+		t.Fatal("pergerakan 1.0 pada SL 8.20 seharusnya masih lolos")
+	}
 }
 
 func TestSlippageCheckForexTolerance(t *testing.T) {
-	// EURUSD pip 0.0001; jarak SL 0.0050 memberi 10% = 0.00050.
+	// EURUSD toleransi dasar 10 pip (0.00100). SL 0.0050 memberi 15% = 0.00075,
+	// jadi tabel pair yang berlaku.
 	ok, _, limit := SlippageCheck("EURUSD", 1.08500, 1.08530, 1.08000)
 	if !ok {
 		t.Fatalf("drift kecil seharusnya lolos, limit %v", limit)
 	}
+	if limit < 0.00099 || limit > 0.00101 {
+		t.Fatalf("limit = %v, ingin sekitar 0.00100 (10 pip)", limit)
+	}
 
-	ok, _, _ = SlippageCheck("EURUSD", 1.08500, 1.08700, 1.08000)
+	// 10 pip persis: harus lolos (batas inklusif).
+	//
+	// Selisih 1.08600-1.08500 pada float64 menghasilkan 0.0010000000000000009,
+	// sedikit di atas 0.00100. Batas dibuat inklusif dengan kelonggaran relatif
+	// kecil di SlippageDecision.OK, sehingga kasus tepi ini tetap lolos.
+	ok, _, _ = SlippageCheck("EURUSD", 1.08500, 1.08600, 1.08000)
+	if !ok {
+		t.Fatal("drift tepat 10 pip seharusnya masih lolos")
+	}
+
+	// 11 pip: harus ditolak.
+	ok, _, _ = SlippageCheck("EURUSD", 1.08500, 1.08610, 1.08000)
 	if ok {
-		t.Fatal("pergerakan 20 pip seharusnya ditolak")
+		t.Fatal("pergerakan 11 pip seharusnya ditolak")
+	}
+
+	// Kasus nyata 12 Nov: drift 6.3 pip kini LOLOS (dulu ditolak).
+	ok, _, _ = SlippageCheck("EURUSD", 1.10941, 1.11004, 1.11091)
+	if !ok {
+		t.Fatal("drift 6.3 pip (kasus produksi 12 Nov) seharusnya lolos")
+	}
+}
+
+func TestEffectiveSlippageLimitPerPair(t *testing.T) {
+	// Setiap pair harus punya toleransi sendiri, bukan jatuh ke nol.
+	cases := []struct {
+		symbol string
+		min    float64
+	}{
+		{"XAUUSD", 0.75},
+		{"XAUEUR", 1.50},
+		{"XAGUSD", 0.15},
+		{"EURUSD", 0.00100},
+		{"GBPUSD", 0.00100},
+		{"USDJPY", 0.10},
+		{"USTEC", 40},
+		{"US30", 30},
+		{"US500", 15},
+		{"BTCUSD", 50},
+	}
+
+	for _, tc := range cases {
+		// SL dibuat sangat tipis agar sumber batas murni tabel pair.
+		d := EffectiveSlippageLimit(tc.symbol, 100, 99.999, LimitOptions{})
+		if d.Limit < tc.min {
+			t.Errorf("%s: limit = %v, ingin minimal %v", tc.symbol, d.Limit, tc.min)
+		}
+	}
+}
+
+func TestEffectiveSlippageLimitBasisAndSpread(t *testing.T) {
+	// SL tipis: basis harus "pair".
+	d := EffectiveSlippageLimit("XAUUSD", 4000, 3999.999, LimitOptions{})
+	if d.Basis != "pair" {
+		t.Fatalf("basis = %q, ingin %q", d.Basis, "pair")
+	}
+
+	// Spread lebar harus mengalahkan tabel pair: 0.40 x 2 = 0.80 > 0.75.
+	d = EffectiveSlippageLimit("XAUUSD", 4000, 3999.999, LimitOptions{Spread: 0.40})
+	if d.Basis != "spread" {
+		t.Fatalf("basis = %q, ingin %q", d.Basis, "spread")
+	}
+	if d.Limit < 0.79 || d.Limit > 0.81 {
+		t.Fatalf("limit = %v, ingin sekitar 0.80", d.Limit)
+	}
+
+	// Spread kecil tidak boleh mengecilkan batas tabel pair.
+	d = EffectiveSlippageLimit("XAUUSD", 4000, 3999.999, LimitOptions{Spread: 0.05})
+	if d.Limit < 0.74 {
+		t.Fatalf("limit = %v, spread kecil tidak boleh menurunkan batas", d.Limit)
+	}
+
+	// SL lebar harus mengalahkan keduanya: 15% x 20 = 3.0.
+	d = EffectiveSlippageLimit("XAUUSD", 4000, 3980, LimitOptions{Spread: 0.40})
+	if d.Basis != "sl" {
+		t.Fatalf("basis = %q, ingin %q", d.Basis, "sl")
+	}
+	if d.Limit < 2.99 || d.Limit > 3.01 {
+		t.Fatalf("limit = %v, ingin sekitar 3.00", d.Limit)
+	}
+}
+
+func TestSlippageDecisionOKTanpaBatas(t *testing.T) {
+	// Simbol tak dikenal tanpa SL: limit nol, harus menolak (bukan menebak).
+	d := EffectiveSlippageLimit("UNKNOWN", 100, 100, LimitOptions{})
+	if d.OK() {
+		t.Fatal("limit nol seharusnya menolak")
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -137,6 +138,12 @@ type Service struct {
 	keyring    *cryptox.Keyring
 	// schedule mengawasi kecocokan status pasar dengan jadwal NY.
 	schedule *ScheduleWatch
+	// accounts menyimpan snapshot akun sebentar agar satu eksekusi tidak
+	// membaca equity dua kali ke broker.
+	accounts *accountSnapshotCache
+	// antrean memisahkan pembacaan stream engine dari pemrosesan sinyal,
+	// sehingga sinyal siap entry tidak menunggu status WAIT_* di depannya.
+	antrean *signalQueue
 }
 
 // NewService membuat Runner.
@@ -161,6 +168,8 @@ func NewService(store Store, brokers *broker.Registry, pub Publisher, logger *sl
 		market:   enginev1.MarketState_MARKET_OPEN,
 		clients:  make(map[string]broker.Client),
 		schedule: NewScheduleWatch(10*time.Minute, 10*time.Minute),
+		accounts: newAccountSnapshotCache(opts.Clock),
+		antrean:  newSignalQueue(0),
 	}
 }
 
@@ -280,12 +289,59 @@ func (s *Service) marketOpen() bool {
 // HandleSignal memproses sinyal baru dari engine untuk seluruh user yang
 // memantau simbolnya. Setiap user dinilai terpisah: satu sinyal bisa menjadi
 // posisi bagi user A, tertahan bagi user B, dan terlewat bagi user C.
+// HandleSignal memproses satu sinyal sampai selesai pada goroutine pemanggil.
+//
+// Dipakai pengujian dan pemanggil yang memang menginginkan hasil langsung.
+// Jalur produksi memakai HandleSignalAsync agar pembacaan stream tidak menahan
+// sinyal berikutnya.
 func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
-	// Engine mengirim penarikan sinyal (CANCEL / EXPIRE / SUPERSEDE) lewat
-	// payload Signal yang hanya memuat identitas dan Action — tanpa Status dan
-	// tanpa Direction. Tanpa penanganan di sini, event itu jatuh ke validasi
-	// "sinyal tidak lengkap" dan memunculkan WARN yang menyesatkan, seolah ada
-	// sinyal siap eksekusi yang dibuang.
+	signal := s.siapkanSinyal(ctx, in)
+	if signal == nil {
+		return
+	}
+	s.prosesSinyalMasuk(ctx, signal)
+}
+
+// HandleSignalAsync menerima sinyal dari stream engine tanpa menahan pembaca.
+//
+// Callback stream gRPC dipanggil sinkron, sehingga pekerjaan berat di sana
+// menahan seluruh sinyal di belakangnya. Data produksi menunjukkannya: sinyal
+// yang rilis bersamaan tiba antara 3,6 detik sampai 20,7 detik setelah candle
+// tutup, dan sinyal siap entry selalu paling terakhir karena engine mengirim
+// status WAIT_* lebih dulu.
+//
+// Antrean berprioritas membalik urutan itu: sinyal siap entry didahulukan,
+// sedangkan status WAIT_* menyusul di belakang.
+func (s *Service) HandleSignalAsync(ctx context.Context, in *enginev1.Signal) {
+	signal := s.siapkanSinyal(ctx, in)
+	if signal == nil {
+		return
+	}
+
+	prioritas := PrioritasMenunggu
+	if signal.Status == SignalReady {
+		prioritas = PrioritasSiap
+	}
+
+	// Salinan dipakai pekerja antrean: payload gRPC tidak boleh dirujuk lagi
+	// setelah callback kembali.
+	salinan := *signal
+	if !s.antrean.push(prioritas, func() { s.prosesSinyalMasuk(ctx, &salinan) }) {
+		siap, tunggu, dibuang := s.antrean.stats()
+		s.logger.Warn("antrean sinyal penuh, sinyal dilepas",
+			"evt", "signal.antrean.penuh",
+			"signal_id", signal.SignalID, "status", signal.Status,
+			"siap", siap, "tunggu", tunggu, "dibuang", dibuang)
+	}
+}
+
+// siapkanSinyal mengubah payload engine menjadi sinyal yang bisa diproses.
+//
+// Mengembalikan nil bila sinyal bukan penerbitan (penarikan ditangani langsung)
+// atau bila isinya tidak lengkap.
+func (s *Service) siapkanSinyal(ctx context.Context, in *enginev1.Signal) *model.Signal {
+	// Penarikan sinyal (CANCEL / EXPIRE / SUPERSEDE) tetap langsung: isinya
+	// kecil dan harus segera terlihat di dashboard.
 	if action := in.GetAction(); action != enginev1.SignalAction_SIGNAL_ACTION_PUBLISH &&
 		action != enginev1.SignalAction_SIGNAL_ACTION_UNSPECIFIED {
 		s.HandleUpdate(ctx, &enginev1.SignalUpdate{
@@ -294,16 +350,21 @@ func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
 			Reason:    alasanPenarikan(action),
 			UpdatedAt: in.GetPublishedAt(),
 		})
-		return
+		return nil
 	}
 
 	signal, ok := ingest.ConvertSignal(in)
 	if !ok {
 		s.logger.Warn("sinyal engine tidak lengkap, diabaikan",
 			"signal_id", in.GetSignalId())
-		return
+		return nil
 	}
 
+	return signal
+}
+
+// prosesSinyalMasuk menyimpan sinyal lalu menyebarkannya ke akun.
+func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
 	existing, findErr := s.store.FindSignal(ctx, signal.SignalID)
 	if findErr == nil && IsTerminal(existing.Status) {
 		// Sinyal terminal tidak boleh dihidupkan kembali oleh kiriman ulang.
@@ -414,20 +475,30 @@ func (s *Service) userWantsSignal(ctx context.Context, userID string, signal *mo
 	return false
 }
 
+// FanOutConcurrency membatasi berapa akun diproses bersamaan untuk satu sinyal.
+//
+// Sebelumnya akun diproses satu per satu. Setiap akun memanggil broker beberapa
+// kali (cek akun, baca kutipan, hitung lot, kirim order) sehingga akun terakhir
+// menunggu seluruh antrean di depannya. Data produksi menunjukkan sinyal siap
+// entry tiba 20 detik setelah candle tutup - terlalu lama untuk setup M5.
+//
+// Batas 8 dipilih agar tetap jauh di bawah batas koneksi broker dan memori VPS
+// kecil, sementara akun-akun pertama tidak lagi menunggu yang terakhir.
+const FanOutConcurrency = 8
+
 func (s *Service) fanOutReady(ctx context.Context, signal *model.Signal) {
 	// Sinyal disebar ke setiap akun yang mencentang simbol ini. Satu user dapat
 	// menyumbang lebih dari satu akun karena pilihan pair kini per akun.
 	pairs, err := s.store.ListAccountsBySymbol(ctx, signal.Symbol)
 	if err == nil {
-		for i := range pairs {
-			user := pairs[i].User
-			account := pairs[i].Account
-			if procErr := s.processSignalForAccount(ctx, &user, &account, signal); procErr != nil {
-				s.logger.Error("gagal memproses sinyal untuk akun",
-					"user_id", user.ID, "account_id", account.ID,
-					"signal_id", signal.SignalID, "error", procErr.Error())
-			}
-		}
+		mulai := s.opts.Clock()
+		s.prosesParalel(ctx, signal, pairs)
+		s.logger.Info("penyebaran sinyal selesai",
+			"evt", "signal.fanout",
+			"signal_id", signal.SignalID,
+			"symbol", signal.Symbol,
+			"akun", len(pairs),
+			"durasi_ms", s.opts.Clock().Sub(mulai).Milliseconds())
 		return
 	}
 
@@ -445,6 +516,53 @@ func (s *Service) fanOutReady(ctx context.Context, signal *model.Signal) {
 				"user_id", user.ID, "signal_id", signal.SignalID, "error", procErr.Error())
 		}
 	}
+}
+
+// prosesParalel menjalankan pemrosesan sinyal untuk beberapa akun sekaligus.
+//
+// Kendali yang dijaga:
+//   - Batas FanOutConcurrency, supaya lonjakan akun tidak membuka puluhan
+//     koneksi broker sekaligus.
+//   - Kegagalan satu akun tidak menghentikan akun lain: trading user lain tidak
+//     boleh ikut berhenti karena satu kredensial bermasalah.
+//   - Pembatalan mengikuti ctx, sehingga saat Runner berhenti tidak ada
+//     goroutine yang tertinggal menahan shutdown.
+func (s *Service) prosesParalel(ctx context.Context, signal *model.Signal, pairs []model.SubscriptionAccount) {
+	if len(pairs) == 0 {
+		return
+	}
+
+	batas := FanOutConcurrency
+	if len(pairs) < batas {
+		batas = len(pairs)
+	}
+
+	var wg sync.WaitGroup
+	antre := make(chan struct{}, batas)
+
+	for i := range pairs {
+		user := pairs[i].User
+		account := pairs[i].Account
+
+		antre <- struct{}{}
+		wg.Add(1)
+
+		go func(u *model.User, a *model.BrokerAccount) {
+			defer wg.Done()
+			defer func() { <-antre }()
+
+			if ctx.Err() != nil {
+				return
+			}
+			if procErr := s.processSignalForAccount(ctx, u, a, signal); procErr != nil {
+				s.logger.Error("gagal memproses sinyal untuk akun",
+					"user_id", u.ID, "account_id", a.ID,
+					"signal_id", signal.SignalID, "error", procErr.Error())
+			}
+		}(&user, &account)
+	}
+
+	wg.Wait()
 }
 
 // processSignalForAccount menjalankan urutan pemeriksaan untuk SATU akun.
@@ -629,6 +747,30 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 
 // validateSignal memeriksa kelengkapan dan masa berlaku sinyal.
 func (s *Service) validateSignal(ctx context.Context, signal *model.Signal, now time.Time) RejectReason {
+	return s.validateSignalMode(ctx, signal, now, false)
+}
+
+// MaxManualTTLFactor adalah kelipatan masa berlaku yang masih boleh dipakai
+// untuk eksekusi manual.
+//
+// Sinyal M5 berlaku 5 menit; dengan faktor 4 user masih punya 20 menit untuk
+// memutuskan, asalkan harga masih di dalam range entry. Angka ini menjaga dua
+// hal sekaligus: setup yang sudah basi tidak dieksekusi, tetapi keputusan user
+// tidak dibunuh oleh jam dinding ketika harganya belum bergerak.
+const MaxManualTTLFactor = 4
+
+// validateSignalMode menjalankan pemeriksaan kelayakan sinyal.
+//
+// manual=false (eksekusi otomatis) memakai aturan ketat: begitu masa berlaku
+// habis, sinyal tidak boleh dieksekusi lagi karena order otomatis harus
+// mengikuti harga saat setup terbit.
+//
+// manual=true (tombol konfirmasi user) memperlakukan masa berlaku sebagai
+// petunjuk, bukan dinding: sinyal masih boleh dieksekusi selama belum melewati
+// batas keras MaxManualTTLFactor kali masa berlakunya. Kelayakan harga tetap
+// diperiksa terpisah oleh gerbang slippage, sehingga setup yang harganya sudah
+// jauh tetap ditolak - dan pesan yang dilihat user menyebut harga, bukan jam.
+func (s *Service) validateSignalMode(ctx context.Context, signal *model.Signal, now time.Time, manual bool) RejectReason {
 	// Mode platform diperiksa paling awal: saat pemeliharaan, sinyal baru
 	// dilewati (bukan ditunda) karena harga sudah berubah. Posisi berjalan
 	// tidak pernah disentuh di sini (plans/18 §4.3).
@@ -649,12 +791,35 @@ func (s *Service) validateSignal(ctx context.Context, signal *model.Signal, now 
 		if menungguStatus(signal.Status) {
 			return RejectWaitingNext
 		}
-		return RejectExpired
+		// Eksekusi manual masih boleh selama belum melewati batas keras.
+		// Sinyal yang sudah tidak menawarkan entry (dibatalkan, digantikan,
+		// sudah dipakai) tetap ditolak di tempat lain, bukan di sini.
+		if !manual || !manualStillAllowed(signal, now) {
+			return RejectExpired
+		}
 	}
 	if s.marketOpenRequired(ctx) && !s.marketOpen() {
 		return RejectMarketClosed
 	}
 	return RejectNone
+}
+
+// manualStillAllowed menandai sinyal yang sudah lewat masa berlaku tetapi masih
+// boleh dieksekusi manual karena belum melewati batas keras.
+//
+// Sinyal tanpa PublishedAt (nol) selalu ditolak: selisihnya menjadi durasi
+// raksasa dan akan membuka eksekusi tanpa batas nyata.
+func manualStillAllowed(signal *model.Signal, now time.Time) bool {
+	if signal.PublishedAt.IsZero() || signal.ExpiresAt.IsZero() {
+		return false
+	}
+	ttl := signal.ExpiresAt.Sub(signal.PublishedAt)
+	if ttl <= 0 {
+		// Baris tanpa rentang waktu yang masuk akal tidak diberi perpanjangan:
+		// menebak batas lebih berbahaya daripada menolak.
+		return false
+	}
+	return now.Before(signal.ExpiresAt.Add(ttl * (MaxManualTTLFactor - 1)))
 }
 
 // menungguStatus menandai sinyal yang masih dalam tahap menunggu konfirmasi
@@ -742,12 +907,11 @@ func (s *Service) evaluate(ctx context.Context, user *model.User, account *model
 	}
 
 	// [3] Broker harus bisa dihubungi; dry-run tidak butuh koneksi.
+	//
+	// Snapshot ini juga dipakai calculateLot saat menghitung ukuran posisi,
+	// sehingga satu eksekusi hanya sekali membaca akun ke broker.
 	if !s.mustDryRun(ctx, &userSession{User: user}, account) {
-		client, err := s.client(ctx, account)
-		if err != nil {
-			return RejectAccountFrozen, nil
-		}
-		if _, err := client.Account(ctx); err != nil {
+		if _, err := s.accountSnapshot(ctx, account); err != nil {
 			s.markBrokerDown(ctx, account, err)
 			return RejectAccountFrozen, nil
 		}
@@ -803,7 +967,7 @@ func (s *Service) checkSlippage(ctx context.Context, account *model.BrokerAccoun
 		return RejectAccountFrozen
 	}
 
-	price, err := client.CurrentPrice(ctx, signal.Symbol)
+	price, spread, err := s.quoteForSlippage(ctx, client, signal.Symbol)
 	if err != nil || price <= 0 {
 		// Harga tidak terbaca: menolak lebih aman daripada menebak.
 		s.logger.Warn("harga acuan tidak tersedia",
@@ -811,14 +975,55 @@ func (s *Service) checkSlippage(ctx context.Context, account *model.BrokerAccoun
 		return RejectSlippage
 	}
 
-	ok, drift, limit := SlippageCheck(signal.Symbol, signal.EntryPrice, price, signal.StopLoss)
-	if !ok {
+	decision := EffectiveSlippageLimit(signal.Symbol, signal.EntryPrice, signal.StopLoss,
+		LimitOptions{Spread: spread})
+	decision.Drift = math.Abs(price - signal.EntryPrice)
+
+	if !decision.OK() {
 		s.logger.Warn("slippage melewati batas",
+			"evt", "slippage.tolak",
 			"symbol", signal.Symbol, "signal_id", signal.SignalID,
-			"drift", drift, "limit", limit)
+			"drift", decision.Drift, "limit", decision.Limit,
+			"basis", decision.Basis, "spread", decision.Spread,
+			"sl_distance", decision.SLDistance)
 		return RejectSlippage
 	}
+
+	// Keputusan dibuat per pair dan per akun, sehingga sumber batas yang
+	// berlaku dicatat: tanpa ini, sulit menjelaskan mengapa satu akun lolos
+	// sementara akun lain ditolak pada sinyal yang sama.
+	s.logger.Info("slippage lolos",
+		"evt", "slippage.lolos",
+		"symbol", signal.Symbol, "signal_id", signal.SignalID,
+		"drift", decision.Drift, "limit", decision.Limit,
+		"basis", decision.Basis, "spread", decision.Spread,
+		"sl_distance", decision.SLDistance)
 	return RejectNone
+}
+
+// quoteForSlippage membaca harga acuan beserta spread-nya.
+//
+// Spread dipakai agar toleransi menyesuaikan akun: akun dengan spread lebar
+// wajar bergerak lebih jauh dari level entry, sehingga batas tetap wajar tanpa
+// harus dilonggarkan untuk semua orang. Adapter yang belum melaporkan bid/ask
+// mengembalikan spread nol, dan perhitungan jatuh ke tabel pair + persentase SL
+// persis seperti sebelumnya.
+func (s *Service) quoteForSlippage(ctx context.Context, client broker.Client, symbol string) (float64, float64, error) {
+	if quoted, ok := client.(broker.QuoteSource); ok {
+		q, err := quoted.Quote(ctx, symbol)
+		if err != nil {
+			return 0, 0, err
+		}
+		if q.Mid() > 0 {
+			return q.Mid(), q.Spread(), nil
+		}
+	}
+
+	price, err := client.CurrentPrice(ctx, symbol)
+	if err != nil {
+		return 0, 0, err
+	}
+	return price, 0, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,17 +1215,16 @@ func (s *Service) calculateLot(ctx context.Context, user *model.User, account *m
 	equity := 10_000.0 // asumsi simulasi saat akun nyata tidak bisa dibaca
 
 	if !dryRun {
-		client, err := s.client(ctx, account)
-		if err != nil {
-			return LotCalculation{}, err
-		}
-
-		snapshot, err := client.Account(ctx)
+		snapshot, err := s.accountSnapshot(ctx, account)
 		if err != nil {
 			return LotCalculation{}, fmt.Errorf("membaca akun: %w", err)
 		}
 		equity = snapshot.Equity
 
+		client, err := s.client(ctx, account)
+		if err != nil {
+			return LotCalculation{}, err
+		}
 		if brokerSpec, specErr := client.Symbol(ctx, signal.Symbol); specErr == nil {
 			spec = brokerSpec
 		}
@@ -1165,7 +1369,10 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 		return RejectNone, err
 	}
 
-	if reason := s.validateSignal(ctx, signal, now); reason != RejectNone {
+	// Jalur manual: user sudah melihat setupnya di dashboard dan memutuskan
+	// sekarang. Masa berlaku tidak boleh membatalkannya selama harga masih di
+	// dalam range entry (diperiksa gerbang slippage di evaluate).
+	if reason := s.validateSignalMode(ctx, signal, now, true); reason != RejectNone {
 		return reason, nil
 	}
 

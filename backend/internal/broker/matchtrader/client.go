@@ -129,11 +129,15 @@ func (c *Client) Symbol(ctx context.Context, symbol string) (broker.SymbolSpec, 
 	return toSpec(info), nil
 }
 
-// CurrentPrice mengembalikan harga tengah bid/ask sebagai acuan slippage.
-func (c *Client) CurrentPrice(ctx context.Context, symbol string) (float64, error) {
+// Quote mengembalikan bid/ask terakhir beserta waktunya.
+//
+// Spread inilah yang membuat toleransi slippage menyesuaikan akun: akun dengan
+// spread lebar memang melihat harga lebih jauh dari level entry, sehingga
+// batasnya harus lebih longgar daripada akun spread ketat.
+func (c *Client) Quote(ctx context.Context, symbol string) (broker.Quote, error) {
 	t, err := c.transport()
 	if err != nil {
-		return 0, err
+		return broker.Quote{}, err
 	}
 
 	brokerSymbol := mapSymbol(symbol)
@@ -141,17 +145,29 @@ func (c *Client) CurrentPrice(ctx context.Context, symbol string) (float64, erro
 
 	var out quotesResponse
 	if err := t.get(ctx, path, &out); err != nil {
-		return 0, err
+		return broker.Quote{}, err
 	}
 	if len(out.Quotes) == 0 {
-		return 0, fmt.Errorf("%w: kutipan %s kosong", broker.ErrUnsupported, brokerSymbol)
+		return broker.Quote{}, fmt.Errorf("%w: kutipan %s kosong", broker.ErrUnsupported, brokerSymbol)
 	}
 
 	q := out.Quotes[0]
 	if q.Ask <= 0 || q.Bid <= 0 {
-		return 0, fmt.Errorf("%w: kutipan %s tidak sah", broker.ErrUnsupported, brokerSymbol)
+		return broker.Quote{}, fmt.Errorf("%w: kutipan %s tidak sah", broker.ErrUnsupported, brokerSymbol)
 	}
-	return (q.Ask + q.Bid) / 2, nil
+	return broker.Quote{Bid: q.Bid, Ask: q.Ask, At: q.Timestamp}, nil
+}
+
+// CurrentPrice mengembalikan harga tengah bid/ask sebagai acuan slippage.
+//
+// Dipertahankan karena masih dipakai pemanggil lain; nilainya identik dengan
+// Quote().Mid(). Pemanggil yang butuh spread sebaiknya memakai Quote langsung.
+func (c *Client) CurrentPrice(ctx context.Context, symbol string) (float64, error) {
+	q, err := c.Quote(ctx, symbol)
+	if err != nil {
+		return 0, err
+	}
+	return q.Mid(), nil
 }
 
 // OpenPosition memasang order market beserta SL/TP di server broker.

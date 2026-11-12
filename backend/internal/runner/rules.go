@@ -164,43 +164,157 @@ func DayEnd(t time.Time) time.Time {
 	return DayStart(t).AddDate(0, 0, 1)
 }
 
-// slippageTolerance mengembalikan batas penyimpangan harga per simbol.
-// Simbol tak dikenal memakai toleransi konservatif berbasis jarak SL.
+// slippageTolerance mengembalikan batas penyimpangan harga dasar per simbol.
+//
+// Nilai ini adalah toleransi MINIMUM. Batas efektif selalu dihitung ulang oleh
+// EffectiveSlippageLimit, yang ikut mempertimbangkan spread akun dan jarak SL.
+//
+// Satuan mengikuti harga instrumen apa adanya (bukan pip), karena broker
+// berbeda-beda menuliskan desimal. Contoh: EURUSD 10 pip ditulis 0.00100.
+//
+// Rujukan angka mengikuti data sinyal nyata (jarak SL rata-rata per pair):
+//   - XAUUSD  SL ~$5.00  -> 0.75 (75 pips)  ~15% SL
+//   - XAUEUR  SL ~EUR16  -> 1.50            ~9% SL
+//   - XAGUSD  SL ~$0.28  -> 0.15            ~54% SL
+//   - EURUSD  SL ~16 pip -> 10 pip          ~63% SL (dipilih: gagal entry
+//     jauh lebih merugikan daripada meleset 10 pip pada RR 2.5)
+//   - USTEC   SL ~110    -> 40              ~36% SL
 func slippageTolerance(symbol string) (float64, bool) {
 	switch strings.ToUpper(symbol) {
 	case "XAUUSD":
-		return 0.50, true
+		return 0.75, true
+	case "XAUEUR":
+		return 1.50, true
+	case "XAGUSD":
+		return 0.15, true
+	case "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF":
+		return 0.00100, true
+	case "USDJPY":
+		return 0.10, true
 	case "USTEC", "NAS100", "US100":
-		return 5.0, true
-	case "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "USDJPY":
-		return 0.00010, true
+		return 40, true
+	case "US30", "DJ30", "WS30":
+		return 30, true
+	case "US500", "SPX500", "US500.CASH":
+		return 15, true
+	case "BTCUSD":
+		return 50, true
 	default:
 		return 0, false
 	}
 }
 
-// SlippageCheck menjaga kualitas eksekusi agar RR yang diproyeksikan tidak
-// hancur oleh pergerakan harga selama sinyal menempuh jaringan.
+// slippageSLFraction adalah porsi jarak SL yang boleh termakan slippage.
 //
-//	batas = max(toleransi simbol, 10% jarak SL)
-func SlippageCheck(symbol string, entryPrice, currentPrice, stopLoss float64) (bool, float64, float64) {
-	tolerance, known := slippageTolerance(symbol)
-	if !known {
-		tolerance = 0
+// Dinaikkan dari 10% ke 15% karena data produksi menunjukkan harga sering
+// bergerak 3-6% jarak SL hanya dalam hitungan detik antara sinyal terbit dan
+// order terkirim. Dengan 15%, RR terencana 2.5 turun paling jauh ke ~2.15 -
+// masih sehat, jauh lebih baik daripada kehilangan entry sama sekali.
+const slippageSLFraction = 0.15
+
+// SlippageDecision adalah hasil perhitungan batas slippage beserta asalnya.
+//
+// Basis dicatat agar keputusan bisa diaudit: ketika sebuah entry ditolak,
+// operator bisa melihat sumber batas mana yang berlaku (tabel pair, spread
+// akun, atau persentase SL) tanpa menebak.
+type SlippageDecision struct {
+	// Symbol adalah simbol yang diperiksa.
+	Symbol string
+	// Drift adalah besar pergerakan harga dari level entry ke harga sekarang.
+	Drift float64
+	// Limit adalah batas efektif yang berlaku.
+	Limit float64
+	// Basis menandai sumber batas yang dipakai: "pair", "spread", atau "sl".
+	Basis string
+	// Spread adalah spread akun saat pemeriksaan; nol bila tidak diketahui.
+	Spread float64
+	// SLDistance adalah jarak entry ke stop loss.
+	SLDistance float64
+}
+
+// slippageEpsilon adalah kelonggaran relatif pada perbandingan drift.
+//
+// Aritmetika float64 membuat selisih harga yang "seharusnya" tepat sama dengan
+// batas kadang sedikit lebih besar (mis. 1.08600-1.08500 = 0.001000000...09).
+// Tanpa kelonggaran ini, harga yang persis di batas ditolak hanya karena galat
+// representasi, sehingga pedagang melihat penolakan yang tidak bisa dijelaskan.
+const slippageEpsilon = 1e-9
+
+// OK menandai apakah drift masih dalam batas. Batas bersifat inklusif.
+func (d SlippageDecision) OK() bool {
+	if d.Limit <= 0 {
+		// Tanpa batas yang masuk akal, jangan menebak: tolak.
+		return false
 	}
+	return d.Drift <= d.Limit*(1+slippageEpsilon)
+}
+
+// LimitOptions adalah masukan opsional untuk EffectiveSlippageLimit.
+//
+// Zero value berarti "tanpa spread diketahui", sehingga perilakunya sama
+// dengan sebelum fitur spread akun ada. Ini menjaga pemanggil lama tetap sah.
+type LimitOptions struct {
+	// Spread adalah spread aktual akun untuk simbol ini (ask - bid).
+	Spread float64
+}
+
+// EffectiveSlippageLimit menghitung batas slippage yang berlaku.
+//
+//	batas = max(toleransi_pair, faktor_spread x spread_akun, 15% jarak SL)
+//
+// Setiap komponen menjawab masalah berbeda:
+//   - toleransi_pair : perbedaan karakter instrumen (XAUUSD vs EURUSD).
+//   - spread_akun    : akun dengan spread lebar wajar bergerak lebih jauh,
+//     karena harga yang tersedia memang sudah lebih jauh dari level.
+//   - 15% jarak SL   : adaptasi terhadap volatilitas setup itu sendiri.
+//
+// spreadFactor sengaja 2x spread: satu spread sudah termakan saat masuk, satu
+// lagi memberi ruang untuk pergerakan selama order menempuh jaringan.
+const spreadFactor = 2.0
+
+func EffectiveSlippageLimit(symbol string, entryPrice, stopLoss float64, opts LimitOptions) SlippageDecision {
+	tolerance, _ := slippageTolerance(symbol)
 
 	slDistance := math.Abs(entryPrice - stopLoss)
+	fromSL := slDistance * slippageSLFraction
+
 	limit := tolerance
-	if tenth := slDistance * 0.10; tenth > limit {
-		limit = tenth
-	}
-	if limit <= 0 {
-		// Tanpa toleransi dan tanpa jarak SL yang masuk akal, jangan menebak.
-		return false, math.Abs(currentPrice - entryPrice), limit
+	basis := "pair"
+	if tolerance == 0 {
+		basis = "sl"
 	}
 
-	drift := math.Abs(currentPrice - entryPrice)
-	return drift <= limit, drift, limit
+	if fromSL > limit {
+		limit = fromSL
+		basis = "sl"
+	}
+
+	if spread := math.Abs(opts.Spread); spread > 0 {
+		if fromSpread := spread * spreadFactor; fromSpread > limit {
+			limit = fromSpread
+			basis = "spread"
+		}
+	}
+
+	return SlippageDecision{
+		Symbol:     symbol,
+		Limit:      limit,
+		Basis:      basis,
+		Spread:     math.Abs(opts.Spread),
+		SLDistance: slDistance,
+	}
+}
+
+// SlippageCheck memeriksa apakah harga saat ini masih layak dieksekusi.
+//
+// Dipertahankan dengan tanda tangan lama agar pemanggil dan pengujian yang
+// sudah ada tetap sah. Implementasinya kini memakai EffectiveSlippageLimit
+// dengan spread tidak diketahui; pemanggil yang punya data bid/ask sebaiknya
+// memakai EffectiveSlippageLimit langsung agar spread akun ikut dihitung.
+func SlippageCheck(symbol string, entryPrice, currentPrice, stopLoss float64) (bool, float64, float64) {
+	decision := EffectiveSlippageLimit(symbol, entryPrice, stopLoss, LimitOptions{})
+	decision.Drift = math.Abs(currentPrice - entryPrice)
+	return decision.OK(), decision.Drift, decision.Limit
 }
 
 // LotCalculation adalah hasil perhitungan ukuran posisi.

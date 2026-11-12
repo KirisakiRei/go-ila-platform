@@ -21,11 +21,32 @@ type transport struct {
 	http    *http.Client
 }
 
+// httpTransport adalah pengaturan koneksi bersama seluruh akun Match-Trader.
+//
+// Koneksi di-pool dan handshake TLS dipakai ulang. Tanpa ini, setiap panggilan
+// (cek akun, baca kutipan, kirim order) bisa membayar handshake baru 200-400 ms
+// ke server broker di luar negeri - ongkos yang langsung mengurangi kecepatan
+// entry, padahal datanya sendiri kecil.
+var httpTransport = &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	MaxIdleConns:        64,
+	MaxIdleConnsPerHost: 8,
+	// Rapatkan koneksi idle agar tetap hangat tanpa menahan terlalu lama
+	// sumber daya di VPS kecil.
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   5 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+	ForceAttemptHTTP2:     true,
+}
+
 func newTransport(baseURL, token string) *transport {
 	return &transport{
 		baseURL: baseURL,
 		token:   token,
-		http:    &http.Client{Timeout: 15 * time.Second},
+		http: &http.Client{
+			Timeout:   15 * time.Second,
+			Transport: httpTransport,
+		},
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ila/backend/internal/model"
+	"ila/backend/internal/runner"
 	"ila/backend/pkg/apperror"
 )
 
@@ -296,9 +297,29 @@ func (s *approveService) validate(ctx context.Context, userID, rawToken string) 
 }
 
 // blockedReason mengembalikan alasan tombol konfirmasi harus nonaktif.
+// maxManualTTLFactor adalah kelipatan masa berlaku yang masih boleh dicoba
+// user lewat tombol konfirmasi.
+//
+// Nilainya harus sama dengan runner.MaxManualTTLFactor supaya UI dan eksekusi
+// tidak berbeda pendapat: tombol yang tampak aktif lalu ditolak di belakang
+// hanya membingungkan. Karena itu nilainya diambil langsung dari paket runner.
+const maxManualTTLFactor = runner.MaxManualTTLFactor
+
+// blockedReason mengembalikan alasan tombol konfirmasi harus nonaktif.
+//
+// Masa berlaku sinyal diperlakukan sebagai petunjuk, bukan dinding: user yang
+// sudah melihat setup dan menekan tombol tidak boleh dibatalkan hanya karena
+// jam berjalan, asalkan belum melewati batas keras. Kelayakan harga tetap
+// diperiksa Runner saat tombol benar-benar ditekan, dan pesan penolakannya
+// menyebut harga - bukan jam, yang tidak bisa dipakai memutuskan apa pun.
 func (s *approveService) blockedReason(ctx context.Context, userID string, signal *model.Signal) string {
-	if !s.clock().Before(signal.ExpiresAt) {
-		return "Sinyal sudah kedaluwarsa (batas waktu habis)."
+	now := s.clock()
+
+	// Masa berlaku hanya menjadi penentu bila batas keras manual juga terlewat.
+	// manualWindowOpen menolak sinyal tanpa rentang waktu yang sah, sehingga
+	// baris rusak tidak mendapat perpanjangan.
+	if !now.Before(signal.ExpiresAt) && !manualWindowOpen(signal, now) {
+		return "Sinyal sudah terlalu lama untuk dieksekusi."
 	}
 
 	switch signal.Status {
@@ -308,8 +329,6 @@ func (s *approveService) blockedReason(ctx context.Context, userID string, signa
 		return "Ada setup yang lebih baru untuk pair ini."
 	case model.SignalStatusConsumed:
 		return "Sinyal ini sudah dieksekusi sebelumnya."
-	case model.SignalStatusExpired:
-		return "Sinyal sudah kedaluwarsa (batas waktu habis)."
 	}
 
 	us, err := s.users.FindUserSignal(ctx, userID, signal.SignalID)
@@ -327,8 +346,13 @@ func (s *approveService) blockedReason(ctx context.Context, userID string, signa
 			return us.RejectReason
 		}
 		return "Sinyal ini tertahan aturan harian."
-	case model.SignalStatusCancelled, model.SignalStatusSuperseded, model.SignalStatusExpired:
+	case model.SignalStatusCancelled, model.SignalStatusSuperseded:
 		return "Setup ini tidak lagi berlaku."
+	case model.SignalStatusExpired:
+		if !manualWindowOpen(signal, now) {
+			return "Setup ini sudah terlalu lama untuk dieksekusi."
+		}
+		return ""
 	case model.SignalStatusOpportunity:
 		// Peluang memang menunggu keputusan user: eksekusi otomatisnya mati,
 		// bukan sinyalnya ditolak. Tanpa cabang eksplisit ini pesannya akan
@@ -337,6 +361,22 @@ func (s *approveService) blockedReason(ctx context.Context, userID string, signa
 	}
 
 	return ""
+}
+
+// manualWindowOpen menandai sinyal yang sudah lewat masa berlaku tetapi masih
+// di dalam batas keras eksekusi manual.
+//
+// Sinyal tanpa PublishedAt (nol) ditolak: selisihnya akan menjadi durasi
+// raksasa dan membuka jendela eksekusi tanpa batas nyata.
+func manualWindowOpen(signal *model.Signal, now time.Time) bool {
+	if signal.PublishedAt.IsZero() || signal.ExpiresAt.IsZero() {
+		return false
+	}
+	ttl := signal.ExpiresAt.Sub(signal.PublishedAt)
+	if ttl <= 0 {
+		return false
+	}
+	return now.Before(signal.ExpiresAt.Add(ttl * (maxManualTTLFactor - 1)))
 }
 
 func (s *approveService) recordAudit(ctx context.Context, userID, signalID, event, note string) {
