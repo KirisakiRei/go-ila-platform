@@ -44,6 +44,10 @@ type Config struct {
 	AllowedOrigins  []string
 	ShutdownTimeout time.Duration
 	LogLevel        string
+	// UploadDir adalah akar penyimpanan lampiran. Berada di volume yang sama
+	// dengan log agar tidak perlu volume baru; isinya tidak pernah disajikan
+	// langsung sebagai berkas statis.
+	UploadDir string
 
 	// Sesi disimpan di cookie HttpOnly agar tidak terjangkau JavaScript.
 	SessionCookieName string
@@ -157,6 +161,7 @@ func Load(service string) (*Config, error) {
 		AllowedOrigins:      envList("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		ShutdownTimeout:     envDuration("SHUTDOWN_TIMEOUT", 15*time.Second),
 		LogLevel:            env("LOG_LEVEL", "info"),
+		UploadDir:           env("UPLOAD_DIR", "/var/log/ila/lampiran"),
 		SessionCookieName:   env("SESSION_COOKIE_NAME", "ila_session"),
 		CSRFCookieName:      env("CSRF_COOKIE_NAME", "ila_csrf"),
 		AdminCookieName:     env("ADMIN_COOKIE_NAME", "ila_admin_session"),

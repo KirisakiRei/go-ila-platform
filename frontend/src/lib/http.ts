@@ -111,7 +111,11 @@ async function requestEnvelope<T>(
   }
 
   const headers = new Headers({ Accept: 'application/json' })
-  if (body !== undefined) {
+  // FormData (unggahan berkas) TIDAK boleh diberi Content-Type: peramban
+  // menuliskan sendiri beserta boundary multipart-nya. Memasangnya manual
+  // membuat badan permintaan tidak terbaca di server.
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+  if (body !== undefined && !isFormData) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -125,7 +129,7 @@ async function requestEnvelope<T>(
     const response = await fetch(buildUrl(path, query), {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
       signal: controller.signal,
       credentials: 'same-origin',
     })

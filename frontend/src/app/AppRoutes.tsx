@@ -50,6 +50,9 @@ import AdminSignalTracePage from '@/pages/admin/AdminSignalTracePage'
 import AdminUserDetailPage from '@/pages/admin/AdminUserDetailPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminInvitesPage from '@/pages/admin/AdminInvitesPage'
+import AdminBugReportsPage from '@/pages/admin/AdminBugReportsPage'
+import LaporkanBugPage from '@/pages/LaporkanBugPage'
+import RiwayatLaporanBugPage from '@/pages/RiwayatLaporanBugPage'
 import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 import { ScrollToTop } from './ScrollToTop'
@@ -272,6 +275,26 @@ export function AppRoutes() {
         />
 
         <Route
+          path="/laporkan-bug"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <LaporkanBugPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/laporkan-bug/riwayat"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <RiwayatLaporanBugPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/langganan"
           element={
             <RequireAuth>
@@ -388,6 +411,14 @@ export function AppRoutes() {
           element={
             <AdminPage>
               <AdminTrialsPage />
+            </AdminPage>
+          }
+        />
+        <Route
+          path="/admin/laporan-bug"
+          element={
+            <AdminPage>
+              <AdminBugReportsPage />
             </AdminPage>
           }
         />

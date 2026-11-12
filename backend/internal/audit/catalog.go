@@ -48,6 +48,8 @@ const (
 	InviteCreate Action = "invite.create"
 	InviteRevoke Action = "invite.revoke"
 	InviteRedeem Action = "invite.redeem"
+	// Laporan bug: dibuat pengguna, ditriage admin. Tidak memuat isi laporan.
+	BugReportTriage Action = "bugreport.triage"
 )
 
 // Akun broker.
@@ -144,6 +146,7 @@ var Catalog = []Entry{
 	{InviteCreate, "Undangan", "Tautan undangan dibuat", false},
 	{InviteRevoke, "Undangan", "Tautan undangan dicabut", true},
 	{InviteRedeem, "Undangan", "Akun dibuat lewat undangan", false},
+	{BugReportTriage, "Laporan Bug", "Status laporan bug diubah", false},
 
 	{AccountCreate, "Akun Broker", "Akun broker ditambah", false},
 	{AccountUpdate, "Akun Broker", "Akun broker diubah", false},

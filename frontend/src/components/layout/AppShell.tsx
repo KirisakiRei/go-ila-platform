@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { BarChart3, Bot, CreditCard, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
+import { BarChart3, Bot, Bug, CreditCard, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
 import { Logo } from '@/components/brand/Logo'
@@ -29,6 +29,8 @@ const TITLES: Record<string, string> = {
   '/pengaturan': 'Settings',
   '/pengaturan/keamanan': 'Security Settings',
   '/mulai': 'Onboarding',
+  '/laporkan-bug': 'Laporkan Bug',
+  '/laporkan-bug/riwayat': 'Riwayat Laporan',
 }
 
 type NavItem = {
@@ -66,6 +68,12 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/langganan', label: 'Subscription & Billing', short: 'Billing', icon: CreditCard },
       { to: '/pengaturan', label: 'Settings & Security', short: 'Settings', icon: Settings },
+    ],
+  },
+  {
+    label: 'Bantuan',
+    items: [
+      { to: '/laporkan-bug', label: 'Laporkan Bug', short: 'Lapor', icon: Bug },
     ],
   },
 ]

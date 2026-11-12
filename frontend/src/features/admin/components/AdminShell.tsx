@@ -26,6 +26,7 @@ import {
   Timer,
   Users,
   Link2,
+  Bug,
   Wallet,
 } from 'lucide-react'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
@@ -65,6 +66,8 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/admin/pengguna', label: 'Users & Accounts', icon: Users, permission: 'user.view' },
       // Undangan: jalan masuk anggota komunitas selama platform invite only.
       { to: '/admin/undangan', label: 'Invites', icon: Link2, permission: 'user.view' },
+      // Laporan bug dari pengguna; ditriage di sini.
+      { to: '/admin/laporan-bug', label: 'Bug Reports', icon: Bug, permission: 'user.view' },
       { to: '/admin/dukungan', label: 'Customer Support', icon: LifeBuoy, permission: 'user.view' },
       { to: '/admin/sinyal', label: 'Signals & Monitor', icon: Radio, permission: 'signal.view' },
     ],

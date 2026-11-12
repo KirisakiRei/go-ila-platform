@@ -78,6 +78,10 @@ var harapanAksiAudit = map[string]audit.Action{
 	"POST /api/v1/admin/invites":            audit.InviteCreate,
 	"POST /api/v1/admin/invites/:id/revoke": audit.InviteRevoke,
 
+	// Triage laporan bug: mengubah status yang dilihat pelapor, jadi
+	// perubahannya harus punya jejak pelaku.
+	"PATCH /api/v1/admin/bug-reports/:id": audit.BugReportTriage,
+
 	// Konten: FAQ dan pengumuman tidak menyentuh uang maupun trading.
 	"POST /api/v1/admin/faq":                 audit.CMSFaqChange,
 	"PATCH /api/v1/admin/faq/:id":            audit.CMSFaqChange,

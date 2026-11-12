@@ -391,6 +391,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	billingHandler := handler.NewBillingHandler(billingService)
 	inviteService := service.NewInviteService(repository.NewInviteRepository(db), authService, adminAudit)
 	inviteHandler := handler.NewInviteHandler(inviteService, inviteService)
+	bugService := service.NewBugService(repository.NewBugReportRepository(db), cfg.UploadDir, adminAudit)
+	bugHandler := handler.NewBugHandler(bugService, bugService)
 	// Pendaftaran hanya bisa lewat undangan selama mode invite only.
 	authHandler.SetInviteRegistrar(inviteService)
 	legalHandler := handler.NewLegalHandler(legalService)
@@ -474,6 +476,17 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 
 	me := r.Group("/api/v1")
 	me.Use(middleware.Auth(newTokenIssuer(cfg), cfg.SessionCookieName, userRepo))
+
+	// Unduhan lampiran laporan bug menerima DUA jenis sesi: pemilik laporan
+	// (cookie pengguna) dan admin yang men-triage (cookie admin). Middleware
+	// user menolak sesi admin, jadi grup ini mencoba keduanya. Wewenang tetap
+	// diperiksa service: pemilik laporan sendiri atau admin.
+	dual := r.Group("/api/v1")
+	dual.Use(middleware.SesiPenggunaAtauAdmin(newTokenIssuer(cfg), newAdminTokenIssuer(cfg), cfg.SessionCookieName, cfg.AdminCookieName, userRepo))
+	dual.Use(middleware.RateLimitByUser(middleware.NewRateLimiter(0, 0)))
+	{
+		bugHandler.RegisterAttachment(dual)
+	}
 	// Batas per akun mencegah satu klien yang rusak menghabiskan memori.
 	me.Use(middleware.RateLimitByUser(middleware.NewRateLimiter(0, 0)))
 	// Cookie HttpOnly menahan pencurian token lewat XSS, tetapi permintaan
@@ -535,6 +548,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		me.POST("/trial", trialHandler.Start)
 
 		// Billing: checkout dan riwayat tagihan pengguna.
+		// Lapor bug: kirim laporan dan lihat riwayat sendiri.
+		bugHandler.RegisterUser(me)
 		billingHandler.RegisterUser(me)
 
 		// Status pasar, engine, broker, dan kuota harian.
@@ -566,7 +581,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler, inviteHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler, inviteHandler, bugHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -611,6 +626,7 @@ func registerAdmin(
 	adminPairHandler *handler.AdminPairHandler,
 	adminSignalHandler *handler.AdminSignalHandler,
 	inviteHandler *handler.InviteHandler,
+	bugHandler *handler.BugHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -700,6 +716,7 @@ func registerAdmin(
 	// Pelanggan: daftar, profil, dan aksi berlapis.
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.
 	inviteHandler.Register(admin.Group(""), guard)
+	bugHandler.Register(admin.Group(""), guard)
 	userHandler.Register(admin.Group(""), guard)
 	auditHandler.Register(admin.Group(""), guard)
 	billingHandler.Register(admin.Group(""), guard)

@@ -11,6 +11,11 @@ const ContextUserID = "user_id"
 // ContextRole adalah kunci context Gin untuk peran akun.
 const ContextRole = "user_role"
 
+// ContextAdminScope menandai bahwa permintaan lolos middleware sesi ADMIN.
+// Dipakai route yang menerima kedua jenis sesi (mis. unduh lampiran
+// laporan bug) untuk membedakan wewenang admin dari wewenang pemilik.
+const ContextAdminScope = "admin_scope"
+
 // ContextSessionID adalah kunci context Gin untuk ID sesi perangkat ini.
 const ContextSessionID = "session_id"
 

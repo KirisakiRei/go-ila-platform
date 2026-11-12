@@ -36,6 +36,69 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-13 (3) — Lapor bug: formulir pengguna + triage admin
+
+**Pelaku:** Claude
+**Tipe:** Fitur
+**Status:** 🟢 SELESAI & teruji — belum di-deploy
+
+**Yang bisa dilakukan pengguna:** sidebar → Bantuan → Laporkan Bug. Pilih
+kategori, tulis judul + kronologi, lampirkan tangkapan layar bila perlu.
+Riwayat laporan beserta status dan catatan tim ada di `/laporkan-bug/riwayat`.
+
+**Yang bisa dilakukan admin:** `/admin/laporan-bug` → filter status/kategori,
+buka laporan, lihat lampiran, ubah status + tulis catatan untuk pelapor.
+
+| Endpoint | Siapa |
+|---|---|
+| `POST /api/v1/bug-reports` (multipart) | pengguna |
+| `GET /api/v1/bug-reports` | pengguna, miliknya |
+| `GET /api/v1/bug-reports/categories` | pengguna |
+| `GET /api/v1/bug-reports/:id/attachments/:aid` | pemilik ATAU admin |
+| `GET/PATCH /api/v1/admin/bug-reports...` | admin (`user.view` / `user.edit`) |
+
+**Keamanan lampiran — yang paling penting di fitur ini:**
+
+1. Tipe dinilai dari **magic bytes**, bukan `Content-Type` kiriman browser.
+   SVG dan HTML ditolak walau dinamai `.png` — keduanya jalur XSS langsung ke
+   sesi admin yang membuka lampiran.
+2. Nama simpan = **UUID**; nama kiriman hanya metadata tampilan. Nama
+   `../../etc/passwd.png` tidak menyentuh jalur berkas.
+3. Unduhan selalu `Content-Disposition: attachment` + `nosniff`.
+4. **Batas 1 MB**, bukan 2 MB. Sebabnya: `deploy/Caddyfile` memasang
+   `request_body max_size 1MB` untuk seluruh situs, jadi berkas lebih besar
+   sudah ditolak Caddy sebelum sampai backend. Angka ini sengaja disamakan di
+   tiga tempat (Caddy, `MaxBytesReader`, validasi frontend).
+5. Akses silang dijawab **404, bukan 403**: 403 akan membocorkan bahwa laporan
+   itu ada.
+
+**Rintangan nyata yang ditemukan saat mengerjakan:** middleware `Auth` menolak
+sesi admin, dan `AdminScope` menolak sesi pengguna. Jadi tidak ada satu grup pun
+yang bisa melayani unduhan lampiran untuk keduanya. Solusinya satu middleware
+kecil `SesiPenggunaAtauAdmin` yang mencoba cookie pengguna lalu cookie admin,
+dan memasang penanda `ContextAdminScope` bila jalur admin yang berhasil.
+Wewenang tetap diperiksa service (pemilik atau admin), bukan middleware.
+
+**Bukti uji (mutasi):**
+- validasi magic bytes dimatikan → `TestSVGDitolak` + `TestHTMLDitolak` MERAH
+- pemeriksaan kepemilikan dimatikan → `TestPemilikLainTidakBisaBukaLampiran` MERAH
+- batas ukuran di frontend dihapus → tes UI MERAH
+- `page_url` dikosongkan → tes UI MERAH
+
+**Catatan operasional:** lampiran disimpan di `${UPLOAD_DIR:-/var/log/ila/lampiran}`,
+memakai volume yang sudah dimount (`${LOG_DIR_HOST}:/var/log/ila`). Tidak ada
+volume baru.
+
+Backend: `go build` bersih, `go test ./...` hijau.
+Frontend: `tsc` bersih, 26 berkas / 168 tes hijau, `vite build` sukses.
+
+**Login tidak disentuh.** Tidak satu baris pun `LoginWithDevice`,
+`AuthHandler.Login`, limiter, atau penerbitan cookie berubah. Mode invite only
+hanya menutup `auth/register`; masuk tetap normal untuk semua akun yang ada.
+
+**Belum dikerjakan:** deploy (Fase 11) dan kaitan di `docs/AGENT_LOG.md` untuk
+commit ini.
+
 ### 2026-11-13 (2) — Undangan komunitas: tautan berkuota dengan batas waktu
 
 **Pelaku:** Claude
