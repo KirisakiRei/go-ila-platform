@@ -36,6 +36,47 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-12 (2) — Dashboard kosong total: `/api/v1/signals` gagal 500 (SQLSTATE 42P10)
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug produksi
+**Status:** 🟢 SELESAI — live di VPS 2 pada commit `bb0d4c6`
+
+**Gejala:** radar dan histori sinyal kosong sepenuhnya, padahal 170 sinyal
+XAUUSD ILA 2.0 ada di basis data.
+
+**Akar masalah:** `ListForUser` memakai `JOIN subscription` lalu menambal baris
+ganda dengan `SELECT DISTINCT`. Duplikat muncul karena user punya beberapa baris
+langganan untuk simbol yang sama. PostgreSQL menolak `DISTINCT` yang `ORDER BY`-nya
+memuat ekspresi di luar select list:
+
+```
+ERROR: for SELECT DISTINCT, ORDER BY expressions must appear in select list (SQLSTATE 42P10)
+GET /api/v1/signals -> 500
+```
+
+**Perbaikan:** `JOIN` + `DISTINCT` diganti `EXISTS`. EXISTS menyaring tanpa
+menggandakan baris, sehingga `DISTINCT` tidak lagi diperlukan dan ekspresi
+`ORDER BY` (mengutamakan baris radar) tetap sah.
+
+**Mengapa lolos ke produksi:** uji `TestListForUserMempertahankanBarisRadar`
+dilewati (`SKIP`) bila `TEST_POSTGRES_DSN` kosong, dan peringatannya sudah
+ditulis eksplisit di berkas uji itu. Ditambahkan
+`TestListForUserTidakMemakaiDistinct` yang memeriksa SQL hasil kueri memakai
+GORM `DryRun` (tanpa PostgreSQL), sehingga regresi kelas ini tertangkap.
+
+**Verifikasi:**
+
+- Uji baru **terbukti menangkap bug**: dikembalikan ke `Joins`+`Distinct` → GAGAL;
+  diperbaiki → LULUS.
+- `GET /api/v1/signals` → **200** (sebelumnya 500), nol error di log API.
+- Data sampai ke UI: 4 slot XAUUSD ILA 2.0 terisi `WAIT_SWEEP`, dan 5 sinyal
+  historis XAUUSD ILA 2.0 ikut terkirim.
+
+**Catatan:** perubahan lokal tak ter-commit di VPS 2 pada
+`query_repository.go` dan `query_repository_test.go` sudah dibuang sebelum pull,
+karena isinya versi lama yang masih memuat `Distinct`.
+
 ### 2026-11-12 — Penarikan sinyal tidak lagi dianggap "sinyal tidak lengkap", refresh UI tidak berkedip
 
 **Pelaku:** Claude
