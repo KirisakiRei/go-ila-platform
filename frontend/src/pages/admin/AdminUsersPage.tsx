@@ -15,6 +15,7 @@ import {
   Label,
   Modal,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -50,6 +51,8 @@ export default function AdminUsersPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
+  /** Jumlah baris per halaman; dikirim ke server sebagai per_page. */
+  const [ukuranHalaman, setUkuranHalaman] = useState(20)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -59,7 +62,7 @@ export default function AdminUsersPage() {
   const query = useMemo(
     () => ({
       page,
-      per_page: 25,
+      per_page: ukuranHalaman,
       q: debounced,
       status,
       tier,
@@ -69,7 +72,7 @@ export default function AdminUsersPage() {
       from,
       to,
     }),
-    [page, debounced, status, tier, accounts, trial, role, from, to],
+    [page, ukuranHalaman, debounced, status, tier, accounts, trial, role, from, to],
   )
 
   const exportUrl = useMemo(() => {
@@ -304,28 +307,22 @@ export default function AdminUsersPage() {
             </TableBody>
           </Table>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">
-              {meta ? `${meta.total} pengguna · halaman ${meta.page}/${meta.total_pages || 1}` : ''}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((value) => Math.max(1, value - 1))}
-              >
-                Sebelumnya
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!meta || page >= (meta.total_pages || 1)}
-                onClick={() => setPage((value) => value + 1)}
-              >
-                Berikutnya
-              </Button>
-            </div>
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={meta?.page ?? page}
+              totalPages={meta?.total_pages ?? 1}
+              shown={rows.length}
+              total={meta?.total ?? rows.length}
+              unit="pengguna"
+              pageSize={ukuranHalaman}
+              onPageChange={(berikut) => setPage(berikut)}
+              onPageSizeChange={(ukuran) => {
+                // Ukuran berubah berarti pembagian halaman berubah; kembali ke
+                // halaman pertama agar tidak mendarat di halaman kosong.
+                setUkuranHalaman(ukuran)
+                setPage(1)
+              }}
+            />
           </div>
         </Card>
       )}

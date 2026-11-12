@@ -13,6 +13,7 @@ import {
   Label,
   Modal,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -21,6 +22,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import type { CouponItem } from '@/types/admin'
 
@@ -51,6 +53,11 @@ export default function AdminCouponsPage() {
   })
 
   const rows: CouponItem[] = data ?? []
+
+
+  // Daftar dipecah per halaman agar tabel panjang tidak memaksa menggulir jauh.
+
+  const paginasi = usePaginasiLokal(rows)
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'coupons'] })
 
@@ -140,7 +147,7 @@ export default function AdminCouponsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {paginasi.baris.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="text-[13px] font-medium">{row.code}</TableCell>
                   <TableCell className="text-[12px]">
@@ -174,8 +181,21 @@ export default function AdminCouponsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
+            </TableBody>          </Table>
+          {paginasi.total > 0 && (
+            <div className="border-t border-border px-3 py-2">
+              <Pagination
+                page={paginasi.page}
+                totalPages={paginasi.totalPages}
+                shown={paginasi.baris.length}
+                total={paginasi.total}
+                unit="kupon"
+                pageSize={paginasi.pageSize}
+                onPageChange={paginasi.setPage}
+                onPageSizeChange={paginasi.setPageSize}
+              />
+            </div>
+          )}
         </Card>
       )}
     </>

@@ -85,6 +85,8 @@ func main() {
 	}
 
 	store := repository.NewRunnerRepository(db)
+	// Katalog pair dipakai untuk nilai kontrak saat menghitung R posisi.
+	pairCatalog := repository.NewPairRepository(db)
 
 	// Flag & mode dibaca ulang tiap evaluasi dengan cache 10 detik, sehingga
 	// rem darurat dari panel admin berlaku tanpa restart (plans/11 I2).
@@ -164,6 +166,10 @@ func main() {
 		// CorrelationGate meneruskan pasangan SMT (mis. XAUUSD → XAGUSD) agar
 		// engine ikut menarik lilin instrumen pembanding.
 		CorrelationGate: runner.NewCachedCorrelationGate(store, time.Minute),
+		// ValuePerLot dipakai menghitung hasil posisi dalam R. Nilai kontrak
+		// diambil dari katalog pair yang diisi admin, dengan cadangan bawaan
+		// per jenis simbol.
+		ValuePerLot: runner.NewCachedValuePerLot(pairCatalog, time.Minute).ValuePerLot,
 		// Tanpa ini gerbang strategi memakai env saja dan seluruh permintaan
 		// ILA 3.0 tersaring habis walau engine-nya sudah berjalan.
 		Settings: strategySettings,

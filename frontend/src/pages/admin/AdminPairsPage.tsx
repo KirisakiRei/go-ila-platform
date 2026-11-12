@@ -13,6 +13,7 @@ import {
   Label,
   Modal,
   PageHeader,
+  Pagination,
   Section,
   Select,
   Skeleton,
@@ -22,6 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import { adminPairApi } from '@/lib/admin-api'
 import { queryKeys } from '@/lib/queries'
@@ -92,6 +94,12 @@ export default function AdminPairsPage() {
       ),
     [categories],
   )
+
+  // Daftar pair dan grup bisa panjang; dipecah per halaman agar tabel
+  // tetap ringkas tanpa kehilangan baris.
+  const paginasiPair = usePaginasiLokal(daftarPair)
+  const paginasiGroup = usePaginasiLokal(daftarGroup)
+  const paginasiKategori = usePaginasiLokal(categories)
 
   const segarkan = () => {
     void queryClient.invalidateQueries({ queryKey: adminPairKey })
@@ -246,7 +254,7 @@ export default function AdminPairsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {daftarPair.map(({ pair, category }) => (
+                {paginasiPair.baris.map(({ pair, category }) => (
                   <TableRow key={pair.id}>
                     <TableCell className="font-semibold text-foreground">{pair.symbol}</TableCell>
                     <TableCell>{pair.display_name || <span className="text-muted-foreground">—</span>}</TableCell>
@@ -301,6 +309,18 @@ export default function AdminPairsPage() {
               </TableBody>
             </Table>
           )}
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasiPair.page}
+              totalPages={paginasiPair.totalPages}
+              shown={paginasiPair.baris.length}
+              total={paginasiPair.total}
+              unit="pair"
+              pageSize={paginasiPair.pageSize}
+              onPageChange={paginasiPair.setPage}
+              onPageSizeChange={paginasiPair.setPageSize}
+            />
+          </div>
         </Section>
       )}
 
@@ -332,7 +352,7 @@ export default function AdminPairsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category) => (
+                {paginasiKategori.baris.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell className="font-mono text-[12px]">{category.key}</TableCell>
                     <TableCell className="font-medium">{category.label}</TableCell>
@@ -377,6 +397,18 @@ export default function AdminPairsPage() {
               </TableBody>
             </Table>
           )}
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasiKategori.page}
+              totalPages={paginasiKategori.totalPages}
+              shown={paginasiKategori.baris.length}
+              total={paginasiKategori.total}
+              unit="kategori"
+              pageSize={paginasiKategori.pageSize}
+              onPageChange={paginasiKategori.setPage}
+              onPageSizeChange={paginasiKategori.setPageSize}
+            />
+          </div>
         </Section>
       )}
 
@@ -410,7 +442,7 @@ export default function AdminPairsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {daftarGroup.map(({ group, category }) => (
+                {paginasiGroup.baris.map(({ group, category }) => (
                   <TableRow key={group.id}>
                     <TableCell className="text-muted-foreground">{category.label}</TableCell>
                     <TableCell className="font-mono text-[12px]">{group.key}</TableCell>
@@ -455,6 +487,18 @@ export default function AdminPairsPage() {
               </TableBody>
             </Table>
           )}
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasiGroup.page}
+              totalPages={paginasiGroup.totalPages}
+              shown={paginasiGroup.baris.length}
+              total={paginasiGroup.total}
+              unit="grup"
+              pageSize={paginasiGroup.pageSize}
+              onPageChange={paginasiGroup.setPage}
+              onPageSizeChange={paginasiGroup.setPageSize}
+            />
+          </div>
         </Section>
       )}
 

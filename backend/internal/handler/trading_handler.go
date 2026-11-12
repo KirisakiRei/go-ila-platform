@@ -55,6 +55,7 @@ func (h *TradingHandler) Journal(c *gin.Context) {
 	hari, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
 	limitPositions, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	limitSkipped, _ := strconv.Atoi(c.DefaultQuery("skipped_limit", "100"))
+	skippedPage, _ := strconv.Atoi(c.DefaultQuery("skipped_page", "1"))
 
 	query := service.JournalQuery{
 		From:           parseDayParam(c.Query("from")),
@@ -64,6 +65,7 @@ func (h *TradingHandler) Journal(c *gin.Context) {
 		Symbol:         c.Query("symbol"),
 		LimitPositions: limitPositions,
 		LimitSkipped:   limitSkipped,
+		HalamanSkipped: skippedPage,
 	}
 
 	// To dari antarmuka berupa tanggal; jadikan eksklusif (awal hari berikutnya)

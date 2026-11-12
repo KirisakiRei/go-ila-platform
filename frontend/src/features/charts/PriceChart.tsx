@@ -20,6 +20,7 @@ import type { MarketCandle } from '@/types/api'
 import { cn } from '@/lib/utils'
 import { chartTheme, isDarkMode } from './lib/theme'
 import { ZonePrimitive, type ZoneSpec } from './lib/zonePrimitive'
+import { priceStep } from '@/lib/pricePrecision'
 
 export type PriceLineSpec = {
   price: number
@@ -68,6 +69,12 @@ type PriceChartProps = {
   focusTime?: number
   /** Legend ringkas di bawah chart. */
   footer?: ReactNode
+  /**
+   * Jumlah desimal harga pair ini. Menentukan label sumbu, crosshair, dan
+   * label garis harga (Entry/SL/TP). Tanpa ini lightweight-charts memakai 2
+   * desimal sehingga pair 5 desimal (EURUSD) tampil membulat.
+   */
+  digits?: number
 }
 
 const STYLE_MAP = {
@@ -143,6 +150,7 @@ export function PriceChart({
   className,
   focusTime,
   footer,
+  digits = 2,
 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -222,6 +230,8 @@ export function PriceChart({
       wickDownColor: theme.downWick,
       priceLineVisible: false,
       lastValueVisible: true,
+      // Format harga awal; diperbarui effect terpisah saat pair berganti.
+      priceFormat: { type: 'price', precision: digits, minMove: priceStep(digits) },
     })
 
     chartRef.current = chart
@@ -272,6 +282,15 @@ export function PriceChart({
       wickDownColor: theme.downWick,
     })
   }, [theme])
+
+  // Presisi harga mengikuti pair. Chart tidak dibuat ulang saat simbol
+  // berganti; cukup format series-nya diperbarui. Garis harga ikut dibuat
+  // ulang karena label sumbunya menyimpan format saat dibuat.
+  useEffect(() => {
+    seriesRef.current?.applyOptions({
+      priceFormat: { type: 'price', precision: digits, minMove: priceStep(digits) },
+    })
+  }, [digits])
 
   // Data candle: bersihkan duplikat dan urutkan menaik.
   useEffect(() => {

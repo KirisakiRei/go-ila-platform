@@ -23,7 +23,8 @@ import {
   StatusPill,
 } from '@/components/ui'
 import { usePositions, useSignals, useStrategies, useSubscriptions, useTimeframeSwitchMatrix } from '@/lib/queries'
-import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
+import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
+import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
 import { setTimeframeDipantau, mapSignalsToSlots, ringkasanSlot } from '@/features/signals/lib/signal-slots'
@@ -669,7 +670,7 @@ function SlotCell({
 
       {stage.ready && signal && (
         <span className="truncate text-[10px] tabular-nums text-muted-foreground" title="Entry">
-          @ {formatNumber(signal.entry_price, 2)}
+          @ {formatPrice(signal.entry_price, priceDigits(signal.symbol, signal.entry_price))}
         </span>
       )}
     </div>

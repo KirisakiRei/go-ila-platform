@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { adminAuditApi } from '@/lib/admin-api'
 import { formatInvoice } from '@/features/admin/lib/format'
 import {
-  Button,
   Card,
   EmptyState,
   Input,
   Label,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -37,10 +37,12 @@ export default function AdminAuditPage() {
   const [actorID, setActorID] = useState('')
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [trail, setTrail] = useState<string[]>([])
+  /** Jumlah baris per halaman; dikirim ke server sebagai per_page. */
+  const [ukuranHalaman, setUkuranHalaman] = useState(50)
 
   const query = useMemo(
-    () => ({ from, to, action, target_type: targetType, actor_id: actorID, cursor, per_page: 50 }),
-    [from, to, action, targetType, actorID, cursor],
+    () => ({ from, to, action, target_type: targetType, actor_id: actorID, cursor, per_page: ukuranHalaman }),
+    [from, to, action, targetType, actorID, cursor, ukuranHalaman],
   )
 
   const { data, isLoading, isError, error } = useQuery({
@@ -188,37 +190,34 @@ export default function AdminAuditPage() {
             </TableBody>
           </Table>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
-            <p className="text-[11px] text-muted-foreground">
-              {meta?.approx_total ? `~${meta.total}` : meta?.total ?? 0} perkiraan baris
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={trail.length === 0}
-                onClick={() => {
-                  const next = [...trail]
-                  next.pop()
-                  setTrail(next)
-                  setCursor(next[next.length - 1])
-                }}
-              >
-                Sebelumnya
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!meta?.next_cursor}
-                onClick={() => {
+          <div className="border-t border-border px-3 py-2">
+            {/* Audit memakai kursor, bukan nomor halaman: hanya mundur dan maju
+                yang bermakna. Nomor halaman diturunkan dari panjang jejak agar
+                pengguna tetap tahu sedang di halaman berapa. */}
+            <Pagination
+              page={trail.length + 1}
+              totalPages={meta?.next_cursor ? trail.length + 2 : trail.length + 1}
+              shown={rows.length}
+              total={meta?.total ?? rows.length}
+              unit={meta?.approx_total ? 'perkiraan baris' : 'baris'}
+              pageSize={ukuranHalaman}
+              onPageChange={(berikut) => {
+                if (berikut > trail.length + 1) {
                   if (!meta?.next_cursor) return
                   setTrail([...trail, meta.next_cursor])
                   setCursor(meta.next_cursor)
-                }}
-              >
-                Berikutnya
-              </Button>
-            </div>
+                  return
+                }
+                const next = trail.slice(0, Math.max(0, berikut - 1))
+                setTrail(next)
+                setCursor(next[next.length - 1])
+              }}
+              onPageSizeChange={(ukuran) => {
+                setUkuranHalaman(ukuran)
+                // Ukuran berubah berarti kursor lama tidak lagi sebanding.
+                resetCursor()
+              }}
+            />
           </div>
         </Card>
       )}

@@ -12,6 +12,7 @@ import {
   Input,
   Label,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -20,6 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import type { AdminInvoiceItem } from '@/types/admin'
 
@@ -53,6 +55,11 @@ export default function AdminInvoicesPage() {
   })
 
   const rows = useMemo(() => data ?? [], [data])
+
+
+  // Daftar dipecah per halaman agar tabel panjang tidak memaksa menggulir jauh.
+
+  const paginasi = usePaginasiLokal(rows)
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'invoices'] })
     void queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] })
@@ -136,7 +143,7 @@ export default function AdminInvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {paginasi.baris.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="text-[12px] font-medium">{row.number}</TableCell>
                   <TableCell className="text-[12px] uppercase">{row.plan_code}</TableCell>
@@ -166,8 +173,21 @@ export default function AdminInvoicesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
+            </TableBody>          </Table>
+          {paginasi.total > 0 && (
+            <div className="border-t border-border px-3 py-2">
+              <Pagination
+                page={paginasi.page}
+                totalPages={paginasi.totalPages}
+                shown={paginasi.baris.length}
+                total={paginasi.total}
+                unit="invoice"
+                pageSize={paginasi.pageSize}
+                onPageChange={paginasi.setPage}
+                onPageSizeChange={paginasi.setPageSize}
+              />
+            </div>
+          )}
         </Card>
       )}
 

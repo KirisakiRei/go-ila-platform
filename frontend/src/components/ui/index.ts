@@ -21,3 +21,10 @@ export {
 } from './table'
 export { StatusDot, type StatusState } from './status-dot'
 export { Modal } from './modal'
+export { Pagination, halamanSekitar } from './pagination'
+export {
+  PILIHAN_UKURAN,
+  UKURAN_BAWAAN,
+  usePaginasiLokal,
+  type HasilPaginasi,
+} from './use-paginasi-lokal'

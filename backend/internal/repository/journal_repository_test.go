@@ -198,7 +198,7 @@ func TestJournalSkippedMengabaikanYangSudahJadiPosisi(t *testing.T) {
 	buat("peluang", model.SignalStatusOpportunity, "")
 	buat("sudah", model.SignalStatusConsumed, "pos-1")
 
-	rows, err := repo.ListSkipped(ctx, userID, JournalFilter{}, 50)
+	rows, err := repo.ListSkipped(ctx, userID, JournalFilter{}, 0, 50)
 	if err != nil {
 		t.Fatalf("ListSkipped: %v", err)
 	}
@@ -209,5 +209,131 @@ func TestJournalSkippedMengabaikanYangSudahJadiPosisi(t *testing.T) {
 		if row.Status == model.SignalStatusConsumed {
 			t.Fatal("sinyal CONSUMED tidak boleh muncul di daftar tidak tereksekusi")
 		}
+	}
+}
+
+// TestJournalSkippedFilterMetodeDanPair memastikan filter metode dan pair ikut
+// diterapkan pada daftar peluang terlewat.
+//
+// Kolom strategy_version dan symbol ada di tabel signal, bukan user_signal.
+// Merujuknya langsung membuat kueri gagal di basis data - bukan sekadar
+// menampilkan baris yang salah.
+func TestJournalSkippedFilterMetodeDanPair(t *testing.T) {
+	db := newJournalTestDB(t)
+	repo := NewJournalRepository(db)
+	ctx := context.Background()
+
+	userID := uuid.NewString()
+	prefix := userID[:8]
+
+	buatSinyal := func(suffix, symbol, strategi string) {
+		sig := &model.Signal{
+			Base:            model.Base{ID: uuid.NewString()},
+			SignalID:        "sig-uji-" + prefix + "-" + suffix,
+			Symbol:          symbol,
+			StrategyVersion: strategi,
+			Direction:       "BUY",
+			Status:          model.SignalStatusRejected,
+			PublishedAt:     time.Now().UTC(),
+			ExpiresAt:       time.Now().UTC().Add(time.Hour),
+		}
+		if err := db.Create(sig).Error; err != nil {
+			t.Fatalf("buat signal: %v", err)
+		}
+		t.Cleanup(func() { db.Unscoped().Delete(sig) })
+
+		us := &model.UserSignal{
+			Base:     model.Base{ID: uuid.NewString(), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()},
+			UserID:   userID,
+			SignalID: sig.SignalID,
+			Status:   model.SignalStatusRejected,
+		}
+		if err := db.Create(us).Error; err != nil {
+			t.Fatalf("buat user_signal: %v", err)
+		}
+		t.Cleanup(func() { db.Unscoped().Delete(us) })
+	}
+
+	buatSinyal("a", "XAUUSD", "ila-2.0")
+	buatSinyal("b", "EURUSD", "ila-2.0")
+	buatSinyal("c", "XAUUSD", "ila-3.0")
+
+	uji := []struct {
+		nama      string
+		filter    JournalFilter
+		inginRows int
+	}{
+		{"tanpa filter", JournalFilter{}, 3},
+		{"metode ila-3.0", JournalFilter{StrategyVersion: "ila-3.0"}, 1},
+		{"pair XAUUSD", JournalFilter{Symbol: "XAUUSD"}, 2},
+		{"kombinasi", JournalFilter{StrategyVersion: "ila-2.0", Symbol: "XAUUSD"}, 1},
+	}
+
+	for _, kasus := range uji {
+		t.Run(kasus.nama, func(t *testing.T) {
+			rows, err := repo.ListSkipped(ctx, userID, kasus.filter, 0, 50)
+			if err != nil {
+				t.Fatalf("ListSkipped: %v", err)
+			}
+			if len(rows) != kasus.inginRows {
+				t.Fatalf("baris = %d, ingin %d", len(rows), kasus.inginRows)
+			}
+
+			total, err := repo.CountSkipped(ctx, userID, kasus.filter)
+			if err != nil {
+				t.Fatalf("CountSkipped: %v", err)
+			}
+			if total != kasus.inginRows {
+				t.Fatalf("hitungan = %d, ingin %d", total, kasus.inginRows)
+			}
+		})
+	}
+}
+
+// TestJournalSkippedPagination memastikan offset dan batas halaman bekerja,
+// serta hitungan tidak ikut terpotong oleh batas halaman.
+func TestJournalSkippedPagination(t *testing.T) {
+	db := newJournalTestDB(t)
+	repo := NewJournalRepository(db)
+	ctx := context.Background()
+
+	userID := uuid.NewString()
+	prefix := userID[:8]
+
+	for i := 0; i < 5; i++ {
+		us := &model.UserSignal{
+			Base: model.Base{
+				ID:        uuid.NewString(),
+				CreatedAt: time.Now().UTC().Add(time.Duration(i) * time.Minute),
+				UpdatedAt: time.Now().UTC(),
+			},
+			UserID:   userID,
+			SignalID: "sig-uji-" + prefix + "-page-" + string(rune('a'+i)),
+			Status:   model.SignalStatusRejected,
+		}
+		if err := db.Create(us).Error; err != nil {
+			t.Fatalf("buat user_signal: %v", err)
+		}
+		t.Cleanup(func() { db.Unscoped().Delete(us) })
+	}
+
+	halaman1, err := repo.ListSkipped(ctx, userID, JournalFilter{}, 0, 2)
+	if err != nil {
+		t.Fatalf("halaman 1: %v", err)
+	}
+	halaman3, err := repo.ListSkipped(ctx, userID, JournalFilter{}, 4, 2)
+	if err != nil {
+		t.Fatalf("halaman 3: %v", err)
+	}
+	if len(halaman1) != 2 || len(halaman3) != 1 {
+		t.Fatalf("potongan halaman = %d dan %d, ingin 2 dan 1", len(halaman1), len(halaman3))
+	}
+
+	total, err := repo.CountSkipped(ctx, userID, JournalFilter{})
+	if err != nil {
+		t.Fatalf("CountSkipped: %v", err)
+	}
+	if total != 5 {
+		t.Fatalf("total = %d, ingin 5 (tidak dipotong limit)", total)
 	}
 }

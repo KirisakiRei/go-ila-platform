@@ -9,6 +9,7 @@ import {
   Input,
   Label,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   StatusPill,
@@ -21,9 +22,10 @@ import {
 } from '@/components/ui'
 import { useJournal } from '@/lib/queries'
 import { downloadFile } from '@/lib/http'
-import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
+import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
+import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
-import type { Position, PositionStatus } from '@/types/api'
+import type { JournalResponse, Position, PositionStatus } from '@/types/api'
 import { PositionExecutionChart } from '@/features/charts/PositionExecutionChart'
 import { chartTheme } from '@/features/charts/lib/theme'
 import { JournalSummary } from '@/features/journal/components/JournalSummary'
@@ -88,15 +90,24 @@ export default function PositionsPage() {
   const [hari, setHari] = useState(30)
   const [strategi, setStrategi] = useState('')
   const [symbol, setSymbol] = useState('')
-
-  const { data, isLoading, isError, error } = useJournal({
-    days: hari,
-    strategy: strategi,
-    symbol: symbol,
-  })
-
+  // Rentang tanggal khusus. Dideklarasikan sebelum useJournal karena dipakai
+  // sebagai bagian kunci permintaan.
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  /** Halaman dan ukuran daftar peluang terlewat; ikut dikirim ke server. */
+  const [peluang, setPeluang] = useState({ page: 1, limit: 20 })
+
+  const { data, isLoading, isError, error, isFetching } = useJournal({
+    // Rentang tanggal khusus menang atas periode hari: bila pengguna memilih
+    // tanggal, itulah yang diminta. Mengirim keduanya membuat server harus
+    // memilih, dan hasilnya tidak lagi jelas bagi pengguna.
+    ...(from || to ? { from, to } : { days: hari }),
+    strategy: strategi,
+    symbol: symbol,
+    skippedPage: peluang.page,
+    skippedLimit: peluang.limit,
+  })
+
   const [downloading, setDownloading] = useState(false)
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -121,13 +132,43 @@ export default function PositionsPage() {
     setDownloading(true)
     setDownloadNotice(null)
     try {
-      const name = await downloadFile('/positions/export', { from, to })
+      // Ekspor mengikuti filter yang sedang terlihat, supaya berkas yang diunduh
+      // sama dengan yang ada di layar. Bila pengguna memakai periode hari,
+      // rentang tanggalnya diturunkan dari periode itu.
+      const rentang = rentangEkspor()
+      const name = await downloadFile('/positions/export', rentang)
       setDownloadNotice(`Berkas ${name} disiapkan.`)
     } catch (cause) {
       setDownloadNotice(cause instanceof Error ? cause.message : 'Gagal mengunduh riwayat.')
     } finally {
       setDownloading(false)
     }
+  }
+
+  /**
+   * rentangEkspor menentukan tanggal yang dikirim ke endpoint ekspor.
+   * Tanggal yang dipilih pengguna diutamakan; bila kosong, periode hari
+   * diterjemahkan menjadi tanggal agar isi CSV sama dengan yang tampil.
+   */
+  const rentangEkspor = () => {
+    if (from || to) return { from, to }
+    const akhir = new Date()
+    const awal = new Date(akhir.getTime() - hari * 24 * 60 * 60 * 1000)
+    const keTanggal = (d: Date) => d.toISOString().slice(0, 10)
+    return { from: keTanggal(awal), to: keTanggal(akhir) }
+  }
+
+  /** jumlahFilter menghitung filter aktif selain periode bawaan. */
+  const filterAktif = [strategi !== '', symbol !== '', from !== '', to !== ''].filter(Boolean).length
+
+  /** resetFilter mengembalikan filter ke keadaan awal tanpa menyentuh tab. */
+  const resetFilter = () => {
+    setStrategi('')
+    setSymbol('')
+    setFrom('')
+    setTo('')
+    setHari(30)
+    setPeluang({ page: 1, limit: peluang.limit })
   }
 
   const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id))
@@ -152,21 +193,35 @@ export default function PositionsPage() {
         <Skeleton className="h-24 w-full" />
       ) : null}
 
-      {/* --- Filter periode, metode, dan pair ------------------------------ */}
+      {/* --- Filter: periode, tanggal, metode, pair, dan ekspor -------------
+          Semua kontrol penyaring dikumpulkan di satu tempat. Sebelumnya
+          tanggal hanya ada di bagian bawah sebagai pilihan ekspor, sehingga
+          pengguna mengira daftar sudah tersaring padahal hanya berkas CSV
+          yang berubah. */}
       <Card className="p-3">
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="jurnal-periode">Periode</Label>
             <Select
               id="jurnal-periode"
-              value={String(hari)}
-              onChange={(event) => setHari(Number(event.target.value))}
+              value={from || to ? 'custom' : String(hari)}
+              onChange={(event) => {
+                const nilai = event.target.value
+                if (nilai === 'custom') return
+                // Memilih periode membatalkan rentang tanggal agar tidak ada
+                // dua sumber rentang yang saling bertentangan.
+                setFrom('')
+                setTo('')
+                setHari(Number(nilai))
+                setPeluang({ page: 1, limit: peluang.limit })
+              }}
             >
               {PERIODE.map((item) => (
                 <option key={item.hari} value={item.hari}>
                   {item.label}
                 </option>
               ))}
+              {(from || to) && <option value="custom">Rentang tanggal</option>}
             </Select>
           </div>
           <div className="flex flex-col gap-1">
@@ -174,7 +229,12 @@ export default function PositionsPage() {
             <Select
               id="jurnal-metode"
               value={strategi}
-              onChange={(event) => setStrategi(event.target.value)}
+              onChange={(event) => {
+                setStrategi(event.target.value)
+                // Filter berubah berarti kumpulan datanya berubah; halaman 3
+                // dari hasil sebelumnya tidak lagi bermakna.
+                setPeluang({ page: 1, limit: peluang.limit })
+              }}
             >
               <option value="">Semua metode</option>
               <option value="ila-2.0">ILA 2.0</option>
@@ -186,7 +246,10 @@ export default function PositionsPage() {
             <Select
               id="jurnal-pair"
               value={symbol}
-              onChange={(event) => setSymbol(event.target.value)}
+              onChange={(event) => {
+                setSymbol(event.target.value)
+                setPeluang({ page: 1, limit: peluang.limit })
+              }}
             >
               <option value="">Semua pair</option>
               {daftarSimbol.map((item) => (
@@ -196,7 +259,56 @@ export default function PositionsPage() {
               ))}
             </Select>
           </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="jurnal-dari">Dari tanggal</Label>
+            <Input
+              id="jurnal-dari"
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => {
+                setFrom(event.target.value)
+                setPeluang({ page: 1, limit: peluang.limit })
+              }}
+            />
+          </div>
         </div>
+
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="jurnal-sampai">Sampai tanggal</Label>
+            <Input
+              id="jurnal-sampai"
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => {
+                setTo(event.target.value)
+                setPeluang({ page: 1, limit: peluang.limit })
+              }}
+            />
+          </div>
+          <div className="flex items-end gap-2 lg:col-span-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={filterAktif === 0}
+              onClick={resetFilter}
+            >
+              Reset filter{filterAktif > 0 ? ` (${filterAktif})` : ''}
+            </Button>
+            <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
+              {downloading ? 'Menyiapkan…' : 'Export CSV'}
+            </Button>
+          </div>
+        </div>
+
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          {from || to
+            ? 'Daftar dan ekspor mengikuti rentang tanggal yang dipilih.'
+            : 'Daftar dan ekspor mengikuti periode di atas. Isi tanggal untuk memilih rentang sendiri.'}
+        </p>
+        {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
       </Card>
 
       {/* --- Tab ----------------------------------------------------------- */}
@@ -238,7 +350,9 @@ export default function PositionsPage() {
       {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}
 
       {/* --- Tab: peluang terlewat ----------------------------------------- */}
-      {tab === 'terlewat' && data && <JournalSkippedList items={skipped} />}
+      {tab === 'terlewat' && data && (
+        <JournalSkippedTab data={data} isFetching={isFetching} onUbah={setPeluang} />
+      )}
 
       {/* --- Tab: posisi --------------------------------------------------- */}
       {tab !== 'terlewat' && kosong && (
@@ -317,13 +431,13 @@ export default function PositionsPage() {
                         {formatNumber(position.lot_size, 2)}
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right">
-                        {formatNumber(position.open_price, 5)}
+                        {formatPrice(position.open_price, priceDigits(position.symbol, position.open_price))}
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right text-muted-foreground">
-                        {formatNumber(position.stop_loss, 5)}
+                        {formatPrice(position.stop_loss, priceDigits(position.symbol, position.open_price))}
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right text-muted-foreground">
-                        {formatNumber(position.take_profit, 5)}
+                        {formatPrice(position.take_profit, priceDigits(position.symbol, position.open_price))}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right font-medium">
                         {position.pnl_known ? (
@@ -400,12 +514,15 @@ export default function PositionsPage() {
                   <div className="grid grid-cols-3 gap-2 text-[11px]">
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
-                      <p className="tabular font-semibold">{formatNumber(position.open_price, 5)}</p>
+                      <p className="tabular font-semibold">
+                        {formatPrice(position.open_price, priceDigits(position.symbol, position.open_price))}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
                       <p className="tabular text-muted-foreground">
-                        {formatNumber(position.stop_loss, 2)} / {formatNumber(position.take_profit, 2)}
+                        {formatPrice(position.stop_loss, priceDigits(position.symbol, position.open_price))} /{' '}
+                        {formatPrice(position.take_profit, priceDigits(position.symbol, position.open_price))}
                       </p>
                     </div>
                     <div className="text-right">
@@ -437,28 +554,82 @@ export default function PositionsPage() {
         </div>
       )}
 
-      {/* --- Ekspor CSV ---------------------------------------------------- */}
-      <Card className="p-3">
-        <div className="grid gap-2 sm:grid-cols-3">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="export-from">Dari tanggal</Label>
-            <Input id="export-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="export-to">Sampai tanggal</Label>
-            <Input id="export-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-          </div>
-          <div className="flex items-end">
-            <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
-              {downloading ? 'Menyiapkan…' : 'Export CSV'}
-            </Button>
-          </div>
-        </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Format waktu ekspor mencakup WIB dan New York (NY).
-        </p>
-        {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
-      </Card>
+      {/* Ekspor CSV dipindahkan ke bagian filter di atas agar tanggal yang
+          menyaring daftar dan tanggal yang diekspor adalah hal yang sama. */}
+    </>
+  )
+}
+
+/**
+ * JournalSkippedTab menampilkan peluang yang tidak tereksekusi beserta
+ * paginasinya.
+ *
+ * Dipisah menjadi komponen sendiri karena memegang state halaman dan ukuran
+ * halaman. Penyaringan tab yang lain (aktif/riwayat) tetap memakai state
+ * halaman di induk agar mengganti tab tidak mereset pilihan pengguna.
+ */
+function JournalSkippedTab({
+  data,
+  isFetching,
+  onUbah,
+}: {
+  data: JournalResponse
+  isFetching: boolean
+  /** Meneruskan pilihan halaman ke induk, yang memegang permintaan server. */
+  onUbah: (next: { page: number; limit: number }) => void
+}) {
+  // Sumber kebenaran halaman adalah `meta` dari server: setelah permintaan
+  // selesai, server dapat menjepit nomor halaman (mis. melewati batas), dan
+  // tampilan harus mengikuti angka itu, bukan tebakan lokal.
+  const [ukuran, setUkuran] = useState(data.skipped_meta?.per_page ?? 20)
+
+  // Meta bisa tidak ada bila server yang menjawab masih versi lama (mis. saat
+  // deploy bertahap atau respons dari cache). Tanpa penjagaan ini halaman
+  // gagal render total; dengan penjagaan, daftar tetap tampil tanpa pager.
+  const meta = data.skipped_meta
+  if (!meta) {
+    return <JournalSkippedList items={data.skipped} />
+  }
+
+  return (
+    <>
+      <JournalSkippedList items={data.skipped} />
+      <Pagination
+        page={meta.page}
+        totalPages={meta.total_pages}
+        shown={data.skipped.length}
+        total={meta.total}
+        unit="peluang"
+        disabled={isFetching}
+        onPageChange={(nilai) => {
+          onUbah({ page: nilai, limit: ukuran })
+        }}
+        pageSize={ukuran}
+        onPageSizeChange={(nilai) => {
+          setUkuran(nilai)
+          // Ukuran berubah berarti pembagian halaman berubah; kembali ke
+          // halaman pertama agar tidak mendarat di halaman kosong.
+          onUbah({ page: 1, limit: nilai })
+        }}
+      />
+      {/* Halaman bisa kosong bila jumlah peluang menyusut (mis. filter
+          dipersempit dari perangkat lain) sementara nomor halaman tetap.
+          Kembalikan pengguna ke halaman terakhir yang benar-benar ada. */}
+      {data.skipped.length === 0 && meta.total > 0 && meta.page > 1 && (
+        <Alert>
+          Halaman ini sudah tidak berisi data.{" "}
+          <button
+            type="button"
+            className="font-semibold underline underline-offset-2"
+            onClick={() => {
+              const akhir = Math.max(1, meta.total_pages)
+              onUbah({ page: akhir, limit: ukuran })
+            }}
+          >
+            Buka halaman terakhir
+          </button>
+        </Alert>
+      )}
     </>
   )
 }

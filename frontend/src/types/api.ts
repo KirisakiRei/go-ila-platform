@@ -541,12 +541,23 @@ export type JournalResponse = {
   stats: JournalStats
   positions: Position[]
   skipped: JournalSkipped[]
+  /** Halaman daftar peluang terlewat; daftar bisa lebih panjang dari satu layar. */
+  skipped_meta: JournalMeta
   filters: {
     from?: string
     to?: string
     strategy_version?: string
     symbol?: string
   }
+}
+
+/** JournalMeta menjelaskan halaman daftar peluang terlewat. */
+export type JournalMeta = {
+  page: number
+  per_page: number
+  total: number
+  total_pages: number
+  has_more: boolean
 }
 
 /** Satu perangkat yang sedang masuk ke akun ini. */

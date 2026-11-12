@@ -124,6 +124,7 @@ export const tradingApi = {
     symbol?: string
     limit?: number
     skippedLimit?: number
+    skippedPage?: number
   }) =>
     request<JournalResponse>('/journal', {
       query: {
@@ -134,6 +135,7 @@ export const tradingApi = {
         symbol: params.symbol || undefined,
         limit: params.limit,
         skipped_limit: params.skippedLimit,
+        skipped_page: params.skippedPage,
       },
     }),
 }

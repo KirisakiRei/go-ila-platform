@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Skeleton } from '@/components/ui'
 import { useMarketCandles } from '@/lib/queries'
-import { formatMoney, formatNumber, formatR } from '@/lib/format'
+import { formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
+import { priceDigits } from '@/lib/pricePrecision'
 import type { Position } from '@/types/api'
 import { PriceChart, type ChartMarkerSpec, type PriceLineSpec, type SegmentSpec } from './PriceChart'
 import { chartTheme } from './lib/theme'
@@ -60,6 +61,10 @@ export function PositionExecutionChart({
 }: PositionExecutionChartProps) {
   const theme = chartTheme()
 
+  // Presisi mengikuti pair: EURUSD 5 desimal, XAUUSD 2, JPY 3. Tanpa ini
+  // level entry/SL/TP tampil membulat dan terlihat tidak sesuai broker.
+  const digits = priceDigits(position.symbol, position.open_price)
+
   const entryTime = toUnix(position.opened_at)
   const exitTime = toUnix(position.closed_at)
   const isClosed = position.status !== 'OPEN'
@@ -92,7 +97,7 @@ export function PositionExecutionChart({
         position: isBuy ? 'belowBar' : 'aboveBar',
         color: isBuy ? theme.up : theme.down,
         shape: isBuy ? 'arrowUp' : 'arrowDown',
-        text: `${position.direction} ${formatNumber(position.lot_size, 2)} @ ${formatNumber(position.open_price, 2)}`,
+        text: `${position.direction} ${formatNumber(position.lot_size, 2)} @ ${formatPrice(position.open_price, digits)}`,
       })
 
       lines.push({
@@ -108,7 +113,7 @@ export function PositionExecutionChart({
       lines.push({
         price: position.stop_loss,
         color: theme.stopLoss,
-        title: `SL ${formatNumber(position.stop_loss, 2)}`,
+        title: `SL ${formatPrice(position.stop_loss, digits)}`,
         style: 'solid',
         width: 1,
       })
@@ -118,7 +123,7 @@ export function PositionExecutionChart({
       lines.push({
         price: position.take_profit,
         color: theme.takeProfit,
-        title: `TP ${formatNumber(position.take_profit, 2)}`,
+        title: `TP ${formatPrice(position.take_profit, digits)}`,
         style: 'solid',
         width: 1,
       })
@@ -160,6 +165,7 @@ export function PositionExecutionChart({
     exitTime,
     hasExit,
     theme,
+    digits,
   ])
 
   if (query.isLoading) {
@@ -173,6 +179,7 @@ export function PositionExecutionChart({
       markers={markers}
       segments={segments}
       height={height}
+      digits={digits}
       focusTime={entryTime || undefined}
       emptyMessage={
         query.isError
@@ -184,10 +191,10 @@ export function PositionExecutionChart({
           <span>
             {position.symbol} · {chartTimeframe}
           </span>
-          <span className="tabular">Entry {formatNumber(position.open_price, 2)}</span>
+          <span className="tabular">Entry {formatPrice(position.open_price, digits)}</span>
           {hasExit && (
             <span className="tabular">
-              Exit {formatNumber(position.exit_price, 2)}
+              Exit {formatPrice(position.exit_price, digits)}
             </span>
           )}
           {position.pnl_known && (

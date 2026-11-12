@@ -154,8 +154,22 @@ func (s *Service) applyClose(ctx context.Context, pos *model.Position, closed br
 	// Tanpa tanda ini, PnL 0 akan terbaca sebagai "impas" di dashboard.
 	pnlKnown := closed.ExitPrice != 0 || closed.Profit != 0
 
-	if risk := pos.LotSize * absDistance(pos.OpenPrice, pos.StopLoss); risk > 0 && pnlKnown {
-		pos.OutcomeR = roundTo(pos.ProfitLoss/risk, 2)
+	// Risiko dalam UANG, bukan jarak harga.
+	//
+	// Jarak harga adalah satuan yang berbeda-beda antar pair: 0,00164 pada EURUSD
+	// dan 0,00164 pada XAUUSD mewakili nilai uang yang jauh berbeda. Membagi
+	// profit (USD) dengan lot x jarak harga menghasilkan angka tanpa satuan yang
+	// bisa meledak — satu posisi EURUSD pernah tercatat 192.073,17R.
+	//
+	// Risiko uang = lot x jarak harga x nilai per 1.0 pergerakan untuk 1 lot.
+	// Setelah itu pembilang dan penyebut sama-sama USD, sehingga hasilnya R
+	// sesungguhnya.
+	if jarak := absDistance(pos.OpenPrice, pos.StopLoss); jarak > 0 && pnlKnown {
+		nilaiPerLot := s.valuePerLotRunner(pos.Symbol)
+		risikoUang := pos.LotSize * jarak * nilaiPerLot
+		if risikoUang > 0 {
+			pos.OutcomeR = roundTo(pos.ProfitLoss/risikoUang, 2)
+		}
 	}
 
 	if err := s.store.ClosePosition(ctx, pos); err != nil {

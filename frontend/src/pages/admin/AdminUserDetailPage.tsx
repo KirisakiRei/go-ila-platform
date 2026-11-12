@@ -19,6 +19,7 @@ import {
   Input,
   Label,
   PageHeader,
+  Pagination,
   Select,
   Section,
   Skeleton,
@@ -29,6 +30,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import type {
   AdminAccountItem,
@@ -74,6 +76,8 @@ export default function AdminUserDetailPage() {
     // yang pasti ditolak 403.
     enabled: can('user.legal'),
   })
+  // Persetujuan dokumen bisa bertambah tiap versi; dipecah per halaman.
+  const paginasiLegal = usePaginasiLokal(legal.data)
   const credit = useQuery({
     queryKey: ['admin', 'user', id, 'credit'],
     queryFn: () => adminUserApi.credit(id),
@@ -198,7 +202,7 @@ export default function AdminUserDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {legal.data.map((item) => (
+                {paginasiLegal.baris.map((item) => (
                   <TableRow key={`${item.slug}-${item.version}`}>
                     <TableCell className="text-[13px]">{item.title}</TableCell>
                     <TableCell className="text-[12px]">{item.version}</TableCell>
@@ -209,6 +213,18 @@ export default function AdminUserDetailPage() {
                 ))}
               </TableBody>
             </Table>
+            <div className="border-t border-border px-3 py-2">
+              <Pagination
+                page={paginasiLegal.page}
+                totalPages={paginasiLegal.totalPages}
+                shown={paginasiLegal.baris.length}
+                total={paginasiLegal.total}
+                unit="dokumen"
+                pageSize={paginasiLegal.pageSize}
+                onPageChange={paginasiLegal.setPage}
+                onPageSizeChange={paginasiLegal.setPageSize}
+              />
+            </div>
           </Card>
         ) : (
           <p className="text-[12px] text-muted-foreground">Belum ada persetujuan tercatat.</p>
@@ -450,6 +466,8 @@ function UserActions({ user, onDone }: { user: AdminUserDetail; onDone: () => vo
 
 function AccountsTable({ accounts, onDone }: { accounts: AdminAccountItem[]; onDone: () => void }) {
   const { can } = usePermissions()
+  // Daftar akun dipecah per halaman agar seragam dengan tabel lain.
+  const paginasi = usePaginasiLokal(accounts)
   const freeze = useMutation({
     mutationFn: async ({ id, frozen, reason }: { id: string; frozen: boolean; reason: string }) =>
       frozen ? adminUserApi.freezeAccount(id, reason) : adminUserApi.unfreezeAccount(id),
@@ -469,7 +487,7 @@ function AccountsTable({ accounts, onDone }: { accounts: AdminAccountItem[]; onD
           </TableRow>
         </TableHeader>
         <TableBody>
-          {accounts.map((account) => (
+          {paginasi.baris.map((account) => (
             <TableRow key={account.id}>
               <TableCell className="text-[13px]">{account.label || '—'}</TableCell>
               <TableCell className="text-[12px]">{account.broker_type}</TableCell>
@@ -499,6 +517,18 @@ function AccountsTable({ accounts, onDone }: { accounts: AdminAccountItem[]; onD
           ))}
         </TableBody>
       </Table>
+      <div className="border-t border-border px-3 py-2">
+        <Pagination
+          page={paginasi.page}
+          totalPages={paginasi.totalPages}
+          shown={paginasi.baris.length}
+          total={paginasi.total}
+          unit="akun"
+          pageSize={paginasi.pageSize}
+          onPageChange={paginasi.setPage}
+          onPageSizeChange={paginasi.setPageSize}
+        />
+      </div>
     </Card>
   )
 }
@@ -514,6 +544,8 @@ function PositionsSection({ userID }: { userID: string }) {
   })
 
   const rows: AdminPositionItem[] = positions.data ?? []
+  // Riwayat posisi bisa panjang; dipecah per halaman agar tabel tetap ringkas.
+  const paginasi = usePaginasiLokal(rows)
 
   if (!can('trade.view')) {
     return (
@@ -552,7 +584,7 @@ function PositionsSection({ userID }: { userID: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {paginasi.baris.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="text-[13px]">{row.symbol}</TableCell>
                   <TableCell className="text-[12px]">{row.direction}</TableCell>
@@ -567,6 +599,18 @@ function PositionsSection({ userID }: { userID: string }) {
               ))}
             </TableBody>
           </Table>
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasi.page}
+              totalPages={paginasi.totalPages}
+              shown={paginasi.baris.length}
+              total={paginasi.total}
+              unit="posisi"
+              pageSize={paginasi.pageSize}
+              onPageChange={paginasi.setPage}
+              onPageSizeChange={paginasi.setPageSize}
+            />
+          </div>
         </Card>
       )}
     </Section>

@@ -16,7 +16,9 @@ import {
   Label,
   Modal,
   PageHeader,
+  Pagination,
   Skeleton,
+  usePaginasiLokal,
   Table,
   TableBody,
   TableCell,
@@ -61,6 +63,9 @@ export default function BillingPage() {
     queryKey: ['billing', 'invoices'],
     queryFn: () => request<Invoice[]>('/billing/invoices'),
   })
+  // Invoice sudah dimuat seluruhnya oleh endpoint; dipecah per halaman di sisi
+  // klien agar daftar panjang tidak memaksa menggulir jauh.
+  const paginasiInvoice = usePaginasiLokal(invoices.data)
   const subscription = useQuery({
     queryKey: ['billing', 'subscription'],
     queryFn: () =>
@@ -295,7 +300,7 @@ export default function BillingPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {invoices.data.map((row) => (
+                      {paginasiInvoice.baris.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell className="font-mono text-xs font-semibold">{row.number}</TableCell>
                           <TableCell className="text-xs font-medium uppercase">{row.plan_code}</TableCell>
@@ -317,6 +322,20 @@ export default function BillingPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+              {invoices.data && invoices.data.length > 0 && (
+                <div className="border-t border-border px-3 py-2">
+                  <Pagination
+                    page={paginasiInvoice.page}
+                    totalPages={paginasiInvoice.totalPages}
+                    shown={paginasiInvoice.baris.length}
+                    total={paginasiInvoice.total}
+                    unit="tagihan"
+                    pageSize={paginasiInvoice.pageSize}
+                    onPageChange={paginasiInvoice.setPage}
+                    onPageSizeChange={paginasiInvoice.setPageSize}
+                  />
                 </div>
               )}
             </CardContent>

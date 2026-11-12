@@ -12,6 +12,7 @@ import {
   Input,
   Label,
   PageHeader,
+  Pagination,
   Skeleton,
   Stat,
   StatGrid,
@@ -21,6 +22,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 
 /** AdminReportsPage merangkum angka bisnis dan operasional. */
@@ -47,6 +49,11 @@ export default function AdminReportsPage() {
     queryKey: ['admin', 'report', 'operations', from, to],
     queryFn: () => adminReportApi.operations(from, to),
   })
+
+  // Laporan harian dan kupon bisa memuat puluhan baris. Keduanya dipecah per
+  // halaman agar kartu tidak memanjang tanpa batas.
+  const paginasiPendapatan = usePaginasiLokal(revenue.data?.daily)
+  const paginasiKupon = usePaginasiLokal(coupons.data?.items)
 
   return (
     <>
@@ -94,6 +101,7 @@ export default function AdminReportsPage() {
         </CardHeader>
         <CardContent>
           {revenue.data && revenue.data.daily.length > 0 ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -104,7 +112,7 @@ export default function AdminReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {revenue.data.daily.map((row) => (
+                {paginasiPendapatan.baris.map((row) => (
                   <TableRow key={row.date}>
                     <TableCell className="text-[12px]">{row.date}</TableCell>
                     <TableCell className="text-right text-[12px] tabular-nums">{row.count}</TableCell>
@@ -118,6 +126,19 @@ export default function AdminReportsPage() {
                 ))}
               </TableBody>
             </Table>
+            <div className="border-t border-border px-3 py-2">
+              <Pagination
+                page={paginasiPendapatan.page}
+                totalPages={paginasiPendapatan.totalPages}
+                shown={paginasiPendapatan.baris.length}
+                total={paginasiPendapatan.total}
+                unit="hari"
+                pageSize={paginasiPendapatan.pageSize}
+                onPageChange={paginasiPendapatan.setPage}
+                onPageSizeChange={paginasiPendapatan.setPageSize}
+              />
+            </div>
+            </>
           ) : (
             <EmptyState title="Belum ada pendapatan" description="Tidak ada invoice lunas pada rentang ini." />
           )}
@@ -131,6 +152,7 @@ export default function AdminReportsPage() {
         </CardHeader>
         <CardContent>
           {coupons.data && coupons.data.items.length > 0 ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -140,7 +162,7 @@ export default function AdminReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {coupons.data.items.map((row) => (
+                {paginasiKupon.baris.map((row) => (
                   <TableRow key={row.code}>
                     <TableCell className="text-[12px]">{row.code}</TableCell>
                     <TableCell className="text-right text-[12px] tabular-nums">{row.uses}</TableCell>
@@ -151,6 +173,19 @@ export default function AdminReportsPage() {
                 ))}
               </TableBody>
             </Table>
+            <div className="border-t border-border px-3 py-2">
+              <Pagination
+                page={paginasiKupon.page}
+                totalPages={paginasiKupon.totalPages}
+                shown={paginasiKupon.baris.length}
+                total={paginasiKupon.total}
+                unit="kupon"
+                pageSize={paginasiKupon.pageSize}
+                onPageChange={paginasiKupon.setPage}
+                onPageSizeChange={paginasiKupon.setPageSize}
+              />
+            </div>
+            </>
           ) : (
             <EmptyState title="Belum ada kupon dipakai" description="Kupon yang dipakai akan muncul di sini." />
           )}

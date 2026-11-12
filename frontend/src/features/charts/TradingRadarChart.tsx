@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Badge, Skeleton } from '@/components/ui'
 import { useMarketCandles } from '@/lib/queries'
-import { formatNumber } from '@/lib/format'
+import { formatPrice } from '@/lib/format'
+import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, getIla3Mtf, isFinal } from '@/features/signals/lib/status'
@@ -129,6 +130,11 @@ export function TradingRadarChart({
   const candles = query.data?.candles ?? []
   const feed = query.data?.feed ?? ''
 
+  // Presisi level mengikuti pair yang dipantau engine. Garis Sweep, FVG, dan
+  // CISD adalah titik analisis: membulatkannya ke 2 desimal membuat EURUSD
+  // kehilangan seluruh selisihnya (1.08471 dan 1.08476 tampil sama).
+  const digits = priceDigits(symbol, candles[0]?.close)
+
   const { priceLines, markers, zones } = useMemo(() => {
     const lines: PriceLineSpec[] = []
     const marks: ChartMarkerSpec[] = []
@@ -174,7 +180,7 @@ export function TradingRadarChart({
           lines.push({
             price: sweep.stop_loss,
             color: theme.stopLoss,
-            title: `SL Sweep ${formatNumber(sweep.stop_loss, 2)}`,
+            title: `SL Sweep ${formatPrice(sweep.stop_loss, digits)}`,
             style: 'dotted',
             width: 1,
           })
@@ -183,7 +189,7 @@ export function TradingRadarChart({
           lines.push({
             price: sweep.target_dol,
             color: theme.takeProfit,
-            title: `Target DOL ${formatNumber(sweep.target_dol, 2)}`,
+            title: `Target DOL ${formatPrice(sweep.target_dol, digits)}`,
             style: 'dotted',
             width: 1,
           })
@@ -199,7 +205,7 @@ export function TradingRadarChart({
           to: sweep.fvg.bottom,
           color: theme.fvg,
           borderColor: theme.fvgBorder,
-          label: `FVG ${formatNumber(sweep.fvg.bottom, 2)} - ${formatNumber(sweep.fvg.top, 2)}`,
+          label: `FVG ${formatPrice(sweep.fvg.bottom, digits)} - ${formatPrice(sweep.fvg.top, digits)}`,
           timeFrom: start,
         })
       }
@@ -234,7 +240,7 @@ export function TradingRadarChart({
         lines.push({
           price: signal.entry_price,
           color: theme.entry,
-          title: `Entry ${formatNumber(signal.entry_price, 2)}`,
+          title: `Entry ${formatPrice(signal.entry_price, digits)}`,
           style: 'solid',
           width: 2,
         })
@@ -243,7 +249,7 @@ export function TradingRadarChart({
         lines.push({
           price: signal.stop_loss,
           color: theme.stopLoss,
-          title: `SL ${formatNumber(signal.stop_loss, 2)}`,
+          title: `SL ${formatPrice(signal.stop_loss, digits)}`,
           style: 'solid',
           width: 1,
         })
@@ -252,7 +258,7 @@ export function TradingRadarChart({
         lines.push({
           price: signal.take_profit,
           color: theme.takeProfit,
-          title: `TP ${formatNumber(signal.take_profit, 2)}`,
+          title: `TP ${formatPrice(signal.take_profit, digits)}`,
           style: 'solid',
           width: 1,
         })
@@ -275,7 +281,7 @@ export function TradingRadarChart({
     }
 
     return { priceLines: lines, markers: marks, zones: areas }
-  }, [signal, activeTab, tabIndex, tabs.length, theme])
+  }, [signal, activeTab, tabIndex, tabs.length, theme, digits])
 
   if (!symbol) {
     return (
@@ -343,6 +349,7 @@ export function TradingRadarChart({
           markers={markers}
           zones={zones}
           height={340}
+          digits={digits}
           loading={query.isFetching && candles.length === 0}
           emptyMessage={
             query.isError

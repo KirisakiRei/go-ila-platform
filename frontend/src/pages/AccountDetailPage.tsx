@@ -24,6 +24,7 @@ import {
   Input,
   Label,
   Modal,
+  Pagination,
   Select,
   Skeleton,
   StatusDot,
@@ -33,6 +34,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import {
   useAccounts,
@@ -731,6 +733,11 @@ function TabOrderHistory({ accountId: _accountId }: { accountId: string }) {
 
   const rows = positions ?? []
 
+  // Endpoint posisi membatasi 100 baris terbaru, jadi ukuran halaman dibatasi
+  // ke angka yang benar-benar tersedia. Menawarkan 200 di sini akan menjanjikan
+  // baris yang tidak pernah dikirim server.
+  const paginasi = usePaginasiLokal(rows, 20)
+
   return (
     <Card>
       <CardHeader>
@@ -764,7 +771,7 @@ function TabOrderHistory({ accountId: _accountId }: { accountId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((pos) => {
+                {paginasi.baris.map((pos) => {
                   const isProfit = pos.pnl_known && pos.profit_loss > 0
                   const isLoss = pos.pnl_known && pos.profit_loss < 0
 
@@ -803,6 +810,21 @@ function TabOrderHistory({ accountId: _accountId }: { accountId: string }) {
                 })}
               </TableBody>
             </Table>
+          </div>
+        )}
+        {!isLoading && rows.length > 0 && (
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasi.page}
+              totalPages={paginasi.totalPages}
+              shown={paginasi.baris.length}
+              total={paginasi.total}
+              unit="tiket"
+              pageSize={paginasi.pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageChange={paginasi.setPage}
+              onPageSizeChange={paginasi.setPageSize}
+            />
           </div>
         )}
       </CardContent>

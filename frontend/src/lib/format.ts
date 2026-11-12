@@ -8,6 +8,23 @@ export function formatNumber(value: number, digits = 2): string {
   }).format(value)
 }
 
+/**
+ * formatPrice menampilkan harga pair dengan presisi penuh.
+ *
+ * Berbeda dari formatNumber, pemisah ribuan tidak dipakai: harga chart dibaca
+ * dan disalin sebagai level (4051.31), dan titik ribuan akan menyulitkan
+ * pembacaan sekaligus membuatnya tidak cocok saat ditempel ke terminal broker.
+ * Pemisah desimal mengikuti locale aplikasi (koma).
+ */
+export function formatPrice(value: number, digits: number): string {
+  if (!Number.isFinite(value)) return '—'
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+    useGrouping: false,
+  }).format(value)
+}
+
 export function formatMoney(value: number): string {
   if (!Number.isFinite(value)) return '—'
   return new Intl.NumberFormat('id-ID', {

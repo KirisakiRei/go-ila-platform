@@ -61,9 +61,13 @@ type JournalRepository interface {
 	ListPositions(ctx context.Context, userID string, filter JournalFilter, limit int) ([]model.Position, error)
 	// Stats menghitung ringkasan jurnal untuk filter yang sama.
 	Stats(ctx context.Context, userID string, filter JournalFilter) (JournalStats, error)
-	// ListSkipped membaca sinyal yang tidak berakhir sebagai posisi: ditolak,
-	// dilewati, kedaluwarsa, atau masih menunggu keputusan user.
-	ListSkipped(ctx context.Context, userID string, filter JournalFilter, limit int) ([]model.UserSignal, error)
+	// ListSkipped membaca satu halaman sinyal yang tidak berakhir sebagai
+	// posisi: ditolak, dilewati, kedaluwarsa, atau masih menunggu keputusan user.
+	// offset dan limit dipakai agar daftar bisa ditelusuri halaman demi halaman.
+	ListSkipped(ctx context.Context, userID string, filter JournalFilter, offset, limit int) ([]model.UserSignal, error)
+	// CountSkipped menghitung seluruh baris yang cocok, tanpa batas halaman.
+	// Diperlukan agar antarmuka tahu berapa halaman yang ada.
+	CountSkipped(ctx context.Context, userID string, filter JournalFilter) (int, error)
 }
 
 type journalRepository struct {
@@ -196,24 +200,68 @@ var skipStatuses = []string{
 // Tujuannya memberi gambaran peluang yang terlewat, bukan hanya trade yang
 // terjadi. Tanpa ini, jurnal hanya berisi kemenangan dan kekalahan dan
 // menyembunyikan berapa banyak setup yang tidak pernah dieksekusi.
-func (r *journalRepository) ListSkipped(ctx context.Context, userID string, filter JournalFilter, limit int) ([]model.UserSignal, error) {
+func (r *journalRepository) ListSkipped(ctx context.Context, userID string, filter JournalFilter, offset, limit int) ([]model.UserSignal, error) {
 	var rows []model.UserSignal
 
-	query := r.db.WithContext(ctx).
-		Model(&model.UserSignal{}).
-		Where("user_id = ?", userID).
-		Where("status IN ?", skipStatuses).
-		Where("position_id = ?", "")
-
-	if !filter.From.IsZero() {
-		query = query.Where("created_at >= ?", filter.From)
-	}
-	if !filter.To.IsZero() {
-		query = query.Where("created_at < ?", filter.To)
+	query := r.skippedQuery(ctx, userID, filter)
+	if offset > 0 {
+		query = query.Offset(offset)
 	}
 
-	if err := query.Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	// Kolom user_signal dipilih eksplisit agar join tidak menimpa kolom yang
+	// bernama sama (id, status, created_at) saat hasil dipindai ke struct.
+	if err := query.
+		Select("user_signal.*").
+		Order("user_signal.created_at DESC").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("membaca sinyal tidak tereksekusi: %w", err)
 	}
 	return rows, nil
+}
+
+// CountSkipped menghitung seluruh peluang terlewat pada filter yang sama.
+func (r *journalRepository) CountSkipped(ctx context.Context, userID string, filter JournalFilter) (int, error) {
+	var total int64
+	// Distinct pada kunci primer: query memakai join ke signal, dan hitungan
+	// harus tetap satu baris per user_signal walau join-nya menggandakan.
+	if err := r.skippedQuery(ctx, userID, filter).Distinct("user_signal.id").Count(&total).Error; err != nil {
+		return 0, fmt.Errorf("menghitung sinyal tidak tereksekusi: %w", err)
+	}
+	return int(total), nil
+}
+
+// skippedQuery menyusun kueri bersama untuk peluang terlewat.
+//
+// Filter metode dan pair ikut diterapkan di sini. Sebelumnya keduanya diabaikan,
+// sehingga memilih "ILA 3.0" atau satu pair tetap menampilkan seluruh peluang
+// dari metode dan pair lain - angka tab tidak lagi cocok dengan isinya.
+func (r *journalRepository) skippedQuery(ctx context.Context, userID string, filter JournalFilter) *gorm.DB {
+	query := r.db.WithContext(ctx).
+		Model(&model.UserSignal{}).
+		Where("user_signal.user_id = ?", userID).
+		Where("user_signal.status IN ?", skipStatuses).
+		Where("user_signal.position_id = ?", "")
+
+	if !filter.From.IsZero() {
+		query = query.Where("user_signal.created_at >= ?", filter.From)
+	}
+	if !filter.To.IsZero() {
+		query = query.Where("user_signal.created_at < ?", filter.To)
+	}
+
+	// StrategyVersion dan Symbol berada di tabel signal, bukan user_signal:
+	// user_signal hanya mencatat keputusan per akun. Kolomnya harus dirujuk
+	// lewat join, bukan langsung — merujuk kolom yang tidak ada akan gagal
+	// sebagai galat basis data, bukan sekadar filter diabaikan.
+	if filter.StrategyVersion != "" || filter.Symbol != "" {
+		query = query.Joins("JOIN signal ON signal.signal_id = user_signal.signal_id")
+	}
+	if filter.StrategyVersion != "" {
+		query = query.Where("signal.strategy_version = ?", filter.StrategyVersion)
+	}
+	if filter.Symbol != "" {
+		query = query.Where("signal.symbol = ?", filter.Symbol)
+	}
+	return query
 }

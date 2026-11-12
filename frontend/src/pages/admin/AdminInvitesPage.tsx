@@ -14,6 +14,7 @@ import {
   Label,
   Modal,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -22,6 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 
 const STATUS_VARIANT: Record<string, 'muted' | 'outline' | 'solid'> = {
@@ -58,6 +60,8 @@ export default function AdminInvitesPage() {
   })
 
   const rows = data ?? []
+  // Daftar dipecah per halaman agar tabel panjang tidak memaksa menggulir jauh.
+  const paginasi = usePaginasiLokal(rows)
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'invites'] })
 
   const revoke = useMutation({
@@ -110,6 +114,7 @@ export default function AdminInvitesPage() {
             description="Buat tautan pertama untuk mengundang anggota komunitas."
           />
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -122,7 +127,7 @@ export default function AdminInvitesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {paginasi.baris.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-mono text-xs">
                     {row.prefix}…
@@ -161,6 +166,19 @@ export default function AdminInvitesPage() {
               ))}
             </TableBody>
           </Table>
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasi.page}
+              totalPages={paginasi.totalPages}
+              shown={paginasi.baris.length}
+              total={paginasi.total}
+              unit="undangan"
+              pageSize={paginasi.pageSize}
+              onPageChange={paginasi.setPage}
+              onPageSizeChange={paginasi.setPageSize}
+            />
+          </div>
+          </>
         )}
       </Card>
 

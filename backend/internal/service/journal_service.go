@@ -24,6 +24,8 @@ type JournalQuery struct {
 	// LimitPositions dan LimitSkipped membatasi jumlah baris per bagian.
 	LimitPositions int
 	LimitSkipped   int
+	// HalamanSkipped adalah halaman daftar peluang terlewat, dimulai dari 1.
+	HalamanSkipped int
 }
 
 // DefaultJournalDays adalah rentang bawaan jurnal bila pengguna tidak memilih.
@@ -36,7 +38,8 @@ const DefaultJournalDays = 30
 type JournalRepositoryReader interface {
 	ListPositions(ctx context.Context, userID string, filter repository.JournalFilter, limit int) ([]model.Position, error)
 	Stats(ctx context.Context, userID string, filter repository.JournalFilter) (repository.JournalStats, error)
-	ListSkipped(ctx context.Context, userID string, filter repository.JournalFilter, limit int) ([]model.UserSignal, error)
+	ListSkipped(ctx context.Context, userID string, filter repository.JournalFilter, offset, limit int) ([]model.UserSignal, error)
+	CountSkipped(ctx context.Context, userID string, filter repository.JournalFilter) (int, error)
 }
 
 // SignalDetailReader membaca rincian sinyal untuk melengkapi daftar peluang
@@ -63,6 +66,13 @@ func (s *tradingService) Journal(ctx context.Context, userID string, query Journ
 		limitSkipped = DefaultPositionLimit
 	}
 
+	// Nomor halaman dijaga minimal 1 agar offset tidak pernah negatif.
+	halamanSkipped := query.HalamanSkipped
+	if halamanSkipped < 1 {
+		halamanSkipped = 1
+	}
+	offsetSkipped := (halamanSkipped - 1) * limitSkipped
+
 	rows, err := s.journal.ListPositions(ctx, userID, filter, limitPositions)
 	if err != nil {
 		return nil, err
@@ -73,15 +83,21 @@ func (s *tradingService) Journal(ctx context.Context, userID string, query Journ
 		return nil, err
 	}
 
-	skipped, err := s.journal.ListSkipped(ctx, userID, filter, limitSkipped)
+	skipped, err := s.journal.ListSkipped(ctx, userID, filter, offsetSkipped, limitSkipped)
+	if err != nil {
+		return nil, err
+	}
+
+	totalSkipped, err := s.journal.CountSkipped(ctx, userID, filter)
 	if err != nil {
 		return nil, err
 	}
 
 	return &dto.JournalResponse{
-		Stats:     jurnalStatsResponse(stats),
-		Positions: jurnalPositionsResponse(rows),
-		Skipped:   s.jurnalSkippedResponse(ctx, skipped),
+		Stats:       jurnalStatsResponse(stats),
+		Positions:   jurnalPositionsResponse(rows),
+		Skipped:     s.jurnalSkippedResponse(ctx, skipped),
+		SkippedMeta: jurnalMetaResponse(halamanSkipped, limitSkipped, totalSkipped),
 		Filters: dto.JournalFiltersResponse{
 			From:            formatOptionalDay(filter.From),
 			To:              formatOptionalDay(filter.To),
@@ -215,6 +231,27 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 	}
 
 	return out
+}
+
+// jurnalMetaResponse menyusun ringkasan halaman untuk daftar peluang terlewat.
+//
+// Total halaman dibulatkan ke atas supaya sisa baris tetap punya halaman.
+// Halaman yang melewati batas (mis. filter berubah saat pengguna sedang di
+// halaman 5) tidak menghasilkan foto halaman kosong tanpa penjelasan: has_more
+// bernilai false dan antarmuka dapat memindahkan pengguna ke halaman terakhir.
+func jurnalMetaResponse(halaman, perHalaman, total int) dto.JournalMetaResponse {
+	halamanTotal := 0
+	if perHalaman > 0 {
+		halamanTotal = (total + perHalaman - 1) / perHalaman
+	}
+
+	return dto.JournalMetaResponse{
+		Page:       halaman,
+		PerPage:    perHalaman,
+		Total:      total,
+		TotalPages: halamanTotal,
+		HasMore:    halaman*perHalaman < total,
+	}
 }
 
 // formatOptionalDay menulis waktu sebagai tanggal pada zona hari akuntansi.

@@ -12,6 +12,7 @@ import {
   EmptyState,
   Label,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -20,6 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 
 const LABEL_STATUS: Record<BugStatus, string> = {
@@ -55,6 +57,8 @@ export default function AdminBugReportsPage() {
   })
 
   const rows = data ?? []
+  // Daftar dipecah per halaman agar tabel panjang tidak memaksa menggulir jauh.
+  const paginasi = usePaginasiLokal(rows)
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'bug-reports'] })
 
   const ubah = useMutation({
@@ -118,6 +122,7 @@ export default function AdminBugReportsPage() {
         ) : rows.length === 0 ? (
           <EmptyState title="Belum ada laporan" description="Laporan pengguna akan muncul di sini." />
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -129,7 +134,7 @@ export default function AdminBugReportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {paginasi.baris.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="text-xs">{formatDate(row.created_at)}</TableCell>
                   <TableCell className="text-xs">{row.category}</TableCell>
@@ -156,6 +161,19 @@ export default function AdminBugReportsPage() {
               ))}
             </TableBody>
           </Table>
+          <div className="border-t border-border px-3 py-2">
+            <Pagination
+              page={paginasi.page}
+              totalPages={paginasi.totalPages}
+              shown={paginasi.baris.length}
+              total={paginasi.total}
+              unit="laporan"
+              pageSize={paginasi.pageSize}
+              onPageChange={paginasi.setPage}
+              onPageSizeChange={paginasi.setPageSize}
+            />
+          </div>
+          </>
         )}
       </Card>
 

@@ -52,9 +52,21 @@ type JournalResponse struct {
 	Stats     JournalStatsResponse     `json:"stats"`
 	Positions []PositionResponse       `json:"positions"`
 	Skipped   []JournalSkippedResponse `json:"skipped"`
+	// SkippedMeta menjelaskan halaman daftar peluang terlewat. Tanpa ini
+	// antarmuka hanya tahu baris yang dikirim, tidak tahu masih ada lagi.
+	SkippedMeta JournalMetaResponse `json:"skipped_meta"`
 	// Filters mengembalikan pilihan yang benar-benar dipakai server, sehingga
 	// antarmuka bisa menampilkan rentang yang berlaku.
 	Filters JournalFiltersResponse `json:"filters"`
+}
+
+// JournalMetaResponse adalah ringkasan halaman daftar peluang terlewat.
+type JournalMetaResponse struct {
+	Page       int  `json:"page"`
+	PerPage    int  `json:"per_page"`
+	Total      int  `json:"total"`
+	TotalPages int  `json:"total_pages"`
+	HasMore    bool `json:"has_more"`
 }
 
 // JournalFiltersResponse adalah filter yang dipakai server.

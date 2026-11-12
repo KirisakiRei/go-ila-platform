@@ -98,6 +98,14 @@ type Options struct {
 	// CorrelationGate menyediakan pasangan instrumen pembanding SMT. Bila nil,
 	// engine hanya diminta simbol yang benar-benar dilanggani user.
 	CorrelationGate CorrelationGate
+	// ValuePerLot mengembalikan nilai uang untuk pergerakan harga 1.0 pada
+	// 1 lot, dipakai menghitung hasil dalam R saat posisi ditutup.
+	//
+	// Tanpa ini, Runner hanya punya jarak harga yang satuannya berbeda antar
+	// pair (EURUSD 0,00164 vs XAUUSD 0,00164 jauh beda nilainya), sehingga R
+	// tidak bisa dihitung benar. Bila nil, dipakai nilai bawaan per jenis
+	// simbol dari DefaultValuePerLot.
+	ValuePerLot func(symbol string) float64
 }
 
 // PairGate memberi tahu Runner simbol mana yang masih boleh diminta ke engine.

@@ -12,6 +12,7 @@ import {
   Input,
   Label,
   PageHeader,
+  Pagination,
   Select,
   Skeleton,
   Table,
@@ -20,6 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import type { AdminTrialItem } from '@/types/admin'
 
@@ -50,6 +52,11 @@ export default function AdminTrialsPage() {
   })
 
   const rows = useMemo(() => data ?? [], [data])
+
+
+  // Daftar dipecah per halaman agar tabel panjang tidak memaksa menggulir jauh.
+
+  const paginasi = usePaginasiLokal(rows)
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'trials'] })
 
   const end = useMutation({
@@ -106,7 +113,7 @@ export default function AdminTrialsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {paginasi.baris.map((row) => (
                 <TableRow key={row.user_id}>
                   <TableCell className="text-[12px]">
                     <span className="font-medium">{row.name}</span>
@@ -148,8 +155,21 @@ export default function AdminTrialsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
+            </TableBody>          </Table>
+          {paginasi.total > 0 && (
+            <div className="border-t border-border px-3 py-2">
+              <Pagination
+                page={paginasi.page}
+                totalPages={paginasi.totalPages}
+                shown={paginasi.baris.length}
+                total={paginasi.total}
+                unit="uji coba"
+                pageSize={paginasi.pageSize}
+                onPageChange={paginasi.setPage}
+                onPageSizeChange={paginasi.setPageSize}
+              />
+            </div>
+          )}
         </Card>
       )}
 

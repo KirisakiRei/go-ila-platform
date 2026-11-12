@@ -269,6 +269,10 @@ export type JournalParams = {
   to?: string
   strategy?: string
   symbol?: string
+  /** Halaman daftar peluang terlewat, dimulai dari 1. */
+  skippedPage?: number
+  /** Jumlah baris peluang per halaman. */
+  skippedLimit?: number
 }
 
 /**
@@ -281,7 +285,13 @@ export type JournalParams = {
 export function useJournal(params: JournalParams) {
   return useQuery({
     queryKey: queryKeys.journal(params),
-    queryFn: () => tradingApi.journal({ ...params, limit: 100, skippedLimit: 100 }),
+    queryFn: () =>
+      tradingApi.journal({
+        ...params,
+        limit: 100,
+        skippedLimit: params.skippedLimit ?? 20,
+        skippedPage: params.skippedPage,
+      }),
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   })
