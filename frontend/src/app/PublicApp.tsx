@@ -4,6 +4,7 @@ import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import { FullPageLoading } from '@/app/FullPageLoading'
 import { ScrollToTop } from '@/app/ScrollToTop'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
+import RegisterPage from '@/pages/RegisterPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import AboutPage from '@/pages/public/AboutPage'
@@ -66,8 +67,15 @@ function PublicRoutes() {
         <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="verifikasi" element={<VerifyEmailPage />} />
 
-        {/* Masuk dan daftar dilayani entri panel di /app/*; tautan akar
-            diarahkan ke sana agar alamat yang dibagikan tetap satu bentuk. */}
+        {/* Tautan undangan admin berbentuk /daftar?invite=KODE dan dibagikan ke
+            komunitas, jadi alamat itu harus dilayani entri ini apa adanya.
+            Rute ini TIDAK boleh dialihkan ke /app/register: basename /app akan
+            terpasang di depan path dan kode undangan hilang dari alamat. */}
+        <Route path="daftar" element={<RegisterPage />} />
+
+        {/* Masuk dilayani entri panel di /app/*; tautan akar diarahkan ke sana
+            agar alamat yang dibagikan tetap satu bentuk. Pendaftaran mandiri
+            tidak dialihkan karena sudah tertutup dan tautan undangan menang. */}
         <Route path="login" element={<RedirectTo to="/app/login" />} />
         <Route path="register" element={<RedirectTo to="/app/register" />} />
         <Route path="*" element={<NotFound />} />

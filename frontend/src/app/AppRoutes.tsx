@@ -153,6 +153,16 @@ export function AppRoutes() {
             </RedirectIfAuthenticated>
           }
         />
+        {/* Alias di dalam panel supaya /app/daftar?invite=KODE juga bekerja.
+            Alamat resmi yang dibagikan tetap /daftar?invite=KODE di akar situs. */}
+        <Route
+          path="/daftar"
+          element={
+            <RedirectIfAuthenticated>
+              <RegisterPage />
+            </RedirectIfAuthenticated>
+          }
+        />
         <Route
           path="/lupa-sandi"
           element={
