@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   accountApi,
   approvalApi,
@@ -250,6 +250,9 @@ export function useSignals(limit = 50) {
     queryKey: queryKeys.signals(limit),
     queryFn: () => tradingApi.signals(limit),
     refetchInterval: 15_000,
+    // Daftar tetap tampil selama penyegaran berkala; tanpa ini setiap polling
+    // sempat mengosongkan data dan memicu kedipan.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -258,6 +261,7 @@ export function usePositions(limit = 100) {
     queryKey: queryKeys.positions(limit),
     queryFn: () => tradingApi.positions(limit),
     refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -279,6 +283,9 @@ export function useMarketCandles(
     enabled: Boolean(symbol) && enabled,
     staleTime: 8_000,
     refetchInterval: 20_000,
+    // Pertahankan candle sebelumnya saat timeframe berganti, supaya chart tidak
+    // berkedip kembali ke skeleton di tengah pemakaian.
+    placeholderData: keepPreviousData,
     retry: 1,
   })
 }

@@ -281,6 +281,22 @@ func (s *Service) marketOpen() bool {
 // memantau simbolnya. Setiap user dinilai terpisah: satu sinyal bisa menjadi
 // posisi bagi user A, tertahan bagi user B, dan terlewat bagi user C.
 func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
+	// Engine mengirim penarikan sinyal (CANCEL / EXPIRE / SUPERSEDE) lewat
+	// payload Signal yang hanya memuat identitas dan Action — tanpa Status dan
+	// tanpa Direction. Tanpa penanganan di sini, event itu jatuh ke validasi
+	// "sinyal tidak lengkap" dan memunculkan WARN yang menyesatkan, seolah ada
+	// sinyal siap eksekusi yang dibuang.
+	if action := in.GetAction(); action != enginev1.SignalAction_SIGNAL_ACTION_PUBLISH &&
+		action != enginev1.SignalAction_SIGNAL_ACTION_UNSPECIFIED {
+		s.HandleUpdate(ctx, &enginev1.SignalUpdate{
+			SignalId:  in.GetSignalId(),
+			Action:    action,
+			Reason:    alasanPenarikan(action),
+			UpdatedAt: in.GetPublishedAt(),
+		})
+		return
+	}
+
 	signal, ok := ingest.ConvertSignal(in)
 	if !ok {
 		s.logger.Warn("sinyal engine tidak lengkap, diabaikan",
@@ -1041,6 +1057,23 @@ func valuePerLotFallback(symbol string) float64 {
 // ---------------------------------------------------------------------------
 // Pembaruan sinyal (CANCEL / EXPIRE / SUPERSEDE)
 // ---------------------------------------------------------------------------
+
+// alasanPenarikan memberi keterangan baku untuk penarikan sinyal.
+//
+// Payload Signal tidak membawa kolom Reason (itu milik SignalUpdate), jadi
+// alasannya diturunkan dari jenis aksi agar riwayat tidak kosong.
+func alasanPenarikan(action enginev1.SignalAction) string {
+	switch action {
+	case enginev1.SignalAction_SIGNAL_ACTION_EXPIRE:
+		return "masa berlaku habis"
+	case enginev1.SignalAction_SIGNAL_ACTION_CANCEL:
+		return "setup dibatalkan engine"
+	case enginev1.SignalAction_SIGNAL_ACTION_SUPERSEDE:
+		return "digantikan sinyal baru"
+	default:
+		return ""
+	}
+}
 
 // HandleUpdate menerapkan pembaruan status sinyal dari engine.
 //

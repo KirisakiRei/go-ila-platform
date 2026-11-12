@@ -123,6 +123,19 @@ export default function SignalsPage() {
 
   const isLoading = loadingSignals || loadingSubs
 
+  // Putaran pada tombol "Muat Ulang" hanya mewakili permintaan yang diminta
+  // pengguna. Penyegaran berkala berjalan di latar belakang, dan menampilkan
+  // spinner tiap 15 detik membuat halaman tampak terus dimuat ulang.
+  const [memuatManual, setMemuatManual] = useState(false)
+  const muatUlang = async () => {
+    setMemuatManual(true)
+    try {
+      await refetch()
+    } finally {
+      setMemuatManual(false)
+    }
+  }
+
   return (
     <>
       {/* ============================================================ */}
@@ -170,8 +183,8 @@ export default function SignalsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void refetch()}
-                isLoading={isFetching}
+                onClick={() => void muatUlang()}
+                isLoading={memuatManual}
                 className="text-xs"
               >
                 Muat Ulang
@@ -180,7 +193,9 @@ export default function SignalsPage() {
           }
         />
 
-      {isLoading ? (
+      {/* Skeleton hanya untuk pemuatan pertama. Saat data sudah pernah ada,
+          perpindahan pair atau penyegaran berkala tidak mengosongkan layar. */}
+      {isLoading && !signals ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-56 w-full rounded-xl" />
@@ -258,7 +273,13 @@ export default function SignalsPage() {
                 {filteredSignals.length === 0 ? (
                   <Card>
                     <CardContent className="py-6 text-center text-xs text-muted-foreground">
-                      Belum ada riwayat setup pada pair {activePair}.
+                      Belum ada riwayat setup pada pair {activePair} untuk metode{' '}
+                      {activeStrategyFilter}.
+                      <span className="mt-1 block text-[11px] text-muted-foreground/80">
+                        Sinyal hanya dikirim untuk pasangan timeframe yang dipantau.
+                        Nyalakan minimal satu switch metode {activeStrategyFilter} pada
+                        pair ini di pengaturan switch timeframe.
+                      </span>
                     </CardContent>
                   </Card>
                 ) : (

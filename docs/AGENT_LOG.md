@@ -36,6 +36,64 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-12 — Penarikan sinyal tidak lagi dianggap "sinyal tidak lengkap", refresh UI tidak berkedip
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug + UX
+**Status:** 🟡 SELESAI di repo (belum di-deploy)
+
+**Ringkasan:**
+
+1. **Bug WARN palsu tiap 5 menit.** Engine mengirim penarikan sinyal
+   (EXPIRE / CANCEL / SUPERSEDE) lewat payload `Signal` yang hanya memuat
+   identitas dan `Action` — **tanpa `Status` dan tanpa `Direction`**. Runner
+   memasukkannya ke `HandleSignal` → `ConvertSignal` menolak → muncul
+   `WARN "sinyal engine tidak lengkap, diabaikan"` persis saat sinyal
+   kedaluwarsa. WARN itu terbaca seolah ada sinyal siap eksekusi yang dibuang.
+
+2. **Perbaikan.** `HandleSignal` sekarang membaca `Action` lebih dulu: aksi
+   selain `PUBLISH` dialihkan ke `HandleUpdate`, jalur yang memang sudah benar
+   (idempoten lewat cek `IsTerminal`). Alasan penarikan diturunkan dari jenis
+   aksi karena `Signal` tidak punya kolom `Reason`.
+
+3. **Bukan celah eksekusi.** `validateSignal` sudah menolak sinyal yang lewat
+   `ExpiresAt` (`RejectExpired`). Jadi status DB yang tertinggal bukan risiko
+   trading, hanya ketidaktepatan tampilan. Tetap diperbaiki agar riwayat akurat.
+
+4. **Refresh UI tidak lagi berkedip.**
+   - `useMarketCandles`, `useSignals`, `usePositions` memakai
+     `placeholderData: keepPreviousData`, sehingga data lama dipertahankan saat
+     ganti timeframe / polling.
+   - Skeleton hanya muncul bila benar-benar belum ada data sama sekali.
+   - Tombol "Muat Ulang" tidak lagi berputar tiap polling 15 detik; putaran
+     hanya mewakili permintaan yang diminta pengguna.
+
+5. **Pesan kosong lebih jujur.** Daftar setup kosong kini menjelaskan bahwa
+   sinyal hanya dikirim untuk pasangan timeframe yang dipantau, bukan sekadar
+   "belum ada riwayat".
+
+**File terdampak:**
+
+- `backend/internal/runner/service.go` (`HandleSignal`, `alasanPenarikan`)
+- `backend/internal/runner/expire_payload_test.go` (baru, 4 test)
+- `frontend/src/lib/queries.ts` (`keepPreviousData`)
+- `frontend/src/features/charts/TradingRadarChart.tsx` (skeleton kondisional)
+- `frontend/src/pages/SignalsPage.tsx` (refetch manual, skeleton, pesan kosong)
+
+**Verifikasi:**
+
+- Test payload baru **terbukti menangkap bug**: dimutasi dengan mematikan cabang
+  Action → 2 test GAGAL; dikembalikan → LULUS.
+- `go build ./...` + `go test ./internal/runner/` hijau.
+- Frontend `tsc --noEmit` bersih, 20 file / 114 test lulus, `vite build` sukses.
+- Catatan: `admin-buat-akun.test.tsx` sempat gagal karena timeout 5s saat suite
+  paralel; lulus sendiri dan pada run berikutnya. Flaky, bukan regresi.
+
+**Catatan temuan produksi (bukan bug):** akun `ryn-admin` hanya punya switch
+**ILA 2.0** untuk EURUSD, sedangkan sinyal EURUSD yang terbit adalah **ILA 3.0**.
+Karena tidak ada switch yang cocok, sinyal itu memang tidak diteruskan ke akun
+tersebut. Untuk menerimanya, nyalakan switch ILA 3.0 pada pair itu.
+
 ### 2026-11-11 — Pair timeframe per simbol: switch `watch` tidak lagi bocor antar simbol
 
 **Pelaku:** Claude

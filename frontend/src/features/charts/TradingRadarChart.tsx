@@ -331,7 +331,10 @@ export function TradingRadarChart({
         </div>
       </div>
 
-      {query.isLoading ? (
+      {/* Skeleton hanya untuk pemuatan pertama. Saat data lama masih ada
+          (ganti timeframe atau penyegaran berkala), chart lama dipertahankan
+          agar tampilan tidak berkedip. */}
+      {query.isLoading && candles.length === 0 ? (
         <Skeleton className="h-[340px] w-full rounded-xl" />
       ) : (
         <PriceChart
