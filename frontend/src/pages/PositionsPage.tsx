@@ -1,10 +1,15 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, LineChart } from 'lucide-react'
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   EmptyState,
+  Input,
+  Label,
   PageHeader,
+  Select,
   Skeleton,
   StatusPill,
   Table,
@@ -13,18 +18,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Alert,
-  Card,
-  Input,
-  Label,
 } from '@/components/ui'
-import { usePositions } from '@/lib/queries'
+import { useJournal } from '@/lib/queries'
 import { downloadFile } from '@/lib/http'
 import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Position, PositionStatus } from '@/types/api'
 import { PositionExecutionChart } from '@/features/charts/PositionExecutionChart'
 import { chartTheme } from '@/features/charts/lib/theme'
+import { JournalSummary } from '@/features/journal/components/JournalSummary'
+import { JournalSkippedList } from '@/features/journal/components/JournalSkippedList'
+import { SimulasiBadge } from '@/features/journal/components/SimulasiBadge'
 
 const LABEL: Record<PositionStatus, string> = {
   OPEN: 'Open',
@@ -42,22 +46,76 @@ const TONE: Record<PositionStatus, 'solid' | 'outline' | 'neutral' | 'muted'> = 
   UNTRACKED: 'muted',
 }
 
+/** Tab memisahkan posisi berjalan, riwayat, dan peluang yang terlewat. */
+type Tab = 'aktif' | 'riwayat' | 'terlewat'
+
+const TABS: { id: Tab; label: string; keterangan: string }[] = [
+  { id: 'aktif', label: 'Posisi Aktif', keterangan: 'Order yang masih hidup di broker.' },
+  { id: 'riwayat', label: 'Riwayat', keterangan: 'Posisi yang sudah ditutup beserta hasilnya.' },
+  {
+    id: 'terlewat',
+    label: 'Tidak Tereksekusi',
+    keterangan: 'Sinyal yang tidak berakhir sebagai posisi, beserta alasannya.',
+  },
+]
+
+/** Periode jurnal yang bisa dipilih pengguna. */
+const PERIODE = [
+  { hari: 7, label: '7 hari terakhir' },
+  { hari: 30, label: '30 hari terakhir' },
+  { hari: 90, label: '90 hari terakhir' },
+  { hari: 365, label: '1 tahun terakhir' },
+]
+
 /**
- * PositionsPage menampilkan posisi dan menyediakan unduhan riwayat.
- * Cetak biru CSV memuat waktu WIB dan NY sekaligus agar tidak ambigu saat
- * dibuka di luar Indonesia.
+ * PositionsPage adalah Jurnal Eksekusi.
+ *
+ * Halaman ini menjawab tiga pertanyaan yang berbeda, karena itu dipecah per
+ * tab alih-alih dicampur dalam satu daftar:
+ *  1. Apa yang sedang berjalan?          -> Posisi Aktif
+ *  2. Bagaimana hasil yang sudah selesai? -> Riwayat
+ *  3. Peluang mana yang terlewat?         -> Tidak Tereksekusi
+ *
+ * Ringkasan performa selalu terlihat di atas agar pengguna membaca angka
+ * sebelum detailnya. Angka ringkasan hanya memakai posisi yang sudah ditutup;
+ * posisi berjalan dipisahkan supaya winrate tidak berubah tanpa sebab.
  *
  * Setiap posisi dapat dibuka sebagai accordion berisi chart eksekusi: titik
  * entry, level SL/TP broker, dan garis penghubung ke titik exit.
  */
 export default function PositionsPage() {
-  const { data, isLoading, isError, error } = usePositions()
+  const [tab, setTab] = useState<Tab>('aktif')
+  const [hari, setHari] = useState(30)
+  const [strategi, setStrategi] = useState('')
+  const [symbol, setSymbol] = useState('')
+
+  const { data, isLoading, isError, error } = useJournal({
+    days: hari,
+    strategy: strategi,
+    symbol: symbol,
+  })
+
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [downloading, setDownloading] = useState(false)
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const theme = chartTheme()
+
+  // positions di-memo agar identitasnya stabil: tanpa itu, setiap render
+  // menghasilkan array baru dan seluruh useMemo di bawahnya dihitung ulang.
+  const positions = useMemo(() => data?.positions ?? [], [data?.positions])
+  const skipped = useMemo(() => data?.skipped ?? [], [data?.skipped])
+  const aktif = useMemo(() => positions.filter((pos) => pos.status === 'OPEN'), [positions])
+  const riwayat = useMemo(() => positions.filter((pos) => pos.status !== 'OPEN'), [positions])
+
+  /** daftarSimbol menyusun pilihan pair dari posisi dan peluang yang ada. */
+  const daftarSimbol = useMemo(() => {
+    const unik = new Set<string>()
+    for (const pos of positions) unik.add(pos.symbol)
+    for (const item of skipped) if (item.symbol) unik.add(item.symbol)
+    return [...unik].sort()
+  }, [positions, skipped])
 
   const download = async () => {
     setDownloading(true)
@@ -77,47 +135,132 @@ export default function PositionsPage() {
   const pnlColor = (position: Position) =>
     position.profit_loss >= 0 ? theme.profit : theme.loss
 
+  const tampil = tab === 'aktif' ? aktif : riwayat
+  const kosong = data && positions.length === 0
+
   return (
     <>
       <PageHeader
-        title="Positions"
-        description="Posisi aktif dan riwayat transaksi broker yang dieksekusi dari sinyal ILA."
+        title="Jurnal Eksekusi"
+        description="Rekam jejak trading dari sinyal ILA: posisi berjalan, hasil yang sudah ditutup, dan peluang yang terlewat."
       />
 
+      {/* --- Ringkasan performa ------------------------------------------- */}
+      {data ? (
+        <JournalSummary stats={data.stats} />
+      ) : isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : null}
+
+      {/* --- Filter periode, metode, dan pair ------------------------------ */}
       <Card className="p-3">
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="export-from">Dari tanggal</Label>
-            <Input id="export-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+            <Label htmlFor="jurnal-periode">Periode</Label>
+            <Select
+              id="jurnal-periode"
+              value={String(hari)}
+              onChange={(event) => setHari(Number(event.target.value))}
+            >
+              {PERIODE.map((item) => (
+                <option key={item.hari} value={item.hari}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="export-to">Sampai tanggal</Label>
-            <Input id="export-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+            <Label htmlFor="jurnal-metode">Metode</Label>
+            <Select
+              id="jurnal-metode"
+              value={strategi}
+              onChange={(event) => setStrategi(event.target.value)}
+            >
+              <option value="">Semua metode</option>
+              <option value="ila-2.0">ILA 2.0</option>
+              <option value="ila-3.0">ILA 3.0</option>
+            </Select>
           </div>
-          <div className="flex items-end">
-            <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
-              {downloading ? 'Menyiapkan…' : 'Export CSV'}
-            </Button>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="jurnal-pair">Pair</Label>
+            <Select
+              id="jurnal-pair"
+              value={symbol}
+              onChange={(event) => setSymbol(event.target.value)}
+            >
+              <option value="">Semua pair</option>
+              {daftarSimbol.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Format waktu ekspor mencakup WIB dan New York (NY).
-        </p>
-        {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
       </Card>
+
+      {/* --- Tab ----------------------------------------------------------- */}
+      <div className="flex flex-wrap gap-1 border-b border-border">
+        {TABS.map((item) => {
+          const jumlah =
+            item.id === 'aktif'
+              ? aktif.length
+              : item.id === 'riwayat'
+                ? riwayat.length
+                : skipped.length
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              aria-selected={tab === item.id}
+              role="tab"
+              className={cn(
+                '-mb-px border-b-2 px-3 py-2 text-[12.5px] font-medium transition-colors',
+                tab === item.id
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {item.label}
+              <span className="ml-1.5 tabular text-[11px] text-muted-foreground">{jumlah}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <p className="text-[11px] text-muted-foreground">
+        {TABS.find((item) => item.id === tab)?.keterangan}
+      </p>
 
       {isLoading && <Skeleton className="h-56 w-full" />}
       {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}
 
-      {data && data.length === 0 && (
+      {/* --- Tab: peluang terlewat ----------------------------------------- */}
+      {tab === 'terlewat' && data && <JournalSkippedList items={skipped} />}
+
+      {/* --- Tab: posisi --------------------------------------------------- */}
+      {tab !== 'terlewat' && kosong && (
         <EmptyState
-          title="Belum ada posisi"
-          description="Posisi tercatat setelah sinyal dieksekusi pada akun broker Anda."
+          title={tab === 'aktif' ? 'Belum ada posisi berjalan' : 'Belum ada riwayat posisi'}
+          description={
+            tab === 'aktif'
+              ? 'Posisi muncul setelah sinyal dieksekusi pada akun broker Anda.'
+              : 'Riwayat terisi begitu posisi ditutup oleh broker.'
+          }
+        />
+      )}
+
+      {tab !== 'terlewat' && !kosong && tampil.length === 0 && (
+        <EmptyState
+          title={tab === 'aktif' ? 'Tidak ada posisi berjalan' : 'Tidak ada posisi tertutup'}
+          description="Coba ubah periode atau filter di atas."
         />
       )}
 
       {/* --- Desktop: tabel dengan accordion chart ------------------------- */}
-      {data && data.length > 0 && (
+      {tab !== 'terlewat' && tampil.length > 0 && (
         <div className="hidden lg:block">
           <Table>
             <TableHeader>
@@ -135,7 +278,7 @@ export default function PositionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((position) => {
+              {tampil.map((position) => {
                 const expanded = expandedId === position.id
                 return (
                   <Fragment key={position.id}>
@@ -164,7 +307,7 @@ export default function PositionsPage() {
                       <TableCell className="whitespace-nowrap font-semibold">
                         <span className="flex items-center gap-1.5">
                           {position.symbol}
-                          {position.is_dry_run && <Badge variant="muted">Demo</Badge>}
+                          {position.is_dry_run && <SimulasiBadge />}
                         </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -224,9 +367,9 @@ export default function PositionsPage() {
       )}
 
       {/* --- Mobile: kartu dengan accordion chart -------------------------- */}
-      {data && data.length > 0 && (
+      {tab !== 'terlewat' && tampil.length > 0 && (
         <div className="space-y-2 lg:hidden">
-          {data.map((position) => {
+          {tampil.map((position) => {
             const expanded = expandedId === position.id
             return (
               <div key={position.id} className="overflow-hidden rounded-xl border border-border bg-card">
@@ -237,12 +380,12 @@ export default function PositionsPage() {
                   className="flex w-full flex-col gap-2 p-3 text-left"
                 >
                   <div className="flex w-full items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold">{position.symbol}</span>
                       <Badge variant="outline" className="text-[10px]">
                         {position.direction}
                       </Badge>
-                      {position.is_dry_run && <Badge variant="muted">Demo</Badge>}
+                      {position.is_dry_run && <SimulasiBadge />}
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusPill tone={TONE[position.status]}>{LABEL[position.status]}</StatusPill>
@@ -293,6 +436,29 @@ export default function PositionsPage() {
           })}
         </div>
       )}
+
+      {/* --- Ekspor CSV ---------------------------------------------------- */}
+      <Card className="p-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="export-from">Dari tanggal</Label>
+            <Input id="export-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="export-to">Sampai tanggal</Label>
+            <Input id="export-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+          </div>
+          <div className="flex items-end">
+            <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
+              {downloading ? 'Menyiapkan…' : 'Export CSV'}
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Format waktu ekspor mencakup WIB dan New York (NY).
+        </p>
+        {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
+      </Card>
     </>
   )
 }

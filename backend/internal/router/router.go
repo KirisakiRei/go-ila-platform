@@ -212,7 +212,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		repository.NewTierFeatureReader(db),
 	)
 	service.SetAccountStrategyLister(accountService, accountPairStrategyRepo)
-	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo)
+	// Jurnal eksekusi memakai pembaca sendiri: kebutuhannya (rentang, agregat,
+	// peluang terlewat) tidak dimiliki daftar posisi biasa.
+	journalRepo := repository.NewJournalRepository(db)
+	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo).
+		WithJournal(journalRepo, signalReader{repo: signalRepo}).
+		Build()
 	systemService := service.NewSystemService(service.SystemServiceDeps{
 		Accounts:  accountRepo,
 		States:    stateRepo,
@@ -533,6 +538,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		me.GET("/signals", tradingHandler.Signals)
 		me.GET("/positions", tradingHandler.Positions)
 		me.GET("/positions/export", tradingHandler.ExportPositions)
+		me.GET("/journal", tradingHandler.Journal)
 
 		// Candle untuk chart radar sinyal dan peninjau posisi. Feed mengikuti
 		// pair yang dipilih admin agar selaras dengan evaluasi engine.

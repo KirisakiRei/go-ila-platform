@@ -484,6 +484,66 @@ export type Position = {
   pnl_known: boolean
 }
 
+/**
+ * JournalStats merangkum jurnal eksekusi.
+ *
+ * Angka R dan winrate hanya memakai posisi yang sudah ditutup, sehingga tidak
+ * berubah setiap halaman dimuat oleh posisi baru yang masih berjalan.
+ */
+export type JournalStats = {
+  total_positions: number
+  open_positions: number
+  closed_tp: number
+  closed_sl: number
+  closed_manual: number
+  untracked: number
+  wins: number
+  losses: number
+  /** Persen 0-100; nol bila belum ada penutupan yang hasilnya diketahui. */
+  win_rate: number
+  total_r: number
+  average_r: number
+  total_profit: number
+  dry_run_positions: number
+}
+
+/**
+ * JournalSkipped adalah sinyal yang tidak berakhir sebagai posisi.
+ *
+ * Ditampilkan agar jurnal tidak hanya berisi trade yang jadi: peluang yang
+ * terlewat juga bagian dari rekam jejak.
+ */
+export type JournalSkipped = {
+  signal_id: string
+  symbol: string
+  strategy_version: StrategyVersion
+  direction: TradeDirection
+  htf: string
+  ltf: string
+  entry_price: number
+  stop_loss: number
+  take_profit: number
+  risk_reward: number
+  /** Status user_signal, bukan status sinyal. */
+  status: string
+  reason?: string
+  occurred_at: string
+  occurred_at_pair: TimePair
+}
+
+/** Balasan satu permintaan jurnal. */
+export type JournalResponse = {
+  stats: JournalStats
+  positions: Position[]
+  skipped: JournalSkipped[]
+  filters: {
+    from?: string
+    to?: string
+    strategy_version?: string
+    symbol?: string
+  }
+}
+
 /** Satu perangkat yang sedang masuk ke akun ini. */
 export type Session = {
   id: string

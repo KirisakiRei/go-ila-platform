@@ -72,7 +72,7 @@ func newTradingServiceFor(t *testing.T, user *model.User, signals []model.Signal
 		&fakePositionLister{},
 		&fakeUserSignalReader{status: map[string]*model.UserSignal{}},
 	)
-	svc.(*tradingService).clock = func() time.Time { return now }
+	svc.clock = func() time.Time { return now }
 	return svc
 }
 
@@ -186,7 +186,7 @@ func TestCanConfirmHanyaSaatSiap(t *testing.T) {
 			"sig-1": {SignalID: "sig-1", UserID: userIDTest, Status: model.SignalStatusSkipped},
 		}},
 	)
-	svc.(*tradingService).clock = func() time.Time { return now }
+	svc.clock = func() time.Time { return now }
 
 	list, err := svc.Signals(context.Background(), userIDTest, 0)
 	if err != nil {

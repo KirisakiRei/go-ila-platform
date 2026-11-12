@@ -41,6 +41,8 @@ type TradingService interface {
 	Positions(ctx context.Context, userID string, limit int) ([]dto.PositionResponse, error)
 	// ExportPositions menyiapkan riwayat posisi sebagai CSV.
 	ExportPositions(ctx context.Context, userID string, from, to time.Time) (*PositionExport, error)
+	// Journal menyusun jurnal eksekusi: posisi, ringkasan, dan peluang terlewat.
+	Journal(ctx context.Context, userID string, query JournalQuery) (*dto.JournalResponse, error)
 }
 
 type tradingService struct {
@@ -49,7 +51,12 @@ type tradingService struct {
 	positions  PositionLister
 	userSignal UserSignalReader
 	clock      func() time.Time
+	// journal dan signalDetail disuntikkan lewat WithJournal agar pemanggil
+	// lama (dan pengujian yang sudah ada) tetap sah tanpa perubahan.
+	journal      JournalRepositoryReader
+	signalDetail SignalDetailReader
 }
+
 
 // NewTradingService membuat service tampilan trading.
 func NewTradingService(
@@ -57,14 +64,35 @@ func NewTradingService(
 	signals SignalLister,
 	positions PositionLister,
 	userSignal UserSignalReader,
-) TradingService {
-	return &tradingService{
+) *TradingServiceBuilder {
+	return &TradingServiceBuilder{tradingService{
 		users:      users,
 		signals:    signals,
 		positions:  positions,
 		userSignal: userSignal,
 		clock:      func() time.Time { return time.Now().UTC() },
-	}
+	}}
+}
+
+// TradingServiceBuilder merangkai layanan tampilan trading.
+//
+// Mengembalikan struct (bukan interface) supaya pemanggil bisa memasang
+// tambahan seperti jurnal sebelum layanan dipakai. Tanpa ini, jurnal harus
+// menjadi parameter wajib konstruktor dan setiap pemanggil lama ikut berubah.
+type TradingServiceBuilder struct {
+	tradingService
+}
+
+// WithJournal memasang pembaca jurnal beserta pembaca rincian sinyal.
+func (b *TradingServiceBuilder) WithJournal(journal JournalRepositoryReader, detail SignalDetailReader) *TradingServiceBuilder {
+	b.journal = journal
+	b.signalDetail = detail
+	return b
+}
+
+// Build menyerahkan layanan sebagai antarmuka yang dipakai handler.
+func (b *TradingServiceBuilder) Build() TradingService {
+	return &b.tradingService
 }
 
 // Signals mengembalikan sinyal untuk user, sudah memperhitungkan delay tier.

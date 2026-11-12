@@ -7,6 +7,7 @@ import type {
   BrokerAccount,
   CreateAccountPayload,
   CreateSubscriptionPayload,
+  JournalResponse,
   MarketCandlesResponse,
   PairCatalogResponse,
   Position,
@@ -109,6 +110,32 @@ export const strategyApi = {
 export const tradingApi = {
   signals: (limit = 50) => request<Signal[]>('/signals', { query: { limit } }),
   positions: (limit = 100) => request<Position[]>('/positions', { query: { limit } }),
+  /**
+   * Jurnal eksekusi: posisi, ringkasan, dan peluang yang terlewat.
+   *
+   * Rentang dikirim sebagai `days` bila pengguna tidak memilih tanggal,
+   * supaya server yang menentukan batas hari pada zona hari akuntansi.
+   */
+  journal: (params: {
+    days?: number
+    from?: string
+    to?: string
+    strategy?: string
+    symbol?: string
+    limit?: number
+    skippedLimit?: number
+  }) =>
+    request<JournalResponse>('/journal', {
+      query: {
+        days: params.days,
+        from: params.from || undefined,
+        to: params.to || undefined,
+        strategy: params.strategy || undefined,
+        symbol: params.symbol || undefined,
+        limit: params.limit,
+        skipped_limit: params.skippedLimit,
+      },
+    }),
 }
 
 /**

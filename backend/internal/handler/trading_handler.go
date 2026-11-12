@@ -47,6 +47,39 @@ func (h *TradingHandler) Positions(c *gin.Context) {
 	httpx.OK(c, "Daftar posisi", result)
 }
 
+// Journal menangani GET /api/v1/journal.
+//
+// Rentang bawaan 30 hari bila parameter hari kosong: cukup memuat banyak trade
+// untuk menilai strategi tanpa membuat halaman berat.
+func (h *TradingHandler) Journal(c *gin.Context) {
+	hari, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
+	limitPositions, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	limitSkipped, _ := strconv.Atoi(c.DefaultQuery("skipped_limit", "100"))
+
+	query := service.JournalQuery{
+		From:           parseDayParam(c.Query("from")),
+		To:             parseDayParam(c.Query("to")),
+		Hari:           hari,
+		Strategy:       c.Query("strategy"),
+		Symbol:         c.Query("symbol"),
+		LimitPositions: limitPositions,
+		LimitSkipped:   limitSkipped,
+	}
+
+	// To dari antarmuka berupa tanggal; jadikan eksklusif (awal hari berikutnya)
+	// agar seluruh hari terakhir ikut terhitung.
+	if !query.To.IsZero() {
+		query.To = query.To.AddDate(0, 0, 1)
+	}
+
+	result, err := h.trading.Journal(c.Request.Context(), middleware.CurrentUserID(c), query)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Jurnal eksekusi", result)
+}
+
 // ExportPositions menangani GET /api/v1/positions/export.
 // Rentang tanggal memakai zona hari akuntansi yang sama dengan Runner.
 func (h *TradingHandler) ExportPositions(c *gin.Context) {

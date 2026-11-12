@@ -35,6 +35,7 @@ export const queryKeys = {
   marketCandles: (symbol: string, timeframe: string, limit: number) =>
     ['market', 'candles', symbol, timeframe, limit] as const,
   positions: (limit: number) => ['positions', limit] as const,
+  journal: (params: JournalParams) => ['journal', params] as const,
   systemStatus: ['system', 'status'] as const,
   trial: ['trial'] as const,
   sessions: ['me', 'sessions'] as const,
@@ -252,6 +253,36 @@ export function useSignals(limit = 50) {
     refetchInterval: 15_000,
     // Daftar tetap tampil selama penyegaran berkala; tanpa ini setiap polling
     // sempat mengosongkan data dan memicu kedipan.
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * JournalParams adalah kunci permintaan jurnal.
+ *
+ * Dipakai juga sebagai bagian kunci cache, sehingga setiap kombinasi filter
+ * mendapat hasilnya sendiri tanpa saling menimpa.
+ */
+export type JournalParams = {
+  days?: number
+  from?: string
+  to?: string
+  strategy?: string
+  symbol?: string
+}
+
+/**
+ * useJournal membaca jurnal eksekusi.
+ *
+ * Jurnal menyegarkan diri lebih lambat daripada daftar posisi: isinya
+ * ringkasan dan riwayat, dan memuat ulang terlalu sering hanya menambah beban
+ * tanpa informasi baru.
+ */
+export function useJournal(params: JournalParams) {
+  return useQuery({
+    queryKey: queryKeys.journal(params),
+    queryFn: () => tradingApi.journal({ ...params, limit: 100, skippedLimit: 100 }),
+    refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   })
 }
