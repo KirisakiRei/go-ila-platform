@@ -79,7 +79,11 @@ func (r *signalRepository) ListForUser(ctx context.Context, userID string, since
 		Joins("JOIN subscription s ON s.symbol = signal.symbol AND s.user_id = ? AND s.is_active = ?", userID, true).
 		Where("signal.published_at >= ?", since).
 		Distinct("signal.*").
-		Order("signal.published_at DESC").
+		// Baris radar (identitas tetap `status-*`) selalu diurutkan lebih dulu.
+		// Tanpa ini, `published_at`-nya yang lama membuat baris radar terpotong
+		// oleh limit ketika riwayat sinyal sudah menumpuk, sehingga matriks
+		// timeframe tampak kosong padahal radar masih bergerak.
+		Order("CASE WHEN signal.signal_id LIKE 'status-%' THEN 0 ELSE 1 END, signal.published_at DESC").
 		Limit(limit).
 		Find(&signals).Error
 	if err != nil {
