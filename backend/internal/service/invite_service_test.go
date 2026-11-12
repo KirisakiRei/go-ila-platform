@@ -201,6 +201,13 @@ func TestUndanganSahMembuatAkunTierPlus(t *testing.T) {
 		t.Fatalf("tier undangan tidak diterapkan: %v", auth.diterapkan)
 	}
 
+	// Balasan ke klien harus membawa tier yang SAMA dengan database. Objek ini
+	// dibentuk sebelum hak undangan ditulis, jadi tanpa pembaruan eksplisit ia
+	// masih berkata "free" dan menyesatkan pengguna yang baru masuk.
+	if user.Tier != "plus" {
+		t.Fatalf("tier pada balasan Klaim = %q; ingin \"plus\"", user.Tier)
+	}
+
 	// Kuota terpakai satu.
 	row, _ := store.FindByHash(context.Background(), HashInviteCode(created.Code))
 	if row.UsedCount != 1 {

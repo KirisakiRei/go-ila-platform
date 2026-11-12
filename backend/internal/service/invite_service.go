@@ -341,6 +341,12 @@ func (s *inviteService) Klaim(ctx context.Context, code string, req dto.Register
 		return nil, err
 	}
 
+	// Hak undangan sudah tertulis di database. Salinan yang dikembalikan masih
+	// membawa tier lama (free) dari saat akun dibuat, jadi tier di sini harus
+	// ikut diperbarui: balasan ini yang dibaca klien, dan free akan menyesatkan
+	// pengguna yang baru saja masuk lewat undangan plus.
+	user.Tier = invite.Tier
+
 	if s.audit != nil {
 		_ = s.audit.Record(ctx, AuditEntry{
 			ActorID: user.ID, Action: audit.InviteRedeem,
