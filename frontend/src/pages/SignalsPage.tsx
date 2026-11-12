@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Bot,
+  ChevronDown,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
@@ -25,7 +26,8 @@ import { usePositions, useSignals, useStrategies, useSubscriptions, useTimeframe
 import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
-import { setTimeframeDipantau } from '@/features/signals/lib/signal-slots'
+import { setTimeframeDipantau, mapSignalsToSlots, ringkasanSlot } from '@/features/signals/lib/signal-slots'
+import { slotPalingDekat, stageOf, type SlotStage } from '@/features/signals/lib/slot-stage'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
 import { TradingRadarChart } from '@/features/charts/TradingRadarChart'
@@ -526,8 +528,19 @@ export default function SignalsPage() {
                 const pairSigs = (signals ?? []).filter((s) => s.symbol.toUpperCase() === symbol)
                 const pairPos = (positions ?? []).filter((p) => p.symbol.toUpperCase() === symbol)
 
-                const latestIla2 = pairSigs.find((s) => s.strategy_version === 'ila-2.0')
-                const latestIla3 = pairSigs.find((s) => s.strategy_version === 'ila-3.0')
+                // Slot per metode menggantikan `find()` yang dulu mengambil satu
+                // baris acak: tiap pasangan timeframe bergerak sendiri-sendiri,
+                // jadi semuanya harus terlihat, bukan diwakili satu saja.
+                const slotIla2 = mapSignalsToSlots(
+                  pairSigs.filter((s) => s.strategy_version === 'ila-2.0'),
+                  'ila-2.0',
+                )
+                const ringkasIla2 = ringkasanSlot(slotIla2)
+                const slotIla3 = mapSignalsToSlots(
+                  pairSigs.filter((s) => s.strategy_version === 'ila-3.0'),
+                  'ila-3.0',
+                )
+                const ringkasIla3 = ringkasanSlot(slotIla3)
 
                 const hasActiveSub = (subscriptions ?? []).some(
                   (sub) => sub.symbol.toUpperCase() === symbol && sub.is_active,
@@ -564,71 +577,11 @@ export default function SignalsPage() {
                     </CardHeader>
 
                     <CardContent className="space-y-3 pt-3.5">
-                      {/* Sub-card ILA 2.0 */}
-                      <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-foreground">ILA 2.0</span>
-                          {latestIla2 ? (
-                            <StatusPill tone={SIGNAL_TONE[latestIla2.status]} className="text-[10px]">
-                              {SIGNAL_LABEL[latestIla2.status]}
-                            </StatusPill>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground">Belum ada sinyal</span>
-                          )}
-                        </div>
+                      {/* Slot per metode: semua pasangan timeframe tampil sekaligus. */}
+                      <MetodeSlotGrid strategy="ila-2.0" slots={slotIla2} ringkas={ringkasIla2} />
 
-                        {latestIla2 && (
-                          <div className="mt-2 flex items-center justify-between text-xs">
-                            <span
-                              className={cn(
-                                'inline-flex items-center gap-1 font-bold',
-                                latestIla2.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
-                              )}
-                            >
-                              {latestIla2.direction === 'BUY' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                              {latestIla2.direction} @ {formatNumber(latestIla2.entry_price, 4)}
-                            </span>
-                            <span className="text-[10.5px] tabular-nums text-muted-foreground">
-                              R:R 1:{formatNumber(latestIla2.risk_reward, 1)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Sub-card ILA 3.0 — hanya untuk tier yang berhak. */}
                       {adaIla3 && (
-                        <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-foreground">ILA 3.0</span>
-                              <Badge variant="muted" className="text-[9px]">Plus</Badge>
-                            </div>
-                            {latestIla3 ? (
-                              <StatusPill tone={SIGNAL_TONE[latestIla3.status]} className="text-[10px]">
-                                {SIGNAL_LABEL[latestIla3.status]}
-                              </StatusPill>
-                            ) : (
-                              <span className="text-[11px] text-muted-foreground">Menunggu setup</span>
-                            )}
-                          </div>
-
-                          {latestIla3 && (
-                            <div className="mt-2 flex items-center justify-between text-xs">
-                              <span
-                                className={cn(
-                                  'inline-flex items-center gap-1 font-bold',
-                                  latestIla3.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
-                                )}
-                              >
-                                {latestIla3.direction === 'BUY' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                {latestIla3.direction} @ {formatNumber(latestIla3.entry_price, 4)}
-                              </span>
-                              <span className="text-[10.5px] tabular-nums text-muted-foreground">
-                                R:R 1:{formatNumber(latestIla3.risk_reward, 1)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                        <MetodeSlotGrid strategy="ila-3.0" slots={slotIla3} ringkas={ringkasIla3} />
                       )}
 
                       <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
@@ -656,5 +609,139 @@ export default function SignalsPage() {
       )}
       </div>
     </>
+  )
+}
+
+/**
+ * SlotCell menampilkan satu pasangan timeframe pada kartu overview.
+ *
+ * Angka Entry/SL/TP sengaja HANYA muncul saat slot benar-benar siap entry.
+ * Baris radar selalu membawa harga 0 sebelum setup terbentuk, dan menampilkan
+ * "BUY @ 0,0000" membuat pengguna membaca angka yang tidak nyata.
+ */
+function SlotCell({
+  slot,
+  stage,
+  tersorot,
+}: {
+  slot: ReturnType<typeof mapSignalsToSlots>[number]
+  stage: SlotStage
+  tersorot: boolean
+}) {
+  const signal = slot.latestSignal
+  const arah = signal?.direction
+  const punyaArah = arah === 'BUY' || arah === 'SELL'
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-0.5 rounded-md border px-2 py-1.5',
+        // Aksen dipakai HANYA untuk menandai slot yang paling dekat entry.
+        // Tidak ada simbol panah atau teks tambahan: cukup bobot garis.
+        tersorot ? 'border-foreground/60 bg-secondary' : 'border-border/60 bg-secondary/30',
+        stage.ready && 'border-foreground bg-secondary',
+      )}
+    >
+      <span className="font-mono text-[10px] font-semibold leading-tight text-muted-foreground">
+        {slot.label}
+      </span>
+
+      <span
+        className={cn(
+          'inline-flex items-center gap-0.5 text-[11px] font-bold leading-tight',
+          punyaArah ? (arah === 'BUY' ? 'text-emerald-600' : 'text-rose-600') : 'text-muted-foreground',
+        )}
+      >
+        {arah === 'BUY' && <TrendingUp className="h-2.5 w-2.5 shrink-0" />}
+        {arah === 'SELL' && <TrendingDown className="h-2.5 w-2.5 shrink-0" />}
+        {punyaArah ? arah : '—'}
+      </span>
+
+      <span
+        className={cn(
+          'truncate text-[10px] leading-tight',
+          stage.ready ? 'font-semibold text-foreground' : 'text-muted-foreground',
+        )}
+        title={stage.label}
+      >
+        {stage.label}
+      </span>
+
+      {stage.ready && signal && (
+        <span className="truncate text-[10px] tabular-nums text-muted-foreground" title="Entry">
+          @ {formatNumber(signal.entry_price, 2)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * MetodeSlotGrid menampilkan seluruh slot satu metode sebagai grid.
+ *
+ * Semua slot tampil sekaligus, bukan bergantian: tiap pasangan timeframe
+ * bergerak sendiri-sendiri, jadi menyembunyikan sebagian hanya menghilangkan
+ * informasi yang memang tidak saling menggantikan.
+ */
+function MetodeSlotGrid({
+  strategy,
+  slots,
+  ringkas,
+}: {
+  strategy: 'ila-2.0' | 'ila-3.0'
+  slots: ReturnType<typeof mapSignalsToSlots>
+  ringkas: { total: number; siap: number; terisi: number }
+}) {
+  const terdekat = slotPalingDekat(slots, strategy)
+  // ILA 3.0 dilipat bawaan: delapan slot sekaligus membuat kartu overview
+  // terlalu tinggi dan mendorong pair lain keluar layar.
+  const [terbuka, setTerbuka] = useState(strategy === 'ila-2.0')
+
+  return (
+    <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5">
+      <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-foreground">
+            {strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
+          </span>
+          {strategy === 'ila-3.0' && (
+            <Badge variant="muted" className="text-[9px]">
+              Plus
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10.5px] tabular-nums text-muted-foreground">
+            {ringkas.siap > 0 ? `${ringkas.siap} ready` : `${ringkas.terisi} slot`}
+          </span>
+          {strategy === 'ila-3.0' && (
+            <button
+              type="button"
+              onClick={() => setTerbuka((v) => !v)}
+              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              aria-expanded={terbuka}
+              aria-label={terbuka ? 'Tutup slot ILA 3.0' : 'Buka slot ILA 3.0'}
+            >
+              {terbuka ? 'Tutup' : 'Buka'}
+              <ChevronDown className={cn('h-3 w-3 transition-transform', terbuka && 'rotate-180')} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {terbuka && (
+        <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {slots.map((slot) => (
+            <SlotCell
+              key={slot.key}
+              slot={slot}
+              stage={stageOf(strategy, slot.latestSignal?.status ?? '')}
+              tersorot={slot.key === terdekat}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

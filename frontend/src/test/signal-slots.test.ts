@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   mapSignalsToSlots,
+  ringkasanSlot,
   semuaTimeframeMati,
   setTimeframeDipantau,
   timeframeSlotDipantau,
@@ -144,5 +145,37 @@ describe('setTimeframeDipantau', () => {
     // Server boleh mengirim D1/H1, UI memakai D/H1.
     const aktif = setTimeframeDipantau(matriks({ 'D1|H1': true }), 'ila-2.0')
     expect(timeframeSlotDipantau(aktif, { htf: 'D1', ltf: 'H1' })).toBe(true)
+  })
+})
+
+describe('ringkasanSlot', () => {
+  const slot = (
+    key: string,
+    status: 'READY' | 'WAIT_CISD' | 'WAIT_SWEEP' | 'SCANNING' | 'INVALIDATED',
+    terisi: boolean,
+  ) => ({
+    key,
+    label: key,
+    htf: key,
+    ltf: key,
+    status,
+    statusLabel: status,
+    statusTone: 'neutral' as const,
+    latestSignal: terisi ? ({} as unknown as Signal) : undefined,
+  })
+
+  it('menghitung slot siap dan slot terisi', () => {
+    const hasil = ringkasanSlot([
+      slot('a', 'WAIT_SWEEP', true),
+      slot('b', 'WAIT_CISD', true),
+      slot('c', 'READY', true),
+      slot('d', 'SCANNING', false),
+    ])
+    expect(hasil).toEqual({ total: 4, siap: 1, terisi: 3 })
+  })
+
+  it('tanpa slot siap tetap dihitung benar', () => {
+    const hasil = ringkasanSlot([slot('a', 'SCANNING', false), slot('b', 'SCANNING', false)])
+    expect(hasil).toEqual({ total: 2, siap: 0, terisi: 0 })
   })
 })

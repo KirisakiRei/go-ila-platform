@@ -289,3 +289,24 @@ export function timeframeSlotDipantau(
 export function semuaTimeframeMati(aktif: Set<string> | null): boolean {
   return aktif !== null && aktif.size === 0
 }
+
+/**
+ * ringkasanSlot merangkum keadaan slot satu metode untuk header kartu.
+ *
+ * `ready` menghitung slot yang benar-benar siap dieksekusi. Angka ini dipakai
+ * overview supaya pengguna bisa membedakan pair yang hanya "dipantau" dari
+ * pair yang punya peluang nyata, tanpa harus membuka detailnya.
+ */
+export function ringkasanSlot(slots: TimeframeSlot[]): {
+  total: number
+  siap: number
+  terisi: number
+} {
+  let siap = 0
+  let terisi = 0
+  for (const slot of slots) {
+    if (slot.latestSignal) terisi += 1
+    if (slot.status === 'READY') siap += 1
+  }
+  return { total: slots.length, siap, terisi }
+}
