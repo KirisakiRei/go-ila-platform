@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -553,26 +552,12 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 }
 
 // envFlag menjadi nilai bawaan flag ketika belum ada override di database.
-// Satu sumber untuk backend-api dan proses latar, sehingga angka yang tampil
-// di panel sama dengan yang dipakai Runner (plans/11 I2).
+//
+// Implementasinya sengaja tidak lagi ditulis di sini: backend-api dan Runner
+// wajib membaca sumber yang sama, karena salinan terpisah pernah menyimpang dan
+// membuat panel admin menampilkan angka berbeda dari yang dipakai Runner.
 func envFlag(cfg *config.Config, key string) string {
-	switch key {
-	case settings.KeyAutoExecute:
-		return strconv.FormatBool(cfg.AutoExecute)
-	case settings.KeyDryRunAll:
-		return strconv.FormatBool(cfg.DryRunAll)
-	case settings.KeyMaxDailyTrades:
-		return strconv.Itoa(cfg.MaxDailyTrades)
-	case settings.KeyMaxDailyLosses:
-		return strconv.Itoa(cfg.MaxDailyLosses)
-	case settings.KeyStopAfterWin:
-		return strconv.FormatBool(cfg.StopAfterWin)
-	case settings.KeyMarketOpenOnly:
-		return "true"
-	case settings.KeyLegalGate:
-		return "true"
-	}
-	return ""
+	return settings.EnvFromConfig(cfg)(key)
 }
 
 // registerAdmin memasang pintu admin: login, sesi, lalu route ber-permission.

@@ -73,6 +73,11 @@ type RunnerRepository interface {
 	FindUserByID(ctx context.Context, userID string) (*model.User, error)
 	ListActiveBrokerAccounts(ctx context.Context) ([]model.BrokerAccount, error)
 	UpdateBrokerAccount(ctx context.Context, account *model.BrokerAccount) error
+	// MarkAccountVerified mencatat bahwa broker menjawab pada waktu tertentu.
+	// Sengaja hanya menyentuh dua kolom: menulis seluruh baris (Save) bisa
+	// menimpa perubahan user yang terjadi bersamaan, mis. perubahan lot atau
+	// status freeze.
+	MarkAccountVerified(ctx context.Context, accountID string, at time.Time) error
 	UpsertAccountState(ctx context.Context, state *model.BrokerAccountState) error
 	FindCredential(ctx context.Context, accountID string) (*model.Credential, error)
 
@@ -607,6 +612,20 @@ func (r *runnerRepository) ListActiveBrokerAccounts(ctx context.Context) ([]mode
 func (r *runnerRepository) UpdateBrokerAccount(ctx context.Context, account *model.BrokerAccount) error {
 	if err := r.db.WithContext(ctx).Save(account).Error; err != nil {
 		return fmt.Errorf("memperbarui akun broker: %w", err)
+	}
+	return nil
+}
+
+// MarkAccountVerified mencatat waktu terakhir broker terbukti menjawab.
+//
+// last_error ikut dikosongkan karena keberhasilan membaca akun berarti galat
+// sebelumnya sudah tidak berlaku.
+func (r *runnerRepository) MarkAccountVerified(ctx context.Context, accountID string, at time.Time) error {
+	err := r.db.WithContext(ctx).Model(&model.BrokerAccount{}).
+		Where("id = ?", accountID).
+		Updates(map[string]any{"last_verified_at": at, "last_error": ""}).Error
+	if err != nil {
+		return fmt.Errorf("menandai akun terverifikasi: %w", err)
 	}
 	return nil
 }

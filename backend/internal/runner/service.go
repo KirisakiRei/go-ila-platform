@@ -626,12 +626,26 @@ func (s *Service) validateSignal(ctx context.Context, signal *model.Signal, now 
 		return RejectBadSignal
 	}
 	if !now.Before(signal.ExpiresAt) {
+		// Sinyal yang belum pernah siap bukan "gagal dieksekusi": engine hanya
+		// mengirim ulang status menunggu pada slot yang sama, sehingga barisnya
+		// memang basi. Bedakan agar notifikasi tidak berbunyi "terlambat" pada
+		// setup yang belum pernah menawarkan entry.
+		if menungguStatus(signal.Status) {
+			return RejectWaitingNext
+		}
 		return RejectExpired
 	}
 	if s.marketOpenRequired(ctx) && !s.marketOpen() {
 		return RejectMarketClosed
 	}
 	return RejectNone
+}
+
+// menungguStatus menandai sinyal yang masih dalam tahap menunggu konfirmasi
+// (belum pernah menawarkan entry). Dipakai untuk membedakan "setup kedaluwarsa"
+// dari "setup masih menunggu tahap berikutnya".
+func menungguStatus(status string) bool {
+	return strings.HasPrefix(status, "WAIT_")
 }
 
 // executableAccounts menyaring akun yang boleh menerima order baru.

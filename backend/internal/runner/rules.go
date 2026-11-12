@@ -16,8 +16,13 @@ import (
 type RejectReason string
 
 const (
-	RejectNone         RejectReason = ""
+	RejectNone RejectReason = ""
+	// Dua alasan berbeda perlu dibedakan agar notifikasi bisa menjelaskan
+	// keadaan sebenarnya: "lewat masa berlaku" hanya terjadi pada sinyal yang
+	// sempat READY, sedangkan "menunggu setup berikutnya" terjadi pada sinyal
+	// yang memang belum pernah siap sehingga wajar bila baris lamanya basi.
 	RejectExpired      RejectReason = "Sinyal sudah kedaluwarsa (batas waktu habis)."
+	RejectWaitingNext  RejectReason = "Setup belum siap dan sudah menunggu lewat satu lilin. Radar menunggu setup berikutnya."
 	RejectNotReady     RejectReason = "Sinyal belum siap dieksekusi."
 	RejectTerminal     RejectReason = "Sinyal sudah berada di status akhir."
 	RejectOpenPosition RejectReason = "Masih ada posisi terbuka. Tunggu sampai ditutup."

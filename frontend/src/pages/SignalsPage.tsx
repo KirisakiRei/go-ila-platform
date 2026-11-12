@@ -51,15 +51,11 @@ export default function SignalsPage() {
     [strategies],
   )
 
-  const [activeStrategyFilter, setActiveStrategyFilter] = useState<'all' | 'ila-2.0' | 'ila-3.0'>('all')
+  const [activeStrategyFilter, setActiveStrategyFilter] = useState<'ila-2.0' | 'ila-3.0'>('ila-2.0')
 
   // Filter metode yang ditawarkan mengikuti hak akses tier pengguna.
   const strategiTersedia = useMemo(
-    () =>
-      (adaIla3
-        ? (['all', 'ila-2.0', 'ila-3.0'] as const)
-        : (['all', 'ila-2.0'] as const)
-      ).slice(),
+    () => (adaIla3 ? (['ila-2.0', 'ila-3.0'] as const) : (['ila-2.0'] as const)).slice(),
     [adaIla3],
   )
 
@@ -92,14 +88,13 @@ export default function SignalsPage() {
     return (positions ?? []).filter((p) => p.symbol.toUpperCase() === activePair)
   }, [positions, activePair])
 
-  // Filter berdasarkan metode (ILA 2.0 / ILA 3.0)
+  // Filter berdasarkan metode (ILA 2.0 / ILA 3.0). Tidak ada mode campuran
+  // supaya chart dan matriks timeframe tidak pernah tercampur antar metode.
   const filteredSignals = useMemo(() => {
-    if (activeStrategyFilter === 'all') return pairSignals
     return pairSignals.filter((s) => s.strategy_version === activeStrategyFilter)
   }, [pairSignals, activeStrategyFilter])
 
   const filteredPositions = useMemo(() => {
-    if (activeStrategyFilter === 'all') return pairPositions
     return pairPositions.filter((p) => p.strategy_version === activeStrategyFilter)
   }, [pairPositions, activeStrategyFilter])
 
@@ -206,7 +201,7 @@ export default function SignalsPage() {
                       setHistoryPage(1)
                     }}
                   >
-                    {strat === 'all' ? 'Semua Metode' : strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
+                    {strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
                   </Button>
                 ))}
               </div>

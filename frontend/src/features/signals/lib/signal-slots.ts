@@ -52,17 +52,42 @@ function matchTF(a: string, b: string): boolean {
  * mapSignalsToSlots memetakan daftar sinyal dari server ke dalam slot pasangan timeframe yang tepat.
  * Setiap slot memegang sinyal terbarunya sendiri sehingga tidak saling menimpa.
  */
-export function mapSignalsToSlots(signals: Signal[], strategy: string): TimeframeSlot[] {
+/**
+ * waktuTerbaru mengembalikan patokan waktu terakhir baris disentuh.
+ * Baris radar memakai identitas tetap sehingga `published_at`-nya bisa jauh
+ * lebih lama daripada sinyal nyata di slot yang sama; `updated_at` yang
+ * menunjukkan bahwa radar masih bergerak.
+ */
+function waktuTerbaru(s: Signal): number {
+  return new Date(s.updated_at || s.published_at).getTime()
+}
+
+/**
+ * pilihTerbaru mengambil sinyal yang paling akhir diperbarui di antara kandidat
+ * satu slot. Tanpa ini, urutan dari API (published_at DESC) membuat sinyal lama
+ * yang sudah EXPIRED selalu menang atas baris radar yang masih aktif.
+ */
+function pilihTerbaru(kandidat: Signal[]): Signal | undefined {
+  if (kandidat.length === 0) return undefined
+  return kandidat.reduce((a, b) => (waktuTerbaru(b) > waktuTerbaru(a) ? b : a))
+}
+
+export function mapSignalsToSlots(
+  signals: Signal[],
+  strategy: 'ila-2.0' | 'ila-3.0',
+): TimeframeSlot[] {
   const isILA3 = strategy === 'ila-3.0'
 
   if (isILA3) {
     return ILA3_SLOTS.map((slot) => {
       // Cari sinyal terbaru yang cocok dengan slot ini
-      const matched = signals.find(
-        (s) =>
-          s.strategy_version === 'ila-3.0' &&
-          matchTF(s.htf, slot.htf) &&
-          matchTF(s.ltf, slot.ltf),
+      const matched = pilihTerbaru(
+        signals.filter(
+          (s) =>
+            s.strategy_version === 'ila-3.0' &&
+            matchTF(s.htf, slot.htf) &&
+            matchTF(s.ltf, slot.ltf),
+        ),
       )
 
       return buildSlot({
@@ -77,13 +102,15 @@ export function mapSignalsToSlots(signals: Signal[], strategy: string): Timefram
     })
   }
 
-  // ILA 2.0 (atau filter 'all' dengan default ILA 2.0 view)
+  // ILA 2.0
   return ILA2_SLOTS.map((slot) => {
-    const matched = signals.find(
-      (s) =>
-        s.strategy_version !== 'ila-3.0' &&
-        matchTF(s.htf, slot.htf) &&
-        matchTF(s.ltf, slot.ltf),
+    const matched = pilihTerbaru(
+      signals.filter(
+        (s) =>
+          s.strategy_version === 'ila-2.0' &&
+          matchTF(s.htf, slot.htf) &&
+          matchTF(s.ltf, slot.ltf),
+      ),
     )
 
     return buildSlot({

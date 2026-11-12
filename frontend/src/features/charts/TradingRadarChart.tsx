@@ -10,7 +10,7 @@ import { arahBearish } from './lib/direction'
 import { chartTheme } from './lib/theme'
 import type { ZoneSpec } from './lib/zonePrimitive'
 
-type StrategyFilter = 'all' | 'ila-2.0' | 'ila-3.0'
+type StrategyFilter = 'ila-2.0' | 'ila-3.0'
 
 type TradingRadarChartProps = {
   symbol: string | null
@@ -84,7 +84,12 @@ export function TradingRadarChart({
   className,
   enabled = true,
 }: TradingRadarChartProps) {
-  const signal = useMemo(() => sinyalAktif(signals), [signals])
+  // Chart dikunci ke satu metode. Penyaringan ini pengaman tambahan supaya chart
+  // tidak pernah memilih sinyal dari metode lain walau daftar sinyal tercampur.
+  const signal = useMemo(
+    () => sinyalAktif(signals.filter((s) => s.strategy_version === strategy)),
+    [signals, strategy],
+  )
 
   const tabs = useMemo<Tab[]>(() => {
     if (!signal) return []
@@ -92,8 +97,7 @@ export function TradingRadarChart({
     const { htf, ltf } = times(signal)
     if (!htf || !ltf) return []
 
-    const ila3 =
-      signal.strategy_version === 'ila-3.0' && (strategy === 'all' || strategy === 'ila-3.0')
+    const ila3 = signal.strategy_version === 'ila-3.0'
 
     if (ila3) {
       const mtf = getIla3Mtf(htf, ltf)
@@ -108,7 +112,7 @@ export function TradingRadarChart({
       { timeframe: htf, label: `${htf} Setup` },
       { timeframe: ltf, label: `${ltf} Trigger` },
     ])
-  }, [signal, strategy])
+  }, [signal])
 
   const [activeIndex, setActiveIndex] = useState(0)
   const tabIndex = Math.min(activeIndex, Math.max(tabs.length - 1, 0))

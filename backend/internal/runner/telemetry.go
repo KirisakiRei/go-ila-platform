@@ -65,6 +65,14 @@ func (s *Service) refreshAccount(ctx context.Context, account *model.BrokerAccou
 	state.Equity = snapshot.Equity
 	state.FreeMargin = snapshot.FreeMargin
 	s.persistState(ctx, state)
+
+	// Broker menjawab: catat kapan terakhir koneksi benar-benar terbukti.
+	// Tanpa ini dashboard tidak bisa membedakan "kredensial tersimpan" dari
+	// "kredensial masih berlaku", dan kolom verifikasi selalu kosong.
+	if err := s.store.MarkAccountVerified(ctx, account.ID, now); err != nil {
+		s.logger.Warn("gagal mencatat verifikasi akun",
+			"account_id", account.ID, "error", err.Error())
+	}
 }
 
 func (s *Service) persistState(ctx context.Context, state *model.BrokerAccountState) {

@@ -46,6 +46,8 @@ type fakeStore struct {
 	timeframes map[string]repository.TimeframeState
 	// staleClaims menandai klaim yang dianggap tertinggal pada pengujian.
 	staleClaims map[string]struct{}
+	// verified mencatat waktu verifikasi akun yang ditulis saat broker menjawab.
+	verified map[string]time.Time
 }
 
 func newFakeStore() *fakeStore {
@@ -357,12 +359,41 @@ func (s *fakeStore) FindUserByID(_ context.Context, userID string) (*model.User,
 }
 
 func (s *fakeStore) ListActiveBrokerAccounts(_ context.Context) ([]model.BrokerAccount, error) {
-	return nil, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := make([]model.BrokerAccount, 0, len(s.accounts))
+	for _, account := range s.accounts {
+		if account.IsActive {
+			out = append(out, *account)
+		}
+	}
+	return out, nil
 }
 
 func (s *fakeStore) UpdateBrokerAccount(_ context.Context, _ *model.BrokerAccount) error { return nil }
 func (s *fakeStore) UpsertAccountState(_ context.Context, _ *model.BrokerAccountState) error {
 	return nil
+}
+
+// MarkAccountVerified mencatat pemanggilan agar test bisa memastikan waktu
+// verifikasi hanya ditulis ketika broker benar-benar menjawab.
+func (s *fakeStore) MarkAccountVerified(_ context.Context, accountID string, at time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.verified == nil {
+		s.verified = make(map[string]time.Time)
+	}
+	s.verified[accountID] = at
+	return nil
+}
+
+// verification membaca waktu verifikasi yang tercatat untuk satu akun.
+func (s *fakeStore) verification(accountID string) (time.Time, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	at, ok := s.verified[accountID]
+	return at, ok
 }
 
 func (s *fakeStore) FindCredential(_ context.Context, _ string) (*model.Credential, error) {

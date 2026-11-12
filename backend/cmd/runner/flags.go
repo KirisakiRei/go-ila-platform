@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"strconv"
 
 	"ila/backend/internal/config"
 	"ila/backend/internal/repository"
@@ -11,36 +10,14 @@ import (
 )
 
 // envFlagReader menjadi nilai bawaan flag ketika belum ada override di
-// database. Nilainya sama dengan yang dibaca backend-api agar keduanya
-// menampilkan angka yang sama (plans/11 I2).
+// database.
+//
+// Logikanya tidak lagi ditulis di sini melainkan dipakai bersama backend-api
+// lewat settings.EnvFromConfig. Duplikasi sebelumnya membuat dua saklar yang
+// bawaannya NYALA tidak terbaca di salah satu sisi, sehingga setelan seolah
+// diabaikan.
 func envFlagReader(cfg *config.Config) func(string) string {
-	return func(key string) string {
-		switch key {
-		case settings.KeyAutoExecute:
-			return strconv.FormatBool(cfg.AutoExecute)
-		case settings.KeyDryRunAll:
-			return strconv.FormatBool(cfg.DryRunAll)
-		case settings.KeyMaxDailyTrades:
-			return strconv.Itoa(cfg.MaxDailyTrades)
-		case settings.KeyMaxDailyLosses:
-			return strconv.Itoa(cfg.MaxDailyLosses)
-		case settings.KeyStopAfterWin:
-			return strconv.FormatBool(cfg.StopAfterWin)
-		case settings.KeyMarketOpenOnly:
-			return "true"
-		case settings.KeyLegalGate:
-			return "true"
-		// Saklar yang bawaannya NYALA di katalog. Tanpa cabang ini nilainya
-		// kembali kosong, ParseBool gagal, dan pemanggil jatuh ke fallback
-		// `false` — akibatnya mengeset variabel lingkungan tetap tidak
-		// berpengaruh, seolah saklarnya rusak.
-		case settings.KeyTimeframeSwitch:
-			return strconv.FormatBool(cfg.TimeframeSwitch)
-		case settings.KeyPairSwitch:
-			return strconv.FormatBool(cfg.PairSwitch)
-		}
-		return ""
-	}
+	return settings.EnvFromConfig(cfg)
 }
 
 // runnerModeSource membaca mode platform dari tabel system_state.

@@ -35,8 +35,8 @@ type SignalsMobileViewProps = {
   isFetching: boolean
   refetch: () => Promise<unknown>
   adaIla3: boolean
-  activeStrategyFilter: 'all' | 'ila-2.0' | 'ila-3.0'
-  onSelectStrategy: (strat: 'all' | 'ila-2.0' | 'ila-3.0') => void
+  activeStrategyFilter: 'ila-2.0' | 'ila-3.0'
+  onSelectStrategy: (strat: 'ila-2.0' | 'ila-3.0') => void
   filteredSignals: Signal[]
   filteredPositions: Position[]
 }
@@ -70,8 +70,7 @@ export function SignalsMobileView({
     const activePairSet = new Set(allPairs.map((p) => p.toUpperCase()))
     return signals.filter((s) => {
       const matchPair = activePairSet.has(s.symbol.toUpperCase())
-      const matchStrategy =
-        activeStrategyFilter === 'all' || s.strategy_version === activeStrategyFilter
+      const matchStrategy = s.strategy_version === activeStrategyFilter
       return matchPair && matchStrategy
     })
   }, [activePair, filteredSignals, signals, allPairs, activeStrategyFilter])
@@ -304,7 +303,7 @@ export function SignalsMobileView({
         <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs">
           <span className="text-[11px] font-semibold text-muted-foreground">Metode:</span>
           <div className="flex items-center gap-1">
-            {(['all', 'ila-2.0', 'ila-3.0'] as const).map((strat) => (
+            {(['ila-2.0', 'ila-3.0'] as const).map((strat) => (
               <button
                 key={strat}
                 type="button"
@@ -316,7 +315,7 @@ export function SignalsMobileView({
                     : 'bg-secondary text-muted-foreground hover:text-foreground',
                 )}
               >
-                {strat === 'all' ? 'Semua' : strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
+                {strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
               </button>
             ))}
           </div>

@@ -22,10 +22,13 @@ export function TimeframeRadarMatrix({
   symbol,
 }: {
   signals: Signal[]
-  strategy: string
+  strategy: 'ila-2.0' | 'ila-3.0'
   symbol: string
 }) {
-  const slots = mapSignalsToSlots(signals, strategy)
+  // Matriks dikunci ke satu metode. Penyaringan ini pengaman tambahan supaya
+  // sinyal dari metode lain tidak pernah ikut membentuk slot di matriks ini.
+  const signalMetode = signals.filter((s) => s.strategy_version === strategy)
+  const slots = mapSignalsToSlots(signalMetode, strategy)
 
   // Otomatis arahkan ke slot yang statusnya READY jika ada, atau slot pertama
   const initialKey = slots.find((s) => s.status === 'READY')?.key ?? slots[0]?.key ?? ''
