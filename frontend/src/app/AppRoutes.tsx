@@ -49,6 +49,7 @@ import AdminSignalsPage from '@/pages/admin/AdminSignalsPage'
 import AdminSignalTracePage from '@/pages/admin/AdminSignalTracePage'
 import AdminUserDetailPage from '@/pages/admin/AdminUserDetailPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminInvitesPage from '@/pages/admin/AdminInvitesPage'
 import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 import { ScrollToTop } from './ScrollToTop'
@@ -339,6 +340,14 @@ export function AppRoutes() {
           element={
             <AdminPage>
               <AdminUserDetailPage />
+            </AdminPage>
+          }
+        />
+        <Route
+          path="/admin/undangan"
+          element={
+            <AdminPage>
+              <AdminInvitesPage />
             </AdminPage>
           }
         />

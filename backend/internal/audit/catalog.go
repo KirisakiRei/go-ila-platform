@@ -43,6 +43,11 @@ const (
 	// dianonimkan, sehingga identitas pada catatan audit ini menjadi satu-satunya
 	// jejak akun yang dihapus.
 	AdminDelete Action = "admin.delete"
+	// Undangan komunitas: pembuatan tautan, pencabutan, dan pemakaian.
+	// Kode mentah tidak pernah masuk catatan audit.
+	InviteCreate Action = "invite.create"
+	InviteRevoke Action = "invite.revoke"
+	InviteRedeem Action = "invite.redeem"
 )
 
 // Akun broker.
@@ -135,6 +140,10 @@ var Catalog = []Entry{
 	{UserCreate, "Pengguna", "Akun pelanggan dibuat oleh admin", false},
 	{AdminCreate, "Pengguna", "Akun pengelola dibuat", true},
 	{AdminDelete, "Pengguna", "Akun pengelola dihapus", true},
+
+	{InviteCreate, "Undangan", "Tautan undangan dibuat", false},
+	{InviteRevoke, "Undangan", "Tautan undangan dicabut", true},
+	{InviteRedeem, "Undangan", "Akun dibuat lewat undangan", false},
 
 	{AccountCreate, "Akun Broker", "Akun broker ditambah", false},
 	{AccountUpdate, "Akun Broker", "Akun broker diubah", false},

@@ -26,8 +26,16 @@ type AuthHandler struct {
 	// accessGate memutuskan apakah pendaftaran mandiri masih terbuka.
 	// Nil berarti terbuka — hanya untuk pemanggil lama dan pengujian.
 	accessGate AccessGate
-	cookies    session.Config
-	jwtExpiry  time.Duration
+	// invites dipakai saat pintu mandiri tertutup: satu-satunya jalan masuk
+	// adalah tautan undangan. Nil berarti jalur undangan tidak tersedia.
+	invites   InviteRegistrar
+	cookies   session.Config
+	jwtExpiry time.Duration
+}
+
+// InviteRegistrar memakai satu undangan lalu membuat akun.
+type InviteRegistrar interface {
+	Klaim(ctx context.Context, code string, req dto.RegisterRequest) (*dto.UserResponse, error)
 }
 
 // AccessGate melaporkan apakah pendaftaran mandiri masih dibuka.
@@ -68,18 +76,48 @@ func (h *AuthHandler) SetAccessGate(gate AccessGate) {
 	h.accessGate = gate
 }
 
+// SetInviteRegistrar memasang jalur pendaftaran lewat undangan.
+func (h *AuthHandler) SetInviteRegistrar(reg InviteRegistrar) {
+	h.invites = reg
+}
+
+// gateTertutup melaporkan apakah pendaftaran mandiri sedang ditutup.
+// Tanpa gerbang (pemanggil lama), pintu dianggap terbuka.
+func (h *AuthHandler) gateTertutup(ctx context.Context) bool {
+	if h.accessGate == nil {
+		return false
+	}
+	return h.accessGate.InviteOnly(ctx)
+}
+
 // Register menangani POST /api/v1/auth/register.
 func (h *AuthHandler) Register(c *gin.Context) {
-	// Diperiksa paling awal: mode undangan bukan sekadar penolakan validasi,
-	// melainkan pintu yang memang tertutup.
-	if h.accessGate != nil && h.accessGate.InviteOnly(c.Request.Context()) {
-		c.Error(ErrPendaftaranTertutup)
-		return
-	}
-
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+
+	// Selama gate tertutup, satu-satunya jalan masuk adalah tautan undangan.
+	// Limiter per IP/email sengaja TIDAK dipakai di jalur ini: anggota komunitas
+	// sering berbagi satu IP, dan batas sesungguhnya adalah kuota + masa berlaku
+	// pada undangan itu sendiri.
+	if h.gateTertutup(c.Request.Context()) {
+		code := strings.TrimSpace(req.InviteCode)
+		if code == "" {
+			c.Error(ErrPendaftaranTertutup)
+			return
+		}
+		if h.invites == nil {
+			c.Error(ErrPendaftaranTertutup)
+			return
+		}
+		result, err := h.invites.Klaim(c.Request.Context(), code, req)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		httpx.Created(c, "Akun berhasil dibuat lewat undangan", result)
 		return
 	}
 

@@ -36,6 +36,62 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-13 (2) — Undangan komunitas: tautan berkuota dengan batas waktu
+
+**Pelaku:** Claude
+**Tipe:** Fitur (akses masuk)
+**Status:** 🟢 SELESAI & teruji — belum di-deploy
+
+**Masalahnya:** mode invite only menutup pendaftaran, tetapi belum ada jalan
+mengundang orang masuk. Satu-satunya cara adalah admin membuat akun lalu
+mengirimkan password — praktik yang tidak boleh dipakai.
+
+**Alur akhirnya:** admin membuat tautan → salin → sebar ke komunitas → anggota
+klik `/daftar?invite=KODE` → isi nama/email/password → akun aktif dengan tier
+undangan, email terverifikasi, onboarding selesai.
+
+**Batas yang dipakai (bukan IP, sesuai keputusan):**
+
+| Batas | Sifat |
+|---|---|
+| Kuota (`max_uses`) | Wajib angka ≥ 1. Tidak ada "0 = tanpa batas" |
+| Masa berlaku | Wajib; bawaan 7 hari, maks 365 |
+| Email tujuan | Opsional; bila diisi, hanya alamat itu yang lolos |
+
+**Keputusan teknis penting:**
+
+1. **Kode hanya disimpan sebagai SHA-256.** Kode mentah tampil sekali saat
+dibuat. Basis data yang bocor tidak memberi tautan yang bisa dipakai.
+2. **Kuota dipotong lewat `UPDATE ... WHERE used_count < max_uses`**, bukan
+`if` di Go. Dua orang yang mengklaim slot terakhir bersamaan: tepat satu lolos.
+Teruji dengan 20 goroutine paralel, kuota 1 → tepat 1 akun.
+3. **Kuota dikembalikan bila pembuatan akun gagal** (email sudah terdaftar,
+legal ditolak). Pendaftaran yang tidak jadi tidak menghabiskan jatah orang lain.
+4. **Batas IP/email tidak berlaku** untuk jalur undangan sah — anggota komunitas
+sering berbagi satu IP kantor.
+
+**Batasan arsitektur yang ditemukan saat menyusun plan:** repository proyek ini
+menyimpan `*gorm.DB` sendiri dan tidak mengambil transaksi dari `context`.
+Jadi "satu transaksi membungkus registrasi" tidak bisa dipakai tanpa merombak
+semua repository. Dipakai urutan: potong kuota (atomik) → daftar → kembalikan
+bila gagal. Risiko sisa: proses mati di antara dua langkah itu (jendela
+milidetik, kerugian satu slot).
+
+**Bukti uji (mutasi, bukan sekadar hijau):**
+- hapus pengembalian kuota → `TestKuotaKembaliBilaPendaftaranGagal` MERAH
+- hapus syarat `used_count < max_uses` dari SQL → tes SQL MERAH
+- hapus `invite_code` dari payload → tes UI MERAH
+
+**Pelajaran yang dicatat:** tes tiruan di memori **tidak** menangkap hilangnya
+syarat kuota di SQL (tiruannya menegakkan syarat sendiri). Karena itu ditambah
+`invite_repository_sql_test.go` yang menangkap SQL asli lewat callback GORM —
+tanpa Postgres, jadi tidak ter-skip di CI.
+
+Backend: `go build` bersih, `go test ./...` hijau.
+Frontend: `tsc` bersih, 24 berkas / 150 tes hijau, `vite build` sukses.
+
+**Belum dikerjakan:** halaman lapor bug (Fase 8–10 di plan).
+
 ### 2026-11-13 — Mode invite only aktif; pembayaran, uji coba, dan pendaftaran ditutup
 
 **Pelaku:** Claude

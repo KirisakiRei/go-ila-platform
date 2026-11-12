@@ -389,6 +389,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	adminTrialHandler := handler.NewAdminTrialHandler(adminTrialService)
 	adminBillingHandler := handler.NewAdminBillingHandler(adminBillingService)
 	billingHandler := handler.NewBillingHandler(billingService)
+	inviteService := service.NewInviteService(repository.NewInviteRepository(db), authService, adminAudit)
+	inviteHandler := handler.NewInviteHandler(inviteService, inviteService)
+	// Pendaftaran hanya bisa lewat undangan selama mode invite only.
+	authHandler.SetInviteRegistrar(inviteService)
 	legalHandler := handler.NewLegalHandler(legalService)
 
 	// Alamat surel dipakai sebagai label di aplikasi authenticator.
@@ -448,6 +452,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		// Halaman depan memakai ringkasan arah sinyal tanpa login. Letaknya di
 		// grup yang dibatasi per alamat IP, sama seperti status layanan.
 		publicStatus.GET("/signals/preview", publicSignalHandler.Preview)
+		// Pemeriksaan tautan undangan: publik karena halaman daftar memakainya
+		// sebelum ada sesi. Tidak memakai kuota; keputusan tetap saat submit.
+		publicStatus.GET("/invites/:code", inviteHandler.Periksa)
 		cmsHandler.PublicRegister(publicStatus.Group(""))
 		pageHandler.PublicRegister(publicStatus.Group(""))
 	}
@@ -559,7 +566,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler, inviteHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -603,6 +610,7 @@ func registerAdmin(
 	adminTrialHandler *handler.AdminTrialHandler,
 	adminPairHandler *handler.AdminPairHandler,
 	adminSignalHandler *handler.AdminSignalHandler,
+	inviteHandler *handler.InviteHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
 
@@ -691,6 +699,7 @@ func registerAdmin(
 
 	// Pelanggan: daftar, profil, dan aksi berlapis.
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.
+	inviteHandler.Register(admin.Group(""), guard)
 	userHandler.Register(admin.Group(""), guard)
 	auditHandler.Register(admin.Group(""), guard)
 	billingHandler.Register(admin.Group(""), guard)

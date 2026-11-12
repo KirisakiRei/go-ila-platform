@@ -66,6 +66,11 @@ export type RegisterPayload = {
   password: string
   /** Wajib true: backend menolak pendaftaran tanpa persetujuan. */
   accept_terms: boolean
+  /**
+   * Kode dari tautan undangan. Wajib saat platform sedang invite only;
+   * diabaikan pada pendaftaran mandiri biasa.
+   */
+  invite_code?: string
 }
 
 export type LoginResult = {

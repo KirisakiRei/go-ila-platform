@@ -31,6 +31,8 @@ func allModels() []any {
 		&model.SystemSetting{}, &model.SystemState{}, &model.SupportNote{},
 		&model.Faq{}, &model.Announcement{}, &model.EmailOutbox{}, &model.EmailToken{},
 		&model.Page{}, &model.PageSection{}, &model.PageItem{},
+		&model.InviteCode{}, &model.InviteRedemption{},
+		&model.BugReport{}, &model.BugReportAttachment{},
 	}
 }
 

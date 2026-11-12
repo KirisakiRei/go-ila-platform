@@ -73,6 +73,11 @@ var harapanAksiAudit = map[string]audit.Action{
 	"PUT /api/v1/admin/system/mode":              audit.SystemModeChange,
 	"POST /api/v1/admin/users/:id/support-notes": audit.SupportNoteAdd,
 
+	// Undangan komunitas: membuat tautan berarti memberi akses masuk, jadi
+	// jejaknya wajib tercatat seperti pembuatan akun.
+	"POST /api/v1/admin/invites":            audit.InviteCreate,
+	"POST /api/v1/admin/invites/:id/revoke": audit.InviteRevoke,
+
 	// Konten: FAQ dan pengumuman tidak menyentuh uang maupun trading.
 	"POST /api/v1/admin/faq":                 audit.CMSFaqChange,
 	"PATCH /api/v1/admin/faq/:id":            audit.CMSFaqChange,

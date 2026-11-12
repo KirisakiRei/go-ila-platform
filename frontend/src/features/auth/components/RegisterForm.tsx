@@ -21,7 +21,7 @@ import {
  * tanpa sadar. Dengan langkah, kesalahan tertangkap per bagian dan pengguna
  * tahu seberapa jauh prosesnya.
  */
-export function RegisterForm() {
+export function RegisterForm({ inviteCode }: { inviteCode?: string } = {}) {
   const signUp = useSignUp()
   const [formError, setFormError] = useState('')
   const [isDone, setIsDone] = useState(false)
@@ -65,6 +65,9 @@ export function RegisterForm() {
         phone: values.phone,
         password: values.password,
         accept_terms: values.acceptTerms,
+        // Kode undangan diteruskan apa adanya; backend memvalidasi ulang dan
+        // memotong kuota di sana. Tanpa ini, pendaftaran saat invite only ditolak.
+        ...(inviteCode ? { invite_code: inviteCode } : {}),
       },
       {
         onSuccess: () => setIsDone(true),

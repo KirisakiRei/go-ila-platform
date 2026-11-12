@@ -13,6 +13,9 @@ type RegisterRequest struct {
 	// AcceptTerms menandai centang Syarat & Ketentuan + Kebijakan Privasi.
 	// Registrasi tanpa centang ditolak (plans/09 §3).
 	AcceptTerms bool `json:"accept_terms"`
+	// InviteCode diisi dari tautan undangan. Wajib bila platform sedang
+	// invite only; diabaikan pada pendaftaran mandiri biasa.
+	InviteCode string `json:"invite_code,omitempty"`
 }
 
 // LoginRequest menerima email ATAU username pada kolom yang sama.

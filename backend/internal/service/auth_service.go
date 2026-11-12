@@ -481,3 +481,27 @@ func (s *authService) LogoutAll(ctx context.Context, userID string) error {
 	s.recordAudit(ctx, userID, "auth.logout_all", "user", userID)
 	return nil
 }
+
+// TerapkanUndangan menetapkan hak yang datang dari tautan undangan.
+//
+// Dipisahkan dari Register karena pendaftaran mandiri tidak memilikinya: tier
+// dipilih admin saat membuat undangan, dan kepemilikan alamat surel sudah
+// dibuktikan dengan memegang tautan yang dikirim ke alamat itu. Karena itu
+// verifikasi surel dan onboarding ditandai selesai sekaligus.
+func (s *authService) TerapkanUndangan(ctx context.Context, userID, tier string, at time.Time) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	user.Tier = tier
+	if user.EmailVerifiedAt == nil {
+		user.EmailVerifiedAt = &at
+	}
+	user.OnboardingDone = true
+	user.UpdatedAt = at
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+	s.recordAudit(ctx, userID, "auth.invite_apply", "user", userID)
+	return nil
+}

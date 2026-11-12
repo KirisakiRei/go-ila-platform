@@ -88,6 +88,8 @@ func main() {
 		&model.Page{},
 		&model.PageSection{},
 		&model.PageItem{},
+		&model.InviteCode{}, &model.InviteRedemption{},
+		&model.BugReport{}, &model.BugReportAttachment{},
 		&model.EmailOutbox{},
 		&model.EmailToken{},
 		&model.PairCategory{},
