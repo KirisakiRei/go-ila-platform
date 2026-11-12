@@ -22,9 +22,11 @@ type MobileMoreDrawerProps = {
   open: boolean
   onClose: () => void
   user: User
+  /** Saat invite only, menu Subscription disembunyikan. */
+  inviteOnly?: boolean
 }
 
-export function MobileMoreDrawer({ open, onClose, user }: MobileMoreDrawerProps) {
+export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: MobileMoreDrawerProps) {
   const signOut = useSignOut()
 
   useEffect(() => {
@@ -142,19 +144,21 @@ export function MobileMoreDrawer({ open, onClose, user }: MobileMoreDrawerProps)
               Akun & Layanan
             </span>
             <div className="grid grid-cols-2 gap-2.5">
-              <Link
-                to="/langganan"
-                onClick={onClose}
-                className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-secondary/30 p-2.5 hover:bg-secondary/60 transition-colors"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-foreground shadow-xs">
-                  <CreditCard className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-foreground">Subscription</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Paket & Billing</p>
-                </div>
-              </Link>
+              {!inviteOnly && (
+                <Link
+                  to="/langganan"
+                  onClick={onClose}
+                  className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-secondary/30 p-2.5 hover:bg-secondary/60 transition-colors"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-foreground shadow-xs">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-foreground">Subscription</p>
+                    <p className="truncate text-[10.5px] text-muted-foreground">Paket & Billing</p>
+                  </div>
+                </Link>
+              )}
 
               <Link
                 to="/pengaturan/keamanan"

@@ -26,7 +26,14 @@ type TrialService interface {
 type trialService struct {
 	users UserRepository
 	audit AuditRepository
+	// gate nil berarti pintar terbuka (perilaku lama).
+	gate  AccessGate
 	clock func() time.Time
+}
+
+// SetAccessGate memasang penjaga mode undangan.
+func (s *trialService) SetAccessGate(gate AccessGate) {
+	s.gate = gate
 }
 
 // NewTrialService membuat service uji coba.
@@ -40,6 +47,12 @@ func NewTrialService(users UserRepository, audit AuditRepository) TrialService {
 
 // Start mengaktifkan trial sekali per user. Percobaan kedua ditolak.
 func (s *trialService) Start(ctx context.Context, userID string) (*dto.TrialResponse, error) {
+	// Uji coba adalah jalan masuk ke jalur berbayar yang kini ditutup, jadi
+	// ikut ditutup. Pemeriksaan lama tetap utuh bila gerbang terbuka.
+	if s.gate != nil && s.gate.InviteOnly(ctx) {
+		return nil, ErrInviteOnly
+	}
+
 	user, err := s.users.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err

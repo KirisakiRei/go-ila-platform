@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -22,9 +23,27 @@ type AuthHandler struct {
 	limiter     LoginLimiter
 	// registerLimiter opsional; nil berarti hanya batas per IP middleware.
 	registerLimiter RegisterLimiter
-	cookies         session.Config
-	jwtExpiry       time.Duration
+	// accessGate memutuskan apakah pendaftaran mandiri masih terbuka.
+	// Nil berarti terbuka — hanya untuk pemanggil lama dan pengujian.
+	accessGate AccessGate
+	cookies    session.Config
+	jwtExpiry  time.Duration
 }
+
+// AccessGate melaporkan apakah pendaftaran mandiri masih dibuka.
+//
+// Dipisahkan dari settings.Service agar handler tidak bergantung pada
+// pembacaan basis data dan tetap mudah diuji.
+type AccessGate interface {
+	// InviteOnly bernilai true bila akun baru hanya boleh lahir dari undangan admin.
+	InviteOnly(ctx context.Context) bool
+}
+
+// ErrPendaftaranTertutup adalah penolakan pendaftaran saat mode undangan.
+var ErrPendaftaranTertutup = errors.Join(
+	apperror.ErrForbidden,
+	errors.New("Pendaftaran hanya lewat undangan. Hubungi admin untuk akun."),
+)
 
 // NewAuthHandler merangkai handler autentikasi.
 func NewAuthHandler(
@@ -43,8 +62,21 @@ func NewAuthHandler(
 	}
 }
 
+// SetAccessGate memasang penjaga pendaftaran. Dipanggil saat perakitan router
+// agar konstruktor lama tetap sah.
+func (h *AuthHandler) SetAccessGate(gate AccessGate) {
+	h.accessGate = gate
+}
+
 // Register menangani POST /api/v1/auth/register.
 func (h *AuthHandler) Register(c *gin.Context) {
+	// Diperiksa paling awal: mode undangan bukan sekadar penolakan validasi,
+	// melainkan pintu yang memang tertutup.
+	if h.accessGate != nil && h.accessGate.InviteOnly(c.Request.Context()) {
+		c.Error(ErrPendaftaranTertutup)
+		return
+	}
+
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(httpx.WrapValidation(err.Error()))

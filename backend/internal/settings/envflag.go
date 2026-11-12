@@ -43,6 +43,9 @@ func EnvFromConfig(cfg *config.Config) func(key string) string {
 			return strconv.FormatBool(cfg.TimeframeSwitch)
 		case KeyPairSwitch:
 			return strconv.FormatBool(cfg.PairSwitch)
+		// Gate akses: hanya admin yang boleh membuka pendaftaran mandiri.
+		case KeyInviteOnly:
+			return strconv.FormatBool(cfg.InviteOnly)
 		}
 		return ""
 	}

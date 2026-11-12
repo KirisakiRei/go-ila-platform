@@ -256,6 +256,11 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		return envFlag(cfg, key)
 	})
 
+	// Gerbang mode undangan. Satu gerbang dipakai pendaftaran, uji coba, dan
+	// pembayaran supaya ketiganya tidak pernah berbeda pendapat.
+	accessGate := service.NewFlagAccessGate(settingsService)
+	service.SetTrialAccessGate(trialService, accessGate)
+
 	systemRepo := repository.NewSystemRepository(db)
 	systemOpsService := service.NewSystemOpsService(systemRepo, runnerRepo, settingsService, adminAudit)
 	adminSystemService := service.NewAdminSystemService(settingsService, settingsRepo, adminAudit)
@@ -304,6 +309,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		cookies,
 		cfg.JWTExpiry,
 	)
+	// Pendaftaran mandiri ditutup selama mode undangan; handler memeriksa
+	// gerbang yang sama dengan billing dan uji coba.
+	authHandler.SetAccessGate(accessGate)
 	approveHandler := handler.NewApproveHandler(approveService)
 	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
 	accountHandler := handler.NewAccountHandler(accountService)
@@ -354,6 +362,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	pageHandler := handler.NewPageHandler(pageService)
 	emailAccountHandler := handler.NewEmailAccountHandler(emailAccountService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
+	// Daftar paket ikut ditutup selama mode undangan.
+	pricingHandler.SetAccessGate(accessGate)
 
 	// Gateway pembayaran: kunci tidak pernah ditampilkan ke siapa pun.
 	// Penyedia dipilih lewat PAYMENT_PROVIDER agar penggantian gateway tidak
@@ -366,6 +376,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	logger.Info("gateway pembayaran", "provider", gateway.Name())
 	billingRepo := repository.NewBillingStore(db)
 	billingService := service.NewBillingService(userRepo, billingRepo, pricingService, billingRepo, gateway, adminAudit, billingRepo)
+	// Pembayaran ditutup selama mode undangan, memakai gerbang yang sama
+	// dengan pendaftaran dan uji coba.
+	service.SetBillingAccessGate(billingService, accessGate)
 	adminBillingService := service.NewAdminBillingService(billingRepo, adminAudit, billingService, gateway)
 	adminTrialService := service.NewAdminTrialService(userRepo, adminAudit)
 	adminTrialHandler := handler.NewAdminTrialHandler(adminTrialService)

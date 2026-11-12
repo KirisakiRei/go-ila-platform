@@ -66,7 +66,9 @@ type billingService struct {
 	coupons couponLookup
 	gateway payment.Gateway
 	audit   AdminAudit
-	now     func() time.Time
+	// gate nil berarti pintar terbuka (perilaku lama).
+	gate AccessGate
+	now  func() time.Time
 }
 
 // couponLookup membaca id kupon berdasarkan kode untuk dicatat pemakaiannya.
@@ -88,8 +90,20 @@ func NewBillingService(users BillingUserReader, store BillingStore, pricing Pric
 	}
 }
 
+// SetAccessGate memasang penjaga mode undangan. Dipanggil setelah perakitan
+// agar pemanggil lama tetap sah tanpa gerbang.
+func (s *billingService) SetAccessGate(gate AccessGate) {
+	s.gate = gate
+}
+
 // Checkout membuat invoice dan meminta URL pembayaran.
 func (s *billingService) Checkout(ctx context.Context, userID string, req dto.CheckoutRequest) (*dto.CheckoutResult, error) {
+	// Mode undangan menutup pembayaran lebih dulu: tidak ada tagihan yang
+	// boleh lahir selagi platform tertutup (plans/11 Fase I).
+	if s.gate != nil && s.gate.InviteOnly(ctx) {
+		return nil, ErrInviteOnly
+	}
+
 	// Pembayaran dikunci sampai email terbukti: tanpa itu, akun hasil salah
 	// ketik akan menerima invoice yang tidak bisa dipulihkan (plans/17 §2.5).
 	if s.users != nil {
@@ -329,6 +343,10 @@ func (s *billingService) activate(ctx context.Context, invoice *model.Invoice, n
 // RedeemCredit menukar kode kredit. Penukaran ganda ditolak repository, bukan
 // hanya diperiksa di sini, agar dua permintaan bersamaan tidak lolos.
 func (s *billingService) RedeemCredit(ctx context.Context, userID string, code string) (*dto.CreditSummary, error) {
+	// Saldo kredit hanya berguna untuk membayar; ikut ditutup bersama checkout.
+	if s.gate != nil && s.gate.InviteOnly(ctx) {
+		return nil, ErrInviteOnly
+	}
 	normalized := strings.ToUpper(strings.TrimSpace(code))
 	if normalized == "" {
 		return nil, validation("kode kredit wajib diisi")

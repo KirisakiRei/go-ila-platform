@@ -3,6 +3,7 @@ import { ArrowRight, Bot, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { useTrial, useSystemStatus } from '@/lib/queries'
+import { useInviteOnly } from '@/lib/use-invite-only'
 import { formatDate } from '@/lib/format'
 import type { Tier } from '@/types/api'
 
@@ -28,6 +29,7 @@ export function AccountStatusCard() {
   const { user } = useAuthContext()
   const trial = useTrial()
   const { data: status } = useSystemStatus()
+  const inviteOnly = useInviteOnly()
 
   if (!user) return null
 
@@ -90,31 +92,35 @@ export function AccountStatusCard() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-          {tier === 'free' && !isTrialActive && !isTrialUsed && (
-            <Button size="sm" variant="default" asChild className="gap-1.5 text-xs font-semibold">
-              <Link to="/pengaturan">
-                <Sparkles className="h-3.5 w-3.5" />
-                Mulai Uji Coba 7 Hari
-              </Link>
-            </Button>
-          )}
+        {/* Ajakan trial dan billing disembunyikan selama invite only: tidak
+            ada yang bisa didaftarkan maupun dibeli dari sini. */}
+        {!inviteOnly && (
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+            {tier === 'free' && !isTrialActive && !isTrialUsed && (
+              <Button size="sm" variant="default" asChild className="gap-1.5 text-xs font-semibold">
+                <Link to="/pengaturan">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Mulai Uji Coba 7 Hari
+                </Link>
+              </Button>
+            )}
 
-          {tier === 'free' && (isTrialActive || isTrialUsed) && (
-            <Button size="sm" variant="default" asChild className="gap-1.5 text-xs font-semibold">
-              <Link to="/langganan">
-                Tingkatkan Paket
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          )}
+            {tier === 'free' && (isTrialActive || isTrialUsed) && (
+              <Button size="sm" variant="default" asChild className="gap-1.5 text-xs font-semibold">
+                <Link to="/langganan">
+                  Tingkatkan Paket
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            )}
 
-          {tier !== 'free' && (
-            <Button size="sm" variant="outline" asChild className="gap-1.5 text-xs">
-              <Link to="/langganan">Kelola Langganan</Link>
-            </Button>
-          )}
-        </div>
+            {tier !== 'free' && (
+              <Button size="sm" variant="outline" asChild className="gap-1.5 text-xs">
+                <Link to="/langganan">Kelola Langganan</Link>
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

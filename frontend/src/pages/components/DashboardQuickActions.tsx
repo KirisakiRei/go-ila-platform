@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { accountFlowApi } from '@/lib/auth-api'
+import { useInviteOnly } from '@/lib/use-invite-only'
 import type { Tier } from '@/types/api'
 
 const TIER_SHORT: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
@@ -23,6 +24,7 @@ type DashboardQuickActionsProps = {
 
 export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: DashboardQuickActionsProps) {
   const { user } = useAuthContext()
+  const inviteOnly = useInviteOnly()
 
   // Ambil progres checklist onboarding
   const { data: onboarding } = useQuery({
@@ -111,19 +113,22 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <span className="text-[11px] font-medium text-foreground leading-tight">Checklist</span>
           </button>
 
-          {/* 6. Billing (dengan badge tier) */}
-          <Link
-            to="/langganan"
-            className="flex flex-col items-center gap-1 text-center transition-transform active:scale-95 group"
-          >
-            <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
-              <CreditCard className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 rounded-full bg-emerald-600 px-1 text-[8px] font-bold text-white ring-1 ring-card leading-tight">
-                {tierLabel}
-              </span>
-            </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Billing</span>
-          </Link>
+          {/* 6. Billing (dengan badge tier) — disembunyikan saat invite only
+              karena tidak ada paket yang bisa dibeli. */}
+          {!inviteOnly && (
+            <Link
+              to="/langganan"
+              className="flex flex-col items-center gap-1 text-center transition-transform active:scale-95 group"
+            >
+              <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
+                <CreditCard className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 rounded-full bg-emerald-600 px-1 text-[8px] font-bold text-white ring-1 ring-card leading-tight">
+                  {tierLabel}
+                </span>
+              </div>
+              <span className="text-[11px] font-medium text-foreground leading-tight">Billing</span>
+            </Link>
+          )}
 
           {/* 7. Keamanan */}
           <Link

@@ -156,4 +156,9 @@ export type PublicStatus = {
   server_time: string
   time_pair: { wib: string; ny: string; utc: string }
   market: MarketWindow
+  /**
+   * Platform sedang tertutup untuk pendaftar mandiri: pendaftaran, uji coba,
+   * dan pembayaran tidak ditawarkan. Akun baru hanya dari undangan admin.
+   */
+  invite_only: boolean
 }

@@ -91,6 +91,9 @@ type Config struct {
 	TimeframeSwitch bool
 	// PairSwitch mengaktifkan saklar metode per akun pada pair.
 	PairSwitch bool
+	// InviteOnly menutup pendaftaran mandiri, uji coba, dan pembayaran.
+	// Akun baru hanya dibuat admin selama flag ini menyala.
+	InviteOnly bool
 
 	// MasterKey membungkus kunci per user; wajib untuk kredensial broker.
 	MasterKey        string
@@ -181,8 +184,10 @@ func Load(service string) (*Config, error) {
 		StopAfterWin:        envBool("STOP_AFTER_WIN", true),
 		// Default true mengikuti katalog settings, supaya perilaku tanpa env
 		// sama dengan perilaku setelah flag diubah lewat admin.
-		TimeframeSwitch:       envBool("TIMEFRAME_SWITCH_ENABLED", true),
-		PairSwitch:            envBool("PAIR_SWITCH_ENABLED", true),
+		TimeframeSwitch: envBool("TIMEFRAME_SWITCH_ENABLED", true),
+		PairSwitch:      envBool("PAIR_SWITCH_ENABLED", true),
+		// Gate akses bawaan NYALA (fail-closed): platform sedang invite only.
+		InviteOnly:            envBool("INVITE_ONLY", true),
 		AutoExecute:           envBool("AUTO_EXECUTE", false),
 		DryRunAll:             envBool("DRY_RUN_ALL", false),
 		MasterKey:             env("MASTER_KEY", ""),

@@ -107,4 +107,8 @@ type PublicStatus struct {
 	TimePair    TimePair   `json:"time_pair"`
 	// Market menjelaskan jadwal buka/tutup; dihitung dari aturan sesi NY.
 	Market MarketWindow `json:"market"`
+	// InviteOnly menandai platform sedang tertutup untuk pendaftar mandiri.
+	// Frontend memakainya untuk menyembunyikan pendaftaran, uji coba, dan
+	// pembayaran tanpa menebak-nebak.
+	InviteOnly bool `json:"invite_only"`
 }

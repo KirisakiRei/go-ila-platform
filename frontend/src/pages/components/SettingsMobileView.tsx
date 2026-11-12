@@ -24,6 +24,7 @@ import { accountFlowApi } from '@/lib/auth-api'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api-error'
 import { formatDate } from '@/lib/format'
+import { useInviteOnly } from '@/lib/use-invite-only'
 import { cn } from '@/lib/utils'
 import type { User } from '@/types/api'
 
@@ -262,6 +263,7 @@ export function SettingsMobileView() {
   const profile: User | null = user ?? null
   const initial = (profile?.name || profile?.email || 'I').trim().charAt(0).toUpperCase()
   const isVerified = Boolean(profile?.email_verified_at)
+  const inviteOnly = useInviteOnly()
 
   const onConnectTelegram = async () => {
     setTelegramNotice(null)
@@ -325,8 +327,9 @@ export function SettingsMobileView() {
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </Link>
 
-      {/* Banner uji coba */}
-      <TrialCard />
+      {/* Banner uji coba dan menu billing disembunyikan selama invite only:
+          keduanya hanya pintu menuju langganan berbayar yang kini ditutup. */}
+      {!inviteOnly && <TrialCard />}
 
       {/* Grup Umum */}
       <Group title="Umum">
@@ -336,12 +339,14 @@ export function SettingsMobileView() {
           description="Data diri dan informasi kontak"
           to="/pengaturan/keamanan"
         />
-        <MenuRow
-          icon={CreditCard}
-          label="Langganan & Tagihan"
-          description="Paket aktif dan riwayat invoice"
-          to="/langganan"
-        />
+        {!inviteOnly && (
+          <MenuRow
+            icon={CreditCard}
+            label="Langganan & Tagihan"
+            description="Paket aktif dan riwayat invoice"
+            to="/langganan"
+          />
+        )}
         <MenuRow
           icon={Sparkles}
           label="Penyiapan Akun"

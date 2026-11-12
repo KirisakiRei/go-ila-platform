@@ -11,6 +11,7 @@ import { OnboardingModal } from '@/features/onboarding'
 import { MobileTopBar } from '@/components/layout/MobileTopBar'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
+import { useInviteOnly } from '@/lib/use-invite-only'
 import type { Tier, User } from '@/types/api'
 
 const TIER_LABEL: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
@@ -79,7 +80,18 @@ export function AppShell({ user, children }: AppShellProps) {
   const signOut = useSignOut()
   const { pathname } = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const inviteOnly = useInviteOnly()
   const title = TITLES[pathname] ?? 'ILA Bot'
+
+  // Menu billing hanya berguna bila ada yang bisa dibeli. Saat invite only,
+  // kelompoknya hilang sama sekali supaya tidak ada pintu mati di sidebar.
+  const navGroups = inviteOnly
+    ? NAV_GROUPS.map((group) =>
+        group.label === 'Akun & Billing'
+          ? { ...group, label: 'Akun', items: group.items.filter((item) => item.to !== '/langganan') }
+          : group,
+      ).filter((group) => group.items.length > 0)
+    : NAV_GROUPS
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
@@ -111,7 +123,7 @@ export function AppShell({ user, children }: AppShellProps) {
           aria-label="Navigasi utama"
           className="flex flex-1 flex-col overflow-y-auto p-3 scrollbar-thin"
         >
-          {NAV_GROUPS.map((group, groupIndex) => (
+          {navGroups.map((group, groupIndex) => (
             <div key={group.label} className={cn('flex flex-col', groupIndex > 0 && 'mt-3')}>
               <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
                 {group.label}
@@ -175,13 +187,14 @@ export function AppShell({ user, children }: AppShellProps) {
       </div>
 
       {/* Navigasi Bawah Sticky khusus Mobile */}
-      <MobileBottomNav />
+      <MobileBottomNav inviteOnly={inviteOnly} />
 
       {/* Drawer menu penuh ketika hamburger atau menu Lainnya dibuka */}
       <MobileMoreDrawer
         open={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
         user={user}
+        inviteOnly={inviteOnly}
       />
     </div>
   )

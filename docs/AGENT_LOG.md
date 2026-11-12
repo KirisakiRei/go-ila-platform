@@ -36,6 +36,58 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-13 — Mode invite only aktif; pembayaran, uji coba, dan pendaftaran ditutup
+
+**Pelaku:** Claude
+**Tipe:** Fitur (gate akses)
+**Status:** 🟢 Fase 1–3 SELESAI & teruji — belum di-deploy
+
+**Satu flag mengendalikan tiga pintu.** `INVITE_ONLY` (katalog `settings`, baca
+lewat `settings.Service`, ikut tampil di panel admin) menutup sekaligus:
+
+| Pintu | Penolakan |
+|---|---|
+| `POST /api/v1/auth/register` | 403 “Pendaftaran hanya lewat undangan” |
+| `POST /api/v1/billing/checkout` | 403 `ErrInviteOnly` |
+| `POST /api/v1/billing/credit/redeem` | 403 `ErrInviteOnly` |
+| `POST /api/v1/trial` | 403 `ErrInviteOnly` |
+| `GET /api/v1/billing/plans` | daftar kosong (bukan 404, agar UI tidak tampak rusak) |
+
+Gerbangnya satu: `service.FlagAccessGate`. Ketiganya memakai objek yang sama,
+jadi tidak mungkin berbeda pendapat.
+
+**Bawaan TERTUTUP (fail-closed).** Flag gagal dibaca → `true`. Menutup pintu
+yang seharusnya terbuka hanya menunda satu pendaftaran; membuka pintu yang
+seharusnya tertutup mengotori data secara permanen.
+
+**Frontend** membaca `invite_only` dari `GET /api/v1/status` (endpoint yang
+sudah dipakai status pemeliharaan) lewat hook `useInviteOnly()`. Tidak ada
+permintaan tambahan.
+
+**Yang disembunyikan:** sidebar, tab bawah mobile, drawer mobile, tombol trial
+& billing di `AccountStatusCard`, ubin Billing di `DashboardQuickActions`, kartu
+trial + menu langganan di `SettingsMobileView`. Halaman `/langganan` dan
+`/langganan/bayar` **dialihkan** ke dashboard — route-nya tetap terdaftar supaya
+membuka pembayaran cukup mengubah flag, tanpa deploy ulang.
+
+**Bukti uji (mutasi, bukan sekadar hijau):**
+- cabang `EnvFromConfig` dihapus → `TestInviteOnlyMembacaNilaiEnv` MERAH
+- bawaan config `true`→`false` → `TestInviteOnlyBawaanKonfigurasiTertutup` MERAH
+- gerbang register dimatikan → `TestRegisterDitolakSaatModeUndangan` MERAH (dapat 201)
+- gerbang billing & trial dimatikan → 3 tes service MERAH
+- `useInviteOnly` dipaksa `false` → 2 tes UI MERAH
+
+Backend: `go build` bersih, `go test ./...` hijau.
+Frontend: `tsc` bersih, 22 berkas / 138 tes hijau, `vite build` sukses.
+
+**Catatan penting bagi admin:** selama `INVITE_ONLY` menyala, **satu-satunya**
+jalan membuat akun adalah panel admin → User → Buat akun (sudah berfungsi penuh:
+email terverifikasi, onboarding selesai). Tidak ada sistem token undangan, dan
+memang tidak perlu.
+
+**Belum dikerjakan:** halaman lapor bug (Fase 4–7). Menunggu keputusan dua hal:
+(1) lampiran cukup gambar + PDF? (2) setuju uji coba ikut dinonaktifkan?
+
 ### 2026-11-12 (3) — Kartu overview Signals & Radar kini menampilkan grid slot per metode
 
 **Pelaku:** Claude

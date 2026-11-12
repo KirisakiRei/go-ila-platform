@@ -36,6 +36,11 @@ const (
 	// semua sinyal akan dianggap "tidak diketahui" dan penyaringan justru
 	// menyesatkan pengguna.
 	KeyTimeframeSwitch = "TIMEFRAME_SWITCH_ENABLED"
+	// KeyInviteOnly menutup pendaftaran mandiri, uji coba, dan pembayaran.
+	// Akun baru hanya lahir dari undangan admin (panel admin → buat akun).
+	// Bawaannya NYALA: lebih aman menolak pendaftaran yang seharusnya boleh
+	// daripada menerima pendaftaran yang seharusnya ditutup.
+	KeyInviteOnly = "INVITE_ONLY"
 )
 
 // Kind menjelaskan cara nilai dibaca dan ditampilkan.
@@ -70,6 +75,7 @@ var Catalog = []Definition{
 	{KeyLegalGate, "Tahan bila dokumen belum disetujui", "Entry baru ditolak sampai dokumen wajib disetujui.", KindBool, 0, 0, false},
 	{KeyPairSwitch, "Saklar metode per akun", "Bila nyala, Runner hanya menjalankan metode yang dinyalakan akun pada pair tersebut.", KindBool, 0, 0, true},
 	{KeyTimeframeSwitch, "Saklar timeframe per akun", "Bila nyala, Runner hanya memproses pasangan timeframe yang dipantau dan hanya mengeksekusi yang diizinkan otomatis. Aktifkan setelah engine mengirim htf/ltf.", KindBool, 0, 0, true},
+	{KeyInviteOnly, "Hanya undangan", "Pendaftaran mandiri ditutup, uji coba dan pembayaran dimatikan. Akun baru dibuat admin lewat Undangan.", KindBool, 0, 0, true},
 }
 
 // Definition mencari flag berdasarkan kunci.

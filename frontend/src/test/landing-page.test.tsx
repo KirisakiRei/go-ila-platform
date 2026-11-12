@@ -22,6 +22,7 @@ function makePublicStatus(mode: string, message = ''): PublicStatus {
       next_label: 'Buka',
       next_change_pair: { wib: '05:00 WIB', ny: '17:00 NY', utc: '22:00 UTC' },
     },
+    invite_only: false,
   }
 }
 

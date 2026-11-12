@@ -6,6 +6,7 @@ import { AdminIdleGuard } from '@/features/admin/components/AdminIdleGuard'
 import { RequireAdminPermission } from '@/features/admin/components/RequireAdminPermission'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
+import { useInviteOnly } from '@/lib/use-invite-only'
 import AdminLoginPage from '@/pages/admin/AdminLoginPage'
 import ApprovePage from '@/pages/ApprovePage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -64,6 +65,21 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuthContext()
   if (isAuthenticated) {
     return <Navigate to="/" replace />
+  }
+  return <>{children}</>
+}
+
+/**
+ * HalamanPembayaran menutup halaman billing saat platform invite only.
+ *
+ * Route-nya sengaja tetap terdaftar, hanya dialihkan. Menghapus route berarti
+ * membuka kembali pembayaran menuntut deploy ulang; mengalihkan cukup
+ * mengubah flag. Alamat diketik langsung pun tidak menampilkan harga.
+ */
+function HalamanPembayaran({ children }: { children: ReactNode }) {
+  const inviteOnly = useInviteOnly()
+  if (inviteOnly) {
+    return <Navigate to="/dashboard" replace />
   }
   return <>{children}</>
 }
@@ -258,9 +274,11 @@ export function AppRoutes() {
           path="/langganan"
           element={
             <RequireAuth>
-              <ShellPage>
-                <BillingPage />
-              </ShellPage>
+              <HalamanPembayaran>
+                <ShellPage>
+                  <BillingPage />
+                </ShellPage>
+              </HalamanPembayaran>
             </RequireAuth>
           }
         />
@@ -268,9 +286,11 @@ export function AppRoutes() {
           path="/langganan/bayar"
           element={
             <RequireAuth>
-              <ShellPage>
-                <CheckoutPage />
-              </ShellPage>
+              <HalamanPembayaran>
+                <ShellPage>
+                  <CheckoutPage />
+                </ShellPage>
+              </HalamanPembayaran>
             </RequireAuth>
           }
         />

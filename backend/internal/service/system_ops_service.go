@@ -311,6 +311,9 @@ func (s *systemOpsService) Status(ctx context.Context) (*dto.PublicStatus, error
 		ServerTime: now,
 		TimePair:   dto.NewTimePair(now),
 		Market:     marketWindow(now),
+		// Gagal membaca flag diperlakukan sebagai tertutup: registry yang
+		// terbuka tiba-tiba lebih mahal daripada satu penolakan pendaftaran.
+		InviteOnly: s.flags.Bool(ctx, settings.KeyInviteOnly, true),
 	}
 	if state.Mode != model.ModeNormal {
 		out.ExpectedEnd = state.ExpectedEnd
