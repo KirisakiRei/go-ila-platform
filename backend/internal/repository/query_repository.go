@@ -76,9 +76,17 @@ func (r *signalRepository) ListForUser(ctx context.Context, userID string, since
 
 	err := r.db.WithContext(ctx).
 		Model(&model.Signal{}).
-		Joins("JOIN subscription s ON s.symbol = signal.symbol AND s.user_id = ? AND s.is_active = ?", userID, true).
+		// EXISTS dipakai, bukan JOIN ke subscription.
+		//
+		// JOIN membuat satu sinyal bisa muncul berkali-kali bila ada lebih dari
+		// satu baris langganan untuk simbol yang sama, sehingga dulu harus
+		// ditambal SELECT DISTINCT. Tambalan itu justru merusak: PostgreSQL
+		// menolak DISTINCT yang ORDER BY-nya memuat ekspresi di luar select
+		// list (SQLSTATE 42P10), sehingga /api/v1/signals gagal 500 dan seluruh
+		// dashboard tampak kosong. EXISTS tidak pernah menggandakan baris, jadi
+		// DISTINCT tidak lagi dibutuhkan.
+		Where("EXISTS (SELECT 1 FROM subscription s WHERE s.symbol = signal.symbol AND s.user_id = ? AND s.is_active = ?)", userID, true).
 		Where("signal.published_at >= ?", since).
-		Distinct("signal.*").
 		// Baris radar (identitas tetap `status-*`) selalu diurutkan lebih dulu.
 		// Tanpa ini, `published_at`-nya yang lama membuat baris radar terpotong
 		// oleh limit ketika riwayat sinyal sudah menumpuk, sehingga matriks
