@@ -36,6 +36,55 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-12 (3) — Kartu overview Signals & Radar kini menampilkan grid slot per metode
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan tampilan
+**Status:** 🟢 SELESAI — live di VPS 2 pada commit `8900f30`
+
+**Masalah pada kartu lama:**
+
+1. `pairSigs.find(...)` mengambil satu sinyal acak per metode, sehingga arah yang
+   tampil bisa kebalikan dari slot lain. Untuk XAUUSD: `W·H4` SELL sementara tiga
+   slot lain BUY.
+2. Harga ditampilkan tanpa memeriksa status. Semua baris radar membawa
+   `entry_price=0`, sehingga kartu menampilkan `BUY @ 0,0000` dan `R:R 1:0,0` —
+   angka yang tidak nyata.
+3. Label tahap tidak membedakan fase: semua jatuh ke `Pantau HTF`.
+4. Timeframe tidak terlihat sama sekali di overview.
+
+**Perubahan:**
+
+- Baru `frontend/src/features/signals/lib/slot-stage.ts`:
+  `stageILA2`, `stageILA3`, `stageOf`, `slotPalingDekat`.
+  Label pendek: `Sweep` -> `Candle` -> `CISD` -> `Ready` (ILA 2.0);
+  `Key Lvl` -> `Reversal` -> `CISD 1` -> `Ready` (ILA 3.0).
+- `signal-slots.ts`: tambah `ringkasanSlot` (total/siap/terisi).
+- `SignalsPage.tsx`: `SlotCell` + `MetodeSlotGrid` menggantikan dua sub-card.
+  Angka Entry hanya muncul saat slot `READY_TO_ENTRY`.
+
+**Keputusan yang sengaja diambil:**
+
+- **Tidak ada carousel/auto-rotate.** Tiap pasangan timeframe bergerak sendiri,
+  jadi menyembunyikan sebagian hanya menghilangkan informasi.
+- **Tidak ada peringatan "arah belum sepakat".** Arah berbeda antar slot adalah
+  kondisi normal, bukan konflik (koreksi dari human).
+- **Tidak ada penanda panah** untuk slot terdekat; hanya aksen garis.
+- Bila beberapa slot seri di tahap yang sama, **tidak ada** yang disorot, supaya
+  tidak menunjuk slot secara acak.
+- ILA 3.0 dilipat bawaan agar kartu tidak terlalu tinggi.
+- `StatusPill`/`StatusDot`/token monokrom **tidak disentuh**.
+
+**Verifikasi:**
+
+- `slot-stage.test.ts` (baru, 17 kasus) + `ringkasanSlot` di
+  `signal-slots.test.ts`.
+- Simulasi dengan data produksi XAUUSD: 4 slot tampil, semua `Sweep`, **tidak ada
+  satu pun** yang menampilkan harga 0.
+- `tsc --noEmit` bersih, `eslint` bersih, 21 berkas / 133 uji lulus,
+  `vite build` sukses.
+- Frontend healthy, restart 0, nol error API, engine tetap `EURUSD:4 USTEC:3 XAUUSD:2`.
+
 ### 2026-11-12 (2) — Dashboard kosong total: `/api/v1/signals` gagal 500 (SQLSTATE 42P10)
 
 **Pelaku:** Claude
