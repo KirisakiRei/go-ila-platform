@@ -36,6 +36,67 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-11 — Pair timeframe per simbol: switch `watch` tidak lagi bocor antar simbol
+
+**Pelaku:** Claude
+**Tipe:** Perbaikan bug + perubahan kontrak gRPC
+**Status:** 🟡 SELESAI di repo (belum di-deploy ke VPS 2)
+
+**Ringkasan:**
+
+1. **Akar masalah.** `SubscribeRequest.Pairs` adalah satu daftar global untuk
+   semua simbol. Runner menggabung pair seluruh simbol lalu mengirim daftar yang
+   sama untuk setiap simbol. Karena satu-satunya baris switch di DB produksi
+   adalah `USTEC · D·15M`, XAUUSD dan simbol lain hanya dievaluasi pada `D·15M`.
+   Gejalanya: slot ILA 3.0 `1H·5m`, `4H·5m`, `W·1H` mati sejak 11 Nov 10:58 NY.
+
+2. **Bug kedua yang ikut diperbaiki.** Fingerprint sinkronisasi di
+   `hitungPasangan()` dibentuk `metode:htf/ltf` — **tanpa simbol**. Menyalakan
+   atau mematikan switch satu simbol bisa tidak mengubah fingerprint, sehingga
+   sinkronisasi ke engine (interval 2 menit) tidak terpicu. Perubahan di UI tidak
+   sampai ke engine sama sekali.
+
+3. **Kontrak baru.** `map<string, SymbolPairs> symbol_pairs = 6`, dengan
+   `SymbolPairs{ repeated Pair pairs = 1; bool restricted = 2; }`.
+   Field lama `pairs = 3` **dipertahankan** sebagai jalur rollback supaya engine
+   lama tetap jalan.
+
+4. **Semantik.** `restricted=false` = simbol belum pernah diatur, engine memakai
+   seluruh pair bawaan. `restricted=true` = daftar final; kosong berarti simbol
+   sengaja tidak dipindai (Opsi A). Simbol yang tidak ada di peta diperlakukan
+   sebagai `restricted=false`, **bukan** dimatikan.
+
+5. **UI.** Radar sekarang membedakan tiga kondisi yang sebelumnya tercampur:
+   *sedang memindai*, *slot ini dimatikan*, dan *tidak ada satu pun timeframe
+   aktif*. Data diambil dari endpoint yang sudah ada
+   (`GET /pairs/:symbol/timeframes`), jadi **tidak ada** perubahan API signals
+   dan tidak ada risiko ke alur eksekusi.
+
+**File terdampak:**
+
+- `proto/engine/v1/engine.proto` (+ `backend/gen/engine/v1/engine.pb.go`)
+- `backend/internal/runner/timeframe_requirements.go` (`SymbolPairPolicy`, `ComputeSymbolPairs`)
+- `backend/internal/runner/service.go` (`hitungPasangan` kini memuat simbol + restricted)
+- `backend/cmd/runner/main.go` (`symbolPairs()` + dua call site)
+- `frontend/src/features/signals/lib/signal-slots.ts` (`setTimeframeDipantau`, `timeframeSlotDipantau`, `semuaTimeframeMati`)
+- `frontend/src/features/signals/components/TimeframeRadarMatrix.tsx` (`SemuaTimeframeMatiState`, `SlotMatiState`)
+- `frontend/src/pages/SignalsPage.tsx`, `frontend/src/pages/components/SignalsMobileView.tsx`
+- Test: `backend/internal/runner/symbol_pairs_test.go`, `pairs_fingerprint_test.go`, `frontend/src/test/signal-slots.test.ts`
+
+**Verifikasi:**
+
+- `go build ./...` hijau; `go test ./internal/runner/` hijau.
+- Test fingerprint **terbukti menangkap bug**: sengaja dimutasi dengan membuang
+  simbol dari fingerprint → test GAGAL; dikembalikan → LULUS.
+- Frontend: `tsc --noEmit` bersih, 20 file test / 114 test lulus, `vite build` sukses.
+
+**Catatan penting:**
+
+- **Urutan deploy wajib: Engine (VPS 1) dulu, Runner (VPS 2) kemudian.** Kalau
+  kebalik, engine lama mengabaikan `symbol_pairs` tanpa error apa pun.
+- `putuskanTimeframe()` (gate eksekusi), `slotDue()`, `menungguLTF()`,
+  `latestCandleClose()` **tidak diubah** — sudah benar.
+
 ### 2026-11-11 — PR Hermes digabung, `go 1.24.1` dipulihkan, platform live di VPS 2
 
 **Pelaku:** Claude

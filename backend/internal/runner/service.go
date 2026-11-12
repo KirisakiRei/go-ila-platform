@@ -1313,24 +1313,30 @@ func (s *Service) syncDenganSidik(ctx context.Context, strategy string, desired 
 func (s *Service) hitungPasangan(ctx context.Context, strategy string, symbols []string) string {
 	semua := make([]string, 0, len(symbols))
 	for _, symbol := range symbols {
-		reqs, err := s.ComputeTimeframeRequirements(ctx, symbol)
+		// Fingerprint HARUS memuat simbol. Tanpa itu, mengubah switch satu
+		// simbol tidak mengubah sidik, sehingga sinkronisasi ke engine tidak
+		// pernah terpicu dan perubahan di UI tidak sampai ke engine.
+		kebijakan, err := s.ComputeSymbolPairs(ctx, symbol)
 		if err != nil {
 			continue
 		}
-		for nama, list := range reqs {
-			// Hanya pasangan strategi ini yang relevan bagi engine tujuan;
-			// pasangan strategi lain tidak boleh memicu kirim ulang.
-			if nama != strategy {
-				continue
-			}
-			for _, p := range list {
-				semua = append(semua, nama+":"+p.Htf+"/"+p.Ltf)
-			}
+		policy, ada := kebijakan[strategy]
+		if !ada {
+			// Simbol tanpa kebijakan untuk metode ini: engine memakai daftar
+			// bawaan. Tetap dicatat agar perpindahan dari/dan ke kondisi ini
+			// ikut memicu sinkronisasi.
+			semua = append(semua, symbol+":"+strategy+":bawaan")
+			continue
+		}
+		if policy.Restricted {
+			semua = append(semua, symbol+":"+strategy+":restricted")
+		}
+		for _, p := range policy.Pairs {
+			semua = append(semua, symbol+":"+strategy+":"+p.Htf+"/"+p.Ltf)
 		}
 	}
 	sort.Strings(semua)
 
-	// Duplikat dibuang: dua simbol dengan pasangan sama tetap satu sidik.
 	var b strings.Builder
 	var terakhir string
 	for _, item := range semua {

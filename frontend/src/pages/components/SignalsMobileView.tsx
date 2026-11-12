@@ -39,6 +39,10 @@ type SignalsMobileViewProps = {
   onSelectStrategy: (strat: 'ila-2.0' | 'ila-3.0') => void
   filteredSignals: Signal[]
   filteredPositions: Position[]
+  /**
+   * Pasangan timeframe yang sedang dipantau. `null` berarti belum diketahui.
+   */
+  timeframeAktif?: Set<string> | null
 }
 
 export function SignalsMobileView({
@@ -55,6 +59,7 @@ export function SignalsMobileView({
   onSelectStrategy,
   filteredSignals,
   filteredPositions,
+  timeframeAktif,
 }: SignalsMobileViewProps) {
   const [activeTab, setActiveTab] = useState<TabFilter>('all')
   // Chart dilipat secara bawaan agar daftar sinyal tetap jadi fokus utama di
@@ -563,6 +568,7 @@ export function SignalsMobileView({
             signals={filteredSignals}
             strategy={activeStrategyFilter}
             symbol={activePair}
+            timeframeAktif={timeframeAktif}
           />
 
           {/* Riwayat Order Posisi Mobile */}

@@ -11,7 +11,7 @@ import { Badge, Button, Card, CardContent, CardDescription, CardHeader, StatusPi
 import { formatDualDateTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
-import { mapSignalsToSlots, type TimeframeSlot } from '../lib/signal-slots'
+import { mapSignalsToSlots, semuaTimeframeMati, timeframeSlotDipantau, type TimeframeSlot } from '../lib/signal-slots'
 import { SIGNAL_LABEL, SIGNAL_TONE, getCycleBadge, getIla3Mtf, getIla3Progress } from '../lib/status'
 import { SignalDetail } from './SignalDetail'
 import { TimeframeBadge } from './TimeframeBadge'
@@ -20,15 +20,23 @@ export function TimeframeRadarMatrix({
   signals,
   strategy,
   symbol,
+  timeframeAktif,
 }: {
   signals: Signal[]
   strategy: 'ila-2.0' | 'ila-3.0'
   symbol: string
+  /**
+   * Pasangan timeframe yang sedang dipantau untuk metode ini.
+   * `null` berarti belum diketahui, sehingga slot tidak ditandai mati.
+   */
+  timeframeAktif?: Set<string> | null
 }) {
   // Matriks dikunci ke satu metode. Penyaringan ini pengaman tambahan supaya
   // sinyal dari metode lain tidak pernah ikut membentuk slot di matriks ini.
   const signalMetode = signals.filter((s) => s.strategy_version === strategy)
   const slots = mapSignalsToSlots(signalMetode, strategy)
+  const aktif = timeframeAktif ?? null
+  const matiSemua = semuaTimeframeMati(aktif)
 
   // Otomatis arahkan ke slot yang statusnya READY jika ada, atau slot pertama
   const initialKey = slots.find((s) => s.status === 'READY')?.key ?? slots[0]?.key ?? ''
@@ -137,9 +145,13 @@ export function TimeframeRadarMatrix({
       </div>
 
       {/* Main Content Area */}
-      {viewMode === 'tab' ? (
+      {matiSemua ? (
+        <SemuaTimeframeMatiState symbol={symbol} strategy={strategy} />
+      ) : viewMode === 'tab' ? (
         currentSlot?.latestSignal ? (
           <SignalDetail signal={currentSlot.latestSignal} />
+        ) : currentSlot && !timeframeSlotDipantau(aktif, currentSlot) ? (
+          <SlotMatiState slot={currentSlot} symbol={symbol} />
         ) : (
           <SlotEmptyState slot={currentSlot} symbol={symbol} />
         )
@@ -160,6 +172,52 @@ export function TimeframeRadarMatrix({
         </div>
       )}
     </div>
+  )
+}
+
+function SemuaTimeframeMatiState({
+  symbol,
+  strategy,
+}: {
+  symbol: string
+  strategy: 'ila-2.0' | 'ila-3.0'
+}) {
+  // Kondisi ini bukan "menunggu setup": tidak ada satu pun pasangan timeframe
+  // yang dipantau, jadi engine memang tidak memindai apa pun. Dibedakan supaya
+  // user tidak menunggu sinyal yang tidak akan pernah datang.
+  return (
+    <Card className="border-dashed border-border bg-card/60">
+      <CardContent className="py-12 text-center flex flex-col items-center justify-center gap-2">
+        <Radio className="h-8 w-8 text-muted-foreground/60" />
+        <h4 className="text-sm font-semibold text-foreground">
+          Tidak ada timeframe yang dipindai untuk {symbol}
+        </h4>
+        <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
+          Seluruh switch {strategy} untuk pair ini sedang dimatikan. Nyalakan
+          minimal satu pasangan timeframe di pengaturan switch timeframe agar
+          engine mulai memindai lagi.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function SlotMatiState({ slot, symbol }: { slot?: TimeframeSlot; symbol: string }) {
+  // Slot ini sengaja tidak dipantau. Dibedakan dari "sedang memindai" supaya
+  // user tidak menunggu setup yang tidak akan pernah muncul.
+  return (
+    <Card className="border-dashed border-border bg-card/60">
+      <CardContent className="py-12 text-center flex flex-col items-center justify-center gap-2">
+        <Radio className="h-8 w-8 text-muted-foreground/60" />
+        <h4 className="text-sm font-semibold text-foreground">
+          {slot?.label || 'Timeframe'} tidak dipindai untuk {symbol}
+        </h4>
+        <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
+          Pasangan timeframe ini sedang dimatikan pada switch timeframe, jadi
+          engine tidak mengevaluasinya.
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 

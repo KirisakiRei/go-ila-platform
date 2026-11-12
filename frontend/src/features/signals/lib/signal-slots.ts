@@ -239,3 +239,53 @@ export function getActiveCallEntries(signals: Signal[]): Signal[] {
     .filter((s) => s.status === 'READY_TO_ENTRY' || s.status === 'OPPORTUNITY')
     .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
 }
+
+/**
+ * setTimeframeDipantau menghitung pasangan timeframe yang sedang dipantau
+ * (watch) untuk satu metode, berdasarkan matriks switch yang dikirim server.
+ *
+ * Hasil `null` berarti "belum bisa dipastikan": user belum punya akun, atau
+ * metodenya tidak berjalan. Pemanggil harus memperlakukannya sebagai "tidak
+ * tahu", BUKAN "semua mati" — kalau salah, radar yang sebenarnya berjalan akan
+ * tampil seperti dimatikan.
+ *
+ * Hasil himpunan kosong berarti semua switch memang dimatikan.
+ */
+export function setTimeframeDipantau(
+  matrix: { groups?: Array<{ strategy: string; accounts: Array<{ pairs: Array<{ htf: string; ltf: string; watch: boolean }> }> }> } | null | undefined,
+  strategy: 'ila-2.0' | 'ila-3.0',
+): Set<string> | null {
+  const group = matrix?.groups?.find((g) => g.strategy === strategy)
+  if (!group || group.accounts.length === 0) return null
+
+  const aktif = new Set<string>()
+  for (const account of group.accounts) {
+    for (const pair of account.pairs) {
+      if (!pair.watch) continue
+      aktif.add(`${normTF(pair.htf)}|${normTF(pair.ltf)}`)
+    }
+  }
+  return aktif
+}
+
+/**
+ * timeframeSlotDipantau menandai apakah satu slot benar-benar dipindai engine.
+ *
+ * `aktif` bernilai null berarti status belum diketahui, sehingga slot dianggap
+ * dipantau agar tampilan tidak menuduh user mematikan sesuatu.
+ */
+export function timeframeSlotDipantau(
+  aktif: Set<string> | null,
+  slot: { htf: string; ltf: string },
+): boolean {
+  if (aktif === null) return true
+  return aktif.has(`${normTF(slot.htf)}|${normTF(slot.ltf)}`)
+}
+
+/**
+ * semuaTimeframeMati menandai kondisi khusus "tidak ada satu pun timeframe
+ * yang dipantau". Hanya bernilai true bila status benar-benar diketahui.
+ */
+export function semuaTimeframeMati(aktif: Set<string> | null): boolean {
+  return aktif !== null && aktif.size === 0
+}

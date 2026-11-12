@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { mapSignalsToSlots } from '@/features/signals/lib/signal-slots'
+import {
+  mapSignalsToSlots,
+  semuaTimeframeMati,
+  setTimeframeDipantau,
+  timeframeSlotDipantau,
+} from '@/features/signals/lib/signal-slots'
 import type { Signal } from '@/types/api'
 
 /**
@@ -84,5 +89,60 @@ describe('mapSignalsToSlots', () => {
 
     expect(slot?.latestSignal?.signal_id).toBe('status-XAUUSD-H4-M15')
     expect(slot?.status).toBe('WAIT_SWEEP')
+  })
+})
+
+describe('setTimeframeDipantau', () => {
+  const matriks = (watch: Record<string, boolean>) => ({
+    groups: [
+      {
+        strategy: 'ila-2.0',
+        accounts: [
+          {
+            pairs: Object.entries(watch).map(([key, on]) => {
+              const [htf = '', ltf = ''] = key.split('|')
+              return { htf, ltf, watch: on }
+            }),
+          },
+        ],
+      },
+    ],
+  })
+
+  it('mengumpulkan pasangan yang dipantau saja', () => {
+    const aktif = setTimeframeDipantau(
+      matriks({ 'H4|M15': true, 'H1|M5': false }),
+      'ila-2.0',
+    )
+    expect(aktif?.size).toBe(1)
+    expect(timeframeSlotDipantau(aktif, { htf: 'H4', ltf: 'M15' })).toBe(true)
+    expect(timeframeSlotDipantau(aktif, { htf: 'H1', ltf: 'M5' })).toBe(false)
+  })
+
+  it('null bila belum ada akun, bukan dianggap semua mati', () => {
+    // Kesalahan paling berbahaya: radar yang berjalan tampil seperti dimatikan.
+    expect(setTimeframeDipantau(undefined, 'ila-2.0')).toBeNull()
+    expect(setTimeframeDipantau({ groups: [] }, 'ila-2.0')).toBeNull()
+    expect(setTimeframeDipantau({ groups: [{ strategy: 'ila-2.0', accounts: [] }] }, 'ila-2.0')).toBeNull()
+  })
+
+  it('himpunan kosong berarti semua switch dimatikan', () => {
+    const aktif = setTimeframeDipantau(matriks({ 'H4|M15': false }), 'ila-2.0')
+    expect(aktif?.size).toBe(0)
+    expect(semuaTimeframeMati(aktif)).toBe(true)
+  })
+
+  it('semuaTimeframeMati tidak pernah menuduh saat status belum diketahui', () => {
+    expect(semuaTimeframeMati(null)).toBe(false)
+  })
+
+  it('slot dianggap dipantau saat status belum diketahui', () => {
+    expect(timeframeSlotDipantau(null, { htf: 'W', ltf: 'H4' })).toBe(true)
+  })
+
+  it('menyamakan alias penulisan timeframe', () => {
+    // Server boleh mengirim D1/H1, UI memakai D/H1.
+    const aktif = setTimeframeDipantau(matriks({ 'D1|H1': true }), 'ila-2.0')
+    expect(timeframeSlotDipantau(aktif, { htf: 'D1', ltf: 'H1' })).toBe(true)
   })
 })

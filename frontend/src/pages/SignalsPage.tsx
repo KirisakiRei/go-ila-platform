@@ -21,10 +21,11 @@ import {
   Skeleton,
   StatusPill,
 } from '@/components/ui'
-import { usePositions, useSignals, useStrategies, useSubscriptions } from '@/lib/queries'
+import { usePositions, useSignals, useStrategies, useSubscriptions, useTimeframeSwitchMatrix } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatNumber, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
+import { setTimeframeDipantau } from '@/features/signals/lib/signal-slots'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
 import { TradingRadarChart } from '@/features/charts/TradingRadarChart'
@@ -76,6 +77,10 @@ export default function SignalsPage() {
     const upper = pairParam.toUpperCase()
     return allPairs.includes(upper) ? upper : null
   }, [pairParam, allPairs])
+
+  // Matriks switch dipakai hanya untuk membedakan "sedang memindai" dari
+  // "tidak ada timeframe yang dipindai". Tidak memengaruhi eksekusi.
+  const { data: timeframeMatrix } = useTimeframeSwitchMatrix(activePair)
 
   // Sinyal dan posisi untuk pair yang sedang aktif
   const pairSignals = useMemo(() => {
@@ -140,6 +145,7 @@ export default function SignalsPage() {
         }}
         filteredSignals={filteredSignals}
         filteredPositions={filteredPositions}
+        timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
       />
 
       {/* ============================================================ */}
@@ -226,6 +232,7 @@ export default function SignalsPage() {
                   signals={filteredSignals}
                   strategy={activeStrategyFilter}
                   symbol={activePair}
+                  timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
                 />
               </Section>
 

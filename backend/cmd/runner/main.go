@@ -459,6 +459,7 @@ func streamOnce(
 			SubscriberId:      subscriberID,
 			Symbols:           symbolsAwal,
 			Pairs:             timeframePairs(ctx, target, svc, logger),
+			SymbolPairs:       symbolPairs(ctx, target, svc, symbolsAwal, logger),
 			SymbolFeeds:       pairFeeds(ctx, store, symbolsAwal, logger),
 			WantStatusUpdates: true,
 		},
@@ -536,6 +537,7 @@ func symbolSync(client enginev1.EngineServiceClient, subscriberID string, target
 			SubscriberId:      subscriberID,
 			Symbols:           symbols,
 			Pairs:             timeframePairs(syncCtx, target, svc, logger),
+			SymbolPairs:       symbolPairs(syncCtx, target, svc, symbols, logger),
 			SymbolFeeds:       pairFeeds(syncCtx, store, symbols, logger),
 			WantStatusUpdates: true,
 		})
@@ -651,6 +653,12 @@ func subscribedSymbols(ctx context.Context, target engineTarget, svc *runner.Ser
 // Isinya gabungan pasangan yang dipantau siapa pun. Bila fitur timeframe belum
 // dinyalakan atau belum ada yang mengaturnya, hasilnya kosong sehingga engine
 // menerima perilaku lama: hanya daftar simbol.
+// timeframePairs menyusun pasangan timeframe gabungan yang perlu dihitung
+// engine untuk sebuah strategi.
+//
+// Deprecated: daftar ini tidak memuat identitas simbol, sehingga switch satu
+// simbol bocor ke simbol lain. Fungsi ini dipertahankan HANYA sebagai jalur
+// kompatibilitas untuk engine lama yang belum mengenal symbol_pairs.
 func timeframePairs(ctx context.Context, target engineTarget, svc *runner.Service, logger *slog.Logger) []*enginev1.Pair {
 	symbols := subscribedSymbols(ctx, target, svc)
 	if len(symbols) == 0 {
@@ -685,6 +693,43 @@ func timeframePairs(ctx context.Context, target engineTarget, svc *runner.Servic
 	out := make([]*enginev1.Pair, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, unik[key])
+	}
+	return out
+}
+
+// symbolPairs menyusun kebijakan pasangan timeframe PER SIMBOL untuk satu
+// strategi. Inilah jalur yang mencegah switch satu simbol mematikan simbol
+// lain.
+//
+// Simbol tanpa kebijakan sengaja tidak dimasukkan: engine memperlakukannya
+// sebagai "pakai daftar bawaan", yang memang perilaku yang diinginkan.
+func symbolPairs(ctx context.Context, target engineTarget, svc *runner.Service, symbols []string, logger *slog.Logger) map[string]*enginev1.SymbolPairs {
+	if len(symbols) == 0 {
+		return nil
+	}
+
+	out := make(map[string]*enginev1.SymbolPairs, len(symbols))
+	for _, symbol := range symbols {
+		kebijakan, err := svc.ComputeSymbolPairs(ctx, symbol)
+		if err != nil {
+			logger.Warn("gagal menyusun pasangan timeframe per simbol",
+				"strategy", target.Strategy, "symbol", symbol, "error", errorText(err))
+			continue
+		}
+		policy, ada := kebijakan[target.Strategy]
+		if !ada || !policy.Restricted {
+			// Belum diatur: biarkan engine memakai daftar bawaannya.
+			continue
+		}
+		pairs := make([]*enginev1.Pair, 0, len(policy.Pairs))
+		for _, p := range policy.Pairs {
+			pairs = append(pairs, &enginev1.Pair{Htf: p.Htf, Ltf: p.Ltf})
+		}
+		out[symbol] = &enginev1.SymbolPairs{Pairs: pairs, Restricted: true}
+	}
+
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }
