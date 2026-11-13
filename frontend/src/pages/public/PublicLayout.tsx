@@ -419,7 +419,7 @@ export function PublicLayout() {
               <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
                 <li>
                   <a href="/app/register" className="transition-colors hover:text-[#52525b]">
-                    Mulai Trial
+                    Mulai Uji Coba
                   </a>
                 </li>
                 <li>

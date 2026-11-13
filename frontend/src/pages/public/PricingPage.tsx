@@ -146,7 +146,7 @@ export default function PricingPage() {
               href="/app/register"
               className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800"
             >
-              Mulai Trial 7 Hari
+              Mulai Uji Coba 7 Hari
             </a>
             <a
               href="/legal/refund"
@@ -352,7 +352,7 @@ export default function PricingPage() {
               </table>
             </div>
             <p className="mt-3 text-[12px] text-[#6b6b74]">
-              Trial 7 hari menyertakan fitur setara paket tertinggi dalam mode demo.
+              Uji coba 7 hari memberi fitur paket Basic dalam mode simulasi, bukan mode eksekusi.
             </p>
           </div>
         </section>

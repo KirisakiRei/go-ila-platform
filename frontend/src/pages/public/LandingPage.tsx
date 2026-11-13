@@ -67,7 +67,7 @@ const FEATURE_STATS = [
   },
   {
     value: '7 Hari',
-    detail: 'Masa uji coba fitur setara Plus dalam mode simulasi sebelum memilih paket.',
+    detail: 'Masa uji coba fitur paket Basic dalam mode simulasi sebelum memilih paket.',
   },
   {
     value: '100%',
@@ -145,7 +145,7 @@ export default function LandingPage() {
                   href="/app/register"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] shadow-lg shadow-black/30 transition-colors hover:bg-zinc-200"
                 >
-                  Mulai Trial 7 Hari
+                  Mulai Uji Coba 7 Hari
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Link
@@ -177,7 +177,7 @@ export default function LandingPage() {
                 href="/app/register"
                 className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
               >
-                Mulai Trial 7 Hari
+                Mulai Uji Coba 7 Hari
               </a>
               <Link
                 to="/bantuan/zona-waktu"
@@ -335,7 +335,7 @@ export default function LandingPage() {
                   href="/app/register"
                   className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
                 >
-                  Mulai Trial
+                  Mulai Uji Coba
                 </a>
                 <Link
                   to="/fitur"
@@ -476,7 +476,7 @@ export default function LandingPage() {
               </h2>
               <p className="max-w-xl text-[14px] text-[#52525b]">
                 Harga mengikuti katalog aktif di server. Mulai dari simulasi gratis atau langsung
-                coba uji coba 7 hari setara Plus.
+                coba uji coba 7 hari dengan fitur paket Basic.
               </p>
             </div>
             <Link
@@ -593,8 +593,8 @@ export default function LandingPage() {
               </h2>
 
               <p className="max-w-[60ch] text-[14px] leading-relaxed text-zinc-300">
-                Mulai trial simulasi 7 hari tanpa kartu kredit. Hubungkan akun broker Anda saat sudah
-                siap menjalankan trading.
+                Mulai uji coba simulasi 7 hari tanpa kartu kredit. Hubungkan akun broker Anda saat
+                sudah siap menjalankan trading.
               </p>
 
               <p className="border-l-2 border-zinc-700 pl-4 max-w-[68ch] text-[12px] leading-relaxed text-zinc-300">
@@ -609,7 +609,7 @@ export default function LandingPage() {
                   href="/app/register"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] transition-colors hover:bg-zinc-200"
                 >
-                  Mulai Trial 7 Hari
+                  Mulai Uji Coba 7 Hari
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Link
