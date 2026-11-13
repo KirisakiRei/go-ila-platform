@@ -494,9 +494,9 @@ export default function SignalsPage() {
           {/* Konfigurasi Akun untuk Pair Ini */}
           <div className="space-y-6 border-t border-border/80 pt-6">
             <div className="flex flex-col gap-1">
-              <h3 className="text-base font-semibold tracking-tight text-foreground">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">
                 Pengaturan Akun ({activePair})
-              </h3>
+              </h2>
               <p className="text-xs text-muted-foreground">
                 Konfigurasi metode dan pasangan timeframe yang diizinkan untuk akun trading Anda.
               </p>
@@ -527,7 +527,7 @@ export default function SignalsPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Bot className="mx-auto h-10 w-10 text-muted-foreground/60" />
-                <h3 className="mt-3 text-base font-semibold">Watchlist Pair Kosong</h3>
+                <h2 className="mt-3 text-base font-semibold">Watchlist Pair Kosong</h2>
                 <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
                   Tambahkan simbol instrumen (misal XAUUSD, EURUSD) pada halaman Watchlist Pair agar sinyal trading
                   otomatis muncul di sini.

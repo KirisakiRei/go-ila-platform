@@ -135,10 +135,10 @@ export default function BillingPage() {
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold tracking-tight">
+                    <h2 className="text-sm font-semibold tracking-tight">
                       Langganan Aktif: Paket {subscription.data.plan_code.toUpperCase()}
-                    </h3>
-                    <Badge variant="solid" className="text-[10px]">Aktif</Badge>
+                    </h2>
+                    <Badge variant="solid" className="text-micro">Aktif</Badge>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     Masa aktif berlaku sampai dengan{' '}
@@ -203,7 +203,7 @@ export default function BillingPage() {
                         </div>
 
                         {isPlus && (
-                          <span className="rounded-full bg-foreground px-2.5 py-0.5 text-[10px] font-semibold text-background">
+                          <span className="rounded-full bg-foreground px-2.5 py-0.5 text-micro font-semibold text-background">
                             Terlengkap
                           </span>
                         )}

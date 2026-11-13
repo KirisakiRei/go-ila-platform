@@ -56,7 +56,7 @@ export function AccountStatusCard() {
 
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold tracking-tight">{user.name}</h3>
+              <h2 className="text-sm font-semibold tracking-tight">{user.name}</h2>
               <Badge variant={meta.badgeVariant}>{meta.label}</Badge>
               {isTrialActive && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
