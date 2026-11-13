@@ -76,7 +76,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
         <div className="overflow-y-auto p-5 space-y-5 pb-8">
           {/* Kelompok 1: Trading & Ekosistem */}
           <div className="space-y-2">
-            <span className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
               Trading & Ekosistem
             </span>
             <div className="grid grid-cols-2 gap-2.5">
@@ -90,7 +90,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Signals & Radar</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Setup ILA Realtime</p>
+                  <p className="truncate text-micro text-muted-foreground">Setup ILA Realtime</p>
                 </div>
               </Link>
 
@@ -104,7 +104,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Posisi Trading</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Riwayat & Order</p>
+                  <p className="truncate text-micro text-muted-foreground">Riwayat & Order</p>
                 </div>
               </Link>
 
@@ -118,7 +118,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Akun Broker</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Match-Trader</p>
+                  <p className="truncate text-micro text-muted-foreground">Match-Trader</p>
                 </div>
               </Link>
 
@@ -132,7 +132,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Watchlist Pair</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Kelola Instrumen</p>
+                  <p className="truncate text-micro text-muted-foreground">Kelola Instrumen</p>
                 </div>
               </Link>
             </div>
@@ -140,7 +140,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
 
           {/* Kelompok 2: Akun & Layanan */}
           <div className="space-y-2">
-            <span className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
               Akun & Layanan
             </span>
             <div className="grid grid-cols-2 gap-2.5">
@@ -155,7 +155,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-foreground">Subscription</p>
-                    <p className="truncate text-[10.5px] text-muted-foreground">Paket & Billing</p>
+                    <p className="truncate text-micro text-muted-foreground">Paket & Billing</p>
                   </div>
                 </Link>
               )}
@@ -170,7 +170,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Keamanan</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Password & 2FA</p>
+                  <p className="truncate text-micro text-muted-foreground">Password & 2FA</p>
                 </div>
               </Link>
 
@@ -184,7 +184,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Onboarding</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Checklist Akun</p>
+                  <p className="truncate text-micro text-muted-foreground">Checklist Akun</p>
                 </div>
               </Link>
 
@@ -198,7 +198,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Pengaturan</p>
-                  <p className="truncate text-[10.5px] text-muted-foreground">Preferensi Akun</p>
+                  <p className="truncate text-micro text-muted-foreground">Preferensi Akun</p>
                 </div>
               </Link>
             </div>

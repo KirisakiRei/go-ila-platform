@@ -33,7 +33,7 @@ export function MobileBottomNav({ inviteOnly = false }: MobileBottomNavProps) {
             end={end}
             className={({ isActive }) =>
               cn(
-                'flex flex-col items-center justify-center w-14 py-1 transition-colors active:scale-95',
+                'flex flex-col items-center justify-center w-16 py-1 transition-colors active:scale-95',
                 isActive
                   ? 'font-semibold text-foreground'
                   : 'text-muted-foreground hover:text-foreground',
@@ -52,7 +52,7 @@ export function MobileBottomNav({ inviteOnly = false }: MobileBottomNavProps) {
                 </div>
                 <span
                   className={cn(
-                    'text-[10px] tracking-tight',
+                    'text-[11px] leading-tight tracking-tight',
                     isActive ? 'font-semibold text-foreground' : 'text-muted-foreground',
                   )}
                 >

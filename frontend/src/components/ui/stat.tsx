@@ -18,11 +18,11 @@ export function Stat({
 
   return (
     <div className={cn('flex flex-col gap-1 border border-border p-4', className)}>
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <dt className="text-micro font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
       <dd className="text-xl font-semibold tabular leading-none">{value}</dd>
-      {showHint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      {showHint && <p className="text-micro text-muted-foreground">{hint}</p>}
     </div>
   )
 }

@@ -117,12 +117,12 @@ export function AppShell({ user, children }: AppShellProps) {
             <Logo className="h-7 w-auto" />
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-bold tracking-tight">ILA</span>
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="rounded bg-secondary px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Platform
               </span>
             </div>
           </div>
-          <Badge variant="muted" className="inline-flex text-[10px]">
+          <Badge variant="muted" className="inline-flex text-micro">
             {TIER_LABEL[user.tier]}
           </Badge>
         </div>
@@ -163,7 +163,7 @@ export function AppShell({ user, children }: AppShellProps) {
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-[12.5px] font-semibold">{user.name}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+              <p className="truncate text-micro text-muted-foreground">{user.email}</p>
             </div>
             <Badge variant="muted">{TIER_LABEL[user.tier]}</Badge>
           </div>
