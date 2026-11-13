@@ -196,7 +196,7 @@ export function SignalsMobileView({
             <span>Semua Pair</span>
             <span
               className={cn(
-                'ml-0.5 rounded-full px-1.5 py-0.2 text-micro',
+                'ml-0.5 rounded-full px-1.5 py-0.2 text-micro leading-none',
                 !activePair
                   ? 'bg-background/20 text-background'
                   : 'bg-secondary text-muted-foreground',
@@ -232,7 +232,7 @@ export function SignalsMobileView({
                 {pairSignalCount > 0 && (
                   <span
                     className={cn(
-                      'ml-0.5 rounded-full px-1.5 py-0.2 text-micro',
+                      'ml-0.5 rounded-full px-1.5 py-0.2 text-micro leading-none',
                       isPairActive
                         ? 'bg-background/20 text-background'
                         : 'bg-secondary text-muted-foreground',
@@ -320,7 +320,7 @@ export function SignalsMobileView({
                 type="button"
                 onClick={() => onSelectStrategy(strat)}
                 className={cn(
-                  'rounded-lg px-2.5 py-1 text-micro font-semibold transition-all',
+                  'rounded-lg px-2.5 py-1 text-micro leading-none font-semibold transition-all',
                   activeStrategyFilter === strat
                     ? 'bg-foreground text-background shadow-xs'
                     : 'bg-secondary text-muted-foreground hover:text-foreground',

@@ -225,7 +225,7 @@ export function CheckoutMobileView({
                       <h2 className="text-sm font-bold tracking-tight text-foreground">{planName}</h2>
                     </div>
                   </div>
-                  <span className="rounded-md border border-border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="rounded-md border border-border px-2 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-muted-foreground">
                     {planCode}
                   </span>
                 </div>
@@ -329,7 +329,7 @@ export function CheckoutMobileView({
               </div>
 
               {isVoucherApplied && (
-                <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2 text-micro font-medium text-emerald-800 dark:text-emerald-300">
+                <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2 text-micro leading-none font-medium text-emerald-800 dark:text-emerald-300">
                   <span className="truncate">Voucher {appliedCoupon} diterapkan</span>
                   <button type="button" onClick={onRemoveCoupon} className="ml-2 shrink-0 underline">
                     Hapus
@@ -462,7 +462,7 @@ export function CheckoutMobileView({
                 </span>
                 <p className="text-[12px] font-semibold text-foreground">{currentMethod.name}</p>
               </div>
-              <span className="rounded-md border border-border px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="rounded-md border border-border px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-muted-foreground">
                 {currentMethod.category}
               </span>
             </div>
@@ -557,7 +557,7 @@ export function CheckoutMobileView({
             <p className="mt-3 text-2xl font-bold tracking-tight tabular-nums text-foreground">
               {formatIDR(invoice.total_idr)}
             </p>
-            <span className="mt-2 inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+            <span className="mt-2 inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
               <Check className="h-3 w-3" />
               Lunas
             </span>

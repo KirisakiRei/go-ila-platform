@@ -102,8 +102,11 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                             </td>
                           )}
                           <td className="px-3.5 py-2.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-mono text-caption font-medium text-foreground">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {/* ILA 3.0 memakai tiga timeframe (W · H4 · H1), lebih
+                                  panjang dari ILA 2.0 (H4 · H1). nowrap menjaga rentang
+                                  itu tetap satu baris. */}
+                              <span className="whitespace-nowrap font-mono text-[11.5px] font-medium text-foreground">
                                 {(() => {
                                   if (group.strategy === 'ila-3.0') {
                                     const mtf = getIla3Mtf(pair.htf, pair.ltf)
@@ -116,7 +119,7 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                                 const cycle = getCycleBadge(group.strategy, pair.htf, pair.ltf)
                                 if (!cycle) return null
                                 return (
-                                  <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-micro font-medium text-primary border border-primary/20">
+                                  <span className="inline-flex items-center whitespace-nowrap rounded border border-primary/20 bg-primary/10 px-1 py-0.5 text-[11px] font-medium leading-none text-primary">
                                     {cycle}
                                   </span>
                                 )

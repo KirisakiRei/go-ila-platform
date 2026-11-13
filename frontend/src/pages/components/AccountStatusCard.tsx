@@ -59,7 +59,7 @@ export function AccountStatusCard() {
               <h2 className="text-sm font-semibold tracking-tight">{user.name}</h2>
               <Badge variant={meta.badgeVariant}>{meta.label}</Badge>
               {isTrialActive && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-semibold text-emerald-700 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-semibold text-emerald-700 dark:text-emerald-400">
                   <Sparkles className="h-3 w-3" />
                   Trial Aktif ({trial.data?.days_remaining} hari lagi)
                 </span>

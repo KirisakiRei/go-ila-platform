@@ -203,7 +203,7 @@ export default function BillingPage() {
                         </div>
 
                         {isPlus && (
-                          <span className="rounded-full bg-foreground px-2.5 py-0.5 text-micro font-semibold text-background">
+                          <span className="rounded-full bg-foreground px-2.5 py-0.5 text-micro leading-none font-semibold text-background">
                             Terlengkap
                           </span>
                         )}

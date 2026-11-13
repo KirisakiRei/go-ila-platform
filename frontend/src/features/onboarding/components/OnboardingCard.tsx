@@ -43,7 +43,7 @@ export function OnboardingCard() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold tracking-tight">Lengkapi Penyiapan Akun</h3>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-medium text-emerald-700 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-medium text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2 className="h-3 w-3" />
                   {completed} dari {total} langkah selesai ({percentage}%)
                 </span>

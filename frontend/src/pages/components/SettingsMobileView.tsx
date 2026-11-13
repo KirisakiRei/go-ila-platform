@@ -53,7 +53,7 @@ function MenuRow({ icon: Icon, label, description, to, onClick, trailing, disabl
       {trailing && (
         <span
           className={cn(
-            'shrink-0 rounded-md border px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide',
+            'shrink-0 rounded-md border px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wide',
             trailing === 'Terverifikasi' || trailing === 'Terhubung'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'border-border bg-secondary text-muted-foreground',
@@ -313,11 +313,11 @@ export function SettingsMobileView() {
           </p>
           <p className="truncate text-micro text-muted-foreground">{profile?.email ?? '—'}</p>
           <div className="mt-1 flex items-center gap-1.5">
-            <span className="rounded-md border border-border bg-secondary px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-foreground">
+            <span className="rounded-md border border-border bg-secondary px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-foreground">
               Tier {TIER_LABEL[profile?.tier ?? 'free'] ?? profile?.tier}
             </span>
             {isVerified && (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="h-2.5 w-2.5" />
                 Terverifikasi
               </span>
@@ -448,7 +448,7 @@ export function SettingsMobileView() {
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-medium text-muted-foreground">Status:</span>
             {isTelegramConnected ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-semibold text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-semibold text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="h-3 w-3" />
                 Terhubung
               </span>

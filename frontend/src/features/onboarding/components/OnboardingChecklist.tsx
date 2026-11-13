@@ -133,12 +133,12 @@ export function OnboardingChecklist({ data, onNavigate }: OnboardingChecklistPro
                       {meta.title}
                     </p>
                     {isDone ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-medium text-emerald-700 dark:text-emerald-400">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-medium text-emerald-700 dark:text-emerald-400">
                         <CheckCircle2 className="h-3 w-3" />
                         Selesai
                       </span>
                     ) : (
-                      <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-micro font-medium text-muted-foreground">
+                      <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-micro leading-none font-medium text-muted-foreground">
                         Belum selesai
                       </span>
                     )}

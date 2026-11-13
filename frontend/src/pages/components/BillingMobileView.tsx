@@ -136,7 +136,7 @@ export function BillingMobileView({
               <span>{item.label}</span>
               <span
                 className={cn(
-                  'rounded-full px-1.5 text-micro',
+                  'rounded-full px-1.5 text-micro leading-none',
                   filter === item.key
                     ? 'bg-background/20 text-background'
                     : 'bg-secondary text-muted-foreground',
@@ -180,7 +180,7 @@ export function BillingMobileView({
                   </div>
                   <span
                     className={cn(
-                      'shrink-0 rounded-lg border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
+                      'shrink-0 rounded-lg border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide leading-none',
                       STATUS_STYLE[row.status] ?? 'border-border bg-secondary text-muted-foreground',
                     )}
                   >
@@ -233,7 +233,7 @@ export function BillingMobileView({
           <p className="truncate text-sm font-bold tracking-tight text-foreground">{userName}</p>
           <p className="truncate text-micro text-muted-foreground">{userEmail}</p>
         </div>
-        <span className="shrink-0 rounded-lg border border-border bg-secondary px-2.5 py-1 text-micro font-semibold uppercase tracking-wider text-foreground">
+        <span className="shrink-0 rounded-lg border border-border bg-secondary px-2.5 py-1 text-micro leading-none font-semibold uppercase tracking-wider text-foreground">
           {tierName}
         </span>
       </div>
@@ -253,7 +253,7 @@ export function BillingMobileView({
           </div>
           <span
             className={cn(
-              'rounded-lg border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
+              'rounded-lg border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide leading-none',
               subscription
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                 : 'border-border bg-secondary text-muted-foreground',
@@ -447,7 +447,7 @@ export function BillingMobileView({
                   </span>
                   <span
                     className={cn(
-                      'rounded-md border px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide',
+                      'rounded-md border px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide leading-none',
                       STATUS_STYLE[row.status] ?? 'border-border bg-secondary text-muted-foreground',
                     )}
                   >

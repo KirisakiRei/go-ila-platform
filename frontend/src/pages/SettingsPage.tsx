@@ -184,7 +184,7 @@ function TelegramSection() {
             <div className="flex items-center gap-2">
               <span className="text-[12px] font-medium text-muted-foreground">Status Bot:</span>
               {isConnected ? (
-                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-semibold text-emerald-700 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-semibold text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2 className="h-3 w-3" />
                   Terhubung
                 </span>

@@ -77,12 +77,12 @@ export function TombolEksekusi({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {sisa.habis ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-micro text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-micro leading-none text-muted-foreground">
             <Clock className="h-3 w-3" />
             Batas waktu sudah lewat
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-micro font-medium tabular-nums">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-micro leading-none font-medium tabular-nums">
             <Clock className="h-3 w-3" />
             Berlaku {formatSisa(sisa.detik)} lagi
           </span>

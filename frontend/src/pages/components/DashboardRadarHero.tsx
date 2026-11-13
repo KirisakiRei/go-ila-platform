@@ -176,7 +176,7 @@ export function DashboardRadarHero() {
               </div>
             </div>
 
-            <span className="rounded-md bg-foreground px-2.5 py-1 text-micro font-bold tracking-wide uppercase text-background shadow-xs shrink-0">
+            <span className="rounded-md bg-foreground px-2.5 py-1 text-micro leading-none font-bold tracking-wide uppercase text-background shadow-xs shrink-0">
               {latestSignal.status === 'READY_TO_ENTRY'
                 ? 'SIAP ENTRY'
                 : latestSignal.status === 'WAIT_LTF_CISD'

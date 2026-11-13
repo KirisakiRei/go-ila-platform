@@ -54,7 +54,7 @@ export default function RiwayatLaporanBugPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13px] font-semibold text-foreground">{row.title}</p>
                 <span
-                  className={`rounded-md border px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
+                  className={`rounded-md border px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
                 >
                   {LABEL_STATUS[row.status]}
                 </span>
