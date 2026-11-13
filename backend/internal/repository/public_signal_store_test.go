@@ -160,49 +160,56 @@ func TestPreviewForSymbolsMengabaikanStatusBatal(t *testing.T) {
 }
 
 // Hanya sinyal terbaru per simbol yang dipakai, dan sinyal lama diabaikan.
-func TestPreviewForSymbolsMengambilTerbaruPerSimbol(t *testing.T) {
+// Status radar terbaru per simbol yang dipakai, bukan sinyal riwayat.
+// Halaman publik harus membaca sumber yang sama dengan dashboard member.
+func TestPreviewForSymbolsMengambilRadarTerbaru(t *testing.T) {
 	db := newPublicSignalTestDB(t)
 	store := NewPublicSignalStore(db)
 
 	sekarang := time.Date(2026, 11, 9, 10, 0, 0, 0, time.UTC)
-	signals := []model.Signal{
-		{SignalID: "x-lama", Symbol: "XAUUSD", Direction: "BEARISH", Status: model.SignalStatusExpired, PublishedAt: sekarang.Add(-3 * time.Hour)},
-		{SignalID: "x-baru", Symbol: "XAUUSD", Direction: "BULLISH", Status: model.SignalStatusOpportunity, PublishedAt: sekarang.Add(-30 * time.Minute)},
-		{SignalID: "e-baru", Symbol: "EURUSD", Direction: "BEARISH", Status: model.SignalStatusReadyToEntry, PublishedAt: sekarang.Add(-10 * time.Minute)},
-		// Terlalu tua untuk ringkasan halaman depan.
-		{SignalID: "tua", Symbol: "USTEC", Direction: "BULLISH", Status: model.SignalStatusExpired, PublishedAt: sekarang.Add(-30 * 24 * time.Hour)},
+	// `published_at` baris radar beku sejak slot lahir, sedangkan `updated_at`
+	// bergerak. Yang menentukan kesegaran adalah updated_at.
+	radar := []model.Signal{
+		{SignalID: "status-XAUUSD-H1-M5", Symbol: "XAUUSD", Direction: "BUY", Status: "WAIT_HTF_SWEEP", Htf: "H1", Ltf: "M5", PublishedAt: sekarang.Add(-72 * time.Hour), UpdatedAt: sekarang.Add(-5 * time.Minute)},
+		{SignalID: "status-XAUUSD-H4-M15", Symbol: "XAUUSD", Direction: "BUY", Status: "WAIT_HTF_SWEEP", Htf: "H4", Ltf: "M15", PublishedAt: sekarang.Add(-72 * time.Hour), UpdatedAt: sekarang.Add(-3 * time.Hour)},
+		{SignalID: "status-EURUSD-H4-M15", Symbol: "EURUSD", Direction: "SELL", Status: "WAIT_LTF_CISD", Htf: "H4", Ltf: "M15", PublishedAt: sekarang.Add(-72 * time.Hour), UpdatedAt: sekarang.Add(-20 * time.Minute)},
+		// Slot yang sudah terlalu lama tidak ditampilkan sama sekali.
+		{SignalID: "status-USTEC-H1-M5", Symbol: "USTEC", Direction: "BUY", Status: "WAIT_HTF_SWEEP", Htf: "H1", Ltf: "M5", PublishedAt: sekarang.Add(-90 * 24 * time.Hour), UpdatedAt: sekarang.Add(-40 * time.Hour)},
 	}
-	for i := range signals {
-		signals[i].Htf, signals[i].Ltf = "H4", "M15"
-		if err := db.Create(&signals[i]).Error; err != nil {
-			t.Fatalf("membuat sinyal: %v", err)
+	// Sinyal riwayat tidak boleh ikut terbaca sebagai arah berlaku.
+	sinyalLama := model.Signal{SignalID: "sinyal-lama", Symbol: "XAUUSD", Direction: "SELL", Status: model.SignalStatusExpired, Htf: "1H", Ltf: "5M", PublishedAt: sekarang.Add(-2 * time.Hour)}
+	for i := range radar {
+		if err := db.Create(&radar[i]).Error; err != nil {
+			t.Fatalf("membuat status radar: %v", err)
 		}
 	}
+	if err := db.Create(&sinyalLama).Error; err != nil {
+		t.Fatalf("membuat sinyal riwayat: %v", err)
+	}
 
-	rows, err := store.PreviewForSymbols(context.Background(), []string{"XAUUSD", "EURUSD", "USTEC"}, sekarang.Add(-7*24*time.Hour))
+	rows, err := store.PreviewForSymbols(context.Background(), []string{"XAUUSD", "EURUSD", "USTEC"}, sekarang.Add(-24*time.Hour))
 	if err != nil {
 		t.Fatalf("PreviewForSymbols error: %v", err)
 	}
 	if len(rows) != 2 {
-		t.Fatalf("rows = %d; ingin 2 (XAUUSD terbaru dan EURUSD)", len(rows))
+		t.Fatalf("rows = %d; ingin 2 (XAUUSD dan EURUSD)", len(rows))
 	}
 
 	perSimbol := make(map[string]model.Signal, len(rows))
 	for _, row := range rows {
 		perSimbol[row.Symbol] = row
 	}
-	if got := perSimbol["XAUUSD"].SignalID; got != "x-baru" {
-		t.Errorf("XAUUSD memakai sinyal %q; ingin x-baru", got)
+	if got := perSimbol["XAUUSD"].SignalID; got != "status-XAUUSD-H1-M5" {
+		t.Errorf("XAUUSD memakai %q; ingin status-XAUUSD-H1-M5 (updated_at terbaru)", got)
 	}
-	if got := perSimbol["EURUSD"].Direction; got != "BEARISH" {
-		t.Errorf("EURUSD arah = %q; ingin BEARISH", got)
+	if got := perSimbol["XAUUSD"].Direction; got != "BUY" {
+		t.Errorf("XAUUSD arah %q; ingin BUY dari radar, bukan SELL dari riwayat", got)
 	}
 	if _, ada := perSimbol["USTEC"]; ada {
-		t.Error("sinyal berusia 30 hari masih ikut ringkasan")
+		t.Error("USTEC muncul padahal status radar-nya sudah lewat 24 jam")
 	}
 }
 
-// Tanpa simbol, kueri tidak dijalankan sama sekali.
 func TestPreviewForSymbolsDaftarKosong(t *testing.T) {
 	db := newPublicSignalTestDB(t)
 	store := NewPublicSignalStore(db)

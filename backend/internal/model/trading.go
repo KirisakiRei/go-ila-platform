@@ -83,6 +83,10 @@ type Signal struct {
 	HtfSweepJSON string    `gorm:"type:text" json:"htf_sweep_json,omitempty"`
 	CisdJSON     string    `gorm:"type:text" json:"cisd_json,omitempty"`
 	PublishedAt  time.Time `json:"published_at"`
+	// UpdatedAt bergerak setiap kali engine memperbarui baris, terutama status
+	// radar. PublishedAt pada baris radar beku sejak slot lahir, sehingga
+	// UpdatedAt yang dipakai untuk menilai kesegaran data.
+	UpdatedAt    time.Time `json:"updated_at"`
 	ExpiresAt    time.Time `gorm:"index" json:"expires_at"`
 	SupersededBy string    `gorm:"type:varchar(64)" json:"superseded_by"`
 	CancelReason string    `gorm:"type:varchar(255)" json:"cancel_reason"`

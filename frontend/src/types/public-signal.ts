@@ -23,9 +23,15 @@ export type PublicSignalSnapshot = {
   /** Rentang waktu sumber sinyal, mis. H4 dan M15. Kosong berarti belum diketahui. */
   htf: string
   ltf: string
-  /** ACTIVE atau EXPIRED. */
+  /**
+   * ACTIVE berarti ada sinyal siap pakai, WATCHING berarti radar masih menunggu
+   * konfirmasi, EXPIRED berarti arahnya sudah lewat.
+   */
   status: string
+  /** Waktu sinyal pertama terbit. Untuk baris radar nilainya beku sejak awal. */
   published_at: string
+  /** Waktu status terakhir diperbarui di server; dipakai untuk menampilkan kesegaran data. */
+  updated_at?: string
 }
 
 export type PublicSignalPreviewItem = {

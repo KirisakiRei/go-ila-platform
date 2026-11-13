@@ -58,7 +58,9 @@ export function SignalOverviewGrid() {
   // Sinyal paling baru dari ketiga instrumen, ditulis sebagai kalimat biasa.
   const ringkasanWaktu = (() => {
     const terbit = items
-      .map((item) => ('signal' in item ? item.signal?.published_at : undefined))
+      .map((item) =>
+        'signal' in item ? item.signal?.updated_at || item.signal?.published_at : undefined,
+      )
       .filter((nilai): nilai is string => Boolean(nilai))
       .map((nilai) => new Date(nilai).getTime())
       .filter((nilai) => !Number.isNaN(nilai))

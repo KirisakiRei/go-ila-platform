@@ -100,40 +100,46 @@ func (s *publicSignalStore) ResolveSymbols(ctx context.Context, names []string) 
 	return out, nil
 }
 
-// PreviewForSymbols mengambil sinyal terbaru per simbol.
+// PreviewForSymbols mengambil status radar terbaru per simbol.
 //
-// Sinyal yang DIBATALKAN, DITOLAK, atau DILEWATI tidak pernah diambil: di
-// halaman publik, sinyal seperti itu terbaca sebagai arah pasar yang sah
-// padahal sistem sudah menyatakannya tidak berlaku. Status yang boleh tampil
-// hanya yang memang diterbitkan ke pengguna.
+// Yang dibaca adalah baris radar (`signal_id` berawalan `status-`), sumber yang
+// sama dengan yang dipakai dashboard member. Sinyal riwayat sengaja tidak ikut:
+// di halaman publik, riwayat lama terbaca sebagai arah pasar yang berlaku
+// sekarang, padahal bisa berumur belasan jam dan sudah bertentangan dengan
+// status radar terkini.
+//
+// Baris radar memakai `published_at` beku sejak slot lahir, sedangkan
+// `updated_at` bergerak setiap kali engine mengirim kemajuan. Pengurutan karena
+// itu memakai `COALESCE(updated_at, published_at)`, sama seperti dashboard.
 func (s *publicSignalStore) PreviewForSymbols(ctx context.Context, symbols []string, since time.Time) ([]model.Signal, error) {
 	if len(symbols) == 0 {
 		return nil, nil
 	}
 
-	statusTampil := []string{
-		model.SignalStatusReadyToEntry,
-		model.SignalStatusOpportunity,
-		model.SignalStatusAcked,
-		model.SignalStatusConsumed,
-		model.SignalStatusExpired,
-		model.SignalStatusInvalidated,
+	// Slot yang dibatalkan atau ditolak tidak ditampilkan: di halaman publik,
+	// arah seperti itu terbaca sah padahal sistem sudah menyatakannya tidak
+	// berlaku.
+	statusDisembunyikan := []string{
+		model.SignalStatusCancelled,
+		model.SignalStatusRejected,
+		model.SignalStatusSkipped,
 	}
 
 	var rows []model.Signal
 	err := s.db.WithContext(ctx).
 		Model(&model.Signal{}).
 		Where("symbol IN ?", symbols).
-		Where("status IN ?", statusTampil).
-		Where("published_at >= ?", since).
-		Order("published_at DESC").
+		Where("signal_id LIKE ?", "status-%").
+		Where("status NOT IN ?", statusDisembunyikan).
+		Where("COALESCE(updated_at, published_at) >= ?", since).
+		Order("COALESCE(updated_at, published_at) DESC").
 		Find(&rows).Error
 	if err != nil {
-		return nil, fmt.Errorf("membaca sinyal publik: %w", err)
+		return nil, fmt.Errorf("membaca status radar publik: %w", err)
 	}
 
-	// Satu sinyal terakhir per simbol; pengurutan sudah menurun sehingga
-	// kemunculan pertama adalah yang terbaru. Selesai di Go supaya kueri tetap
+	// Satu status terbaru per simbol. Pengurutan sudah menurun, jadi kemunculan
+	// pertama adalah yang paling segar. Dikerjakan di Go supaya kueri tetap
 	// sederhana dan berlaku sama di Postgres maupun SQLite.
 	terpilih := make(map[string]model.Signal, len(symbols))
 	urutan := make([]string, 0, len(symbols))

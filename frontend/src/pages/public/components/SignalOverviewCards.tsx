@@ -97,20 +97,27 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 /** Penanda keadaan di pojok kanan atas kartu. */
 function StatusTag({
   hasSignal,
+  menunggu,
   marketOpen,
   badgeClass,
 }: {
   hasSignal: boolean
+  /** Status radar masih berjalan tetapi belum mengirim sinyal. */
+  menunggu?: boolean
   marketOpen: boolean
   badgeClass: string
 }) {
   const gaya = !marketOpen
     ? 'border-zinc-200 bg-transparent text-[#6b6b74]'
-    : hasSignal
-      ? badgeClass
-      : 'border-zinc-300 bg-transparent text-[#3f3f46]'
+    : !hasSignal || menunggu
+      ? 'border-zinc-300 bg-transparent text-[#3f3f46]'
+      : badgeClass
 
-  const teks = !marketOpen ? 'Pasar tutup' : hasSignal ? 'Sinyal Aktif' : 'Dipantau'
+  const teks = !marketOpen
+    ? 'Pasar tutup'
+    : !hasSignal || menunggu
+      ? 'Dipantau'
+      : 'Sinyal aktif'
 
   return (
     <span
@@ -143,10 +150,17 @@ export function SignalOverviewCard({
   const tampilan = ARAH_TAMPILAN[arah]
   const Icon = tampilan.icon
 
+  // Status radar yang masih menunggu konfirmasi bukan sinyal yang bisa dipakai.
+  // Kartu menampilkannya sebagai pantauan berjalan, bukan setup siap eksekusi.
+  const menunggu = sinyal?.status === 'WATCHING'
+
   // Rentang waktu hanya ditulis bila kedua sisi tersedia; setengah informasi
   // ("H4 /") lebih membingungkan daripada tidak menampilkannya sama sekali.
   const rentang = sinyal?.htf && sinyal?.ltf ? `${sinyal.htf} / ${sinyal.ltf}` : null
-  const umur = sinyal ? formatRelativeTime(sinyal.published_at, now) : null
+  // Radar memakai UpdatedAt untuk kesegaran; pada sinyal biasa nilainya sama
+  // dengan published_at.
+  const waktu = sinyal?.updated_at || sinyal?.published_at
+  const umur = waktu ? formatRelativeTime(waktu, now) : null
 
   return (
     <article
@@ -169,6 +183,7 @@ export function SignalOverviewCard({
         </div>
         <StatusTag
           hasSignal={Boolean(sinyal)}
+          menunggu={menunggu}
           marketOpen={marketOpen}
           badgeClass={tampilan.badgeClass}
         />
@@ -194,7 +209,11 @@ export function SignalOverviewCard({
               </p>
             </div>
             <p className="mt-1.5 text-[12px] leading-relaxed text-[#52525b]">
-              {rentang ? `Timeframe ${rentang}` : 'Timeframe belum tersedia'}
+              {menunggu
+                ? 'Radar sedang memantau. Sinyal keluar setelah konfirmasi terpenuhi.'
+                : rentang
+                  ? `Timeframe ${rentang}`
+                  : 'Timeframe belum tersedia'}
             </p>
           </>
         ) : (

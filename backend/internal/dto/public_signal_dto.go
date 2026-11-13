@@ -39,8 +39,15 @@ type PublicSignalSnapshot struct {
 	// diketahui, bukan menebak.
 	Htf string `json:"htf"`
 	Ltf string `json:"ltf"`
-	// Status hanya ACTIVE atau EXPIRED. Sinyal yang dibatalkan atau ditolak
+	// Status bernilai ACTIVE, WATCHING, atau EXPIRED. ACTIVE berarti ada sinyal
+	// siap dieksekusi, WATCHING berarti radar masih menunggu konfirmasi, dan
+	// EXPIRED berarti arahnya sudah lewat. Sinyal yang dibatalkan atau ditolak
 	// tidak pernah sampai ke sini.
-	Status      string    `json:"status"`
+	Status string `json:"status"`
+	// PublishedAt adalah waktu sinyal pertama kali terbit. Untuk baris radar
+	// nilainya beku sejak slot lahir, jadi UpdatedAt yang dipakai untuk
+	// menampilkan kesegaran data.
 	PublishedAt time.Time `json:"published_at"`
+	// UpdatedAt adalah waktu engine terakhir memperbarui status ini.
+	UpdatedAt time.Time `json:"updated_at"`
 }

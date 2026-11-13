@@ -78,7 +78,7 @@ describe('Kartu ringkasan pantauan pasar', () => {
     // Arah ditulis dalam bahasa pembaca, bukan kode BULLISH.
     expect(screen.getByText('Kecenderungan naik')).toBeInTheDocument()
     expect(screen.getByText('Timeframe H4 / M15')).toBeInTheDocument()
-    expect(screen.getByText('Sinyal Aktif')).toBeInTheDocument()
+    expect(screen.getByText('Sinyal aktif')).toBeInTheDocument()
   })
 
   it('tidak menampilkan harga masuk, batas kerugian, atau target', async () => {

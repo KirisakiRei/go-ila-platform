@@ -31,10 +31,11 @@ var SimbolBawaan = []string{"XAUUSD", "EURUSD", "NAS100"}
 // tidak bisa dipakai menelusuri seluruh katalog.
 const BatasSimbol = 5
 
-// UsiaSinyalTerbaru membatasi seberapa lama sebuah arah masih dianggap relevan
-// untuk halaman depan. Lewat dari ini, kartu kembali ke keadaan "sedang
+// UsiaSinyalTerbaru membatasi seberapa lama status radar masih dianggap
+// relevan untuk halaman depan. Radar memperbarui tiap slot timeframe, jadi
+// sehari sudah cukup longgar; lewat dari itu, kartu kembali ke keadaan "sedang
 // dipantau" daripada menampilkan arah yang sudah basi.
-const UsiaSinyalTerbaru = 7 * 24 * time.Hour
+const UsiaSinyalTerbaru = 24 * time.Hour
 
 type publicSignalService struct {
 	store  repository.PublicSignalStore
@@ -113,12 +114,20 @@ func (s *publicSignalService) Preview(ctx context.Context, symbols []string) (*d
 
 		if ada {
 			item.HasSignal = true
+			// Waktu yang dikirim adalah saat status terakhir diperbarui. Untuk
+			// radar, PublishedAt beku sejak slot lahir sehingga tidak berguna
+			// sebagai penanda kesegaran.
+			diperbarui := signal.UpdatedAt
+			if diperbarui.IsZero() {
+				diperbarui = signal.PublishedAt
+			}
 			item.Signal = &dto.PublicSignalSnapshot{
 				Direction:   strings.ToUpper(signal.Direction),
 				Htf:         signal.Htf,
 				Ltf:         signal.Ltf,
 				Status:      publicSignalStatus(signal.Status),
 				PublishedAt: signal.PublishedAt,
+				UpdatedAt:   diperbarui,
 			}
 		}
 		items = append(items, item)
@@ -177,11 +186,22 @@ func (s *publicSignalService) marketState(ctx context.Context) dto.PublicMarketS
 
 // publicSignalStatus menyederhanakan status internal menjadi dua keadaan yang
 // berarti bagi pengunjung: masih berlaku atau sudah lewat.
+// publicSignalStatus menerjemahkan status internal engine ke istilah yang
+// dipakai halaman publik.
+//
+// Selain sinyal yang benar-benar siap dieksekusi, engine juga menyimpan baris
+// radar berawalan WAIT_* (menunggu sweep, menunggu konfirmasi, dan seterusnya).
+// Baris seperti itu belum menjadi sinyal, jadi tidak boleh disebut ACTIVE:
+// pengunjung akan mengira ada setup yang bisa dipakai sekarang.
 func publicSignalStatus(status string) string {
-	if status == model.SignalStatusExpired || status == model.SignalStatusInvalidated {
+	switch {
+	case status == model.SignalStatusExpired || status == model.SignalStatusInvalidated:
 		return "EXPIRED"
+	case strings.HasPrefix(status, "WAIT_"), status == "SCANNING", status == "NEUTRAL":
+		return "WATCHING"
+	default:
+		return "ACTIVE"
 	}
-	return "ACTIVE"
 }
 
 // simbolSah menerima huruf, angka, titik, dan garis bawah — bentuk yang dipakai
