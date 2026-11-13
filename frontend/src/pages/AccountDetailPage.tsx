@@ -164,7 +164,7 @@ export default function AccountDetailPage() {
           {/* 4 Kolom Metrik Finansial */}
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 Balance
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
@@ -173,7 +173,7 @@ export default function AccountDetailPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 Equity
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
@@ -182,7 +182,7 @@ export default function AccountDetailPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 Free Margin
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
@@ -191,7 +191,7 @@ export default function AccountDetailPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-secondary/20 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 Risk / Trade
               </p>
               <p className="mt-1 text-base font-bold tabular-nums text-foreground">
@@ -402,7 +402,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                 <option value="auto">Auto (Otomatis)</option>
               </Select>
               {tier !== 'plus' && (
-                <p className="text-[11px] text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
+                <p className="text-micro text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
               )}
             </div>
           </div>
@@ -430,7 +430,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   Lot Tetap
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-micro text-muted-foreground">
                 {riskMode === 'percent'
                   ? 'Ukuran posisi dihitung dari persentase ekuitas dan jarak stop loss.'
                   : 'Ukuran posisi tetap memakai lot pilihan Anda; risiko mengikuti jarak stop loss.'}
@@ -450,7 +450,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   onChange={(e) => setRiskPercent(Number(e.target.value))}
                   className="text-xs"
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-micro text-muted-foreground">
                   Sah 0,10% sampai 5,00%. Di atas 1% akan ada peringatan sebelum disimpan.
                 </p>
               </div>
@@ -467,7 +467,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   onChange={(e) => setLotSize(Number(e.target.value))}
                   className="text-xs"
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-micro text-muted-foreground">
                   {lotTidakSah
                     ? 'Ukuran lot harus 0,01 sampai 10,00.'
                     : 'Terendah 0,01 lot, tertinggi 10,00 lot.'}
@@ -683,7 +683,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
                   >
                     <div>
                       <p className="text-xs font-bold text-foreground">{pair.symbol}</p>
-                      <p className="text-[11px] text-muted-foreground">{pair.name}</p>
+                      <p className="text-micro text-muted-foreground">{pair.name}</p>
                     </div>
 
                     <div
@@ -788,7 +788,7 @@ function TabOrderHistory({ accountId: _accountId }: { accountId: string }) {
                       </TableCell>
                       <TableCell className="tabular-nums font-mono">{pos.lot_size}</TableCell>
                       <TableCell className="tabular-nums font-mono">{pos.open_price}</TableCell>
-                      <TableCell className="tabular-nums font-mono text-[11px] text-muted-foreground">
+                      <TableCell className="tabular-nums font-mono text-micro text-muted-foreground">
                         {pos.take_profit ?? '—'} / {pos.stop_loss ?? '—'}
                       </TableCell>
                       <TableCell
@@ -801,7 +801,7 @@ function TabOrderHistory({ accountId: _accountId }: { accountId: string }) {
                           : '—'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-micro">
                           {pos.status}
                         </Badge>
                       </TableCell>

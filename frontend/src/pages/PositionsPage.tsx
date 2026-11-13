@@ -303,7 +303,7 @@ export default function PositionsPage() {
           </div>
         </div>
 
-        <p className="mt-2 text-[11px] text-muted-foreground">
+        <p className="mt-2 text-micro text-muted-foreground">
           {from || to
             ? 'Daftar dan ekspor mengikuti rentang tanggal yang dipilih.'
             : 'Daftar dan ekspor mengikuti periode di atas. Isi tanggal untuk memilih rentang sendiri.'}
@@ -336,13 +336,13 @@ export default function PositionsPage() {
               )}
             >
               {item.label}
-              <span className="ml-1.5 tabular text-[11px] text-muted-foreground">{jumlah}</span>
+              <span className="ml-1.5 tabular text-micro text-muted-foreground">{jumlah}</span>
             </button>
           )
         })}
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-micro text-muted-foreground">
         {TABS.find((item) => item.id === tab)?.keterangan}
       </p>
 
@@ -464,7 +464,7 @@ export default function PositionsPage() {
                     {expanded && (
                       <TableRow className="bg-secondary/20 hover:bg-secondary/20">
                         <TableCell colSpan={10} className="p-3">
-                          <div className="flex items-center gap-1.5 pb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          <div className="flex items-center gap-1.5 pb-2 text-micro font-medium uppercase tracking-wide text-muted-foreground">
                             <LineChart className="h-3.5 w-3.5" aria-hidden="true" />
                             Jejak eksekusi
                           </div>
@@ -496,7 +496,7 @@ export default function PositionsPage() {
                   <div className="flex w-full items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold">{position.symbol}</span>
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-micro">
                         {position.direction}
                       </Badge>
                       {position.is_dry_run && <SimulasiBadge />}
@@ -511,22 +511,22 @@ export default function PositionsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div className="grid grid-cols-3 gap-2 text-micro">
                     <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
+                      <p className="text-micro uppercase text-muted-foreground">Entry</p>
                       <p className="tabular font-semibold">
                         {formatPrice(position.open_price, priceDigits(position.symbol, position.open_price))}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
+                      <p className="text-micro uppercase text-muted-foreground">SL / TP</p>
                       <p className="tabular text-muted-foreground">
                         {formatPrice(position.stop_loss, priceDigits(position.symbol, position.open_price))} /{' '}
                         {formatPrice(position.take_profit, priceDigits(position.symbol, position.open_price))}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] uppercase text-muted-foreground">Hasil</p>
+                      <p className="text-micro uppercase text-muted-foreground">Hasil</p>
                       {position.pnl_known ? (
                         <p className="tabular font-semibold" style={{ color: pnlColor(position) }}>
                           {formatMoney(position.profit_loss)} ({formatR(position.outcome_r)})
@@ -537,7 +537,7 @@ export default function PositionsPage() {
                     </div>
                   </div>
 
-                  <p className="text-[10.5px] text-muted-foreground">
+                  <p className="text-micro text-muted-foreground">
                     Buka {formatDateTime(position.opened_at)}
                     {position.closed_at ? ` · Tutup ${formatDateTime(position.closed_at)}` : ''}
                   </p>

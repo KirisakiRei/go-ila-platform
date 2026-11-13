@@ -60,7 +60,7 @@ export function LegalReconsentGate() {
                 <p className="truncate text-[13px] font-medium">{item.title}</p>
                 <Link
                   to={`/legal/${item.slug}`}
-                  className="text-[11px] text-muted-foreground underline underline-offset-2"
+                  className="text-micro text-muted-foreground underline underline-offset-2"
                 >
                   Baca versi {item.current_version}
                 </Link>

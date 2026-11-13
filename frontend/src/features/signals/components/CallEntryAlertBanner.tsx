@@ -153,12 +153,12 @@ function SingleCallEntryCard({
 
           <TimeframeBadge htf={signal.htf} mtf={mtf} ltf={signal.ltf} />
 
-          <Badge variant="outline" className="font-mono text-[10px]">
+          <Badge variant="outline" className="font-mono text-micro">
             {signal.strategy_version}
           </Badge>
 
           {cycle && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-micro">
               {cycle}
             </Badge>
           )}
@@ -168,14 +168,14 @@ function SingleCallEntryCard({
           {/* Multi-signal selector if more than 1 setup is active */}
           {totalEntries > 1 && (
             <div className="flex items-center gap-1.5 border-r border-border/60 pr-3">
-              <span className="text-[11px] font-medium text-muted-foreground">Setup:</span>
+              <span className="text-micro font-medium text-muted-foreground">Setup:</span>
               {Array.from({ length: totalEntries }).map((_, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => onSelectIndex(i)}
                   className={cn(
-                    'flex h-5 w-5 items-center justify-center rounded text-[11px] font-mono font-semibold transition-colors',
+                    'flex h-5 w-5 items-center justify-center rounded text-micro font-mono font-semibold transition-colors',
                     i === currentIndex
                       ? 'bg-foreground text-background'
                       : 'bg-secondary text-muted-foreground hover:bg-secondary/80',
@@ -203,53 +203,53 @@ function SingleCallEntryCard({
         {/* Parameter Order Grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
               Entry Price
             </span>
             <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
               {formatNumber(signal.entry_price, 5)}
             </p>
-            <p className="text-[11px] text-muted-foreground">Harga Pembuka Sinyal</p>
+            <p className="text-micro text-muted-foreground">Harga Pembuka Sinyal</p>
           </div>
 
           <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
               Stop Loss
             </span>
             <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
               {formatNumber(signal.stop_loss, 5)}
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               -{formatNumber(slPips, 1)} pips batas risiko
             </p>
           </div>
 
           <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
               Take Profit (DOL)
             </span>
             <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
               {formatNumber(signal.take_profit, 5)}
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               +{formatNumber(tpPips, 1)} pips target likuiditas
             </p>
           </div>
 
           <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
               Risk : Reward
             </span>
             <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
               1 : {formatNumber(signal.risk_reward, 2)}
             </p>
-            <p className="text-[11px] text-muted-foreground">Rasio Keuntungan</p>
+            <p className="text-micro text-muted-foreground">Rasio Keuntungan</p>
           </div>
         </div>
 
         {/* Action Controls & Info Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3.5">
-          <div className="text-[11.5px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+          <div className="text-caption text-muted-foreground flex items-center gap-1.5 flex-wrap">
             <span>Terbit: {formatDualDateTime(signal.published_at)}</span>
             <span>·</span>
             <span>Konfirmasi: LTF CISD Valid</span>

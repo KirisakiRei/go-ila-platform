@@ -71,17 +71,17 @@ export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-foreground">{account.label || 'Akun Broker'}</span>
                   {account.is_dry_run && (
-                    <Badge variant="muted" className="text-[9.5px]">
+                    <Badge variant="muted" className="text-micro">
                       Simulasi
                     </Badge>
                   )}
                   {!account.is_active && (
-                    <Badge variant="outline" className="text-[9.5px]">
+                    <Badge variant="outline" className="text-micro">
                       Nonaktif
                     </Badge>
                   )}
                 </div>
-                <p className="text-[10.5px] uppercase text-muted-foreground">{account.broker_type}</p>
+                <p className="text-micro uppercase text-muted-foreground">{account.broker_type}</p>
               </td>
               {daftarMetode(accounts).map((metode) => (
                 <td key={metode} className="px-3.5 py-2.5 text-center">

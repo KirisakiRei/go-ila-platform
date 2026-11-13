@@ -24,7 +24,7 @@ export function TimeframeBadge({
   const label = tfs.join(' · ')
 
   return (
-    <Badge variant="muted" className={className ? `text-[10px] ${className}` : 'text-[10px]'}>
+    <Badge variant="muted" className={className ? `text-micro ${className}` : 'text-micro'}>
       {label}
     </Badge>
   )

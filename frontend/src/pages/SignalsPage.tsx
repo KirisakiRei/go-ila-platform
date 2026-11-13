@@ -324,33 +324,33 @@ export default function SignalsPage() {
                               ) : null}
                               {signal.direction}
                             </span>
-                            <Badge variant="outline" className="text-[10.5px]">
+                            <Badge variant="outline" className="text-micro">
                               {signal.strategy_version}
                             </Badge>
                             <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
                           </div>
-                          <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[11px]">
+                          <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-micro">
                             {SIGNAL_LABEL[signal.status]}
                           </StatusPill>
                         </div>
 
                         {signal.entry_price > 0 && (
-                          <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-border pt-2 text-[11.5px]">
+                          <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-border pt-2 text-caption">
                             <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
+                              <p className="text-micro uppercase text-muted-foreground">Entry</p>
                               <p className="font-semibold tabular-nums font-mono">
                                 {formatNumber(signal.entry_price, 5)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
-                              <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
+                              <p className="text-micro uppercase text-muted-foreground">SL / TP</p>
+                              <p className="font-mono text-micro tabular-nums text-muted-foreground">
                                 {formatNumber(signal.stop_loss, 4)} /{' '}
                                 {formatNumber(signal.take_profit, 4)}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-[10px] uppercase text-muted-foreground">R:R</p>
+                              <p className="text-micro uppercase text-muted-foreground">R:R</p>
                               <p className="font-semibold tabular-nums font-mono">
                                 1:{formatNumber(signal.risk_reward, 2)}
                               </p>
@@ -358,7 +358,7 @@ export default function SignalsPage() {
                           </div>
                         )}
 
-                        <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
+                        <div className="mt-2 flex items-center justify-between text-micro text-muted-foreground">
                           <span>Terbit: {formatDateTime(signal.published_at)}</span>
                           {signal.delayed && (
                             <span className="font-semibold uppercase text-amber-600">Delayed 15m</span>
@@ -370,7 +370,7 @@ export default function SignalsPage() {
                     {/* Pagination Controls */}
                     {totalHistoryPages > 1 && (
                       <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5 text-xs">
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-micro text-muted-foreground">
                           Halaman {historyPage} dari {totalHistoryPages}
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -433,7 +433,7 @@ export default function SignalsPage() {
                           <p className="font-semibold text-foreground">
                             #{pos.ticket_number || pos.id.slice(0, 8)}
                           </p>
-                          <p className="text-[10.5px] text-muted-foreground">
+                          <p className="text-micro text-muted-foreground">
                             {formatDateTime(pos.opened_at)}
                           </p>
                         </td>
@@ -455,7 +455,7 @@ export default function SignalsPage() {
                           </span>
                         </td>
                         <td className="px-3.5 py-2.5">
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-micro">
                             {pos.strategy_version}
                           </Badge>
                         </td>
@@ -467,14 +467,14 @@ export default function SignalsPage() {
                           <div className="space-y-0.5">
                             <Badge
                               variant={pos.status.startsWith('CLOSED_TP') ? 'solid' : 'outline'}
-                              className="text-[10px]"
+                              className="text-micro"
                             >
                               {pos.status}
                             </Badge>
                             {pos.pnl_known && (
                               <p
                                 className={cn(
-                                  'text-[11px] font-semibold tabular-nums',
+                                  'text-micro font-semibold tabular-nums',
                                   pos.profit_loss >= 0 ? 'text-emerald-600' : 'text-rose-600',
                                 )}
                               >
@@ -576,7 +576,7 @@ export default function SignalsPage() {
                           </span>
                           <div>
                             <CardTitle className="text-base font-bold tracking-tight">{symbol}</CardTitle>
-                            <p className="text-[11px] text-muted-foreground">
+                            <p className="text-micro text-muted-foreground">
                               {hasActiveSub ? 'Dipantau aktif' : 'Riwayat arsip'}
                             </p>
                           </div>
@@ -586,7 +586,7 @@ export default function SignalsPage() {
                           {hasActiveSub && (
                             <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Aktif dipantau" />
                           )}
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-micro">
                             {pairSigs.length} Setup
                           </Badge>
                         </div>
@@ -601,7 +601,7 @@ export default function SignalsPage() {
                         <MetodeSlotGrid strategy="ila-3.0" slots={slotIla3} ringkas={ringkasIla3} />
                       )}
 
-                      <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+                      <div className="flex items-center justify-between pt-1 text-micro text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <BarChart3 className="h-3.5 w-3.5" />
                           {pairPos.length} Eksekusi Order
@@ -659,13 +659,13 @@ function SlotCell({
         stage.ready && 'border-foreground bg-secondary',
       )}
     >
-      <span className="font-mono text-[10px] font-semibold leading-tight text-muted-foreground">
+      <span className="font-mono text-micro font-semibold leading-tight text-muted-foreground">
         {slot.label}
       </span>
 
       <span
         className={cn(
-          'inline-flex items-center gap-0.5 text-[11px] font-bold leading-tight',
+          'inline-flex items-center gap-0.5 text-micro font-bold leading-tight',
           punyaArah ? (arah === 'BUY' ? 'text-emerald-600' : 'text-rose-600') : 'text-muted-foreground',
         )}
       >
@@ -676,7 +676,7 @@ function SlotCell({
 
       <span
         className={cn(
-          'truncate text-[10px] leading-tight',
+          'truncate text-micro leading-tight',
           stage.ready ? 'font-semibold text-foreground' : 'text-muted-foreground',
         )}
         title={stage.label}
@@ -685,7 +685,7 @@ function SlotCell({
       </span>
 
       {stage.ready && signal && (
-        <span className="truncate text-[10px] tabular-nums text-muted-foreground" title="Entry">
+        <span className="truncate text-micro tabular-nums text-muted-foreground" title="Entry">
           @ {formatPrice(signal.entry_price, priceDigits(signal.symbol, signal.entry_price))}
         </span>
       )}
@@ -722,21 +722,21 @@ function MetodeSlotGrid({
             {strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
           </span>
           {strategy === 'ila-3.0' && (
-            <Badge variant="muted" className="text-[9px]">
+            <Badge variant="muted" className="text-micro">
               Plus
             </Badge>
           )}
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[10.5px] tabular-nums text-muted-foreground">
+          <span className="text-micro tabular-nums text-muted-foreground">
             {ringkas.siap > 0 ? `${ringkas.siap} ready` : `${ringkas.terisi} slot`}
           </span>
           {strategy === 'ila-3.0' && (
             <button
               type="button"
               onClick={() => setTerbuka((v) => !v)}
-              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-micro font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               aria-expanded={terbuka}
               aria-label={terbuka ? 'Tutup slot ILA 3.0' : 'Buka slot ILA 3.0'}
             >

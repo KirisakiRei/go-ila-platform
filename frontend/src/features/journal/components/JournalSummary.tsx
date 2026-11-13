@@ -46,7 +46,7 @@ export function JournalSummary({ stats }: { stats: JournalStats }) {
         />
       </StatGrid>
 
-      <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+      <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-micro text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <dt>Take Profit</dt>
           <dd className="tabular font-medium text-foreground">{stats.closed_tp}</dd>

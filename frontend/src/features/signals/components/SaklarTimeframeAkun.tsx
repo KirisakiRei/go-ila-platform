@@ -66,7 +66,7 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                 {group.strategy}
               </span>
               {!data?.auto_allowed && (
-                <Badge variant="muted" className="text-[9.5px]">
+                <Badge variant="muted" className="text-micro">
                   Eksekusi otomatis tidak tersedia
                 </Badge>
               )}
@@ -103,7 +103,7 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                           )}
                           <td className="px-3.5 py-2.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-mono text-[11.5px] font-medium text-foreground">
+                              <span className="font-mono text-caption font-medium text-foreground">
                                 {(() => {
                                   if (group.strategy === 'ila-3.0') {
                                     const mtf = getIla3Mtf(pair.htf, pair.ltf)
@@ -116,7 +116,7 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                                 const cycle = getCycleBadge(group.strategy, pair.htf, pair.ltf)
                                 if (!cycle) return null
                                 return (
-                                  <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary border border-primary/20">
+                                  <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-micro font-medium text-primary border border-primary/20">
                                     {cycle}
                                   </span>
                                 )

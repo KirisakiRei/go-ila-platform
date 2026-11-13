@@ -9,7 +9,7 @@ import type { BrokerAccount } from '@/types/api'
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-micro uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="tabular text-[13px] font-medium">{value}</dd>
     </div>
   )
@@ -198,7 +198,7 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
           </div>
         </Modal>
 
-        <div className="flex items-center justify-between border-t border-border pt-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between border-t border-border pt-2 text-micro text-muted-foreground">
           <span>Sinkron terakhir {formatDateTime(account.last_synced_at)}</span>
         </div>
       </div>

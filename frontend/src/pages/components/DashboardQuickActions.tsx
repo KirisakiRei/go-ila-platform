@@ -62,7 +62,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
               <Radio className="h-5 w-5" />
               <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-card" />
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Sinyal</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Sinyal</span>
           </Link>
 
           {/* 2. Posisi */}
@@ -73,7 +73,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
               <BarChart3 className="h-5 w-5" />
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Posisi</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Posisi</span>
           </Link>
 
           {/* 3. Broker */}
@@ -84,7 +84,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
               <Landmark className="h-5 w-5" />
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Broker</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Broker</span>
           </Link>
 
           {/* 4. Watchlist */}
@@ -95,7 +95,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
               <Star className="h-5 w-5" />
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Watchlist</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Watchlist</span>
           </Link>
 
           {/* 5. Checklist (dengan badge persentase) */}
@@ -110,7 +110,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
                 {percentage}%
               </span>
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Checklist</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Checklist</span>
           </button>
 
           {/* 6. Billing (dengan badge tier) — disembunyikan saat invite only
@@ -126,7 +126,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
                   {tierLabel}
                 </span>
               </div>
-              <span className="text-[11px] font-medium text-foreground leading-tight">Billing</span>
+              <span className="text-micro font-medium text-foreground leading-tight">Billing</span>
             </Link>
           )}
 
@@ -138,7 +138,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
               <ShieldCheck className="h-5 w-5" />
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Keamanan</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Keamanan</span>
           </Link>
 
           {/* 8. Lainnya */}
@@ -150,7 +150,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
               <Grid className="h-5 w-5" />
             </div>
-            <span className="text-[11px] font-medium text-foreground leading-tight">Lainnya</span>
+            <span className="text-micro font-medium text-foreground leading-tight">Lainnya</span>
           </button>
         </div>
       </div>

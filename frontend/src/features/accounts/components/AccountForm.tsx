@@ -181,7 +181,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
         >
           <Sparkles className="h-3.5 w-3.5" />
           <span>cTrader</span>
-          <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.2 text-[10px] font-bold text-emerald-400">
+          <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.2 text-micro font-bold text-emerald-400">
             OAuth
           </span>
         </button>
@@ -200,7 +200,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
         >
           <KeyRound className="h-3.5 w-3.5" />
           <span>Match-Trader</span>
-          <span className="rounded-full bg-zinc-500/20 px-1.5 py-0.2 text-[10px] font-medium text-muted-foreground">
+          <span className="rounded-full bg-zinc-500/20 px-1.5 py-0.2 text-micro font-medium text-muted-foreground">
             Token
           </span>
         </button>
@@ -234,7 +234,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 <option value="auto">Otomatis (Langsung Eksekusi)</option>
               </Select>
               {tier !== 'plus' && (
-                <p className="text-[11px] text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
+                <p className="text-micro text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
               )}
             </div>
 
@@ -249,7 +249,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 value={ctraderRisk}
                 onChange={(e) => setCtraderRisk(Number(e.target.value))}
               />
-              <p className="text-[11px] text-muted-foreground">Rentang aman: 0,10% – 1,00%.</p>
+              <p className="text-micro text-muted-foreground">Rentang aman: 0,10% – 1,00%.</p>
             </div>
           </div>
 
@@ -266,7 +266,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 }}
                 className="mt-0.5 h-4 w-4 shrink-0 rounded accent-foreground"
               />
-              <span className="text-[11.5px] leading-relaxed text-foreground">
+              <span className="text-caption leading-relaxed text-foreground">
                 Saya memahami risiko perdagangan derivatif dan menyetujui{' '}
                 <a
                   href="/legal/risk"
@@ -280,7 +280,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 </a>
                 .
                 {isRiskAccepted && (
-                  <span className="ml-1 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <span className="ml-1 text-micro font-medium text-emerald-600 dark:text-emerald-400">
                     (Sudah disetujui)
                   </span>
                 )}
@@ -299,7 +299,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
               <span>Hubungkan via cTrader ID (OAuth)</span>
               <ExternalLink className="h-4 w-4" />
             </Button>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            <p className="mt-2 text-center text-micro text-muted-foreground">
               Anda akan diarahkan ke laman login resmi Spotware cTrader ID.
             </p>
           </div>
@@ -320,13 +320,13 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 <HelpCircle className="h-3.5 w-3.5 text-foreground" />
                 Cara Mendapatkan Access Token Match-Trader
               </span>
-              <span className="text-[11px] text-muted-foreground font-normal">
+              <span className="text-micro text-muted-foreground font-normal">
                 {showGuide ? 'Sembunyikan' : 'Lihat Panduan'}
               </span>
             </button>
 
             {showGuide && (
-              <ol className="list-decimal space-y-1 pl-4 pt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+              <ol className="list-decimal space-y-1 pl-4 pt-1 text-caption leading-relaxed text-muted-foreground">
                 <li>Buka aplikasi atau portal web platform <strong>Match-Trader</strong> broker Anda.</li>
                 <li>Masuk ke menu <strong>Profil / Pengaturan Akun</strong> di pojok kanan atas.</li>
                 <li>Cari tab <strong>API Access / Token</strong>, lalu buat atau salin token akses Anda.</li>
@@ -352,7 +352,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
               {...register('token')}
             />
             {errors.token && <p className="text-[12px] text-destructive">{errors.token.message}</p>}
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               Token dienkripsi di server dan tidak dapat ditampilkan kembali.
             </p>
           </div>
@@ -365,7 +365,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 <option value="auto">Otomatis (Langsung Eksekusi)</option>
               </Select>
               {tier !== 'plus' && (
-                <p className="text-[11px] text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
+                <p className="text-micro text-muted-foreground">Otomatis hanya untuk tier Plus.</p>
               )}
             </div>
 
@@ -403,7 +403,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 }}
                 className="mt-0.5 h-4 w-4 shrink-0 rounded accent-foreground"
               />
-              <span className="text-[11.5px] leading-relaxed text-foreground">
+              <span className="text-caption leading-relaxed text-foreground">
                 Saya memahami risiko perdagangan derivatif dan menyetujui{' '}
                 <a
                   href="/legal/risk"
@@ -417,7 +417,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
                 </a>
                 .
                 {isRiskAccepted && (
-                  <span className="ml-1 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <span className="ml-1 text-micro font-medium text-emerald-600 dark:text-emerald-400">
                     (Sudah disetujui)
                   </span>
                 )}

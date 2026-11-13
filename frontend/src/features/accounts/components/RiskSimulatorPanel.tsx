@@ -72,7 +72,7 @@ export function RiskSimulatorPanel({
         <p className="text-[12.5px] font-semibold text-foreground">Simulasi Risiko</p>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+      <p className="text-caption leading-relaxed text-muted-foreground">
         Masukkan rencana entry dan stop loss. Hasilnya menunjukkan lot yang dipakai, nominal yang
         dipertaruhkan, serta padanan risiko 1% sampai 5%.
       </p>
@@ -151,7 +151,7 @@ export function RiskSimulatorPanel({
           {simulasi.isPending ? 'Menghitung…' : 'Hitung Simulasi'}
         </Button>
         {!siap && (
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-micro text-muted-foreground">
             Lengkapi pair, entry, dan stop loss.
           </span>
         )}
@@ -163,11 +163,11 @@ export function RiskSimulatorPanel({
         <div className="space-y-3" aria-live="polite">
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="rounded-lg border border-border bg-card px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Lot</p>
+              <p className="text-micro uppercase tracking-[0.12em] text-muted-foreground">Lot</p>
               <p className="text-sm font-bold tabular-nums text-foreground">{hasil.hasil.lots}</p>
             </div>
             <div className="rounded-lg border border-border bg-card px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="text-micro uppercase tracking-[0.12em] text-muted-foreground">
                 Nominal Risiko
               </p>
               <p className="text-sm font-bold tabular-nums text-foreground">
@@ -175,7 +175,7 @@ export function RiskSimulatorPanel({
               </p>
             </div>
             <div className="rounded-lg border border-border bg-card px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="text-micro uppercase tracking-[0.12em] text-muted-foreground">
                 % Ekuitas
               </p>
               <p
@@ -189,7 +189,7 @@ export function RiskSimulatorPanel({
             </div>
           </div>
 
-          <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="flex items-start gap-1.5 text-micro leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
               Nilai per lot {formatNumber(hasil.value_per_lot, 2)} (
@@ -203,7 +203,7 @@ export function RiskSimulatorPanel({
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full text-left text-[11.5px]">
+            <table className="w-full text-left text-caption">
               <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Risiko</th>
@@ -224,9 +224,9 @@ export function RiskSimulatorPanel({
                     </td>
                     <td className="px-3 py-1.5">
                       {baris.warning ? (
-                        <span className="text-[11px] font-medium text-amber-600">Agresif</span>
+                        <span className="text-micro font-medium text-amber-600">Agresif</span>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">Aman</span>
+                        <span className="text-micro text-muted-foreground">Aman</span>
                       )}
                     </td>
                   </tr>
@@ -236,7 +236,7 @@ export function RiskSimulatorPanel({
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full text-left text-[11.5px]">
+            <table className="w-full text-left text-caption">
               <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Lot</th>
@@ -266,7 +266,7 @@ export function RiskSimulatorPanel({
           </div>
 
           {hasil.peringatan.length > 0 && (
-            <Alert variant="warning" className="text-[11.5px]">
+            <Alert variant="warning" className="text-caption">
               <div className="space-y-1">
                 {hasil.peringatan.map((pesan) => (
                   <p key={pesan}>{pesan}</p>

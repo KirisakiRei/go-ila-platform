@@ -72,7 +72,7 @@ export function DashboardRadarHero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
-            <span className="text-[11px] font-semibold">Live radar</span>
+            <span className="text-micro font-semibold">Live radar</span>
           </div>
         </div>
 
@@ -114,10 +114,10 @@ export function DashboardRadarHero() {
           <div className="h-4 w-px bg-border shrink-0" />
 
           <div className="flex items-center gap-1 shrink-0">
-            <span className="rounded bg-foreground px-2 py-0.5 text-[10px] font-bold text-background uppercase tracking-wider">
+            <span className="rounded bg-foreground px-2 py-0.5 text-micro font-bold text-background uppercase tracking-wider">
               {ltfTimeframe}
             </span>
-            <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
+            <span className="rounded bg-secondary px-2 py-0.5 text-micro font-medium text-muted-foreground uppercase">
               {htfTimeframe}
             </span>
           </div>
@@ -128,7 +128,7 @@ export function DashboardRadarHero() {
       {activePairs.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card p-6 text-center">
           <p className="text-xs font-semibold text-foreground">Watchlist Pair Kosong</p>
-          <p className="mt-1 text-[11.5px] text-muted-foreground">
+          <p className="mt-1 text-caption text-muted-foreground">
             Tambahkan instrumen seperti XAUUSD atau EURUSD di Watchlist Pair agar radar aktif.
           </p>
           <Link
@@ -170,13 +170,13 @@ export function DashboardRadarHero() {
                     {latestSignal.direction}
                   </span>
                 </div>
-                <p className="truncate text-[11px] text-muted-foreground">
+                <p className="truncate text-micro text-muted-foreground">
                   {instrumentName} · {latestSignal.strategy_version} · {latestSignal.htf} · {latestSignal.ltf}
                 </p>
               </div>
             </div>
 
-            <span className="rounded-md bg-foreground px-2.5 py-1 text-[10.5px] font-bold tracking-wide uppercase text-background shadow-xs shrink-0">
+            <span className="rounded-md bg-foreground px-2.5 py-1 text-micro font-bold tracking-wide uppercase text-background shadow-xs shrink-0">
               {latestSignal.status === 'READY_TO_ENTRY'
                 ? 'SIAP ENTRY'
                 : latestSignal.status === 'WAIT_LTF_CISD'
@@ -190,7 +190,7 @@ export function DashboardRadarHero() {
           {/* 4-Box Key Metrics Grid (Entry, SL, TP, R:R) */}
           <div className="grid grid-cols-4 divide-x divide-border/60 rounded-lg border border-border/60 bg-secondary/35 p-2 text-center">
             <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="block text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 Entry
               </span>
               <span className="mt-0.5 block font-mono text-[12px] font-bold text-foreground">
@@ -198,7 +198,7 @@ export function DashboardRadarHero() {
               </span>
             </div>
             <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="block text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 SL
               </span>
               <span className="mt-0.5 block font-mono text-[12px] font-bold text-rose-600 dark:text-rose-400">
@@ -206,7 +206,7 @@ export function DashboardRadarHero() {
               </span>
             </div>
             <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="block text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 TP
               </span>
               <span className="mt-0.5 block font-mono text-[12px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -214,7 +214,7 @@ export function DashboardRadarHero() {
               </span>
             </div>
             <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="block text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                 R:R
               </span>
               <span className="mt-0.5 block font-mono text-[12px] font-bold text-foreground">
@@ -225,7 +225,7 @@ export function DashboardRadarHero() {
 
           {/* Subline Footer */}
           <div className="flex items-center justify-between border-t border-border/60 pt-1.5 text-xs text-muted-foreground">
-            <span className="truncate text-[11px]">
+            <span className="truncate text-micro">
               {latestSignal.summary ||
                 `Tahap 1 HTF (${latestSignal.htf}) Valid · Tahap 2 LTF (${latestSignal.ltf}) Konfirmasi Siap`}
             </span>
@@ -244,14 +244,14 @@ export function DashboardRadarHero() {
               </span>
               <div>
                 <p className="text-xs font-bold text-foreground">{currentPair}</p>
-                <p className="text-[10.5px] text-muted-foreground">{instrumentName}</p>
+                <p className="text-micro text-muted-foreground">{instrumentName}</p>
               </div>
             </div>
-            <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            <span className="rounded bg-secondary px-2 py-0.5 text-micro font-semibold text-muted-foreground">
               STANDBY
             </span>
           </div>
-          <p className="text-[11.5px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Belum ada setup sinyal aktif untuk {currentPair}. Radar engine terus memindai pembentukan struktur FVG & Sweep.
           </p>
           <div className="flex items-center justify-end text-xs font-medium text-foreground">
