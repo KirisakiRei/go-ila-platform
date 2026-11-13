@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { FullPageLoading } from '@/app/FullPageLoading'
 import { ScrollToTop } from '@/app/ScrollToTop'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
@@ -12,6 +12,7 @@ import FeaturesPage from '@/pages/public/FeaturesPage'
 import HelpCenterPage from '@/pages/public/HelpCenterPage'
 import LandingPage from '@/pages/public/LandingPage'
 import LegalCenterPage from '@/pages/public/legal/LegalCenterPage'
+import NotFoundPage from '@/pages/public/NotFoundPage'
 import PricingPage from '@/pages/public/PricingPage'
 import { PublicLayout } from '@/pages/public/PublicLayout'
 
@@ -34,18 +35,6 @@ function RedirectTo({ to }: { to: string }) {
     window.location.replace(to)
   }, [to])
   return <FullPageLoading label="Mengalihkan…" />
-}
-
-function NotFound() {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-2 px-4 py-24 text-center">
-      <p className="text-lg font-semibold">Halaman tidak ditemukan</p>
-      <p className="text-[13px] text-muted-foreground">Tautan mungkin sudah dipindahkan.</p>
-      <Link to="/" className="mt-2 rounded-md border border-border px-3 py-1.5 text-[13px]">
-        Kembali ke beranda
-      </Link>
-    </div>
-  )
 }
 
 function PublicRoutes() {
@@ -78,7 +67,7 @@ function PublicRoutes() {
             tidak dialihkan karena sudah tertutup dan tautan undangan menang. */}
         <Route path="login" element={<RedirectTo to="/app/login" />} />
         <Route path="register" element={<RedirectTo to="/app/register" />} />
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   )
