@@ -131,7 +131,7 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="tabular font-mono text-[13px] font-medium">{value}</dd>
     </div>
   )
@@ -176,11 +176,11 @@ export function SignalDetail({ signal }: { signal: Signal }) {
               ) : null}
               {signal.direction}
             </span>
-            <Badge variant="outline" className="font-mono text-micro">
+            <Badge variant="outline" className="font-mono text-[10.5px]">
               {signal.strategy_version}
             </Badge>
             {cycleName && (
-              <Badge variant="outline" className="text-micro font-medium border-primary/20 bg-primary/5 text-primary">
+              <Badge variant="outline" className="text-[10px] font-medium border-primary/20 bg-primary/5 text-primary">
                 {cycleName}
               </Badge>
             )}
@@ -192,7 +192,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
             </StatusPill>
           </div>
         </div>
-        <CardDescription className="flex items-center gap-1 text-micro text-muted-foreground">
+        <CardDescription className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <Radio className="h-3 w-3 animate-pulse text-emerald-500" />
           Analisis Pasar: {signal.strategy_version.toUpperCase()} · Terbit{' '}
           {formatDualDateTime(signal.published_at)}
@@ -203,10 +203,10 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         {/* Visual Radar Stepper: HTF vs (MTF) vs LTF */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Progres Radar Analisis
             </span>
-            <span className="text-micro text-muted-foreground">
+            <span className="text-[11px] text-muted-foreground">
               {isILA3
                 ? ila3Prog?.label
                 : isReady
@@ -240,7 +240,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   </div>
                   <Badge
                     variant={(ila3Prog?.step ?? 0) >= 1 ? 'default' : 'outline'}
-                    className="text-micro font-mono"
+                    className="text-[10px] font-mono"
                   >
                     {(ila3Prog?.step ?? 0) >= 1 ? 'Valid (Reached)' : 'Monitoring Level'}
                   </Badge>
@@ -251,7 +251,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                     : 'Menunggu harga berinteraksi dengan Key Level HTF atau kondisi Q1 exception.'}
                 </p>
                 {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
-                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-micro font-mono">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
                     <span className="text-muted-foreground">Target DOL:</span>
                     <span className="font-semibold tabular-nums">
                       {formatNumber(signal.htf_sweep.target_dol, 5)}
@@ -284,7 +284,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   </div>
                   <Badge
                     variant={(ila3Prog?.step ?? 0) >= 2 ? 'default' : 'outline'}
-                    className="text-micro font-mono"
+                    className="text-[10px] font-mono"
                   >
                     {(ila3Prog?.step ?? 0) >= 2
                       ? 'Valid (Aligned)'
@@ -326,7 +326,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   </div>
                   <Badge
                     variant={(ila3Prog?.step ?? 0) >= 3 ? 'default' : 'outline'}
-                    className="text-micro font-mono"
+                    className="text-[10px] font-mono"
                   >
                     {(ila3Prog?.step ?? 0) >= 3
                       ? 'Setup Ready'
@@ -343,7 +343,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                       : 'Fase trigger LTF dimulai setelah struktur MTF terkonfirmasi.'}
                 </p>
                 {signal.cisd && signal.cisd.cisd_level > 0 && (
-                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-micro font-mono">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
                     <span className="text-muted-foreground">CISD Level:</span>
                     <span className="font-semibold tabular-nums">
                       {formatNumber(signal.cisd.cisd_level, 5)}
@@ -375,7 +375,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   </div>
                   <Badge
                     variant={isHtfSweepDone ? 'default' : 'outline'}
-                    className="text-micro font-mono"
+                    className="text-[10px] font-mono"
                   >
                     {isHtfSweepDone ? 'Valid (Closed)' : 'Monitoring'}
                   </Badge>
@@ -386,7 +386,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                     : 'Menunggu HTF candle sweep & close pada liquidity level / FVG.'}
                 </p>
                 {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
-                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-micro font-mono">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
                     <span className="text-muted-foreground">Target DOL:</span>
                     <span className="font-semibold tabular-nums">
                       {formatNumber(signal.htf_sweep.target_dol, 5)}
@@ -419,7 +419,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                   </div>
                   <Badge
                     variant={isReady ? 'default' : 'outline'}
-                    className="text-micro font-mono"
+                    className="text-[10px] font-mono"
                   >
                     {isReady ? 'Ready Setup' : isWaitLtf ? 'Waiting CISD Close' : 'Pending HTF'}
                   </Badge>
@@ -432,7 +432,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                       : 'Fase LTF trigger dimulai setelah HTF liquidity sweep selesai.'}
                 </p>
                 {signal.cisd && signal.cisd.cisd_level > 0 && (
-                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-micro font-mono">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">
                     <span className="text-muted-foreground">CISD Level:</span>
                     <span className="font-semibold tabular-nums">
                       {formatNumber(signal.cisd.cisd_level, 5)}
@@ -447,7 +447,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         {/* Parameter Order (Hanya jika harga lengkap atau status siap) */}
         {signal.entry_price > 0 ? (
           <div className="rounded-xl border border-border bg-secondary/10 p-4">
-            <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Parameter Setup Order
             </span>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
@@ -473,11 +473,11 @@ export function SignalDetail({ signal }: { signal: Signal }) {
           return (
             <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs">
               <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                <span className="text-micro font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Compass className="h-3.5 w-3.5 text-primary" />
                   Konteks Analisis Setup
                 </span>
-                <span className="text-micro font-medium text-muted-foreground">
+                <span className="text-[10px] font-medium text-muted-foreground">
                   {signal.strategy_version === 'ila-3.0' ? 'ILA 3.0 Sequence' : 'ILA 2.0 Engine'}
                 </span>
               </div>
@@ -503,7 +503,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                       >
                         {icon}
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-micro font-semibold text-foreground/90">{pt.title}</span>
+                          <span className="text-[11px] font-semibold text-foreground/90">{pt.title}</span>
                           <span className="text-[12px] leading-relaxed text-muted-foreground">{pt.detail}</span>
                         </div>
                       </div>
@@ -519,7 +519,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
 
         {signal.reject_reason && (
           <div className="border-l-2 border-foreground pl-3 py-1">
-            <span className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Penahanan Sistem
             </span>
             <p className="text-[13px] text-foreground">{signal.reject_reason}</p>
@@ -533,7 +533,7 @@ export function SignalDetail({ signal }: { signal: Signal }) {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between border-t border-border pt-3 text-micro text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between border-t border-border pt-3 text-[11px] text-muted-foreground">
           <span>Terbit: {formatDualDateTime(signal.published_at)}</span>
           <span>Batas Waktu: {formatDualDateTime(signal.expires_at)}</span>
         </div>

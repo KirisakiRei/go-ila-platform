@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { publicContentApi } from '@/lib/system-api'
-import { formatRelativeTime } from '@/lib/format'
 import { SignalOverviewCard, SignalOverviewCardSkeleton } from './SignalOverviewCards'
 
 /**
@@ -67,10 +66,13 @@ export function SignalOverviewGrid() {
         ))}
       </div>
 
-      <p className="max-w-[68ch] text-[12px] text-[#6b6b74]">
-        {data
-          ? `Diperbarui ${formatRelativeTime(data.generated_at)} · Khusus informasi arah pasar tanpa parameter eksekusi.`
-          : 'Khusus informasi arah pasar tanpa parameter eksekusi.'}
+      {/* Waktu per instrumen sudah tampil di tiap kartu. Ringkasan ini hanya
+          menyebut cakupan datanya, supaya tidak ada dua angka "diperbarui"
+          yang saling bertentangan di halaman yang sama. Rincian harga masuk
+          dan batas risiko sengaja tidak disebut dengan istilah teknisnya di
+          halaman publik. */}
+      <p className="max-w-[68ch] text-[12px] leading-relaxed text-[#6b6b74]">
+        Hanya arah pasar. Rincian harga dan batas risiko tersedia di dashboard member.
       </p>
     </div>
   )

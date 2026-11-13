@@ -10,7 +10,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-micro uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="tabular text-[15px] font-semibold">{value}</dd>
     </div>
   )

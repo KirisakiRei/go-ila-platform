@@ -206,7 +206,7 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
             <Logo className="h-7 w-auto shrink-0" />
             <div className={cn('flex items-baseline gap-1', isCollapsed && 'lg:hidden')}>
               <span className="text-sm font-bold tracking-tight">ILA</span>
-              <span className="text-micro uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Admin
               </span>
             </div>
@@ -261,7 +261,7 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.category)}
-                    className="group hidden w-full items-center justify-between px-3 pt-2 pb-1 text-left text-micro font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground lg:flex"
+                    className="group hidden w-full items-center justify-between px-3 pt-2 pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground lg:flex"
                     aria-expanded={!isGroupCollapsed}
                   >
                     <span className="flex items-center gap-1.5">
@@ -333,17 +333,17 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
           ) : (
             <div className="flex items-center gap-2 px-1">
               <div className="min-w-0 flex-1">
-                <p className="text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Masuk sebagai
                 </p>
-                <p className="truncate text-micro font-medium text-foreground">
+                <p className="truncate text-[11px] font-medium text-foreground">
                   {email || admin?.name || 'Administrator'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={signOut}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-micro font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label="Keluar dari panel admin"
               >
                 <LogOut className="h-3.5 w-3.5" aria-hidden="true" />

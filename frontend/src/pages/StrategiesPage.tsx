@@ -163,7 +163,7 @@ function ModalPilihPair({
 
       {/* Saring kategori */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-micro font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           Kategori
         </span>
         <Button
@@ -192,7 +192,7 @@ function ModalPilihPair({
       {/* Saring sub-kategori */}
       {kategori !== 'all' && daftarGrup.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-micro font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Sub-kategori
           </span>
           <Button
@@ -274,7 +274,7 @@ function ModalPilihPair({
                   >
                     <span
                       className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-micro font-bold',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-[10px] font-bold',
                         aktif && !terpakai
                           ? 'border-foreground bg-foreground text-background'
                           : 'border-border bg-secondary/60 text-muted-foreground',
@@ -293,12 +293,12 @@ function ModalPilihPair({
                           </span>
                         )}
                         {terpakai && (
-                          <Badge variant="muted" className="text-micro">
+                          <Badge variant="muted" className="text-[9.5px]">
                             Sudah dipantau
                           </Badge>
                         )}
                       </span>
-                      <span className="mt-0.5 block text-micro text-muted-foreground">
+                      <span className="mt-0.5 block text-[10.5px] text-muted-foreground">
                         {item.categoryLabel} · {item.groupLabel}
                         {item.aliases ? ` · ${item.aliases}` : ''}
                       </span>
@@ -316,7 +316,7 @@ function ModalPilihPair({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-        <span className="text-caption text-muted-foreground">
+        <span className="text-[11.5px] text-muted-foreground">
           {loadingCatalog ? 'Memuat katalog…' : `${hasil.length} dari ${semua.length} pair`}
         </span>
         <div className="flex items-center gap-2">
@@ -453,13 +453,13 @@ export default function StrategiesPage() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-[14px] font-semibold">{info?.judul ?? s.name}</h3>
-                    <span className="inline-flex items-center gap-1 text-micro font-medium text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                       <Info className="h-3.5 w-3.5" aria-hidden="true" />
                       Ringkasan
                     </span>
                   </div>
                   <p className="text-[12px] font-medium text-foreground">{info?.tagline}</p>
-                  <p className="text-caption leading-relaxed text-muted-foreground">
+                  <p className="text-[11.5px] leading-relaxed text-muted-foreground">
                     {info?.poin[0]}
                   </p>
                 </button>
@@ -501,7 +501,7 @@ export default function StrategiesPage() {
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex flex-col">
                         <span className="font-bold text-foreground text-sm">{sub.symbol}</span>
-                        <span className="text-micro text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground">
                           {nama ?? 'Nama belum tersedia'}
                         </span>
                       </div>
@@ -563,7 +563,7 @@ export default function StrategiesPage() {
             </ul>
 
             <div className="rounded-lg border border-border bg-secondary/40 px-3.5 py-2.5">
-              <p className="text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Cocok untuk
               </p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-foreground">
@@ -571,7 +571,7 @@ export default function StrategiesPage() {
               </p>
             </div>
 
-            <div className="flex items-start gap-2 text-caption leading-relaxed text-muted-foreground">
+            <div className="flex items-start gap-2 text-[11.5px] leading-relaxed text-muted-foreground">
               <Bot className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>Detail cara kerja internal tidak dipublikasikan.</span>
             </div>

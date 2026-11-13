@@ -187,7 +187,7 @@ export default function LaporkanBugPage() {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-lg font-bold tracking-tight text-foreground">Laporkan Bug</h1>
-          <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
             Ada yang tidak berjalan semestinya? Ceritakan di sini.
           </p>
         </div>
@@ -266,7 +266,7 @@ export default function LaporkanBugPage() {
               aria-label="Pilih, tarik-lepas, atau tempel berkas"
               aria-describedby="petunjuk-lampiran"
               className={cn(
-                'flex cursor-pointer flex-col items-center gap-1.5 border border-dashed px-3 py-4 text-center transition-colors',
+                'flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-center transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                 menarik
                   ? 'border-foreground bg-secondary'
@@ -277,7 +277,7 @@ export default function LaporkanBugPage() {
               <p className="text-[12.5px] font-medium text-foreground">
                 {menarik ? 'Lepaskan berkas di sini' : 'Tarik gambar ke sini, atau klik untuk pilih'}
               </p>
-              <p className="flex items-center gap-1 text-micro text-muted-foreground">
+              <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <Paperclip className="h-3 w-3" aria-hidden="true" />
                 Bisa juga Ctrl+V untuk menempel tangkapan layar
               </p>
@@ -298,7 +298,7 @@ export default function LaporkanBugPage() {
               className="sr-only"
             />
 
-            <p id="petunjuk-lampiran" className="text-micro text-muted-foreground">
+            <p id="petunjuk-lampiran" className="text-[11px] text-muted-foreground">
               Gambar (png, jpg, webp, gif) atau PDF, maksimal {BUG_MAKS_LAMPIRAN_MB} MB.
             </p>
 
@@ -321,7 +321,7 @@ export default function LaporkanBugPage() {
                     <p className="truncate text-[12.5px] font-medium text-foreground">
                       {berkas.name}
                     </p>
-                    <p className="text-micro text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       {labelUkuran(berkas.size)}
                     </p>
                   </div>

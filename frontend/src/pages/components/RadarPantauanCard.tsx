@@ -107,7 +107,7 @@ export function RadarPantauanCard() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
-          <span className="font-mono text-micro">Live radar</span>
+          <span className="font-mono text-[11px]">Live radar</span>
         </div>
       }
     >
@@ -151,11 +151,11 @@ export function RadarPantauanCard() {
                 </div>
 
                 {signal ? (
-                  <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-micro">
+                  <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[10px]">
                     {SIGNAL_LABEL[signal.status]}
                   </StatusPill>
                 ) : (
-                  <Badge variant="outline" className="text-micro">
+                  <Badge variant="outline" className="text-[10px]">
                     Memantau
                   </Badge>
                 )}
@@ -164,7 +164,7 @@ export function RadarPantauanCard() {
               {/* Timeframe & Strategy */}
               <div className="mt-2.5 flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
-                  <Badge variant="outline" className="font-mono text-micro">
+                  <Badge variant="outline" className="font-mono text-[9.5px]">
                     {signal?.strategy_version || 'ila-2.0'}
                   </Badge>
                   {signal && <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />}
@@ -173,8 +173,8 @@ export function RadarPantauanCard() {
               </div>
 
               {/* Radar Step Mini Progress Bar */}
-              <div className="mt-3.5 rounded-lg border border-border/60 bg-secondary/25 p-2.5 text-caption">
-                <div className="flex items-center justify-between text-micro font-medium text-muted-foreground">
+              <div className="mt-3.5 rounded-lg border border-border/60 bg-secondary/25 p-2.5 text-[11.5px]">
+                <div className="flex items-center justify-between text-[10.5px] font-medium text-muted-foreground">
                   <span className="flex items-center gap-1">
                     {isHtfDone ? (
                       <CheckCircle2 className="h-3 w-3 text-emerald-500" />
@@ -198,7 +198,7 @@ export function RadarPantauanCard() {
               </div>
 
               {/* Update Footer */}
-              <div className="mt-3 flex items-center justify-between text-micro text-muted-foreground">
+              <div className="mt-3 flex items-center justify-between text-[10.5px] text-muted-foreground">
                 <span>
                   {signal
                     ? `Update ${formatDateTime(signal.updated_at ?? signal.published_at)}`

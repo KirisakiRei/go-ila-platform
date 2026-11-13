@@ -23,7 +23,7 @@ export function DashboardGreetingBar() {
         <h1 className="text-base font-bold tracking-tight text-foreground sm:text-lg">
           Halo, {user.name}
         </h1>
-        <span className="rounded bg-foreground px-1.5 py-0.5 text-micro font-bold uppercase tracking-wider text-background">
+        <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-background">
           {tierName}
         </span>
       </div>
@@ -31,7 +31,7 @@ export function DashboardGreetingBar() {
       {/* Kanan: Live Broker Indicator */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-        <span className="text-caption">
+        <span className="text-[11.5px]">
           Live Broker · <strong className="font-semibold text-foreground">{connectedBrokers}/{totalBrokers} Aktif</strong>
         </span>
       </div>

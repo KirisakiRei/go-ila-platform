@@ -48,12 +48,12 @@ function MenuRow({ icon: Icon, label, description, to, onClick, trailing, disabl
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[12.5px] font-semibold text-foreground">{label}</p>
-        <p className="truncate text-micro text-muted-foreground">{description}</p>
+        <p className="truncate text-[10.5px] text-muted-foreground">{description}</p>
       </div>
       {trailing && (
         <span
           className={cn(
-            'shrink-0 rounded-md border px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wide',
+            'shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide',
             trailing === 'Terverifikasi' || trailing === 'Terhubung'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'border-border bg-secondary text-muted-foreground',
@@ -89,7 +89,7 @@ function MenuRow({ icon: Icon, label, description, to, onClick, trailing, disabl
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-2xl border border-border bg-card shadow-xs">
-      <h2 className="border-b border-border px-3.5 py-2.5 text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <h2 className="border-b border-border px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {title}
       </h2>
       <div className="divide-y divide-border/70">{children}</div>
@@ -135,7 +135,7 @@ function TrialCard() {
 
   if (isError) {
     return (
-      <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-3.5 text-caption text-destructive">
+      <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-3.5 text-[11.5px] text-destructive">
         {(error as Error).message}
       </div>
     )
@@ -153,11 +153,11 @@ function TrialCard() {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <p className="text-[12.5px] font-bold text-foreground">Uji Coba 7 Hari Aktif</p>
-              <Badge variant="solid" className="text-micro">
+              <Badge variant="solid" className="text-[9px]">
                 {data.days_remaining} hari lagi
               </Badge>
             </div>
-            <p className="mt-1 text-micro leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
               Setara tier Plus, seluruh eksekusi berjalan sebagai simulasi hingga{' '}
               {formatDate(data.trial_expires_at)}.
             </p>
@@ -176,7 +176,7 @@ function TrialCard() {
           </span>
           <div className="min-w-0">
             <p className="text-[12.5px] font-semibold text-foreground">Uji Coba Sudah Dipakai</p>
-            <p className="mt-0.5 text-micro leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
               Masa uji coba hanya bisa dipakai sekali per akun dan tidak dapat diulang.
             </p>
           </div>
@@ -193,7 +193,7 @@ function TrialCard() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[12.5px] font-semibold text-foreground">Coba Tier Plus Gratis</p>
-          <p className="mt-0.5 text-micro leading-relaxed text-muted-foreground">
+          <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
             Nikmati seluruh fitur tier Plus selama 7 hari dengan eksekusi simulasi.
           </p>
         </div>
@@ -202,7 +202,7 @@ function TrialCard() {
       {!canStartTrial && (
         <div className="mt-2.5 flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">
           <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
-          <p className="text-micro leading-relaxed text-amber-800 dark:text-amber-300">
+          <p className="text-[10.5px] leading-relaxed text-amber-800 dark:text-amber-300">
             {!isEmailVerified
               ? 'Verifikasi email diperlukan sebelum memulai uji coba.'
               : `Selesaikan penyiapan akun dulu (${completedSteps}/${totalSteps} langkah).`}
@@ -210,12 +210,12 @@ function TrialCard() {
         </div>
       )}
 
-      {galat && <p className="mt-2 text-micro font-medium text-destructive">{galat}</p>}
+      {galat && <p className="mt-2 text-[10.5px] font-medium text-destructive">{galat}</p>}
 
       <div className="mt-2.5 flex items-center gap-2">
         <Button
           size="sm"
-          className="flex-1 text-micro font-semibold"
+          className="flex-1 text-[11px] font-semibold"
           disabled={!canStartTrial || mulai.isPending}
           isLoading={mulai.isPending}
           onClick={() => void onMulai()}
@@ -223,7 +223,7 @@ function TrialCard() {
           Mulai Uji Coba
         </Button>
         {!isEmailVerified ? (
-          <Button size="sm" variant="outline" className="gap-1 text-micro font-semibold" asChild>
+          <Button size="sm" variant="outline" className="gap-1 text-[11px] font-semibold" asChild>
             <Link to="/pengaturan/keamanan">
               Verifikasi
               <ArrowRight className="h-3 w-3" />
@@ -231,7 +231,7 @@ function TrialCard() {
           </Button>
         ) : (
           !isOnboardingDone && (
-            <Button size="sm" variant="outline" className="gap-1 text-micro font-semibold" asChild>
+            <Button size="sm" variant="outline" className="gap-1 text-[11px] font-semibold" asChild>
               <Link to="/mulai">
                 Lanjutkan
                 <ArrowRight className="h-3 w-3" />
@@ -294,7 +294,7 @@ export function SettingsMobileView() {
       {/* Header */}
       <div>
         <h1 className="text-lg font-bold tracking-tight text-foreground">Pengaturan</h1>
-        <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
+        <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
           Kelola akun, preferensi trading, dan keamanan Anda.
         </p>
       </div>
@@ -311,13 +311,13 @@ export function SettingsMobileView() {
           <p className="truncate text-[13.5px] font-bold tracking-tight text-foreground">
             {profile?.name ?? 'Pengguna ILA'}
           </p>
-          <p className="truncate text-micro text-muted-foreground">{profile?.email ?? '—'}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{profile?.email ?? '—'}</p>
           <div className="mt-1 flex items-center gap-1.5">
-            <span className="rounded-md border border-border bg-secondary px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-foreground">
+            <span className="rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-foreground">
               Tier {TIER_LABEL[profile?.tier ?? 'free'] ?? profile?.tier}
             </span>
             {isVerified && (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-0.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="h-2.5 w-2.5" />
                 Terverifikasi
               </span>
@@ -433,7 +433,7 @@ export function SettingsMobileView() {
         Keluar dari Akun
       </button>
 
-      <p className="pb-1 text-center text-micro text-muted-foreground">
+      <p className="pb-1 text-center text-[10px] text-muted-foreground">
         ILA Trading Platform · Sinyal, radar, dan eksekusi terpandu
       </p>
 
@@ -448,7 +448,7 @@ export function SettingsMobileView() {
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-medium text-muted-foreground">Status:</span>
             {isTelegramConnected ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-semibold text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="h-3 w-3" />
                 Terhubung
               </span>

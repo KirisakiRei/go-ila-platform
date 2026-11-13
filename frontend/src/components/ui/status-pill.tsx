@@ -28,9 +28,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        // leading-none menjaga tinggi pill tetap ramping walau huruf naik ke 12px;
-        // tanpa itu line-height 1.45 membuat pill terlihat gemuk dan meluber.
-        'inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-micro font-semibold uppercase leading-none tracking-wide',
+        'inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
         TONES[tone],
         className,
       )}

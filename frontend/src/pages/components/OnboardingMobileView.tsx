@@ -70,7 +70,7 @@ export function OnboardingMobileView({
       {/* Header */}
       <div>
         <h1 className="text-lg font-bold tracking-tight text-foreground">Mulai</h1>
-        <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
+        <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
           Lima langkah singkat agar sistem mengenal akun, broker, dan preferensi risiko Anda.
         </p>
       </div>
@@ -84,14 +84,14 @@ export function OnboardingMobileView({
             </span>
             <div>
               <p className="text-[12.5px] font-bold tracking-tight text-foreground">Progres Penyiapan</p>
-              <p className="text-micro text-muted-foreground">
+              <p className="text-[10.5px] text-muted-foreground">
                 {completed} dari {total} langkah selesai
               </p>
             </div>
           </div>
           <span className="flex flex-col items-end">
             <span className="text-xl font-bold tabular-nums text-foreground">{percentage}%</span>
-            <span className="text-micro uppercase tracking-wider text-muted-foreground">selesai</span>
+            <span className="text-[9.5px] uppercase tracking-wider text-muted-foreground">selesai</span>
           </span>
         </div>
 
@@ -102,7 +102,7 @@ export function OnboardingMobileView({
           />
         </div>
 
-        <p className="mt-2 text-micro leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground">
           {isDone
             ? 'Semua langkah selesai. Akun Anda siap menerima sinyal.'
             : 'Posisi tersimpan otomatis — Anda bisa melanjutkan kapan saja.'}
@@ -111,7 +111,7 @@ export function OnboardingMobileView({
         {isDone && (
           <div className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2">
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
-            <p className="text-micro font-medium text-emerald-800 dark:text-emerald-300">
+            <p className="text-[10.5px] font-medium text-emerald-800 dark:text-emerald-300">
               Penyiapan akun selesai sepenuhnya.
             </p>
           </div>
@@ -128,7 +128,7 @@ export function OnboardingMobileView({
           </div>
 
           {!data.email_verified && (
-            <Alert variant="warning" className="text-micro leading-relaxed">
+            <Alert variant="warning" className="text-[11px] leading-relaxed">
               Beberapa fitur terkunci sampai email terverifikasi: uji coba simulasi, menghubungkan akun
               broker, dan pembayaran langganan.
             </Alert>
@@ -138,7 +138,7 @@ export function OnboardingMobileView({
             <Button
               variant="outline"
               size="sm"
-              className="w-full text-caption font-semibold"
+              className="w-full text-[11.5px] font-semibold"
               disabled={isSkipping}
               onClick={onSkip}
             >
@@ -152,8 +152,8 @@ export function OnboardingMobileView({
       <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-3.5">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <div>
-          <p className="text-caption font-semibold text-foreground">Keamanan data Anda</p>
-          <p className="mt-0.5 text-micro leading-relaxed text-muted-foreground">
+          <p className="text-[11.5px] font-semibold text-foreground">Keamanan data Anda</p>
+          <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
             Kredensial broker disimpan terenkripsi AES-256 dan tidak pernah dibagikan ke pihak ketiga.
           </p>
         </div>
@@ -161,7 +161,7 @@ export function OnboardingMobileView({
 
       {/* Bantuan cepat */}
       <div className="rounded-2xl border border-border bg-card shadow-xs">
-        <h2 className="border-b border-border px-3.5 py-2.5 text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <h2 className="border-b border-border px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Butuh Panduan?
         </h2>
         <div className="divide-y divide-border/70">
@@ -178,7 +178,7 @@ export function OnboardingMobileView({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-semibold text-foreground">{title}</p>
-                <p className="truncate text-micro text-muted-foreground">{description}</p>
+                <p className="truncate text-[10.5px] text-muted-foreground">{description}</p>
               </div>
               <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </a>
@@ -188,7 +188,7 @@ export function OnboardingMobileView({
 
       <Link
         to="/pengaturan/keamanan"
-        className="pb-1 text-center text-micro font-medium text-muted-foreground underline"
+        className="pb-1 text-center text-[10.5px] font-medium text-muted-foreground underline"
       >
         Pelajari cara kami menjaga keamanan akun
       </Link>

@@ -27,7 +27,7 @@ export function MobileTopBar({ user, onOpenMenu }: MobileTopBarProps) {
 
         <Link to="/dashboard" className="flex items-center gap-1.5">
           <span className="text-base font-bold tracking-tight text-foreground">ILA</span>
-          <span className="rounded bg-foreground px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-background">
+          <span className="rounded bg-foreground px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-background">
             {tierName}
           </span>
         </Link>

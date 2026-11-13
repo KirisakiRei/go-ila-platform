@@ -28,7 +28,7 @@ export default function RiwayatLaporanBugPage() {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-lg font-bold tracking-tight text-foreground">Riwayat Laporan</h1>
-          <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
             Laporan yang Anda kirim dan status penanganannya.
           </p>
         </div>
@@ -54,16 +54,16 @@ export default function RiwayatLaporanBugPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13px] font-semibold text-foreground">{row.title}</p>
                 <span
-                  className={`rounded-md border px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
+                  className={`rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
                 >
                   {LABEL_STATUS[row.status]}
                 </span>
               </div>
-              <p className="text-micro text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 {row.category} · {formatDate(row.created_at)}
               </p>
               {row.admin_note && (
-                <p className="rounded-lg border border-border bg-secondary/40 p-2 text-caption text-foreground">
+                <p className="rounded-lg border border-border bg-secondary/40 p-2 text-[11.5px] text-foreground">
                   Catatan tim: {row.admin_note}
                 </p>
               )}

@@ -62,15 +62,6 @@ export default {
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
-      // Skala tipografi resmi (lihat DESIGN.md). 12px adalah lantai untuk teks
-      // fungsional; nilai di bawahnya hanya sah untuk label chart dan navigasi
-      // bawah mobile yang ruangnya terbatas secara struktural.
-      fontSize: {
-        micro: ['12px', { lineHeight: '1.45' }],
-        caption: ['12.5px', { lineHeight: '1.5' }],
-        'body-sm': ['13px', { lineHeight: '1.55' }],
-        body: ['14px', { lineHeight: '1.6' }],
-      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },

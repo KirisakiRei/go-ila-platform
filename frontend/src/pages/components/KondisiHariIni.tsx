@@ -71,7 +71,7 @@ export function KondisiHariIni({ className }: { className?: string }) {
         {/* Baris 1: kondisi pasar & jadwal sesi */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Kondisi Pasar
             </p>
             <div className="mt-1 flex items-center gap-2">
@@ -81,11 +81,11 @@ export function KondisiHariIni({ className }: { className?: string }) {
               />
               <span className="text-sm font-semibold text-foreground">{pasar.label}</span>
             </div>
-            <p className="mt-0.5 text-caption text-muted-foreground">
+            <p className="mt-0.5 text-[11.5px] text-muted-foreground">
               {jadwalBerikut ?? 'Jadwal sesi belum tersedia'}
             </p>
           </div>
-          <div className="shrink-0 text-right text-micro text-muted-foreground">
+          <div className="shrink-0 text-right text-[11px] text-muted-foreground">
             <p className="font-mono">WIB {publik?.time_pair?.wib ?? '—'}</p>
             <p className="font-mono">NY {publik?.time_pair?.ny ?? '—'}</p>
           </div>
@@ -94,7 +94,7 @@ export function KondisiHariIni({ className }: { className?: string }) {
         {/* Baris 2: kuota trading hari ini */}
         <div className="border-t border-border pt-3">
           <div className="flex items-baseline justify-between">
-            <p className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Kuota Trading
             </p>
             <p className="font-mono text-[12.5px] font-semibold text-foreground">
@@ -112,7 +112,7 @@ export function KondisiHariIni({ className }: { className?: string }) {
             />
           </div>
 
-          <p className="mt-1.5 text-caption text-muted-foreground">
+          <p className="mt-1.5 text-[11.5px] text-muted-foreground">
             {daily.locked
               ? daily.lock_reason || 'Entry baru ditahan sampai besok.'
               : bolehTrading
@@ -124,7 +124,7 @@ export function KondisiHariIni({ className }: { className?: string }) {
         {/* Baris 3: hasil hari ini */}
         <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
           <div>
-            <p className="text-micro uppercase tracking-wide text-muted-foreground">P/L Hari Ini</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">P/L Hari Ini</p>
             <p
               className={cn(
                 'font-mono text-[13px] font-semibold tabular-nums',
@@ -141,16 +141,16 @@ export function KondisiHariIni({ className }: { className?: string }) {
             </p>
           </div>
           <div>
-            <p className="text-micro uppercase tracking-wide text-muted-foreground">Win / Loss</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Win / Loss</p>
             <p className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
               {daily.win_count} / {daily.loss_count}
               {winRate !== null && (
-                <span className="ml-1 text-micro font-normal text-muted-foreground">({winRate}%)</span>
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">({winRate}%)</span>
               )}
             </p>
           </div>
           <div>
-            <p className="text-micro uppercase tracking-wide text-muted-foreground">Posisi Aktif</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Posisi Aktif</p>
             <p className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
               {daily.open_count}
             </p>
@@ -158,7 +158,7 @@ export function KondisiHariIni({ className }: { className?: string }) {
         </div>
 
         {/* Baris 4: kesiapan sistem */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border pt-3 text-caption">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border pt-3 text-[11.5px]">
           {engines.length === 0 ? (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <StatusDot state="idle" label="Engine belum terhubung" />
@@ -215,7 +215,7 @@ export function KondisiHariIniRingkas({ className }: { className?: string }) {
   if (isLoading) return <Skeleton className={cn('h-16 w-full', className)} />
   if (!status) {
     return (
-      <div className={cn('rounded-xl border border-border bg-card px-3 py-2.5 text-caption text-muted-foreground', className)}>
+      <div className={cn('rounded-xl border border-border bg-card px-3 py-2.5 text-[11.5px] text-muted-foreground', className)}>
         Ringkasan hari ini gagal dimuat. Tarik ke bawah untuk mencoba lagi.
       </div>
     )
@@ -239,7 +239,7 @@ export function KondisiHariIniRingkas({ className }: { className?: string }) {
         />
         <div className="leading-tight">
           <p className="text-[12px] font-semibold text-foreground">{pasar.label}</p>
-          <p className="text-micro text-muted-foreground">
+          <p className="text-[10.5px] text-muted-foreground">
             {daily.locked
               ? 'Batas harian tercapai'
               : `Sisa ${sisa} dari ${daily.max_trades} eksekusi`}
@@ -247,12 +247,12 @@ export function KondisiHariIniRingkas({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-micro">
+      <div className="flex items-center gap-3 text-[11px]">
         <div className="text-right leading-tight">
           <p className="font-mono font-semibold text-foreground">
             {daily.win_count}/{daily.loss_count}
           </p>
-          <p className="text-micro text-muted-foreground">W/L</p>
+          <p className="text-[10px] text-muted-foreground">W/L</p>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground" title="Akun broker tersambung">
           <Radio className="h-3.5 w-3.5" aria-hidden="true" />

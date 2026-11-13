@@ -90,7 +90,7 @@ export default function ResetPasswordPage() {
                 onChange={(event) => setConfirm(event.target.value)}
               />
               {mismatch && (
-                <p className="text-micro text-muted-foreground">Kata sandi belum sama.</p>
+                <p className="text-[11px] text-muted-foreground">Kata sandi belum sama.</p>
               )}
             </div>
             <Button type="submit" className="w-full" disabled={!canSubmit || submit.isPending}>

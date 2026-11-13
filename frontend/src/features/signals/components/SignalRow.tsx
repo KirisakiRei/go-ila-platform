@@ -36,11 +36,11 @@ export function SignalRow({
         </span>
         <span className="ml-auto flex items-center gap-2">
           {signal.delayed && (
-            <span className="text-micro uppercase tracking-wide text-muted-foreground">Telat</span>
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Telat</span>
           )}
           <StatusPill tone={SIGNAL_TONE[signal.status]}>{SIGNAL_LABEL[signal.status]}</StatusPill>
         </span>
-        <span className="w-full text-micro text-muted-foreground sm:w-auto sm:flex-1">
+        <span className="w-full text-[11px] text-muted-foreground sm:w-auto sm:flex-1">
           {formatDateTime(signal.published_at)}
         </span>
       </button>

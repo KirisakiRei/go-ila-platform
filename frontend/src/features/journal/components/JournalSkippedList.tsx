@@ -74,22 +74,22 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">{item.symbol || '—'}</span>
                 {item.direction && (
-                  <span className="text-micro font-medium uppercase text-muted-foreground">
+                  <span className="text-[11px] font-medium uppercase text-muted-foreground">
                     {item.direction}
                   </span>
                 )}
                 {pasangan && (
-                  <span className="text-micro text-muted-foreground">{pasangan}</span>
+                  <span className="text-[11px] text-muted-foreground">{pasangan}</span>
                 )}
                 {item.strategy_version && (
-                  <span className="text-micro text-muted-foreground">{item.strategy_version}</span>
+                  <span className="text-[11px] text-muted-foreground">{item.strategy_version}</span>
                 )}
               </div>
-              <span className="text-micro font-medium">{labelStatus(item.status)}</span>
+              <span className="text-[11px] font-medium">{labelStatus(item.status)}</span>
             </div>
 
             {item.entry_price > 0 && (
-              <p className="tabular text-micro text-muted-foreground">
+              <p className="tabular text-[11px] text-muted-foreground">
                 Entry {formatNumber(item.entry_price, 5)} · SL {formatNumber(item.stop_loss, 5)} · TP{' '}
                 {formatNumber(item.take_profit, 5)}
                 {item.risk_reward > 0 ? ` · RR ${formatR(item.risk_reward)}` : ''}
@@ -97,10 +97,10 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
             )}
 
             {alasanTerbaca(item) && (
-              <p className="text-micro text-muted-foreground">{alasanTerbaca(item)}</p>
+              <p className="text-[11px] text-muted-foreground">{alasanTerbaca(item)}</p>
             )}
 
-            <p className="text-micro text-muted-foreground">{formatDateTime(item.occurred_at)}</p>
+            <p className="text-[10.5px] text-muted-foreground">{formatDateTime(item.occurred_at)}</p>
           </li>
         )
       })}

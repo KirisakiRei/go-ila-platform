@@ -189,7 +189,7 @@ export function CheckoutMobileView({
           <h1 className="text-lg font-bold tracking-tight text-foreground">
             {mode === 'receipt' ? 'Status Pembayaran' : mode === 'pending' ? 'Detail Pembayaran' : 'Ringkasan Tagihan'}
           </h1>
-          <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
+          <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
             {mode === 'receipt'
               ? 'Konfirmasi pembayaran langganan Anda.'
               : mode === 'pending'
@@ -200,7 +200,7 @@ export function CheckoutMobileView({
       </div>
 
       {errorMessage && (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-caption font-medium text-destructive">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-[11.5px] font-medium text-destructive">
           {errorMessage}
         </div>
       )}
@@ -219,28 +219,28 @@ export function CheckoutMobileView({
                       <Sparkles className="h-4 w-4" />
                     </span>
                     <div>
-                      <p className="text-micro font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         Paket Dipilih
                       </p>
                       <h2 className="text-sm font-bold tracking-tight text-foreground">{planName}</h2>
                     </div>
                   </div>
-                  <span className="rounded-md border border-border px-2 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="rounded-md border border-border px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground">
                     {planCode}
                   </span>
                 </div>
 
-                <p className="mt-2 text-caption leading-relaxed text-muted-foreground">{planAudience}</p>
+                <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">{planAudience}</p>
 
                 <div className="mt-3 flex items-baseline justify-between gap-2 border-t border-border/70 pt-3">
-                  <span className="text-micro text-muted-foreground">Masa aktif 30 hari</span>
+                  <span className="text-[11px] text-muted-foreground">Masa aktif 30 hari</span>
                   <span className="text-base font-bold tabular-nums text-foreground">{formatIDR(basePrice)}</span>
                 </div>
 
                 {benefits.length > 0 && (
                   <ul className="mt-3 grid grid-cols-1 gap-1.5 border-t border-border/70 pt-3">
                     {benefits.map((benefit) => (
-                      <li key={benefit.label} className="flex items-start gap-2 text-caption text-foreground">
+                      <li key={benefit.label} className="flex items-start gap-2 text-[11.5px] text-foreground">
                         <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                         <span className="leading-snug">{benefit.label}</span>
                       </li>
@@ -285,7 +285,7 @@ export function CheckoutMobileView({
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-[12px] font-semibold text-foreground">{method.name}</p>
-                        <p className="truncate text-micro text-muted-foreground">{method.description}</p>
+                        <p className="truncate text-[10.5px] text-muted-foreground">{method.description}</p>
                       </div>
                     </div>
                     <span
@@ -315,21 +315,21 @@ export function CheckoutMobileView({
                   onChange={(event) => onCouponChange(event.target.value.toUpperCase())}
                   placeholder="Kode promo"
                   aria-label="Kode voucher"
-                  className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2 font-mono text-caption uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2 font-mono text-[11.5px] uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={onApplyCoupon}
                   disabled={!coupon.trim() || isVoucherApplied}
-                  className="shrink-0 text-micro font-semibold"
+                  className="shrink-0 text-[11px] font-semibold"
                 >
                   Terapkan
                 </Button>
               </div>
 
               {isVoucherApplied && (
-                <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2 text-micro leading-none font-medium text-emerald-800 dark:text-emerald-300">
+                <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2 text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
                   <span className="truncate">Voucher {appliedCoupon} diterapkan</span>
                   <button type="button" onClick={onRemoveCoupon} className="ml-2 shrink-0 underline">
                     Hapus
@@ -337,7 +337,7 @@ export function CheckoutMobileView({
                 </div>
               )}
 
-              <label className="flex items-start gap-2 text-caption text-foreground">
+              <label className="flex items-start gap-2 text-[11.5px] text-foreground">
                 <input
                   type="checkbox"
                   checked={useCredit}
@@ -352,7 +352,7 @@ export function CheckoutMobileView({
           {/* Rincian harga */}
           <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs">
             <h2 className="text-[13px] font-bold tracking-tight text-foreground">Rincian Harga</h2>
-            <div className="mt-2.5 space-y-2 text-caption">
+            <div className="mt-2.5 space-y-2 text-[11.5px]">
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Harga paket</span>
                 <span className="font-medium tabular-nums text-foreground">{formatIDR(basePrice)}</span>
@@ -382,7 +382,7 @@ export function CheckoutMobileView({
 
           <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5">
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <p className="text-micro leading-relaxed text-muted-foreground">
+            <p className="text-[10.5px] leading-relaxed text-muted-foreground">
               Transaksi terenkripsi 256-bit. Dana dikembalikan penuh bila paket gagal diaktifkan.
             </p>
           </div>
@@ -391,7 +391,7 @@ export function CheckoutMobileView({
           <div className="sticky bottom-20 z-20 -mx-4 mt-1 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-xl">
             <div className="flex items-center gap-3">
               <div className="min-w-0">
-                <p className="text-micro font-medium uppercase tracking-wider text-muted-foreground">Total Bayar</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Total Bayar</p>
                 <p className="text-base font-bold tabular-nums text-foreground">{formatIDR(finalPrice)}</p>
               </div>
               <Button
@@ -403,7 +403,7 @@ export function CheckoutMobileView({
                 {isSubmitting ? 'Memproses…' : 'Bayar Sekarang'}
               </Button>
             </div>
-            <p className="mt-1.5 text-center text-micro text-muted-foreground">
+            <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
               Dengan melanjutkan, Anda menyetujui Ketentuan Layanan ILA Platform.
             </p>
           </div>
@@ -420,15 +420,15 @@ export function CheckoutMobileView({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[12.5px] font-bold text-amber-800 dark:text-amber-300">Menunggu Pembayaran</p>
-                <p className="mt-0.5 text-micro leading-relaxed text-amber-800/80 dark:text-amber-300/80">
+                <p className="mt-0.5 text-[11px] leading-relaxed text-amber-800/80 dark:text-amber-300/80">
                   Selesaikan pembayaran agar paket langsung aktif otomatis.
                 </p>
                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-background/70 px-2 py-1">
                   <Clock className="h-3 w-3 text-amber-700 dark:text-amber-400" />
-                  <span className="text-micro font-medium text-amber-800 dark:text-amber-300">
+                  <span className="text-[10.5px] font-medium text-amber-800 dark:text-amber-300">
                     Sisa waktu
                   </span>
-                  <span className="font-mono text-caption font-bold tabular-nums text-amber-900 dark:text-amber-200">
+                  <span className="font-mono text-[11.5px] font-bold tabular-nums text-amber-900 dark:text-amber-200">
                     {formatCountdown(remainingMs)}
                   </span>
                 </div>
@@ -438,13 +438,13 @@ export function CheckoutMobileView({
 
           {/* Nominal */}
           <div className="rounded-2xl border border-border bg-card p-4 text-center shadow-xs">
-            <p className="text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Total Yang Harus Dibayar
             </p>
             <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-foreground">
               {formatIDR(invoice.total_idr)}
             </p>
-            <p className="mt-1 text-micro leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
               Nomor invoice <span className="font-mono font-semibold text-foreground">{invoice.number}</span>
             </p>
           </div>
@@ -462,13 +462,13 @@ export function CheckoutMobileView({
                 </span>
                 <p className="text-[12px] font-semibold text-foreground">{currentMethod.name}</p>
               </div>
-              <span className="rounded-md border border-border px-1.5 py-0.5 text-micro leading-none font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="rounded-md border border-border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {currentMethod.category}
               </span>
             </div>
 
             <div className="mt-3 rounded-xl border border-border bg-secondary/30 p-3">
-              <p className="text-micro font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 {currentMethod.category === 'qris' ? 'Kode Referensi QRIS' : `Nomor Virtual Account ${currentMethod.bank ?? ''}`}
               </p>
               <div className="mt-1 flex items-center justify-between gap-2">
@@ -478,14 +478,14 @@ export function CheckoutMobileView({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="shrink-0 gap-1 text-micro font-semibold"
+                  className="shrink-0 gap-1 text-[10.5px] font-semibold"
                   onClick={() => onCopy(currentMethod.accountNumber)}
                 >
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied ? 'Tersalin' : 'Salin'}
                 </Button>
               </div>
-              <p className="mt-1.5 text-micro leading-relaxed text-muted-foreground">
+              <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
                 {currentMethod.category === 'qris'
                   ? 'Pindai kode QRIS pada aplikasi e-wallet atau m-banking Anda, lalu masukkan nominal persis.'
                   : 'Pastikan nama penerima sesuai dan nominal transfer sama persis hingga digit terakhir.'}
@@ -506,10 +506,10 @@ export function CheckoutMobileView({
                 'Konfirmasi pembayaran; paket aktif otomatis dalam 1–3 menit.',
               ].map((step, index) => (
                 <li key={step} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-micro font-bold text-foreground">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-[10px] font-bold text-foreground">
                     {index + 1}
                   </span>
-                  <span className="text-caption leading-snug text-muted-foreground">{step}</span>
+                  <span className="text-[11.5px] leading-snug text-muted-foreground">{step}</span>
                 </li>
               ))}
             </ol>
@@ -521,7 +521,7 @@ export function CheckoutMobileView({
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 gap-1 text-micro font-semibold"
+                className="flex-1 gap-1 text-[11px] font-semibold"
                 onClick={() => onCopy(currentMethod.accountNumber)}
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -529,14 +529,14 @@ export function CheckoutMobileView({
               </Button>
               <Button
                 size="sm"
-                className="flex-1 gap-1 text-micro font-semibold"
+                className="flex-1 gap-1 text-[11px] font-semibold"
                 onClick={onOpenInvoices}
               >
                 <BadgeCheck className="h-3.5 w-3.5" />
                 Cek Status
               </Button>
             </div>
-            <p className="mt-1.5 text-center text-micro text-muted-foreground">
+            <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
               Status diperbarui otomatis setelah pembayaran diterima.
             </p>
           </div>
@@ -551,13 +551,13 @@ export function CheckoutMobileView({
               <CheckCircle2 className="h-9 w-9" strokeWidth={2.2} />
             </span>
             <h2 className="mt-3 text-[17px] font-bold tracking-tight text-foreground">Pembayaran Berhasil</h2>
-            <p className="mt-1 max-w-[260px] text-caption leading-relaxed text-muted-foreground">
+            <p className="mt-1 max-w-[260px] text-[11.5px] leading-relaxed text-muted-foreground">
               Terima kasih, pembayaran Anda telah kami terima dan paket langsung aktif.
             </p>
             <p className="mt-3 text-2xl font-bold tracking-tight tabular-nums text-foreground">
               {formatIDR(invoice.total_idr)}
             </p>
-            <span className="mt-2 inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro leading-none font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+            <span className="mt-2 inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
               <Check className="h-3 w-3" />
               Lunas
             </span>
@@ -566,7 +566,7 @@ export function CheckoutMobileView({
           {/* Rincian transaksi */}
           <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs">
             <h2 className="text-[12.5px] font-bold tracking-tight text-foreground">Rincian Transaksi</h2>
-            <dl className="mt-2.5 space-y-2 text-caption">
+            <dl className="mt-2.5 space-y-2 text-[11.5px]">
               <div className="flex items-start justify-between gap-3">
                 <dt className="text-muted-foreground">No. Invoice</dt>
                 <dd className="flex items-center gap-1 font-mono font-semibold text-foreground">
@@ -593,10 +593,10 @@ export function CheckoutMobileView({
 
             <div className="mt-3 rounded-xl border border-border bg-secondary/30 p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-caption font-semibold text-foreground">{planName}</span>
-                <span className="text-caption tabular-nums text-muted-foreground">{formatIDR(invoice.total_idr)}</span>
+                <span className="text-[11.5px] font-semibold text-foreground">{planName}</span>
+                <span className="text-[11.5px] tabular-nums text-muted-foreground">{formatIDR(invoice.total_idr)}</span>
               </div>
-              <div className="mt-2 space-y-1.5 border-t border-border/70 pt-2 text-micro">
+              <div className="mt-2 space-y-1.5 border-t border-border/70 pt-2 text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="tabular-nums text-foreground">{formatIDR(invoice.total_idr)}</span>
@@ -617,7 +617,7 @@ export function CheckoutMobileView({
           <div className="rounded-2xl border border-dashed border-border bg-card p-3.5">
             <div className="flex items-start gap-2">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              <p className="text-micro leading-relaxed text-muted-foreground">
+              <p className="text-[10.5px] leading-relaxed text-muted-foreground">
                 Bukti pembayaran sah telah tercatat pada sistem ILA Platform dan dapat diunduh untuk keperluan
                 administrasi Anda.
               </p>

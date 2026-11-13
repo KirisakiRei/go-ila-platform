@@ -259,7 +259,7 @@ function StepIndicator({ steps, current }: { steps: readonly string[]; current: 
             />
             <span
               className={cn(
-                'text-micro uppercase tracking-[0.15em]',
+                'text-[10px] uppercase tracking-[0.15em]',
                 state === 'active' ? 'text-foreground' : 'text-muted-foreground',
               )}
             >

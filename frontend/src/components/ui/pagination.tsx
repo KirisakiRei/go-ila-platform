@@ -50,7 +50,7 @@ export function Pagination({
   // bertambah panjang.
   if (totalPages <= 1 && !adaPemilihUkuran) {
     return (
-      <p className={cn('text-micro text-muted-foreground', className)}>
+      <p className={cn('text-[11px] text-muted-foreground', className)}>
         {total} {unit}
       </p>
     )
@@ -59,7 +59,7 @@ export function Pagination({
   if (totalPages <= 1) {
     return (
       <div className={cn('flex flex-wrap items-center justify-between gap-2', className)}>
-        <p className="text-micro text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Menampilkan {shown} dari {total} {unit}
         </p>
         {adaPemilihUkuran && (
@@ -87,7 +87,7 @@ export function Pagination({
       aria-label="Navigasi halaman"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-micro text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Menampilkan {shown} dari {total} {unit} · halaman {page} dari {totalPages}
         </p>
         {adaPemilihUkuran && (
@@ -173,7 +173,7 @@ function PemilihUkuran({
   onChange: (size: number) => void
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5 text-micro text-muted-foreground">
+    <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
       <span>Tampilkan</span>
       <select
         value={value}

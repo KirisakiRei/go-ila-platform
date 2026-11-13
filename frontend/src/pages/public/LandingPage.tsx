@@ -275,11 +275,8 @@ export default function LandingPage() {
           <div className="max-w-2xl space-y-3">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
               <span className="text-[#09090b]">Arah pasar terkini,</span>{' '}
-              <span className="text-[#52525b]">diperbarui sepanjang sesi</span>
+              <span className="text-[#52525b]">diperbarui tiap sesi</span>
             </h2>
-            <p className="max-w-[60ch] text-[14px] leading-relaxed text-[#52525b]">
-              Pembacaan arah tren dari struktur likuiditas instrumen utama secara real-time.
-            </p>
           </div>
 
           <div className="mt-8">
@@ -397,10 +394,6 @@ export default function LandingPage() {
               <span className="text-[#09090b]">Dirancang untuk</span>{' '}
               <span className="text-[#52525b]">trading yang terukur</span>
             </h2>
-            <p className="mt-3 max-w-[60ch] text-[14px] leading-relaxed text-[#52525b]">
-              Membantu Anda menjalankan rencana trading yang sudah ditulis, mulai dari pemindaian
-              sesi hingga pencatatan riwayat keputusan.
-            </p>
           </div>
 
           <div className="mt-12 grid gap-4 lg:grid-cols-12">
