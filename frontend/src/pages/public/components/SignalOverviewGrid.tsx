@@ -67,7 +67,7 @@ export function SignalOverviewGrid() {
         ))}
       </div>
 
-      <p className="text-[11px] text-[#71717a]">
+      <p className="max-w-[68ch] text-[12px] text-[#6b6b74]">
         {data
           ? `Diperbarui ${formatRelativeTime(data.generated_at)} · Khusus informasi arah pasar tanpa parameter eksekusi.`
           : 'Khusus informasi arah pasar tanpa parameter eksekusi.'}

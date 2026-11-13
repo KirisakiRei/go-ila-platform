@@ -57,7 +57,7 @@ export default function HelpTimezonePage() {
   return (
     <div className="bg-[#f5f5f7] text-[#09090b]">
       <div className="mx-auto w-full max-w-4xl px-4 pt-10 pb-20 sm:px-6 sm:pt-14 sm:pb-24">
-        <nav aria-label="Jejak navigasi" className="text-[12px] text-[#71717a]">
+        <nav aria-label="Jejak navigasi" className="text-[12px] text-[#6b6b74]">
           <ol className="flex flex-wrap items-center gap-1.5">
             <li>
               <Link to="/" className="transition-colors hover:text-[#09090b]">
@@ -76,7 +76,7 @@ export default function HelpTimezonePage() {
         </nav>
 
         <header className="mt-8">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#71717a]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6b6b74]">
             Pusat Bantuan
           </p>
           <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight sm:text-[36px]">
@@ -98,7 +98,7 @@ export default function HelpTimezonePage() {
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-zinc-200 bg-white p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#71717a]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6b74]">
               New York
             </p>
             <p className="mt-1.5 text-[15px] font-semibold">Jam pasar</p>
@@ -107,13 +107,13 @@ export default function HelpTimezonePage() {
               utama bergerak.
             </p>
             {data?.time_pair?.ny && (
-              <p className="mt-3 text-[12px] text-[#a1a1aa] tabular">
+              <p className="mt-3 text-[12px] text-[#6b6b74] tabular">
                 Saat ini {data.time_pair.ny} NY
               </p>
             )}
           </div>
           <div className="rounded-xl border border-zinc-200 bg-white p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#71717a]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6b74]">
               Waktu Indonesia Barat
             </p>
             <p className="mt-1.5 text-[15px] font-semibold">Siklus Harian (WIB)</p>
@@ -122,7 +122,7 @@ export default function HelpTimezonePage() {
               WIB.
             </p>
             {data?.time_pair?.wib && (
-              <p className="mt-3 text-[12px] text-[#a1a1aa] tabular">
+              <p className="mt-3 text-[12px] text-[#6b6b74] tabular">
                 Saat ini {data.time_pair.wib} WIB
               </p>
             )}
@@ -184,7 +184,7 @@ export default function HelpTimezonePage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[12px] leading-relaxed text-[#71717a]">
+          <p className="mt-3 text-[12px] leading-relaxed text-[#6b6b74]">
             Saat New York beralih ke daylight saving, jam WIB ikut bergeser satu jam. Tabel ini
             menampilkan nilai terbaru setiap kali halaman dibuka.
           </p>

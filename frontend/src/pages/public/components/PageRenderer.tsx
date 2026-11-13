@@ -99,7 +99,7 @@ function HeroAside({ page }: { page: PageContent }) {
       aria-label="Isi halaman"
       className="rounded-2xl border border-zinc-200 bg-white/80 p-5 backdrop-blur-sm sm:p-6"
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a1a1aa]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b6b74]">
         Di halaman ini
       </p>
       <ol className="mt-3 space-y-2">
@@ -109,7 +109,7 @@ function HeroAside({ page }: { page: PageContent }) {
               href={`#${section.key}`}
               className="group flex items-baseline gap-3 rounded-md py-1 text-[13.5px] text-[#3f3f46] transition-colors hover:text-[#09090b]"
             >
-              <span className="tabular text-[11px] text-[#a1a1aa]">
+              <span className="tabular text-[11px] text-[#6b6b74]">
                 {String(index + 1).padStart(2, '0')}
               </span>
               <span className="underline-offset-4 group-hover:underline">{section.title}</span>
@@ -149,11 +149,18 @@ function SectionBlock({
     <section
       id={section.key}
       className={cn(
-        'scroll-mt-24 rounded-2xl border p-5 sm:p-8',
-        !first && 'mt-10 sm:mt-12',
-        tone === 'dark' && 'border-[#09090b] bg-[#09090b] text-zinc-300',
-        tone === 'quiet' && 'border-zinc-200 bg-white',
-        tone === 'light' && 'border-zinc-200 bg-white',
+        // Bagian bertindak sebagai jalur konten, bukan kartu: bingkai dibuang
+        // supaya kartu di dalamnya menjadi satu-satunya permukaan. Bagian
+        // bernada gelap tetap memakai panel penuh karena isinya prose polos.
+        // Lebar dibatasi supaya baris tidak melebar di layar besar.
+        'scroll-mt-24 sm:p-8',
+        !first && 'mt-12 sm:mt-14',
+        tone === 'dark' &&
+          'rounded-2xl border border-[#09090b] bg-[#09090b] p-5 text-zinc-300 sm:p-8',
+        tone !== 'dark' && 'border-t border-zinc-200 pt-10 first:border-t-0 first:pt-0',
+        // Baris rata yang terlalu panjang melelahkan dibaca; kolom isi
+        // dijaga di kisaran 70 karakter pada layar lebar.
+        'max-w-2xl lg:max-w-3xl',
       )}
     >
       {section.title && (
@@ -200,7 +207,7 @@ function SectionBody({
         <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {section.items.map((item) => (
             <div key={item.label} className="rounded-xl border border-zinc-200 bg-[#fafafa] p-4">
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a1a1aa]">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6b74]">
                 {item.label}
               </dt>
               <dd className="mt-2 text-[13.5px] leading-relaxed text-[#3f3f46]">{item.value}</dd>
@@ -217,7 +224,7 @@ function SectionBody({
               key={`${section.key}-${item.label}`}
               className="flex gap-4 rounded-xl border border-zinc-200 bg-[#fafafa] p-4 sm:p-5"
             >
-              <span className="tabular shrink-0 text-[12px] font-semibold text-[#a1a1aa]">
+              <span className="tabular shrink-0 text-[12px] font-semibold text-[#6b6b74]">
                 {String(index + 1).padStart(2, '0')}
               </span>
               <div className="min-w-0">
@@ -259,7 +266,7 @@ function SectionBody({
                 <span>{item.label}</span>
                 <span
                   aria-hidden="true"
-                  className="mt-0.5 shrink-0 text-[18px] leading-none text-[#a1a1aa] transition-transform group-open:rotate-45"
+                  className="mt-0.5 shrink-0 text-[18px] leading-none text-[#6b6b74] transition-transform group-open:rotate-45"
                 >
                   +
                 </span>
@@ -279,7 +286,9 @@ function SectionBody({
 
 function CalloutBlock({ section }: { section: PageSection }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+    // Tanpa kotak sendiri: callout hanya menandai dirinya dengan pita kiri,
+    // supaya tidak menjadi kartu di dalam panel gelap bagian induknya.
+    <div className="border-l-2 border-white/25 pl-5">
       {/* Judul bagian sudah tampil di atas; label di sini hanya ada bila bagian
           memang tidak punya judul, agar kalimatnya tidak terbaca dua kali. */}
       {!section.title && section.eyebrow && (
@@ -287,7 +296,7 @@ function CalloutBlock({ section }: { section: PageSection }) {
           {section.eyebrow}
         </p>
       )}
-      <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-zinc-300">
+      <p className="max-w-[60ch] whitespace-pre-line text-[13.5px] leading-relaxed text-zinc-300">
         {section.body}
       </p>
     </div>
@@ -297,18 +306,16 @@ function CalloutBlock({ section }: { section: PageSection }) {
 function ItemCard({ item, showNote }: { item: PageItem; showNote?: boolean }) {
   const content = (
     <>
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white">
-        <IconFor name={item.icon} className="h-4 w-4 text-[#3f3f46]" />
-      </span>
-      <p className="mt-3 flex items-center gap-1 text-[14px] font-semibold text-[#09090b]">
+      <IconFor name={item.icon} className="block h-4 w-4 text-[#3f3f46]" />
+      <p className="mt-2 flex items-center gap-1 text-[14px] font-semibold text-[#09090b]">
         {item.label}
-        {item.href && <ArrowUpRight className="h-3.5 w-3.5 text-[#a1a1aa]" aria-hidden="true" />}
+        {item.href && <ArrowUpRight className="h-3.5 w-3.5 text-[#6b6b74]" aria-hidden="true" />}
       </p>
       {item.value && (
         <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#52525b]">{item.value}</p>
       )}
       {showNote && item.note && (
-        <p className="mt-2.5 border-t border-zinc-200 pt-2.5 text-[12.5px] leading-relaxed text-[#71717a]">
+        <p className="mt-2.5 border-t border-zinc-200 pt-2.5 text-[12.5px] leading-relaxed text-[#6b6b74]">
           {item.note}
         </p>
       )}
@@ -354,7 +361,7 @@ function ItemTable({ items }: { items: PageItem[] }) {
               <td className="border-b border-zinc-100 px-4 py-3 text-[#52525b]">
                 <span className="block">{item.value}</span>
                 {item.note && (
-                  <span className="mt-1 block text-[12px] text-[#71717a]">{item.note}</span>
+                  <span className="mt-1 block text-[12px] text-[#6b6b74]">{item.note}</span>
                 )}
               </td>
             </tr>
@@ -371,7 +378,7 @@ function PageFooterNote() {
     <div className="border-t border-zinc-200 bg-white">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p className="flex items-center gap-2 text-[13px] text-[#52525b]">
-          <HelpCircle className="h-4 w-4 text-[#a1a1aa]" aria-hidden="true" />
+          <HelpCircle className="h-4 w-4 text-[#6b6b74]" aria-hidden="true" />
           Ada yang belum jelas? Tim dukungan membalas pada hari kerja.
         </p>
         <a

@@ -9,14 +9,17 @@ import { cn } from '@/lib/utils'
  * halaman punya irama yang sama dan tidak berbeda-beda sendiri-sendiri.
  */
 export function PublicHero({
-  eyebrow,
+  // Eyebrow tidak lagi dirender: label kecil di atas judul hanya mengulang
+  // kata yang sudah ada di judul itu sendiri. Prop dipertahankan supaya
+  // pemanggil tidak perlu diubah, dan agar isi dari server tidak hilang.
+  eyebrow: _eyebrow,
   title,
   description,
   actions,
   aside,
   tone = 'light',
 }: {
-  eyebrow: string
+  eyebrow?: string
   title: ReactNode
   description: string
   actions?: ReactNode
@@ -45,15 +48,7 @@ export function PublicHero({
       <div className="relative mx-auto w-full max-w-6xl px-4 pt-10 pb-16 sm:px-6 sm:pt-14 sm:pb-20">
         <div className="grid gap-10 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <p
-              className={cn(
-                'text-[11px] font-semibold uppercase tracking-[0.18em]',
-                isDark ? 'text-zinc-400' : 'text-[#71717a]',
-              )}
-            >
-              {eyebrow}
-            </p>
-            <h1 className="mt-4 text-[2rem] font-semibold leading-[1.08] tracking-tight sm:text-[2.9rem] lg:text-[3.2rem]">
+            <h1 className="text-[2rem] font-semibold leading-[1.08] tracking-tight sm:text-[2.9rem] lg:text-[3.2rem]">
               {title}
             </h1>
             <p
@@ -99,7 +94,7 @@ export function SectionHeading({
         <p
           className={cn(
             'text-[11px] font-semibold uppercase tracking-[0.18em] tabular',
-            tone === 'dark' ? 'text-zinc-500' : 'text-[#a1a1aa]',
+            tone === 'dark' ? 'text-zinc-400' : 'text-[#6b6b74]',
           )}
         >
           {index}

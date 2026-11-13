@@ -110,6 +110,12 @@ export default function LandingPage() {
       >
         {/* BAGIAN HERO */}
         <section id="hero-band" className="relative text-white">
+          {/* Selubung gelap di belakang teks: gradasi halaman berangsur
+              terang, jadi judul putih butuh latar yang menjamin kontras. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-gradient-to-b from-[#050507]/90 via-[#050507]/70 to-transparent"
+            aria-hidden="true"
+          />
           {/* Background geometris tema trading yang clean & rapi */}
           <HeroTradingGeometry className="pointer-events-none absolute inset-0 h-full w-full" />
 
@@ -264,17 +270,14 @@ export default function LandingPage() {
       </section>
 
       {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
-      <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
+      <section className="bg-[#f5f5f7] pt-16 pb-20 sm:pt-20 sm:pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl space-y-3">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
-              Pantauan Pasar
-            </p>
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
               <span className="text-[#09090b]">Arah pasar terkini,</span>{' '}
               <span className="text-[#52525b]">diperbarui sepanjang sesi</span>
             </h2>
-            <p className="text-[14px] leading-relaxed text-[#52525b]">
+            <p className="max-w-[60ch] text-[14px] leading-relaxed text-[#52525b]">
               Pembacaan arah tren dari struktur likuiditas instrumen utama secara real-time.
             </p>
           </div>
@@ -284,7 +287,7 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6">
-            <p className="text-[13px] text-[#71717a]">
+            <p className="text-[13px] text-[#6b6b74]">
               Parameter lengkap entry price, stop loss, dan take profit tersedia di dashboard member.
             </p>
             <div className="flex flex-wrap items-center gap-3">
@@ -303,7 +306,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <h2 className="mt-14 max-w-3xl text-3xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
+          <h2 className="mt-20 max-w-3xl text-3xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
             <span className="text-[#09090b]">Satu tempat untuk pantau,</span>
             <br />
             <span className="text-[#52525b]">setujui, dan jaga risiko</span>
@@ -321,7 +324,7 @@ export default function LandingPage() {
                   <span className="text-[#09090b]">Dua metode analisis,</span>{' '}
                   <span className="text-[#52525b]">satu disiplin risiko</span>
                 </h2>
-                <p className="text-[14px] leading-relaxed text-[#52525b]">
+                <p className="max-w-[60ch] text-[14px] leading-relaxed text-[#52525b]">
                   Metode ILA memetakan area likuiditas dan menunggu konfirmasi pergerakan harga
                   sebelum mengirim setup — tanpa spekulasi berlebihan.
                 </p>
@@ -377,7 +380,7 @@ export default function LandingPage() {
 
               <div className="relative overflow-hidden rounded-2xl border border-zinc-800/20">
                 <MonochromeHorizonTile className="h-32 w-full object-cover" />
-                <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/85 via-transparent to-transparent p-4">
+                <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/90 via-black/55 to-black/15 p-4">
                   <p className="text-[12px] font-medium text-white">Fokus pada Konfirmasi</p>
                 </div>
               </div>
@@ -387,14 +390,14 @@ export default function LandingPage() {
       </section>
 
       {/* 6. FITUR & CAKUPAN PEMANTAUAN (menggantikan Bento jargon internal) */}
-      <section className="bg-[#f5f5f7] pb-20 sm:pb-24">
+      <section className="bg-[#f5f5f7] pt-16 pb-20 sm:pt-20 sm:pb-24">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
               <span className="text-[#09090b]">Dirancang untuk</span>{' '}
               <span className="text-[#52525b]">trading yang terukur</span>
             </h2>
-            <p className="mt-3 text-[14px] leading-relaxed text-[#52525b]">
+            <p className="mt-3 max-w-[60ch] text-[14px] leading-relaxed text-[#52525b]">
               Membantu Anda menjalankan rencana trading yang sudah ditulis, mulai dari pemindaian
               sesi hingga pencatatan riwayat keputusan.
             </p>
@@ -568,7 +571,7 @@ export default function LandingPage() {
               })}
             </div>
           ) : (
-            <p className="border-t border-zinc-200 pt-6 text-[13px] text-[#52525b]">
+            <p className="border-t border-zinc-200 pt-6 max-w-[62ch] text-[13px] leading-relaxed text-[#52525b]">
               Daftar paket dapat dilihat langsung pada halaman{' '}
               <Link to="/harga" className="font-medium text-[#09090b] underline">
                 Harga
@@ -589,12 +592,12 @@ export default function LandingPage() {
                 <span className="text-zinc-400">dengan aturan lebih jelas?</span>
               </h2>
 
-              <p className="text-[14px] leading-relaxed text-zinc-300">
+              <p className="max-w-[60ch] text-[14px] leading-relaxed text-zinc-300">
                 Mulai trial simulasi 7 hari tanpa kartu kredit. Hubungkan akun broker Anda saat sudah
                 siap menjalankan trading.
               </p>
 
-              <p className="border-l-2 border-zinc-700 pl-4 text-[12px] leading-relaxed text-zinc-300">
+              <p className="border-l-2 border-zinc-700 pl-4 max-w-[68ch] text-[12px] leading-relaxed text-zinc-300">
                 <strong className="font-semibold text-white">Disclaimer Risiko Trading:</strong>{' '}
                 Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi. Platform ini
                 adalah alat bantu analisis dan eksekusi—bukan jaminan keuntungan dan bukan nasihat

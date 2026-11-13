@@ -88,7 +88,7 @@ const ARAH_TAMPILAN: Record<
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[11px] uppercase tracking-[0.08em] text-[#71717a]">{label}</span>
+      <span className="text-[12px] uppercase tracking-[0.08em] text-[#6b6b74]">{label}</span>
       <span className="text-[12px] font-medium text-[#3f3f46]">{value}</span>
     </div>
   )
@@ -105,7 +105,7 @@ function StatusTag({
   badgeClass: string
 }) {
   const gaya = !marketOpen
-    ? 'border-zinc-200 bg-transparent text-[#71717a]'
+    ? 'border-zinc-200 bg-transparent text-[#6b6b74]'
     : hasSignal
       ? badgeClass
       : 'border-zinc-300 bg-transparent text-[#3f3f46]'
@@ -115,7 +115,7 @@ function StatusTag({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.07em]',
+        'inline-flex shrink-0 items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.07em]',
         gaya,
       )}
     >
@@ -151,7 +151,7 @@ export function SignalOverviewCard({
   return (
     <article
       className={cn(
-        'flex h-full flex-col rounded-xl border p-5 transition-colors',
+        'flex h-full min-w-0 flex-col rounded-xl border p-5 transition-colors',
         sinyal ? tampilan.cardBorder : 'border-zinc-200 hover:border-zinc-300',
         sinyal ? tampilan.bgClass : 'bg-white',
       )}
@@ -162,9 +162,9 @@ export function SignalOverviewCard({
           <h3 className="truncate text-[17px] font-semibold leading-tight tracking-tight text-[#09090b]">
             {item.symbol}
           </h3>
-          <p className="mt-1 truncate text-[12px] text-[#71717a]">
+          <p className="mt-1 truncate text-[12px] text-[#6b6b74]">
             {nama}
-            {kategori && <span className="text-zinc-400"> · {kategori}</span>}
+            {kategori && <span className="text-[#6b6b74]"> · {kategori}</span>}
           </p>
         </div>
         <StatusTag

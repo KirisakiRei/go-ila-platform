@@ -49,3 +49,24 @@ tmp_patch*.py
 
 # Override compose untuk pengembangan lokal (bukan produksi)
 deploy/docker-compose.override.yml
+
+# Skill Impeccable — dipasang lokal, bukan bagian dari repo
+frontend/.claude/
+.agent/
+.agents/
+.codex/
+.gemini/
+.kiro/
+.opencode/
+.qoder/
+.cursor/
+.devin/
+.dsh/
+.grok/
+.hermes/
+.pi/
+.rovodev/
+.trae/
+.trae-cn/
+.vibe/
+.veto/

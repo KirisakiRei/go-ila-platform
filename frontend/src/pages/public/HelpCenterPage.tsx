@@ -192,12 +192,9 @@ function HelpHubPage() {
       <div className="mx-auto w-full max-w-6xl px-4 pt-10 pb-16 sm:px-6 sm:pt-14 sm:pb-20">
         <div className="grid gap-10 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#71717a]">
-              Pusat Bantuan
-            </p>
-            <h1 className="mt-4 text-[2rem] font-semibold leading-[1.08] tracking-tight sm:text-[2.9rem]">
+            <h1 className="text-[2rem] font-semibold leading-[1.08] tracking-tight sm:text-[2.9rem]">
               Jawaban yang bisa
-              <span className="block text-[#a1a1aa]">Anda temukan sendiri.</span>
+              <span className="block text-[#6b6b74]">Anda temukan sendiri.</span>
             </h1>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-[#52525b]">
               Kami menyusun penjelasan untuk pertanyaan yang paling sering muncul, dari
@@ -212,7 +209,7 @@ function HelpHubPage() {
             </label>
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a1a1aa]"
+                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b6b74]"
                 aria-hidden="true"
               />
               <input
@@ -221,7 +218,7 @@ function HelpHubPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Cari topik, misalnya jam atau broker"
-                className="w-full rounded-xl border border-zinc-300 bg-white py-3 pl-10 pr-4 text-[14px] text-[#09090b] outline-none transition-colors placeholder:text-[#a1a1aa] focus:border-[#09090b]"
+                className="w-full rounded-xl border border-zinc-300 bg-white py-3 pl-10 pr-4 text-[14px] text-[#09090b] outline-none transition-colors placeholder:text-[#6b6b74] focus:border-[#09090b]"
               />
             </div>
           </div>
@@ -278,7 +275,7 @@ function TopicGrid({ query }: { query: string }) {
         <h2 id="topik-bantuan" className="text-[13px] font-semibold uppercase tracking-[0.16em]">
           Topik panduan
         </h2>
-        <p className="text-[12px] text-[#71717a] tabular">
+        <p className="text-[12px] text-[#6b6b74] tabular">
           {filtered.length + (showTimezone ? 1 : 0)} topik
         </p>
       </div>
@@ -296,10 +293,8 @@ function TopicGrid({ query }: { query: string }) {
               className="group flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400"
             >
               <div>
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f4f4f5] text-[#3f3f46]">
-                  <Clock className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <h3 className="mt-3 text-[14px] font-semibold tracking-tight">
+                <Clock className="h-4 w-4 text-[#3f3f46]" aria-hidden="true" />
+                <h3 className="mt-2 text-[14px] font-semibold tracking-tight">
                   Sesi pasar &amp; zona waktu
                 </h3>
                 <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#52525b]">
@@ -325,10 +320,8 @@ function TopicGrid({ query }: { query: string }) {
                 className="group flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400"
               >
                 <div>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f4f4f5] text-[#3f3f46]">
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-3 text-[14px] font-semibold tracking-tight">{topic.title}</h3>
+                  <Icon className="h-4 w-4 text-[#3f3f46]" aria-hidden="true" />
+                  <h3 className="mt-2 text-[14px] font-semibold tracking-tight">{topic.title}</h3>
                   <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#52525b]">
                     {topic.summary}
                   </p>
@@ -413,7 +406,7 @@ function FaqSection({ query }: { query: string }) {
       <div className="mt-5 space-y-8">
         {grouped.map(([category, items]) => (
           <div key={category}>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#71717a]">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6b74]">
               {category}
             </h3>
             <div className="mt-3 divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white">
@@ -425,7 +418,7 @@ function FaqSection({ query }: { query: string }) {
                     </span>
                     <span
                       aria-hidden="true"
-                      className="mt-0.5 shrink-0 text-[16px] leading-none text-[#a1a1aa] transition-transform group-open:rotate-45"
+                      className="mt-0.5 shrink-0 text-[16px] leading-none text-[#6b6b74] transition-transform group-open:rotate-45"
                     >
                       +
                     </span>
@@ -472,7 +465,7 @@ function HelpTopicPage({ slug }: { slug: string }) {
   return (
     <div className="bg-[#f5f5f7] text-[#09090b]">
       <div className="mx-auto w-full max-w-6xl px-4 pt-10 pb-20 sm:px-6 sm:pt-14 sm:pb-24">
-        <nav aria-label="Jejak navigasi" className="text-[12px] text-[#71717a]">
+        <nav aria-label="Jejak navigasi" className="text-[12px] text-[#6b6b74]">
           <ol className="flex flex-wrap items-center gap-1.5">
             <li>
               <Link to="/" className="transition-colors hover:text-[#09090b]">
@@ -495,7 +488,7 @@ function HelpTopicPage({ slug }: { slug: string }) {
             <div className="sticky top-24 space-y-8">
               {outline.length > 0 && (
                 <nav aria-label="Daftar isi panduan">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b6b74]">
                     Daftar isi
                   </p>
                   <ul className="mt-4 space-y-0.5 border-l border-zinc-300/80">
@@ -508,7 +501,7 @@ function HelpTopicPage({ slug }: { slug: string }) {
                             '-ml-px block border-l-2 py-1.5 pl-3.5 text-[13px] leading-snug transition-colors',
                             item.id === activeId
                               ? 'border-[#09090b] font-medium text-[#09090b]'
-                              : 'border-transparent text-[#71717a] hover:border-zinc-400 hover:text-[#3f3f46]',
+                              : 'border-transparent text-[#6b6b74] hover:border-zinc-400 hover:text-[#3f3f46]',
                           )}
                         >
                           {item.label}
@@ -520,14 +513,14 @@ function HelpTopicPage({ slug }: { slug: string }) {
               )}
 
               <nav aria-label="Topik bantuan lain">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b6b74]">
                   Panduan lain
                 </p>
                 <ul className="mt-4 space-y-1">
                   <li>
                     <Link
                       to="/bantuan/zona-waktu"
-                      className="block rounded-md px-2 py-1.5 text-[13px] text-[#71717a] transition-colors hover:bg-white hover:text-[#09090b]"
+                      className="block rounded-md px-2 py-1.5 text-[13px] text-[#6b6b74] transition-colors hover:bg-white hover:text-[#09090b]"
                     >
                       Sesi pasar &amp; zona waktu
                     </Link>
@@ -541,7 +534,7 @@ function HelpTopicPage({ slug }: { slug: string }) {
                           'block rounded-md px-2 py-1.5 text-[13px] transition-colors',
                           item.slug === slug
                             ? 'bg-white font-medium text-[#09090b]'
-                            : 'text-[#71717a] hover:bg-white hover:text-[#09090b]',
+                            : 'text-[#6b6b74] hover:bg-white hover:text-[#09090b]',
                         )}
                       >
                         {item.title}
@@ -556,7 +549,7 @@ function HelpTopicPage({ slug }: { slug: string }) {
           <div className="lg:col-span-9">
             <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-8 sm:px-10 sm:py-10">
               <header className="border-b border-zinc-200 pb-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b6b74]">
                   Pusat Bantuan
                 </p>
                 <h1 className="mt-2 text-[26px] font-semibold leading-tight tracking-tight sm:text-[32px]">
@@ -619,7 +612,7 @@ function HelpUnknownTopic({ title }: { title?: string }) {
   return (
     <div className="bg-[#f5f5f7] text-[#09090b]">
       <div className="mx-auto w-full max-w-3xl px-4 py-20 text-center sm:px-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#71717a]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6b6b74]">
           Pusat Bantuan
         </p>
         <h1 className="mt-3 text-[26px] font-semibold tracking-tight">

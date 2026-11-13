@@ -236,8 +236,8 @@ export default function PricingPage() {
                     <p
                       className={
                         highlight
-                          ? 'mt-1.5 text-[11px] uppercase tracking-[0.1em] text-zinc-500'
-                          : 'mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#a1a1aa]'
+                          ? 'mt-1.5 text-[11px] uppercase tracking-[0.1em] text-zinc-400'
+                          : 'mt-1.5 text-[11px] uppercase tracking-[0.1em] text-[#6b6b74]'
                       }
                     >
                       {plan.price_idr === 0 ? 'Selamanya' : 'Per bulan'}
@@ -264,8 +264,8 @@ export default function PricingPage() {
                       <li
                         className={
                           highlight
-                            ? 'flex items-start gap-2 text-[12px] text-zinc-500'
-                            : 'flex items-start gap-2 text-[12px] text-[#a1a1aa]'
+                            ? 'flex items-start gap-2 text-[12px] text-zinc-400'
+                            : 'flex items-start gap-2 text-[12px] text-[#6b6b74]'
                         }
                       >
                         <Minus className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -322,7 +322,7 @@ export default function PricingPage() {
                         className="border-b border-zinc-200 px-5 py-3.5 text-[13px] font-semibold text-[#09090b]"
                       >
                         {plan.name}
-                        <span className="tabular mt-0.5 block text-[11px] font-normal text-[#71717a]">
+                        <span className="tabular mt-0.5 block text-[11px] font-normal text-[#6b6b74]">
                           {plan.price_idr === 0 ? 'Gratis' : formatIDR(plan.price_idr)}
                         </span>
                       </th>
@@ -351,7 +351,7 @@ export default function PricingPage() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-[12px] text-[#71717a]">
+            <p className="mt-3 text-[12px] text-[#6b6b74]">
               Trial 7 hari menyertakan fitur setara paket tertinggi dalam mode demo.
             </p>
           </div>
@@ -368,7 +368,7 @@ export default function PricingPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#09090b]">
               {noteSection?.title || 'Disclaimer risiko'}
             </p>
-            <p className="mt-2 max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-[#52525b]">
+            <p className="mt-2 max-w-[62ch] whitespace-pre-line text-[13px] leading-relaxed text-[#52525b]">
               {noteSection?.body ||
                 'Langganan memberi Anda akses ke alat bantu analisis dan eksekusi, bukan jaminan hasil. Hasil trading bergantung pada kondisi pasar dan keputusan Anda sendiri; modal dapat berkurang sebagian atau seluruhnya.'}{' '}
               <a

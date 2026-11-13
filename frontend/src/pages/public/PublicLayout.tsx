@@ -379,7 +379,7 @@ export function PublicLayout() {
             />
             <div>
               <p className="text-base font-bold tracking-tight text-[#09090b]">Imaginary Liquidity</p>
-              <p className="text-xs text-zinc-500">Analisis Likuiditas &amp; Eksekusi Trading Presisi</p>
+              <p className="text-[12.5px] text-[#6b6b74]">Analisis Likuiditas &amp; Eksekusi Trading Presisi</p>
             </div>
           </div>
 

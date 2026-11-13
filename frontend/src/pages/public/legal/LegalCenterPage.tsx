@@ -62,7 +62,7 @@ export default function LegalCenterPage() {
 /** Breadcrumb dipakai hub dan dokumen agar posisi pengguna selalu jelas. */
 function Breadcrumb({ current }: { current?: string }) {
   return (
-    <nav aria-label="Jejak navigasi" className="text-[12px] text-[#71717a]">
+    <nav aria-label="Jejak navigasi" className="text-[12px] text-[#6b6b74]">
       <ol className="flex flex-wrap items-center gap-1.5">
         <li>
           <Link to="/" className="transition-colors hover:text-[#09090b]">
@@ -147,10 +147,7 @@ function LegalHubPage() {
         <Breadcrumb />
 
         <header className="mt-8 max-w-2xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#71717a]">
-            {page.data?.eyebrow || 'Legal Center'}
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold leading-[1.1] tracking-tight sm:text-[2.6rem]">
+          <h1 className="text-3xl font-semibold leading-[1.1] tracking-tight sm:text-[2.6rem]">
             {page.data?.title || 'Ketentuan yang berlaku, ditulis untuk dibaca.'}
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-[#52525b]">
@@ -190,20 +187,26 @@ function LegalHubPage() {
                     >
                       <div>
                         <div className="flex items-start justify-between gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-[#f4f4f5] text-[#3f3f46]">
+                          <span className="flex items-start gap-2">
                             {doc.slug === 'risk' ? (
-                              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                              <ShieldAlert
+                                className="h-4 w-4 shrink-0 text-[#3f3f46]"
+                                aria-hidden="true"
+                              />
                             ) : (
-                              <FileText className="h-4 w-4" aria-hidden="true" />
+                              <FileText
+                                className="h-4 w-4 shrink-0 text-[#3f3f46]"
+                                aria-hidden="true"
+                              />
+                            )}
+                            {doc.featured && (
+                              <span className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.1em] text-[#52525b]">
+                                Utama
+                              </span>
                             )}
                           </span>
-                          {doc.featured && (
-                            <span className="rounded-full border border-zinc-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#52525b]">
-                              Utama
-                            </span>
-                          )}
                         </div>
-                        <h3 className="mt-4 text-[16px] font-semibold tracking-tight">
+                        <h3 className="mt-2 text-[16px] font-semibold tracking-tight">
                           {titleBySlug.get(`/legal/${doc.slug}`) ?? doc.title}
                         </h3>
                         <p className="mt-2 text-[13px] leading-relaxed text-[#52525b]">
@@ -311,7 +314,7 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
                       'relative whitespace-nowrap px-3 py-2.5 text-[13px] transition-colors',
                       isActive
                         ? 'font-semibold text-[#09090b]'
-                        : 'text-[#71717a] hover:text-[#09090b]',
+                        : 'text-[#6b6b74] hover:text-[#09090b]',
                     )}
                   >
                     {doc.title}
@@ -335,7 +338,7 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
           {/* Daftar isi: menempel di kiri pada layar lebar. */}
           <aside className="hidden lg:col-span-3 lg:block">
             <div className="sticky top-40">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b6b74]">
                 Daftar isi
               </p>
               <nav aria-label="Daftar isi dokumen" className="mt-4">
@@ -351,7 +354,7 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
                             '-ml-px block border-l-2 py-1.5 pl-3.5 text-[13px] leading-snug transition-colors',
                             isActive
                               ? 'border-[#09090b] font-medium text-[#09090b]'
-                              : 'border-transparent text-[#71717a] hover:border-zinc-400 hover:text-[#3f3f46]',
+                              : 'border-transparent text-[#6b6b74] hover:border-zinc-400 hover:text-[#3f3f46]',
                           )}
                         >
                           {item.label}
@@ -374,7 +377,7 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
                 <p className="mt-3 text-[13px] leading-relaxed text-[#52525b]">
                   {fallback.summary}
                 </p>
-                <dl className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-[#71717a]">
+                <dl className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-[#6b6b74]">
                   <div className="flex items-center gap-1.5">
                     <dt className="font-medium text-[#3f3f46]">Versi</dt>
                     <dd className="tabular">{version ?? 1}</dd>

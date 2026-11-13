@@ -32,7 +32,7 @@ export function MarkdownView({ source, className }: { source: string; className?
   const blocks = parseMarkdown(source)
 
   return (
-    <div className={cn('text-[15px] leading-[1.8] text-[#3f3f46]', className)}>
+    <div className={cn('max-w-[56ch] text-[15px] leading-[1.8] text-[#3f3f46]', className)}>
       {blocks.map((block, index) => {
         const key = `blok-${index}`
 
