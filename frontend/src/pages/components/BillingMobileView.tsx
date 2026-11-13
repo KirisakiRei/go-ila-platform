@@ -113,7 +113,7 @@ export function BillingMobileView({
           </button>
           <div className="min-w-0">
             <h1 className="text-lg font-bold tracking-tight text-foreground">Riwayat Tagihan</h1>
-            <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
               Daftar seluruh riwayat pembayaran paket dan langganan resmi Anda.
             </p>
           </div>
@@ -136,7 +136,7 @@ export function BillingMobileView({
               <span>{item.label}</span>
               <span
                 className={cn(
-                  'rounded-full px-1.5 text-[9.5px]',
+                  'rounded-full px-1.5 text-micro',
                   filter === item.key
                     ? 'bg-background/20 text-background'
                     : 'bg-secondary text-muted-foreground',
@@ -174,13 +174,13 @@ export function BillingMobileView({
                     <p className="truncate font-mono text-[13px] font-bold tracking-tight text-foreground">
                       {row.number}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-micro text-muted-foreground">
                       {formatInvoice(row.created_at?.wib)} WIB
                     </p>
                   </div>
                   <span
                     className={cn(
-                      'shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                      'shrink-0 rounded-lg border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
                       STATUS_STYLE[row.status] ?? 'border-border bg-secondary text-muted-foreground',
                     )}
                   >
@@ -190,14 +190,14 @@ export function BillingMobileView({
 
                 <div className="mt-3 flex items-end justify-between gap-2 border-t border-border/70 pt-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[11.5px] font-medium text-muted-foreground">
+                    <p className="truncate text-caption font-medium text-muted-foreground">
                       Paket {TIER_LABEL[row.plan_code] ?? row.plan_code.toUpperCase()}
                     </p>
                     <p className="text-[15px] font-bold tabular-nums text-foreground">
                       {formatIDR(row.total_idr)}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                  <span className="shrink-0 text-micro font-semibold text-muted-foreground">
                     {row.status === 'pending' ? 'Menunggu pembayaran' : STATUS_LABEL[row.status] ?? row.status}
                   </span>
                 </div>
@@ -219,7 +219,7 @@ export function BillingMobileView({
       {/* Header halaman */}
       <div>
         <h1 className="text-lg font-bold tracking-tight text-foreground">Langganan &amp; Tagihan</h1>
-        <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
+        <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
           Kelola paket aktif, bandingkan benefit, dan akses riwayat tagihan resmi.
         </p>
       </div>
@@ -231,16 +231,16 @@ export function BillingMobileView({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold tracking-tight text-foreground">{userName}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{userEmail}</p>
+          <p className="truncate text-micro text-muted-foreground">{userEmail}</p>
         </div>
-        <span className="shrink-0 rounded-lg border border-border bg-secondary px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground">
+        <span className="shrink-0 rounded-lg border border-border bg-secondary px-2.5 py-1 text-micro font-semibold uppercase tracking-wider text-foreground">
           {tierName}
         </span>
       </div>
 
       {/* Paket aktif saat ini */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <p className="text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Paket Aktif Saat Ini
         </p>
 
@@ -253,7 +253,7 @@ export function BillingMobileView({
           </div>
           <span
             className={cn(
-              'rounded-lg border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+              'rounded-lg border px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
               subscription
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                 : 'border-border bg-secondary text-muted-foreground',
@@ -263,7 +263,7 @@ export function BillingMobileView({
           </span>
         </div>
 
-        <p className="mt-1 text-[11.5px] text-muted-foreground">
+        <p className="mt-1 text-caption text-muted-foreground">
           {subscription
             ? `Berlaku hingga ${formatInvoice(subscription.period_end?.wib)} WIB`
             : 'Belum ada langganan berbayar yang aktif saat ini.'}
@@ -300,12 +300,12 @@ export function BillingMobileView({
             className="flex items-center justify-center gap-1 rounded-lg py-2 text-micro font-semibold text-muted-foreground"
           >
             Tahunan
-            <span className="rounded bg-secondary px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="rounded bg-secondary px-1 py-0.5 text-micro font-bold uppercase tracking-wide text-muted-foreground">
               -20%
             </span>
           </button>
         </div>
-        <p className="text-[10.5px] text-muted-foreground">
+        <p className="text-micro text-muted-foreground">
           Penagihan tahunan segera hadir — semua paket saat ini ditagihkan per 30 hari.
         </p>
       </div>
@@ -314,7 +314,7 @@ export function BillingMobileView({
       <div className="space-y-3">
         <div>
           <h2 className="text-sm font-bold tracking-tight text-foreground">Pilih Paket Langganan</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 text-micro text-muted-foreground">
             Harga sudah termasuk pajak sesuai ketentuan resmi.
           </p>
         </div>
@@ -345,17 +345,17 @@ export function BillingMobileView({
                     <div className="flex items-center gap-1.5">
                       <h3 className="text-sm font-bold tracking-tight text-foreground">{plan.name}</h3>
                       {isPopular && (
-                        <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-foreground">
+                        <span className="rounded bg-secondary px-1.5 py-0.5 text-micro font-bold uppercase tracking-wider text-foreground">
                           Paling Populer
                         </span>
                       )}
                       {isCurrent && (
-                        <span className="rounded bg-foreground px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-background">
+                        <span className="rounded bg-foreground px-1.5 py-0.5 text-micro font-bold uppercase tracking-wider text-background">
                           Paket Anda
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    <p className="mt-1 text-micro leading-relaxed text-muted-foreground">
                       {getPlanAudience(plan)}
                     </p>
                   </div>
@@ -365,12 +365,12 @@ export function BillingMobileView({
                   <span className="text-xl font-bold tracking-tight tabular-nums text-foreground">
                     {isFree ? 'Gratis' : formatIDR(plan.price_idr)}
                   </span>
-                  {!isFree && <span className="text-[11px] text-muted-foreground">/ 30 hari</span>}
+                  {!isFree && <span className="text-micro text-muted-foreground">/ 30 hari</span>}
                 </div>
 
                 <ul className="mt-3 space-y-1.5 border-t border-border/70 pt-3">
                   {benefits.map((benefit) => (
-                    <li key={benefit.label} className="flex items-start gap-2 text-[11.5px] text-foreground">
+                    <li key={benefit.label} className="flex items-start gap-2 text-caption text-foreground">
                       <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       <span className="leading-snug">{benefit.label}</span>
                     </li>
@@ -412,7 +412,7 @@ export function BillingMobileView({
           <button
             type="button"
             onClick={() => setView('invoices')}
-            className="flex items-center gap-0.5 text-[11px] font-semibold text-foreground"
+            className="flex items-center gap-0.5 text-micro font-semibold text-foreground"
           >
             Lihat Semua
             <ChevronRight className="h-3.5 w-3.5" />
@@ -426,7 +426,7 @@ export function BillingMobileView({
             ))}
           </div>
         ) : recentInvoices.length === 0 ? (
-          <p className="px-3.5 py-5 text-center text-[11.5px] text-muted-foreground">
+          <p className="px-3.5 py-5 text-center text-caption text-muted-foreground">
             Belum ada tagihan. Riwayat akan muncul setelah checkout pertama Anda.
           </p>
         ) : (
@@ -434,20 +434,20 @@ export function BillingMobileView({
             {recentInvoices.map((row) => (
               <div key={row.id} className="flex items-center justify-between gap-2 px-3.5 py-2.5">
                 <div className="min-w-0">
-                  <p className="truncate font-mono text-[11.5px] font-semibold text-foreground">
+                  <p className="truncate font-mono text-caption font-semibold text-foreground">
                     {row.number}
                   </p>
-                  <p className="text-[10.5px] text-muted-foreground">
+                  <p className="text-micro text-muted-foreground">
                     {formatInvoice(row.created_at?.wib)} WIB
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-[11.5px] font-semibold tabular-nums text-foreground">
+                  <span className="text-caption font-semibold tabular-nums text-foreground">
                     {formatIDR(row.total_idr)}
                   </span>
                   <span
                     className={cn(
-                      'rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+                      'rounded-md border px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide',
                       STATUS_STYLE[row.status] ?? 'border-border bg-secondary text-muted-foreground',
                     )}
                   >
@@ -468,10 +468,10 @@ export function BillingMobileView({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[12.5px] font-semibold text-foreground">Punya kode voucher?</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 text-micro leading-relaxed text-muted-foreground">
               Tukarkan kode kredit promosi untuk memotong total tagihan saat checkout.
             </p>
-            <Button size="sm" variant="outline" className="mt-2 gap-1 text-[11px] font-semibold" onClick={onOpenRedeem}>
+            <Button size="sm" variant="outline" className="mt-2 gap-1 text-micro font-semibold" onClick={onOpenRedeem}>
               <FileText className="h-3.5 w-3.5" />
               Tukar Kode Kredit
             </Button>

@@ -147,7 +147,7 @@ export function SignalsMobileView({
               </h2>
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               {activePair ? 'Analisis matriks & histori order' : 'Pemantauan multi-tier live'}
             </p>
           </div>
@@ -196,7 +196,7 @@ export function SignalsMobileView({
             <span>Semua Pair</span>
             <span
               className={cn(
-                'ml-0.5 rounded-full px-1.5 py-0.2 text-[9px]',
+                'ml-0.5 rounded-full px-1.5 py-0.2 text-micro',
                 !activePair
                   ? 'bg-background/20 text-background'
                   : 'bg-secondary text-muted-foreground',
@@ -232,7 +232,7 @@ export function SignalsMobileView({
                 {pairSignalCount > 0 && (
                   <span
                     className={cn(
-                      'ml-0.5 rounded-full px-1.5 py-0.2 text-[9px]',
+                      'ml-0.5 rounded-full px-1.5 py-0.2 text-micro',
                       isPairActive
                         ? 'bg-background/20 text-background'
                         : 'bg-secondary text-muted-foreground',
@@ -253,21 +253,21 @@ export function SignalsMobileView({
           type="button"
           onClick={() => setActiveTab('all')}
           className={cn(
-            'flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] font-semibold transition-all',
+            'flex flex-col items-center justify-center rounded-lg py-1.5 text-micro font-semibold transition-all',
             activeTab === 'all'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
           <span>Semua</span>
-          <span className="text-[9.5px] font-normal opacity-70">({tabCounts.all})</span>
+          <span className="text-micro font-normal opacity-70">({tabCounts.all})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('ready')}
           className={cn(
-            'flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] font-semibold transition-all',
+            'flex flex-col items-center justify-center rounded-lg py-1.5 text-micro font-semibold transition-all',
             activeTab === 'ready'
               ? 'bg-card text-emerald-700 dark:text-emerald-400 shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
@@ -277,42 +277,42 @@ export function SignalsMobileView({
             <Zap className="h-3 w-3" />
             <span>Siap Entry</span>
           </span>
-          <span className="text-[9.5px] font-normal opacity-70">({tabCounts.ready})</span>
+          <span className="text-micro font-normal opacity-70">({tabCounts.ready})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('monitoring')}
           className={cn(
-            'flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] font-semibold transition-all',
+            'flex flex-col items-center justify-center rounded-lg py-1.5 text-micro font-semibold transition-all',
             activeTab === 'monitoring'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
           <span>Pantau HTF</span>
-          <span className="text-[9.5px] font-normal opacity-70">({tabCounts.monitoring})</span>
+          <span className="text-micro font-normal opacity-70">({tabCounts.monitoring})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('history')}
           className={cn(
-            'flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] font-semibold transition-all',
+            'flex flex-col items-center justify-center rounded-lg py-1.5 text-micro font-semibold transition-all',
             activeTab === 'history'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
           <span>Riwayat</span>
-          <span className="text-[9.5px] font-normal opacity-70">({tabCounts.history})</span>
+          <span className="text-micro font-normal opacity-70">({tabCounts.history})</span>
         </button>
       </div>
 
       {/* 4. Strategy Filter (jika user memiliki akses ILA 3.0) */}
       {adaIla3 && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs">
-          <span className="text-[11px] font-semibold text-muted-foreground">Metode:</span>
+          <span className="text-micro font-semibold text-muted-foreground">Metode:</span>
           <div className="flex items-center gap-1">
             {(['ila-2.0', 'ila-3.0'] as const).map((strat) => (
               <button
@@ -320,7 +320,7 @@ export function SignalsMobileView({
                 type="button"
                 onClick={() => onSelectStrategy(strat)}
                 className={cn(
-                  'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all',
+                  'rounded-lg px-2.5 py-1 text-micro font-semibold transition-all',
                   activeStrategyFilter === strat
                     ? 'bg-foreground text-background shadow-xs'
                     : 'bg-secondary text-muted-foreground hover:text-foreground',
@@ -351,7 +351,7 @@ export function SignalsMobileView({
               </span>
               <span>
                 <span className="block text-xs font-bold text-foreground">Chart Setup</span>
-                <span className="block text-[10.5px] text-muted-foreground">
+                <span className="block text-micro text-muted-foreground">
                   Lilin, sweep, FVG, dan level order {activePair}
                 </span>
               </span>
@@ -432,12 +432,12 @@ export function SignalsMobileView({
                           ltf={signal.ltf}
                         />
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <Badge variant="outline" className="text-[9.5px] px-1.5 py-0">
+                      <div className="flex items-center gap-1.5 text-micro text-muted-foreground">
+                        <Badge variant="outline" className="text-micro px-1.5 py-0">
                           {signal.strategy_version}
                         </Badge>
                         {isReady && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                          <span className="inline-flex items-center gap-0.5 text-micro font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
                             <Zap className="h-3 w-3" />
                             Prioritas
                           </span>
@@ -466,7 +466,7 @@ export function SignalsMobileView({
                       <span>{signal.direction}</span>
                     </div>
 
-                    <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[10px]">
+                    <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-micro">
                       {SIGNAL_LABEL[signal.status]}
                     </StatusPill>
                   </div>
@@ -475,7 +475,7 @@ export function SignalsMobileView({
                 {/* 4-Box Grid Metric: ENTRY | STOP LOSS | TAKE PROFIT | R:R */}
                 <div className="grid grid-cols-4 gap-1.5 rounded-xl border border-border/80 bg-secondary/40 p-2">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
                       Entry
                     </span>
                     <span className="font-mono text-xs font-bold tabular-nums text-foreground">
@@ -486,7 +486,7 @@ export function SignalsMobileView({
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
                       Stop Loss
                     </span>
                     <span className="font-mono text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-400">
@@ -495,7 +495,7 @@ export function SignalsMobileView({
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
                       Take Profit
                     </span>
                     <span className="font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -506,7 +506,7 @@ export function SignalsMobileView({
                   </div>
 
                   <div className="flex flex-col text-right">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-micro font-bold uppercase tracking-wider text-muted-foreground">
                       R:R
                     </span>
                     <span className="font-mono text-xs font-bold tabular-nums text-foreground">
@@ -519,18 +519,18 @@ export function SignalsMobileView({
 
                 {/* Summary / Confluence setup */}
                 {signal.summary && (
-                  <p className="text-[11.5px] leading-relaxed text-muted-foreground line-clamp-2">
+                  <p className="text-caption leading-relaxed text-muted-foreground line-clamp-2">
                     {signal.summary}
                   </p>
                 )}
 
                 {/* Footer Kartu: Waktu Terbit + Tombol Aksi Detail */}
-                <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+                <div className="flex items-center justify-between pt-1 text-micro text-muted-foreground">
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-3 w-3" />
                     <span>{formatDateTime(signal.published_at)}</span>
                     {signal.delayed && (
-                      <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-[9.5px] font-bold text-amber-700 dark:text-amber-400">
+                      <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-micro font-bold text-amber-700 dark:text-amber-400">
                         Delayed
                       </span>
                     )}
@@ -561,11 +561,11 @@ export function SignalsMobileView({
               <h3 className="text-sm font-bold tracking-tight text-foreground">
                 Radar Timeframe ({activePair})
               </h3>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-micro text-muted-foreground">
                 Pemantauan konfluensi multi-tier HTF / LTF
               </p>
             </div>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-micro">
               {filteredPositions.length} Eksekusi
             </Badge>
           </div>
@@ -600,17 +600,17 @@ export function SignalsMobileView({
                         </span>
                         <span
                           className={cn(
-                            'font-bold text-[10px]',
+                            'font-bold text-micro',
                             pos.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
                           )}
                         >
                           {pos.direction}
                         </span>
-                        <Badge variant="outline" className="text-[9px] px-1">
+                        <Badge variant="outline" className="text-micro px-1">
                           {pos.lot_size} Lot
                         </Badge>
                       </div>
-                      <p className="text-[10.5px] text-muted-foreground">
+                      <p className="text-micro text-muted-foreground">
                         {formatDateTime(pos.opened_at)}
                       </p>
                     </div>
@@ -618,14 +618,14 @@ export function SignalsMobileView({
                     <div className="text-right">
                       <Badge
                         variant={pos.status.startsWith('CLOSED_TP') ? 'solid' : 'outline'}
-                        className="text-[9.5px]"
+                        className="text-micro"
                       >
                         {pos.status}
                       </Badge>
                       {pos.pnl_known && (
                         <p
                           className={cn(
-                            'font-mono text-[11px] font-bold tabular-nums',
+                            'font-mono text-micro font-bold tabular-nums',
                             pos.profit_loss >= 0 ? 'text-emerald-600' : 'text-rose-600',
                           )}
                         >
@@ -645,7 +645,7 @@ export function SignalsMobileView({
               <h4 className="text-xs font-bold text-foreground">
                 Pengaturan Akun ({activePair})
               </h4>
-              <p className="text-[10.5px] text-muted-foreground">
+              <p className="text-micro text-muted-foreground">
                 Aktifkan metode dan timeframe untuk eksekusi otomatis.
               </p>
             </div>
