@@ -34,6 +34,42 @@ function normTF(s: string): string {
   return (s || '').toUpperCase().replace(/[\s\-_]+/g, '')
 }
 
+/**
+ * kanonTF menyamakan penulisan timeframe yang berbeda antar sumber.
+ *
+ * Engine dan pengaturan akun menulis `1H`/`4H`, sedangkan slot radar memakai
+ * `H1`/`H4`. Tanpa penyamaan ini, saklar yang menyala tidak pernah cocok dengan
+ * slotnya sehingga radar yang sebenarnya berjalan tampil sebagai "tidak
+ * dipantau" — persis jenis kesalahan yang paling menyesatkan bagi pengguna.
+ */
+function kanonTF(s: string): string {
+  const n = normTF(s)
+  switch (n) {
+    case 'D':
+    case 'D1':
+    case '1D':
+      return 'D'
+    case 'W':
+    case 'W1':
+    case '1W':
+      return 'W'
+    case '4H':
+    case 'H4':
+      return 'H4'
+    case '1H':
+    case 'H1':
+      return 'H1'
+    case '15M':
+    case 'M15':
+      return 'M15'
+    case '5M':
+    case 'M5':
+      return 'M5'
+    default:
+      return n
+  }
+}
+
 function matchTF(a: string, b: string): boolean {
   const na = normTF(a)
   const nb = normTF(b)
@@ -262,7 +298,7 @@ export function setTimeframeDipantau(
   for (const account of group.accounts) {
     for (const pair of account.pairs) {
       if (!pair.watch) continue
-      aktif.add(`${normTF(pair.htf)}|${normTF(pair.ltf)}`)
+      aktif.add(`${kanonTF(pair.htf)}|${kanonTF(pair.ltf)}`)
     }
   }
   return aktif
@@ -279,7 +315,7 @@ export function timeframeSlotDipantau(
   slot: { htf: string; ltf: string },
 ): boolean {
   if (aktif === null) return true
-  return aktif.has(`${normTF(slot.htf)}|${normTF(slot.ltf)}`)
+  return aktif.has(`${kanonTF(slot.htf)}|${kanonTF(slot.ltf)}`)
 }
 
 /**

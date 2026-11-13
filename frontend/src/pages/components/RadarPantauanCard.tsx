@@ -23,6 +23,12 @@ import { cn } from '@/lib/utils'
 import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 
+/** waktuSinyal mengubah tanggal sinyal menjadi angka untuk pengurutan. */
+function waktuSinyal(s: { published_at: string }): number {
+  const t = new Date(s.published_at).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
 export function RadarPantauanCard() {
   const navigate = useNavigate()
   const { data: subscriptions, isLoading: loadingSubs } = useSubscriptions()
@@ -41,11 +47,17 @@ export function RadarPantauanCard() {
     return list.sort()
   }, [subscriptions])
 
-  // Pasangkan tiap simbol pantauan dengan sinyal terakhirnya
+  // Pasangkan tiap simbol pantauan dengan sinyal yang paling mewakili keadaannya.
   const items = useMemo(() => {
     return monitoredSymbols.map((sym) => {
-      const latest = (signals ?? []).find((s) => s.symbol.toUpperCase() === sym) ?? null
-      return { symbol: sym, signal: latest }
+      const milikSimbol = (signals ?? []).filter((s) => s.symbol.toUpperCase() === sym)
+      // Sinyal siap eksekusi lebih penting ditampilkan daripada status menunggu:
+      // itulah yang perlu ditindaklanjuti pengguna.
+      const siap = milikSimbol
+        .filter((s) => s.status === 'READY_TO_ENTRY' || s.status === 'OPPORTUNITY')
+        .sort((a, b) => waktuSinyal(b) - waktuSinyal(a))
+      const terbaru = [...milikSimbol].sort((a, b) => waktuSinyal(b) - waktuSinyal(a))
+      return { symbol: sym, signal: siap[0] ?? terbaru[0] ?? null }
     })
   }, [monitoredSymbols, signals])
 

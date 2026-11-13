@@ -146,6 +146,26 @@ describe('setTimeframeDipantau', () => {
     const aktif = setTimeframeDipantau(matriks({ 'D1|H1': true }), 'ila-2.0')
     expect(timeframeSlotDipantau(aktif, { htf: 'D1', ltf: 'H1' })).toBe(true)
   })
+
+  it('mengenali 1H/4H dari server sebagai H1/H4 milik slot', () => {
+    // Regresi produksi: engine dan pengaturan akun menulis `1H`/`4H`, sedangkan
+    // slot radar memakai `H1`/`H4`. Tanpa penyamaan, saklar yang MENYALA tidak
+    // pernah cocok dengan slotnya sehingga radar yang berjalan tampil sebagai
+    // "tidak dipantau" — kebalikan dari kenyataan.
+    const aktif = setTimeframeDipantau(
+      matriks({ '1H|5M': true, '4H|15M': true }),
+      'ila-2.0',
+    )
+    expect(timeframeSlotDipantau(aktif, { htf: 'H1', ltf: 'M5' })).toBe(true)
+    expect(timeframeSlotDipantau(aktif, { htf: 'H4', ltf: 'M15' })).toBe(true)
+  })
+
+  it('saklar yang menyala tidak pernah membuat semuaTimeframeMati', () => {
+    // Kesalahan paling fatal: radar yang sedang berjalan dilaporkan "tidak ada
+    // yang dipantau" hanya karena format timeframenya berbeda.
+    const aktif = setTimeframeDipantau(matriks({ '1H|5M': true }), 'ila-2.0')
+    expect(semuaTimeframeMati(aktif)).toBe(false)
+  })
 })
 
 describe('ringkasanSlot', () => {

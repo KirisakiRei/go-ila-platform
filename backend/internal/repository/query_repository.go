@@ -16,6 +16,10 @@ import (
 // UserSignalLister membaca sinyal pada simbol yang dipantau user.
 type UserSignalLister interface {
 	ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error)
+	// ListRadarForUser membaca baris radar (identitas `status-*`) terpisah dari
+	// riwayat. Dipisah karena radar punya siklus hidup berbeda: jumlahnya tetap
+	// sebanyak slot, dan `published_at`-nya tidak pernah berubah.
+	ListRadarForUser(ctx context.Context, userID string, batas int) ([]model.Signal, error)
 }
 
 // UserPositionLister membaca posisi user.
@@ -70,7 +74,13 @@ func (r *signalRepository) ListKnownTimeframes(ctx context.Context) (map[string]
 	return out, nil
 }
 
-// ListForUser mengembalikan sinyal pada simbol yang dipantau user.
+// ListForUser mengembalikan sinyal riwayat pada simbol yang dipantau user.
+//
+// Baris radar (identitas `status-*`) SENGAJA tidak diambil di sini. Baris itu
+// memakai ID tetap per slot sehingga jumlahnya bertambah seiring jumlah slot,
+// dan dulu ikut memakan jatah `limit`. Ketika jumlah slot melebihi limit,
+// seluruh jatah habis oleh radar dan riwayat tidak pernah terkirim sama sekali.
+// Radar kini punya jalannya sendiri lewat ListRadarForUser.
 func (r *signalRepository) ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error) {
 	var signals []model.Signal
 
@@ -87,15 +97,36 @@ func (r *signalRepository) ListForUser(ctx context.Context, userID string, since
 		// DISTINCT tidak lagi dibutuhkan.
 		Where("EXISTS (SELECT 1 FROM subscription s WHERE s.symbol = signal.symbol AND s.user_id = ? AND s.is_active = ?)", userID, true).
 		Where("signal.published_at >= ?", since).
-		// Baris radar (identitas tetap `status-*`) selalu diurutkan lebih dulu.
-		// Tanpa ini, `published_at`-nya yang lama membuat baris radar terpotong
-		// oleh limit ketika riwayat sinyal sudah menumpuk, sehingga matriks
-		// timeframe tampak kosong padahal radar masih bergerak.
-		Order("CASE WHEN signal.signal_id LIKE 'status-%' THEN 0 ELSE 1 END, signal.published_at DESC").
+		Where("signal.signal_id NOT LIKE ?", "status-%").
+		Order("signal.published_at DESC").
 		Limit(limit).
 		Find(&signals).Error
 	if err != nil {
 		return nil, fmt.Errorf("membaca sinyal user: %w", err)
+	}
+	return signals, nil
+}
+
+// ListRadarForUser mengembalikan baris radar terkini untuk simbol yang dipantau user.
+//
+// Baris radar memakai identitas tetap per slot dan `published_at`-nya beku sejak
+// slot lahir, sedangkan `updated_at` berubah setiap kali engine mengirim kemajuan
+// baru. Pengurutan karena itu memakai `updated_at`: dengan `published_at`, slot
+// paling basi justru terurut paling atas dan radar terbaca tidak bergerak.
+//
+// `batas` membatasi jumlah baris agar respons tetap wajar bila jumlah slot tumbuh.
+func (r *signalRepository) ListRadarForUser(ctx context.Context, userID string, batas int) ([]model.Signal, error) {
+	var signals []model.Signal
+
+	err := r.db.WithContext(ctx).
+		Model(&model.Signal{}).
+		Where("EXISTS (SELECT 1 FROM subscription s WHERE s.symbol = signal.symbol AND s.user_id = ? AND s.is_active = ?)", userID, true).
+		Where("signal.signal_id LIKE ?", "status-%").
+		Order("COALESCE(signal.updated_at, signal.published_at) DESC").
+		Limit(batas).
+		Find(&signals).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca radar user: %w", err)
 	}
 	return signals, nil
 }

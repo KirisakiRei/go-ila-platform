@@ -11,10 +11,15 @@ import (
 
 type fakeSignalLister struct {
 	signals []model.Signal
+	radar   []model.Signal
 }
 
 func (f *fakeSignalLister) ListForUser(_ context.Context, _ string, _ time.Time, _ int) ([]model.Signal, error) {
 	return f.signals, nil
+}
+
+func (f *fakeSignalLister) ListRadarForUser(_ context.Context, _ string, _ int) ([]model.Signal, error) {
+	return f.radar, nil
 }
 
 type fakePositionLister struct {
@@ -74,6 +79,97 @@ func newTradingServiceFor(t *testing.T, user *model.User, signals []model.Signal
 	)
 	svc.clock = func() time.Time { return now }
 	return svc
+}
+
+// newTradingServiceRadar menyusun service dengan baris radar terpisah dari riwayat,
+// meniru dua jalur baca yang sekarang dipakai produksi.
+func newTradingServiceRadar(t *testing.T, user *model.User, riwayat, radar []model.Signal, now time.Time) TradingService {
+	t.Helper()
+
+	users := newFakeUserRepo()
+	users.users[user.Email] = user
+
+	svc := NewTradingService(
+		users,
+		&fakeSignalLister{signals: riwayat, radar: radar},
+		&fakePositionLister{},
+		&fakeUserSignalReader{status: map[string]*model.UserSignal{}},
+	)
+	svc.clock = func() time.Time { return now }
+	return svc
+}
+
+// TestRadarTampilWalauRiwayatPenuh mengunci bug produksi: baris radar memakai ID
+// tetap per slot, dan dulu ikut memakan jatah limit sehingga riwayat tidak pernah
+// terkirim. Setelah dipisah, keduanya harus tetap tampil.
+func TestRadarTampilWalauRiwayatPenuh(t *testing.T) {
+	now := time.Date(2026, 11, 13, 8, 0, 0, 0, time.UTC)
+
+	sig := newSignal("sig-1", now.Add(-5*time.Minute), now.Add(30*time.Minute))
+
+	// Nilai waktu berbeda agar tidak tertukar dengan published_at slot lama.
+	radar := newSignal("status-XAUUSD-H4-M15", now.Add(-96*time.Hour), now.Add(time.Hour))
+	radar.Status = model.SignalStatusWaitHTFSweep
+	radar.UpdatedAt = now.Add(-2 * time.Minute)
+
+	svc := newTradingServiceRadar(t, newTestUser("basic"), []model.Signal{sig}, []model.Signal{radar}, now)
+
+	list, err := svc.Signals(context.Background(), userIDTest, 0)
+	if err != nil {
+		t.Fatalf("signals: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("radar dan riwayat harus sama-sama tampil, dapat %d baris", len(list))
+	}
+	// Radar tetap di depan supaya urutan yang dikenal frontend tidak berubah.
+	if list[0].SignalID != radar.SignalID {
+		t.Fatalf("baris radar harus di urutan pertama, dapat %q", list[0].SignalID)
+	}
+}
+
+// TestRadarPakaiWaktuUpdate memastikan tanggal radar yang ditampilkan adalah waktu
+// gerak terakhirnya, bukan tanggal slot itu pertama kali dibuat.
+func TestRadarPakaiWaktuUpdate(t *testing.T) {
+	now := time.Date(2026, 11, 13, 8, 0, 0, 0, time.UTC)
+
+	radar := newSignal("status-XAUUSD-H4-M15", now.Add(-96*time.Hour), now.Add(time.Hour))
+	radar.Status = model.SignalStatusWaitHTFSweep
+	radar.UpdatedAt = now.Add(-2 * time.Minute)
+
+	svc := newTradingServiceRadar(t, newTestUser("basic"), nil, []model.Signal{radar}, now)
+
+	list, err := svc.Signals(context.Background(), userIDTest, 0)
+	if err != nil {
+		t.Fatalf("signals: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("harus ada satu baris radar, dapat %d", len(list))
+	}
+	if !list[0].PublishedAt.Equal(radar.UpdatedAt) {
+		t.Fatalf("waktu radar harus mengikuti updated_at, dapat %v", list[0].PublishedAt)
+	}
+}
+
+// TestSinyalBiasaTetapPakaiWaktuTerbit memastikan sinyal sungguhan tidak ikut
+// memakai updated_at, karena untuk sinyal biasa waktu terbitnya yang bermakna.
+func TestSinyalBiasaTetapPakaiWaktuTerbit(t *testing.T) {
+	now := time.Date(2026, 11, 13, 8, 0, 0, 0, time.UTC)
+
+	sig := newSignal("sig-1", now.Add(-5*time.Minute), now.Add(30*time.Minute))
+	sig.UpdatedAt = now.Add(-time.Minute)
+
+	svc := newTradingServiceRadar(t, newTestUser("basic"), []model.Signal{sig}, nil, now)
+
+	list, err := svc.Signals(context.Background(), userIDTest, 0)
+	if err != nil {
+		t.Fatalf("signals: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("harus ada satu sinyal, dapat %d", len(list))
+	}
+	if !list[0].PublishedAt.Equal(sig.PublishedAt) {
+		t.Fatalf("sinyal biasa harus memakai published_at, dapat %v", list[0].PublishedAt)
+	}
 }
 
 // TestFreeDelayMenahanSinyalBaru memastikan sinyal belum terlihat sebelum 15 menit.

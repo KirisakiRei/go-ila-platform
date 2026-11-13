@@ -107,6 +107,9 @@ type SignalRepository interface {
 	FindBySignalID(ctx context.Context, signalID string) (*model.Signal, error)
 	UpdateStatus(ctx context.Context, signalID, status, reason string) error
 	ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error)
+	// ListRadarForUser membaca baris radar terpisah dari riwayat supaya keduanya
+	// tidak saling memakan jatah limit.
+	ListRadarForUser(ctx context.Context, userID string, batas int) ([]model.Signal, error)
 	// ListKnownTimeframes mengembalikan pasangan timeframe yang pernah benar-benar
 	// terlihat pada sinyal, dikelompokkan per metode analisis.
 	//

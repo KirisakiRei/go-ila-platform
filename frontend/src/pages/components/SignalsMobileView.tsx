@@ -87,7 +87,12 @@ export function SignalsMobileView({
         s.status === 'READY_TO_ENTRY' ||
         s.status === 'OPPORTUNITY' ||
         s.status.toUpperCase().includes('READY')
-      const isFinalStatus = isFinal(s.status)
+      // Baris radar (status `WAIT_*`) tidak pernah dihitung sebagai riwayat,
+      // sekalipun namanya tidak diawali `WAIT_` persis (mis. WAIT_ILA3_LTF_CISD_1).
+      // Tanpa pengecualian ini, slot yang masih memantau bisa muncul di tab
+      // Riwayat dan terbaca sebagai setup yang sudah selesai.
+      const isWaiting = s.signal_id?.startsWith('status-') || s.status.toUpperCase().startsWith('WAIT')
+      const isFinalStatus = isFinal(s.status) && !isWaiting
 
       if (activeTab === 'ready') return isReady && !isFinalStatus
       if (activeTab === 'monitoring') return !isReady && !isFinalStatus
@@ -107,7 +112,8 @@ export function SignalsMobileView({
         s.status === 'READY_TO_ENTRY' ||
         s.status === 'OPPORTUNITY' ||
         s.status.toUpperCase().includes('READY')
-      const isFinalStatus = isFinal(s.status)
+      const isWaiting = s.signal_id?.startsWith('status-') || s.status.toUpperCase().startsWith('WAIT')
+      const isFinalStatus = isFinal(s.status) && !isWaiting
 
       if (isFinalStatus) {
         historyCount++
@@ -634,7 +640,7 @@ export function SignalsMobileView({
           </div>
 
           {/* Pengaturan Akun Pair Mobile */}
-          <div className="space-y-3 border-t border-border pt-4">
+          <div id="pengaturan-timeframe" className="scroll-mt-20 space-y-3 border-t border-border pt-4">
             <div>
               <h4 className="text-xs font-bold text-foreground">
                 Pengaturan Akun ({activePair})

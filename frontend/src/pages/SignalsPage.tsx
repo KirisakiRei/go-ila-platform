@@ -102,6 +102,19 @@ export default function SignalsPage() {
     return pairSignals.filter((s) => s.strategy_version === activeStrategyFilter)
   }, [pairSignals, activeStrategyFilter])
 
+  // Daftar riwayat hanya berisi sinyal sungguhan, bukan baris radar.
+  //
+  // Baris radar memakai ID tetap per slot (`status-*`) dan tanggal terbitnya
+  // beku sejak slot lahir, sehingga bila ikut masuk daftar ini ia muncul seolah
+  // sinyal lama dan menggeser riwayat yang benar-benar baru.
+  const signalsRiwayat = useMemo(() => {
+    return filteredSignals
+      .filter((s) => !s.signal_id?.startsWith('status-'))
+      // Diurutkan sendiri, tidak bergantung pada urutan API: riwayat harus selalu
+      // menampilkan yang terbaru lebih dulu.
+      .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+  }, [filteredSignals])
+
   const filteredPositions = useMemo(() => {
     return pairPositions.filter((p) => p.strategy_version === activeStrategyFilter)
   }, [pairPositions, activeStrategyFilter])
@@ -109,11 +122,11 @@ export default function SignalsPage() {
   // Pagination untuk riwayat setup sinyal agar tidak melar panjang ke bawah
   const [historyPage, setHistoryPage] = useState(1)
   const historyPerPage = 5
-  const totalHistoryPages = Math.ceil(filteredSignals.length / historyPerPage) || 1
+  const totalHistoryPages = Math.ceil(signalsRiwayat.length / historyPerPage) || 1
   const paginatedSignals = useMemo(() => {
     const start = (historyPage - 1) * historyPerPage
-    return filteredSignals.slice(start, start + historyPerPage)
-  }, [filteredSignals, historyPage])
+    return signalsRiwayat.slice(start, start + historyPerPage)
+  }, [signalsRiwayat, historyPage])
 
   const handleSelectPair = (symbol: string) => {
     setParams({ pair: symbol })
@@ -271,9 +284,9 @@ export default function SignalsPage() {
             <div className="lg:col-span-4">
               <Section
                 title="Histori Setup Sinyal"
-                description={`${filteredSignals.length} setup terakhir pada ${activePair}`}
+                description={`${signalsRiwayat.length} setup terakhir pada ${activePair}`}
               >
-                {filteredSignals.length === 0 ? (
+                {signalsRiwayat.length === 0 ? (
                   <Card>
                     <CardContent className="py-6 text-center text-xs text-muted-foreground">
                       Belum ada riwayat setup pada pair {activePair} untuk metode{' '}
@@ -500,7 +513,10 @@ export default function SignalsPage() {
               title="Timeframe per Akun"
               description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}.`}
             >
-              <SaklarTimeframeAkun symbol={activePair} />
+              {/* Penanda gulir: tombol "Aktifkan pemantauan" di radar menuju ke sini. */}
+              <div id="pengaturan-timeframe" className="scroll-mt-20">
+                <SaklarTimeframeAkun symbol={activePair} />
+              </div>
             </Section>
           </div>
         </div>

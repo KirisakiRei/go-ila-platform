@@ -65,7 +65,7 @@ func newQueryTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestListForUserMempertahankanBarisRadar(t *testing.T) {
+func TestListForUserDanRadarTidakSalingMemakanJatah(t *testing.T) {
 	db := newQueryTestDB(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -89,22 +89,31 @@ func TestListForUserMempertahankanBarisRadar(t *testing.T) {
 		t.Fatalf("menyiapkan langganan: %v", err)
 	}
 
-	// Baris radar: identitas tetap, sehingga published_at-nya paling tua.
-	radar := model.Signal{
-		Base:            model.Base{ID: uuid.NewString()},
-		SignalID:        "status-" + symbol + "-H1-M5",
-		Symbol:          symbol,
-		StrategyVersion: "ila-2.0",
-		Direction:       "SELL",
-		Status:          "WAIT_HTF_SWEEP",
-		PublishedAt:     now.Add(-72 * time.Hour),
-		ExpiresAt:       now.Add(24 * time.Hour),
-	}
-	if err := db.Create(&radar).Error; err != nil {
-		t.Fatalf("menyimpan baris radar: %v", err)
+	// 60 baris radar: sengaja LEBIH BANYAK dari limit riwayat (50). Inilah kondisi
+	// produksi yang dulu menghabiskan seluruh jatah limit sehingga riwayat tidak
+	// pernah terkirim sama sekali.
+	for i := 0; i < 60; i++ {
+		radar := model.Signal{
+			Base: model.Base{
+				ID: uuid.NewString(),
+				// published_at paling tua, sementara updated_at baru: meniru slot
+				// beridentitas tetap yang isinya terus diperbarui.
+				UpdatedAt: now.Add(-time.Duration(i) * time.Minute),
+			},
+			SignalID:        fmt.Sprintf("status-%s-H1-M5-%d", symbol, i),
+			Symbol:          symbol,
+			StrategyVersion: "ila-2.0",
+			Direction:       "SELL",
+			Status:          "WAIT_HTF_SWEEP",
+			PublishedAt:     now.Add(-96 * time.Hour),
+			ExpiresAt:       now.Add(24 * time.Hour),
+		}
+		if err := db.Create(&radar).Error; err != nil {
+			t.Fatalf("menyimpan baris radar: %v", err)
+		}
 	}
 
-	// Riwayat sinyal yang jauh lebih baru dan menumpuk melebihi limit.
+	// Riwayat sinyal yang lebih baru, juga melebihi limit.
 	for i := 0; i < 120; i++ {
 		s := model.Signal{
 			Base:            model.Base{ID: uuid.NewString()},
@@ -122,27 +131,34 @@ func TestListForUserMempertahankanBarisRadar(t *testing.T) {
 	}
 
 	repo := NewSignalRepository(db)
-	rows, err := repo.ListForUser(ctx, userID, now.Add(-7*24*time.Hour), 100)
+
+	// Riwayat tidak boleh mengandung baris radar, dan harus terisi penuh.
+	riwayat, err := repo.ListForUser(ctx, userID, now.Add(-7*24*time.Hour), 50)
 	if err != nil {
 		t.Fatalf("membaca sinyal user: %v", err)
 	}
-
-	if len(rows) == 0 {
-		t.Fatal("hasil kosong, seharusnya memuat baris radar")
+	if len(riwayat) != 50 {
+		t.Fatalf("riwayat harus terisi penuh 50 baris, dapat %d", len(riwayat))
 	}
-	if rows[0].SignalID != radar.SignalID {
-		t.Fatalf("baris radar harus berada di urutan pertama, dapat %q", rows[0].SignalID)
-	}
-
-	adaRadar := false
-	for _, r := range rows {
-		if r.SignalID == radar.SignalID {
-			adaRadar = true
-			break
+	for _, r := range riwayat {
+		if strings.HasPrefix(r.SignalID, "status-") {
+			t.Fatalf("baris radar %q bocor ke daftar riwayat", r.SignalID)
 		}
 	}
-	if !adaRadar {
-		t.Fatal("baris radar terpotong oleh limit; matriks timeframe akan tampak kosong")
+
+	// Radar punya jalannya sendiri dan tidak terpotong oleh riwayat.
+	radar, err := repo.ListRadarForUser(ctx, userID, 200)
+	if err != nil {
+		t.Fatalf("membaca radar user: %v", err)
+	}
+	if len(radar) != 60 {
+		t.Fatalf("radar harus utuh 60 baris, dapat %d", len(radar))
+	}
+	// Diurutkan `updated_at` menurun: baris yang baru bergerak tampil lebih dulu.
+	for i := 1; i < len(radar); i++ {
+		if radar[i].UpdatedAt.After(radar[i-1].UpdatedAt) {
+			t.Fatalf("radar tidak terurut updated_at menurun pada indeks %d", i)
+		}
 	}
 }
 

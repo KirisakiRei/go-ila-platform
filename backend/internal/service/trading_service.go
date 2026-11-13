@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"ila/backend/internal/dto"
@@ -17,11 +18,19 @@ const FreeTierDelay = 15 * time.Minute
 const (
 	DefaultSignalLimit   = 50
 	DefaultPositionLimit = 100
+
+	// DefaultRadarLimit membatasi jumlah baris radar yang dikirim. Radar tidak
+	// memakai DefaultSignalLimit karena jumlahnya sebanding dengan jumlah slot
+	// yang pernah berjalan, bukan dengan riwayat sinyal.
+	DefaultRadarLimit = 200
 )
 
 // SignalLister membaca sinyal yang relevan bagi user.
 type SignalLister interface {
 	ListForUser(ctx context.Context, userID string, since time.Time, limit int) ([]model.Signal, error)
+	// ListRadarForUser membaca baris radar terpisah dari riwayat supaya keduanya
+	// tidak saling memakan jatah limit.
+	ListRadarForUser(ctx context.Context, userID string, batas int) ([]model.Signal, error)
 }
 
 // PositionLister membaca posisi user.
@@ -56,7 +65,6 @@ type tradingService struct {
 	journal      JournalRepositoryReader
 	signalDetail SignalDetailReader
 }
-
 
 // NewTradingService membuat service tampilan trading.
 func NewTradingService(
@@ -118,6 +126,18 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 		return nil, err
 	}
 
+	// Baris radar diambil terpisah dan ditaruh paling depan. Penggabungan ini
+	// menjaga urutan yang sudah dikenal frontend: radar dulu, lalu riwayat
+	// terbaru. Yang berubah hanya sumber datanya, bukan bentuk respons.
+	radar, err := s.signals.ListRadarForUser(ctx, userID, DefaultRadarLimit)
+	if err != nil {
+		return nil, err
+	}
+	gabungan := make([]model.Signal, 0, len(radar)+len(rows))
+	gabungan = append(gabungan, radar...)
+	gabungan = append(gabungan, rows...)
+	rows = gabungan
+
 	out := make([]dto.SignalResponse, 0, len(rows))
 	for i := range rows {
 		signal := &rows[i]
@@ -154,7 +174,7 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 			Status:          signal.Status,
 			Summary:         signal.Summary,
 			NextAction:      signal.NextAction,
-			PublishedAt:     signal.PublishedAt,
+			PublishedAt:     waktuTerjadi(signal),
 			UpdatedAt:       signal.UpdatedAt,
 			ExpiresAt:       signal.ExpiresAt,
 			Delayed:         delayed,
@@ -215,6 +235,20 @@ func (s *tradingService) Positions(ctx context.Context, userID string, limit int
 		})
 	}
 	return out, nil
+}
+
+// waktuTerjadi memilih waktu yang mewakili "kapan ini terjadi" untuk sebuah sinyal.
+//
+// Sinyal biasa diterbitkan sekali, sehingga `published_at` sudah benar. Baris
+// radar berbeda: identitasnya tetap per slot, jadi `published_at` membeku sejak
+// slot itu lahir sementara isinya terus diperbarui. Memakai `published_at` di
+// sana membuat dashboard menampilkan tanggal yang jauh lampau (pernah sampai
+// selisih lebih dari tiga hari) padahal radar baru saja bergerak.
+func waktuTerjadi(signal *model.Signal) time.Time {
+	if strings.HasPrefix(signal.SignalID, "status-") && signal.UpdatedAt.After(signal.PublishedAt) {
+		return signal.UpdatedAt
+	}
+	return signal.PublishedAt
 }
 
 // signalRetention mengembalikan rentang riwayat sinyal per tier.

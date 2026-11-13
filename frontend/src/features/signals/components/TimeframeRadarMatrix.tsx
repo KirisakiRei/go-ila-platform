@@ -148,10 +148,16 @@ export function TimeframeRadarMatrix({
       {matiSemua ? (
         <SemuaTimeframeMatiState symbol={symbol} strategy={strategy} />
       ) : viewMode === 'tab' ? (
-        currentSlot?.latestSignal ? (
-          <SignalDetail signal={currentSlot.latestSignal} />
-        ) : currentSlot && !timeframeSlotDipantau(aktif, currentSlot) ? (
+        /*
+         * Urutan pemeriksaan disengaja: "tidak dipantau" didahulukan atas sinyal
+         * terakhir. Slot yang dimatikan masih menyimpan sinyal lama di database,
+         * dan menampilkannya lebih dulu membuat radar terbaca sedang memindai
+         * padahal engine sudah berhenti mengevaluasinya.
+         */
+        currentSlot && !timeframeSlotDipantau(aktif, currentSlot) ? (
           <SlotMatiState slot={currentSlot} symbol={symbol} />
+        ) : currentSlot?.latestSignal ? (
+          <SignalDetail signal={currentSlot.latestSignal} />
         ) : (
           <SlotEmptyState slot={currentSlot} symbol={symbol} />
         )
@@ -163,6 +169,7 @@ export function TimeframeRadarMatrix({
               key={slot.key}
               slot={slot}
               symbol={symbol}
+              dipantau={timeframeSlotDipantau(aktif, slot)}
               onSelect={() => {
                 setActiveKey(slot.key)
                 setViewMode('tab')
@@ -187,35 +194,57 @@ function SemuaTimeframeMatiState({
   // user tidak menunggu sinyal yang tidak akan pernah datang.
   return (
     <Card className="border-dashed border-border bg-card/60">
-      <CardContent className="py-12 text-center flex flex-col items-center justify-center gap-2">
+      <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
         <Radio className="h-8 w-8 text-muted-foreground/60" />
         <h4 className="text-sm font-semibold text-foreground">
-          Tidak ada timeframe yang dipindai untuk {symbol}
+          Timeframe {strategy} belum dipantau untuk {symbol}
         </h4>
-        <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
-          Seluruh switch {strategy} untuk pair ini sedang dimatikan. Nyalakan
-          minimal satu pasangan timeframe di pengaturan switch timeframe agar
-          engine mulai memindai lagi.
+        <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
+          Seluruh pasangan timeframe metode ini sedang dimatikan, sehingga tidak ada
+          yang dievaluasi. Aktifkan minimal satu pasangan timeframe agar pemantauan
+          dimulai kembali.
         </p>
+        <Button size="sm" variant="outline" className="mt-1" onClick={gulirKePengaturan}>
+          Aktifkan pemantauan
+        </Button>
       </CardContent>
     </Card>
   )
 }
 
-function SlotMatiState({ slot, symbol }: { slot?: TimeframeSlot; symbol: string }) {
+/**
+ * gulirKePengaturan membawa pengguna ke saklar timeframe di halaman yang sama.
+ *
+ * Panel pengaturan ada dua: satu untuk layar lebar, satu untuk mobile, dan
+ * keduanya membawa id yang sama agar satu tombol berlaku di semua ukuran layar.
+ * Karena yang tersembunyi tetap ada di DOM, elemen yang benar-benar tampil
+ * dipilih lebih dulu — kalau tidak, gulir berhenti di elemen tak terlihat dan
+ * pengguna merasa tombolnya tidak bekerja.
+ */
+function gulirKePengaturan() {
+  const semua = document.querySelectorAll<HTMLElement>('#pengaturan-timeframe')
+  const terlihat = Array.from(semua).find((el) => el.offsetParent !== null) ?? semua[0]
+  terlihat?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+function SlotMatiState({ slot }: { slot?: TimeframeSlot; symbol: string }) {
   // Slot ini sengaja tidak dipantau. Dibedakan dari "sedang memindai" supaya
   // user tidak menunggu setup yang tidak akan pernah muncul.
   return (
     <Card className="border-dashed border-border bg-card/60">
-      <CardContent className="py-12 text-center flex flex-col items-center justify-center gap-2">
+      <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
         <Radio className="h-8 w-8 text-muted-foreground/60" />
         <h4 className="text-sm font-semibold text-foreground">
-          {slot?.label || 'Timeframe'} tidak dipindai untuk {symbol}
+          {slot?.label || 'Timeframe'} tidak dipantau
         </h4>
-        <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
-          Pasangan timeframe ini sedang dimatikan pada switch timeframe, jadi
-          engine tidak mengevaluasinya.
+        <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
+          Pasangan timeframe ini dimatikan pada pengaturan timeframe akun, jadi engine
+          tidak mengevaluasinya. Data terakhir yang tampil bisa berasal dari sebelum
+          pemantauan dimatikan.
         </p>
+        <Button size="sm" variant="outline" className="mt-1" onClick={gulirKePengaturan}>
+          Aktifkan pemantauan
+        </Button>
       </CardContent>
     </Card>
   )
@@ -241,13 +270,48 @@ function SlotEmptyState({ slot, symbol }: { slot?: TimeframeSlot; symbol: string
 function SlotGridCard({
   slot,
   symbol,
+  dipantau,
   onSelect,
 }: {
   slot: TimeframeSlot
   symbol: string
+  /** false berarti slot ini sengaja tidak dipindai engine. */
+  dipantau: boolean
   onSelect: () => void
 }) {
   const signal = slot.latestSignal
+
+  // Slot yang dimatikan diperlakukan sama seperti di tampilan fokus: status
+  // "tidak dipantau" didahulukan atas sinyal lama yang masih tersimpan.
+  if (!dipantau) {
+    return (
+      <Card className="flex flex-col justify-between border-dashed border-border/80 bg-secondary/10 p-4">
+        <div className="flex items-center justify-between border-b border-border/50 pb-2.5">
+          <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
+            <span>{slot.label}</span>
+            {slot.cycle && (
+              <Badge variant="outline" className="text-[9.5px]">
+                {slot.cycle}
+              </Badge>
+            )}
+          </div>
+          <span className="font-mono text-[10px] uppercase text-muted-foreground">Tidak dipantau</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <p className="text-xs text-muted-foreground">
+            Pasangan {slot.label} dimatikan pada pengaturan timeframe akun.
+          </p>
+          <Button size="sm" variant="outline" onClick={onSelect}>
+            Lihat detail
+          </Button>
+        </div>
+        <div className="border-t border-border/40 pt-2 text-right text-[10.5px] text-muted-foreground">
+          {symbol} · Tidak dipantau
+        </div>
+      </Card>
+    )
+  }
+
   if (!signal) {
     return (
       <Card className="border-dashed border-border/80 bg-secondary/10 flex flex-col justify-between p-4">
