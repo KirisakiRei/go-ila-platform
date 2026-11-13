@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { publicContentApi } from '@/lib/system-api'
+import { formatRelativeTime } from '@/lib/format'
 import { SignalOverviewCard, SignalOverviewCardSkeleton } from './SignalOverviewCards'
 
 /**
@@ -18,6 +19,7 @@ const SYMBOL_DIPANTAU = ['XAUUSD', 'EURUSD', 'NAS100'] as const
 const GRID = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
 
 export function SignalOverviewGrid() {
+  const now = new Date()
   const preview = useQuery({
     queryKey: ['public', 'signal-preview'],
     queryFn: () => publicContentApi.signalPreview([...SYMBOL_DIPANTAU]),
@@ -53,6 +55,17 @@ export function SignalOverviewGrid() {
           has_signal: false,
         }))
 
+  // Sinyal paling baru dari ketiga instrumen, ditulis sebagai kalimat biasa.
+  const ringkasanWaktu = (() => {
+    const terbit = items
+      .map((item) => ('signal' in item ? item.signal?.published_at : undefined))
+      .filter((nilai): nilai is string => Boolean(nilai))
+      .map((nilai) => new Date(nilai).getTime())
+      .filter((nilai) => !Number.isNaN(nilai))
+    if (terbit.length === 0) return null
+    return `Sinyal terakhir ${formatRelativeTime(new Date(Math.max(...terbit)).toISOString(), now)}.`
+  })()
+
   return (
     <div className="space-y-3">
       <div className={GRID}>
@@ -66,13 +79,12 @@ export function SignalOverviewGrid() {
         ))}
       </div>
 
-      {/* Waktu per instrumen sudah tampil di tiap kartu. Ringkasan ini hanya
-          menyebut cakupan datanya, supaya tidak ada dua angka "diperbarui"
-          yang saling bertentangan di halaman yang sama. Rincian harga masuk
-          dan batas risiko sengaja tidak disebut dengan istilah teknisnya di
-          halaman publik. */}
+      {/* Kalimat ini menjawab pertanyaan pertama pengunjung: seberapa segar data
+          ini. Yang diambil sinyal paling baru dari ketiga instrumen, supaya
+          radar tidak terkesan mandek hanya karena satu instrumen belum bergerak. */}
       <p className="max-w-[68ch] text-[12px] leading-relaxed text-[#6b6b74]">
-        Hanya arah pasar. Rincian harga dan batas risiko tersedia di dashboard member.
+        {ringkasanWaktu ?? 'Menunggu sinyal pertama hari ini.'}{' '}
+        Rincian harga dan batas risiko ada di dashboard member.
       </p>
     </div>
   )

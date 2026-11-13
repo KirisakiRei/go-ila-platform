@@ -274,8 +274,8 @@ export default function LandingPage() {
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl space-y-3">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-              <span className="text-[#09090b]">Arah pasar terkini,</span>{' '}
-              <span className="text-[#52525b]">diperbarui tiap sesi</span>
+              <span className="text-[#09090b]">Ke mana pasar bergerak</span>{' '}
+              <span className="text-[#52525b]">hari ini</span>
             </h2>
           </div>
 

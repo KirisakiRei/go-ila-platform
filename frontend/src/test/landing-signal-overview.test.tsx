@@ -179,6 +179,6 @@ describe('Kartu ringkasan pantauan pasar', () => {
     )
 
     expect(screen.getByText('Kecenderungan turun')).toBeInTheDocument()
-    expect(screen.getByText('Diperbarui')).toBeInTheDocument()
+    expect(screen.getByText('Sinyal terakhir')).toBeInTheDocument()
   })
 })

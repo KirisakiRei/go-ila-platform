@@ -210,10 +210,10 @@ export function SignalOverviewCard({
         )}
       </div>
 
-      {/* Kaki: waktu dan keadaan pasar. */}
+      {/* Kaki: kapan sinyal terakhir masuk, dan keadaan pasar. */}
       <footer className="mt-5 space-y-1.5 border-t border-zinc-200/60 pt-4">
         {umur ? (
-          <MetaRow label="Diperbarui" value={umur} />
+          <MetaRow label="Sinyal terakhir" value={umur} />
         ) : (
           <MetaRow label="Status" value="Menunggu konfirmasi" />
         )}
