@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { publicContentApi } from '@/lib/system-api'
 import { formatRelativeTime } from '@/lib/format'
 import { SignalOverviewCard, SignalOverviewCardSkeleton } from './SignalOverviewCards'
+import { useInView } from './use-in-view'
 
 /**
  * Ringkasan pantauan pasar untuk halaman publik.
@@ -19,6 +20,7 @@ const SYMBOL_DIPANTAU = ['XAUUSD', 'EURUSD', 'NAS100'] as const
 const GRID = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
 
 export function SignalOverviewGrid() {
+  const [gridRef, gridTerlihat] = useInView<HTMLDivElement>()
   const preview = useQuery({
     queryKey: ['public', 'signal-preview'],
     queryFn: () => publicContentApi.signalPreview([...SYMBOL_DIPANTAU]),
@@ -55,15 +57,23 @@ export function SignalOverviewGrid() {
         }))
 
   return (
-    <div className="space-y-3">
+    <div ref={gridRef} className="space-y-3">
       <div className={GRID}>
-        {items.map((item) => (
-          <SignalOverviewCard
+        {items.map((item, i) => (
+          <div
             key={item.symbol}
-            item={item}
-            marketOpen={marketOpen}
-            marketLabel={marketLabel}
-          />
+            style={{
+              opacity: gridTerlihat ? 1 : 0,
+              transform: gridTerlihat ? 'translateY(0)' : 'translateY(6px)',
+              transition: `opacity var(--motion-enter) var(--ease-out) ${i * 60}ms, transform var(--motion-enter) var(--ease-out) ${i * 60}ms`,
+            }}
+          >
+            <SignalOverviewCard
+              item={item}
+              marketOpen={marketOpen}
+              marketLabel={marketLabel}
+            />
+          </div>
         ))}
       </div>
 

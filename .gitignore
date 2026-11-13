@@ -46,3 +46,10 @@ tmp_patch*.py
 
 # Artefak uji visual lokal
 .tmp-*
+
+# Override compose untuk pengembangan lokal (bukan produksi)
+deploy/docker-compose.override.yml
+
+# Skill Impeccable — dipasang lokal lewat `npx impeccable install`, bukan
+# bagian dari kode aplikasi. Isinya besar dan berbeda di tiap mesin.
+frontend/.claude/

@@ -12,6 +12,7 @@ import {
   MonochromeLiquidityWaves,
 } from './components/LandingArtwork'
 import { SignalOverviewGrid } from './components/SignalOverviewGrid'
+import { useInView } from './components/use-in-view'
 import { formatPlanBenefits, getPlanAudience } from './lib/plan-benefits'
 
 const CURVE_METRICS = [
@@ -36,6 +37,14 @@ const CURVE_METRICS = [
     posClass: 'left-[83%] top-[24.5%]',
   },
 ]
+
+/**
+ * Jeda kemunculan label metrik, dihitung dari saat kurva mulai menggambar.
+ *
+ * Tiap label menyala sedikit setelah node-nya tersentuh garis, jadi urutannya
+ * mengikuti arah pertumbuhan kurva dari kiri ke kanan.
+ */
+const LABEL_DELAY = [500, 800, 1100, 1400]
 
 const PILLARS = [
   {
@@ -84,6 +93,8 @@ const FEATURE_STATS = [
  */
 export default function LandingPage() {
   const { hash } = useLocation()
+  const [kurvaRef, kurvaTerlihat] = useInView<HTMLDivElement>()
+  const [metrikRef, metrikTerlihat] = useInView<HTMLDivElement>()
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ['public', 'plans'],
     queryFn: publicPlanApi.list,
@@ -111,7 +122,10 @@ export default function LandingPage() {
         {/* BAGIAN HERO */}
         <section id="hero-band" className="relative text-white">
           {/* Background geometris tema trading yang clean & rapi */}
-          <HeroTradingGeometry className="pointer-events-none absolute inset-0 h-full w-full" />
+          <HeroTradingGeometry
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            active
+          />
 
           <div className="relative mx-auto w-full max-w-6xl px-4 pt-28 pb-16 sm:px-6 sm:pt-36 sm:pb-24">
             {/* Judul utama hero */}
@@ -137,14 +151,14 @@ export default function LandingPage() {
                 {/* Anchor biasa: bundel panel terpisah di /app/*. */}
                 <a
                   href="/app/register"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] shadow-lg shadow-black/30 transition-colors hover:bg-zinc-200"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] shadow-lg shadow-black/30 press hover:bg-zinc-200"
                 >
                   Mulai Trial 7 Hari
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Link
                   to="/fitur"
-                  className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-black/35 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+                  className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-black/35 px-4 py-2.5 text-[13px] font-medium text-white press hover:bg-white/10"
                 >
                   Pelajari Cara Kerja
                 </Link>
@@ -169,7 +183,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <a
                 href="/app/register"
-                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
+                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
               >
                 Mulai Trial 7 Hari
               </a>
@@ -182,11 +196,21 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Kurva naik melengkung mulus + garis vertikal "|" sejajar tanpa card (desktop) */}
-          <div className="relative -mt-6 hidden md:block">
-            <MetricsCurveSvg className="h-auto w-full" />
-            {CURVE_METRICS.map((item) => (
-              <div key={item.value} className={`absolute ${item.posClass} w-[20%] pl-4`}>
+          {/* Kurva naik melengkung mulus + garis vertikal "|" sejajar tanpa card (desktop).
+              Garis dan label baru muncul setelah seksi ini masuk layar, supaya
+              pengunjung menyaksikan kurvanya tergambar, bukan menemukannya sudah jadi. */}
+          <div ref={kurvaRef} className="relative -mt-6 hidden md:block">
+            <MetricsCurveSvg className="h-auto w-full" active={kurvaTerlihat} />
+            {CURVE_METRICS.map((item, i) => (
+              <div
+                key={item.value}
+                className={`absolute ${item.posClass} w-[20%] pl-4`}
+                style={{
+                  opacity: kurvaTerlihat ? 1 : 0,
+                  transform: kurvaTerlihat ? 'translateY(0)' : 'translateY(8px)',
+                  transition: `opacity var(--motion-enter) var(--ease-out) ${LABEL_DELAY[i]}ms, transform var(--motion-enter) var(--ease-out) ${LABEL_DELAY[i]}ms`,
+                }}
+              >
                 <p className="text-2xl font-semibold leading-none tracking-tight text-[#09090b] tabular-nums lg:text-[2rem]">
                   {item.value}
                 </p>
@@ -197,10 +221,19 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Layout metrik bersih tanpa card untuk layar kecil */}
-          <div className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 md:hidden">
-            {CURVE_METRICS.map((item) => (
-              <div key={item.value} className="border-l border-zinc-300 pl-3.5">
+          {/* Layout metrik bersih tanpa card untuk layar kecil.
+              Di layar kecil tidak ada kurva, jadi yang bergiliran hanya angkanya. */}
+          <div ref={metrikRef} className="mt-10 grid grid-cols-2 gap-x-6 gap-y-8 md:hidden">
+            {CURVE_METRICS.map((item, i) => (
+              <div
+                key={item.value}
+                className="border-l border-zinc-300 pl-3.5"
+                style={{
+                  opacity: metrikTerlihat ? 1 : 0,
+                  transform: metrikTerlihat ? 'translateY(0)' : 'translateY(8px)',
+                  transition: `opacity var(--motion-enter) var(--ease-out) ${i * 60}ms, transform var(--motion-enter) var(--ease-out) ${i * 60}ms`,
+                }}
+              >
                 <p className="text-2xl font-semibold leading-none tracking-tight text-[#09090b] tabular-nums">
                   {item.value}
                 </p>
@@ -227,7 +260,7 @@ export default function LandingPage() {
               </p>
               <Link
                 to="/fitur"
-                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#09090b] px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
+                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#09090b] px-4 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
               >
                 Pelajari Fitur
               </Link>
@@ -239,7 +272,7 @@ export default function LandingPage() {
               pillar.kind === 'standard' ? (
                 <div
                   key={pillar.title}
-                  className="flex min-h-[205px] flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-6"
+                  className="hover-lift flex min-h-[205px] flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-6 hover:border-zinc-300"
                 >
                   <h3 className="text-[16px] font-semibold tracking-tight text-[#09090b]">
                     {pillar.title}
@@ -249,7 +282,7 @@ export default function LandingPage() {
               ) : (
                 <div
                   key={pillar.anchor}
-                  className="flex min-h-[205px] flex-col justify-between rounded-2xl border border-zinc-200 bg-[#ececef] p-6"
+                  className="hover-lift flex min-h-[205px] flex-col justify-between rounded-2xl border border-zinc-200 bg-[#ececef] p-6 hover:border-zinc-300"
                 >
                   <p className="text-[13px] leading-relaxed text-[#52525b]">{pillar.note}</p>
                   <p className="mt-6 text-[16px] font-semibold tracking-tight text-[#09090b]">
@@ -289,7 +322,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 to="/harga"
-                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
+                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-4 py-2 text-[13px] font-medium text-white press hover:bg-[#27272a]"
               >
                 Lihat Paket &amp; Harga
               </Link>
@@ -328,13 +361,13 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <a
                   href="/app/register"
-                  className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
+                  className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
                 >
                   Mulai Trial
                 </a>
                 <Link
                   to="/fitur"
-                  className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100"
+                  className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-[13px] font-medium text-[#09090b] press hover:bg-zinc-100"
                 >
                   Pelajari Fitur
                 </Link>
@@ -397,7 +430,7 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-12 grid gap-4 lg:grid-cols-12">
-            <div className="flex flex-col justify-between gap-6 rounded-2xl border border-zinc-200/80 bg-white p-6 lg:col-span-4">
+            <div className="hover-lift flex flex-col justify-between gap-6 rounded-2xl border border-zinc-200/80 bg-white p-6 hover:border-zinc-300 lg:col-span-4">
               <div>
                 <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
                   Pemindaian Sesi Aktif
@@ -417,7 +450,7 @@ export default function LandingPage() {
             </div>
 
             <div className="flex flex-col gap-4 lg:col-span-4">
-              <div className="rounded-2xl border border-zinc-200/80 bg-white p-6">
+              <div className="hover-lift rounded-2xl border border-zinc-200/80 bg-white p-6 hover:border-zinc-300">
                 <h3 className="text-[16px] font-semibold tracking-tight text-[#09090b]">
                   Peringatan &amp; Persetujuan Telegram
                 </h3>
@@ -551,8 +584,8 @@ export default function LandingPage() {
                         href="/app/register"
                         className={
                           isHighlight
-                            ? 'block rounded-lg bg-[#09090b] px-4 py-2.5 text-center text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]'
-                            : 'block rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-center text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100'
+                            ? 'block rounded-lg bg-[#09090b] px-4 py-2.5 text-center text-[13px] font-medium text-white press hover:bg-[#27272a]'
+                            : 'block rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-center text-[13px] font-medium text-[#09090b] press hover:bg-zinc-100'
                         }
                       >
                         Pilih {plan.name}
@@ -598,7 +631,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <a
                   href="/app/register"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] transition-colors hover:bg-zinc-200"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] press hover:bg-zinc-200"
                 >
                   Mulai Trial 7 Hari
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />

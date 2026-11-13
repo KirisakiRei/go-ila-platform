@@ -48,6 +48,20 @@
     --ring: 0 0% 9%;
 
     --radius: 0.5rem;
+
+    /* Kurva gerak. Satu keluarga easing dipakai di seluruh situs: masuk
+       memakai ease-out (langsung terasa responsif), gerak di layar memakai
+       ease-in-out (punya awalan dan akhiran yang wajar). Nilai bawaan CSS
+       terlalu lemah, jadi kurvanya ditulis sendiri. */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+    /* Durasi. Umpan balik tekan paling pendek, animasi penjelasan paling
+       panjang karena pengunjung hanya melihatnya sekali. */
+    --motion-fast: 160ms;
+    --motion-base: 200ms;
+    --motion-enter: 300ms;
+    --motion-draw: 1200ms;
   }
 
   * {
@@ -94,15 +108,117 @@
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
-  /* Hormati preferensi pengguna yang membatasi animasi */
+  /* Hormati preferensi pengguna yang membatasi animasi.
+
+     Yang dimatikan adalah gerak posisi dan perulangan, bukan seluruh
+     transisi. Perubahan opacity dan warna tetap berjalan karena keduanya
+     membantu pembaca menyusul keadaan baru tanpa membuat pusing. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      transition-property: opacity, color, background-color, border-color, fill, stroke !important;
+      transition-duration: 200ms !important;
       scroll-behavior: auto !important;
+    }
+  }
+
+  /* Kartu terangkat sedikit saat ditunjuk tetikus.
+
+     Dikurung di media query karena layar sentuh memicu hover tepat saat
+     tap, sehingga tanpa kurungan ini kartu akan melompat tanpa diminta. */
+  @media (hover: hover) and (pointer: fine) {
+    .hover-lift {
+      transition:
+        transform var(--motion-base) var(--ease-out),
+        border-color var(--motion-base) var(--ease-out);
+    }
+
+    .hover-lift:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  /* Umpan balik tekan untuk tombol dan tautan bertombol.
+
+     Skala kecil 0.97 dipakai, bukan 0, karena sesuatu yang mengecil sampai
+     hilang terlihat seperti muncul dari ketiadaan. Transisi hanya menyentuh
+     transform dan warna supaya tidak memicu perhitungan tata letak. */
+  .press {
+    transition:
+      transform var(--motion-fast) var(--ease-out),
+      background-color var(--motion-fast) var(--ease-out),
+      border-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
+  }
+
+  .press:active {
+    transform: scale(0.97);
+  }
+
+  /* Penanda pasar buka: titik kecil berdenyut pelan. */
+  .status-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background-color: currentColor;
+  }
+
+  /* Titik pemindaian pada latar hero.
+
+     Empat titik menyala bergantian sepanjang lintasan struktur. Siklusnya
+     empat detik, satu titik per detik, lalu jeda satu detik sebelum kembali
+     ke awal. Gerakan ini mewakili radar yang menelusuri harga, bukan hiasan.
+     Dijalankan CSS agar tetap halus saat peramban sibuk memuat halaman. */
+  .artwork-scan-core {
+    animation: artwork-scan 4s var(--ease-in-out) infinite;
+  }
+
+  .artwork-scan-halo {
+    fill-opacity: 0.06;
+    animation: artwork-scan-halo 4s var(--ease-in-out) infinite;
+  }
+
+  @keyframes artwork-scan {
+    0%,
+    20% {
+      opacity: 1;
+    }
+    30%,
+    100% {
+      opacity: 0.35;
+    }
+  }
+
+  @keyframes artwork-scan-halo {
+    0%,
+    20% {
+      fill-opacity: 0.14;
+    }
+    30%,
+    100% {
+      fill-opacity: 0.06;
+    }
+  }
+
+  /* Denyut kecil untuk penanda pasar yang sedang buka.
+
+     Hanya dipakai pada hal yang memang berubah sendiri tanpa sentuhan
+     pengguna. Sesuatu yang statis tidak boleh berdenyut. */
+  .status-live {
+    animation: status-live 1.8s var(--ease-in-out) infinite;
+  }
+
+  @keyframes status-live {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
     }
   }
 }

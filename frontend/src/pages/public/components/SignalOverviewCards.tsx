@@ -112,13 +112,26 @@ function StatusTag({
 
   const teks = !marketOpen ? 'Pasar tutup' : hasSignal ? 'Sinyal Aktif' : 'Dipantau'
 
+  // Titik hidup hanya berdenyut saat pasar benar-benar sedang dipantau. Saat
+  // pasar tutup atau sinyal sudah terkunci, titik berhenti bergerak supaya
+  // gerakan tidak dipakai pada keadaan yang tidak berubah sendiri.
+  const keadaanTitik = !marketOpen ? 'statis' : hasSignal ? 'penuh' : 'hidup'
+
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.07em]',
+        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.07em]',
         gaya,
       )}
     >
+      <span
+        aria-hidden="true"
+        className={cn(
+          'status-dot',
+          keadaanTitik === 'hidup' && 'status-live',
+          keadaanTitik === 'statis' && 'opacity-40',
+        )}
+      />
       {teks}
     </span>
   )
@@ -151,7 +164,7 @@ export function SignalOverviewCard({
   return (
     <article
       className={cn(
-        'flex h-full flex-col rounded-xl border p-5 transition-colors',
+        'hover-lift flex h-full flex-col rounded-xl border p-5',
         sinyal ? tampilan.cardBorder : 'border-zinc-200 hover:border-zinc-300',
         sinyal ? tampilan.bgClass : 'bg-white',
       )}

@@ -4,6 +4,11 @@ type ArtworkProps = {
   className?: string
 }
 
+type AnimatedArtworkProps = ArtworkProps & {
+  /** Menyalakan animasi. Sebelum aktif, artwork tampil dalam keadaan awal. */
+  active?: boolean
+}
+
 /**
  * BrandMark adalah lambang geometris monokrom Imaginary Liquidity pada header.
  */
@@ -64,7 +69,7 @@ export function BrandMark({ className = 'h-7 w-7' }: ArtworkProps) {
  * bersih: kisi koordinat halus, level likuiditas horizontal, serta struktur
  * swing harga tipis di sisi kanan tanpa mengganggu keterbacaan judul.
  */
-export function HeroTradingGeometry({ className = '' }: ArtworkProps) {
+export function HeroTradingGeometry({ className = '', active = true }: AnimatedArtworkProps) {
   const uid = useId().replace(/:/g, '')
   const cols = [120, 240, 360, 480, 600, 720, 840, 960, 1080]
   const rows = [110, 220, 330, 440, 550]
@@ -162,7 +167,11 @@ export function HeroTradingGeometry({ className = '' }: ArtworkProps) {
           strokeWidth="1"
         />
 
-        {/* Batang candlestick geometris minimalis di latar kanan */}
+        {/* Batang candlestick geometris minimalis di latar kanan.
+
+            Sengaja tidak dianimasikan. Candlestick yang bergerak sendiri di
+            latar terbaca sebagai cuplikan pasar dari sumber lain, bukan
+            sebagai pekerjaan produk ini. */}
         {bars.map((bar) => (
           <g key={bar.x}>
             <line
@@ -189,24 +198,42 @@ export function HeroTradingGeometry({ className = '' }: ArtworkProps) {
           </g>
         ))}
 
-        {/* Lintasan struktur swing high/low geometris */}
+        {/* Lintasan struktur swing high/low geometris.
+
+            Garis ini menggambar dirinya satu kali saat hero tampil, lalu diam.
+            Satu entrance saja sudah cukup; gerakan berulang akan menarik
+            perhatian menjauh dari judul. */}
         <path
           d="M 520 420 L 648 334 L 744 366 L 840 242 L 888 278 L 984 176 L 1032 204 L 1128 118"
           stroke={`url(#${uid}-line)`}
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          strokeDasharray={1}
+          strokeDashoffset={active ? 0 : 1}
+          style={{
+            transition: `stroke-dashoffset var(--motion-draw) var(--ease-in-out)`,
+          }}
         />
 
-        {/* Titik simpul struktur */}
+        {/* Titik simpul struktur.
+
+            Satu titik menyala pada satu waktu dan berpindah mengikuti urutan
+            lintasan. Itu memperlihatkan radar sedang menelusuri harga dari
+            kiri ke kanan, bukan sekadar hiasan yang berkedip. */}
         {[
-          { cx: 648, cy: 334 },
-          { cx: 840, cy: 242 },
-          { cx: 984, cy: 176 },
-          { cx: 1128, cy: 118 },
+          { cx: 648, cy: 334, delay: 0 },
+          { cx: 840, cy: 242, delay: 1 },
+          { cx: 984, cy: 176, delay: 2 },
+          { cx: 1128, cy: 118, delay: 3 },
         ].map((pt) => (
-          <g key={`${pt.cx}-${pt.cy}`}>
-            <circle cx={pt.cx} cy={pt.cy} r="7" fill="#ffffff" fillOpacity="0.06" />
+          <g
+            key={`${pt.cx}-${pt.cy}`}
+            className={active ? 'artwork-scan' : undefined}
+            style={{ animationDelay: `${pt.delay}s` }}
+          >
+            <circle cx={pt.cx} cy={pt.cy} r="7" fill="#ffffff" className="artwork-scan-halo" />
             <circle
               cx={pt.cx}
               cy={pt.cy}
@@ -215,6 +242,7 @@ export function HeroTradingGeometry({ className = '' }: ArtworkProps) {
               stroke="#ffffff"
               strokeOpacity="0.55"
               strokeWidth="1.5"
+              className="artwork-scan-core"
             />
           </g>
         ))}
@@ -228,13 +256,13 @@ export function HeroTradingGeometry({ className = '' }: ArtworkProps) {
  * (M 0 212 Q 600 212 1200 18) beserta 4 titik node dan garis vertikal `|`
  * yang turun sejajar ke masing-masing metrik.
  */
-export function MetricsCurveSvg({ className = '' }: ArtworkProps) {
+export function MetricsCurveSvg({ className = '', active = true }: AnimatedArtworkProps) {
   const uid = useId().replace(/:/g, '')
   const nodes = [
-    { x: 96, y: 211, stemBottom: 324 },
-    { x: 396, y: 191, stemBottom: 304 },
-    { x: 696, y: 147, stemBottom: 260 },
-    { x: 996, y: 78, stemBottom: 192 },
+    { x: 96, y: 211, stemBottom: 324, delay: 300 },
+    { x: 396, y: 191, stemBottom: 304, delay: 600 },
+    { x: 696, y: 147, stemBottom: 260, delay: 900 },
+    { x: 996, y: 78, stemBottom: 192, delay: 1150 },
   ]
 
   return (
@@ -253,15 +281,33 @@ export function MetricsCurveSvg({ className = '' }: ArtworkProps) {
         </linearGradient>
       </defs>
 
+      {/* Kurva menggambar dirinya dari kiri ke kanan. Arahnya mengikuti arti
+          datanya: empat titik metrik menanjak, jadi garisnya bergerak ke atas.
+          pathLength dinormalkan ke 1 supaya panjang garis tidak perlu dihitung
+          di JavaScript. */}
       <path
         d="M 0 212 Q 600 212 1200 18"
         stroke={`url(#${uid}-curve)`}
         strokeWidth="1.6"
         strokeLinecap="round"
+        pathLength={1}
+        strokeDasharray={1}
+        strokeDashoffset={active ? 0 : 1}
+        style={{
+          transition: `stroke-dashoffset var(--motion-draw) var(--ease-in-out)`,
+        }}
       />
 
+      {/* Tiap node menyala tepat saat garis melewatinya, jadi urutannya
+          mengikuti posisi x, bukan urutan acak. */}
       {nodes.map((node) => (
-        <g key={node.x}>
+        <g
+          key={node.x}
+          style={{
+            opacity: active ? 1 : 0,
+            transition: `opacity var(--motion-enter) var(--ease-out) ${active ? node.delay : 0}ms`,
+          }}
+        >
           <line
             x1={node.x}
             y1={node.y + 6}
