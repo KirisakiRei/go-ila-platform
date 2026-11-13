@@ -51,7 +51,7 @@ export function SessionSection() {
                 </div>
                 <span className="text-[12px] text-muted-foreground">
                   Terakhir aktif {item.last_seen_pair.wib} WIB
-                  <span className="text-muted-foreground/70"> · {item.last_seen_pair.ny} NY</span>
+                  <span className="text-muted-foreground"> · {item.last_seen_pair.ny} NY</span>
                 </span>
               </div>
 

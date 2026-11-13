@@ -297,7 +297,7 @@ export function BillingMobileView({
             type="button"
             disabled
             aria-pressed="false"
-            className="flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold text-muted-foreground/70"
+            className="flex items-center justify-center gap-1 rounded-lg py-2 text-micro font-semibold text-muted-foreground"
           >
             Tahunan
             <span className="rounded bg-secondary px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">

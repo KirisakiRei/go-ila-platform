@@ -291,7 +291,7 @@ export default function SignalsPage() {
                     <CardContent className="py-6 text-center text-xs text-muted-foreground">
                       Belum ada riwayat setup pada pair {activePair} untuk metode{' '}
                       {activeStrategyFilter}.
-                      <span className="mt-1 block text-[11px] text-muted-foreground/80">
+                      <span className="mt-1 block text-micro text-muted-foreground">
                         Sinyal hanya dikirim untuk pasangan timeframe yang dipantau.
                         Nyalakan minimal satu switch metode {activeStrategyFilter} pada
                         pair ini di pengaturan switch timeframe.

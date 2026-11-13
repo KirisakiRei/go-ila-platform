@@ -133,7 +133,7 @@ export function AppShell({ user, children }: AppShellProps) {
         >
           {navGroups.map((group, groupIndex) => (
             <div key={group.label} className={cn('flex flex-col', groupIndex > 0 && 'mt-3')}>
-              <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+              <p className="px-2.5 pb-1 pt-1.5 text-micro font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {group.label}
               </p>
               {group.items.map(({ to, label, icon: Icon, end }) => (

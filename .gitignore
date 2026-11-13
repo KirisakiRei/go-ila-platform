@@ -46,3 +46,6 @@ tmp_patch*.py
 
 # Artefak uji visual lokal
 .tmp-*
+
+# Override compose untuk pengembangan lokal (bukan produksi)
+deploy/docker-compose.override.yml
