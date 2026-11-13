@@ -92,7 +92,11 @@ export function MarkdownView({ source, className }: { source: string; className?
             return (
               <blockquote
                 key={key}
-                className="mt-5 rounded-r-xl border-l-[3.5px] border-[#09090b] bg-[#f8f8fa] py-3 pr-4 pl-4.5 text-[14.5px] text-[#27272a] shadow-xs"
+                /* Padding kiri memakai nilai sembarang karena 1.125rem tidak ada di
+                   skala Tailwind proyek ini. Sebelumnya ditulis `pl-4.5`, kelas
+                   yang tidak pernah dihasilkan compiler, sehingga teks menempel
+                   ke garis tepi kiri. */
+                className="mt-5 rounded-r-xl border-l-[3.5px] border-[#09090b] bg-[#f8f8fa] py-3 pr-4 pl-[1.125rem] text-[14.5px] text-[#27272a] shadow-xs"
               >
                 {block.lines.map((line, lineIndex) => (
                   <p key={`${key}-${lineIndex}`} className={lineIndex === 0 ? '' : 'mt-2'}>
@@ -109,7 +113,15 @@ export function MarkdownView({ source, className }: { source: string; className?
               <aside
                 key={key}
                 aria-label={CALLOUT_LABEL[block.tone]}
-                className={cn('mt-6 rounded-2xl border p-4.5 sm:p-5.5 transition-shadow', config.wrapper)}
+                /* `p-4.5 sm:p-5.5` yang lama tidak pernah dihasilkan compiler
+                   Tailwind (skala spacing proyek berhenti di 4), sehingga blok
+                   ini tampil tanpa padding sama sekali dan isinya menempel ke
+                   tepi kotak. Nilai sembarang dipakai agar ukuran yang dimaksud
+                   tetap sama. */
+                className={cn(
+                  'mt-6 rounded-2xl border p-[1.125rem] sm:p-[1.375rem]',
+                  config.wrapper,
+                )}
               >
                 <div className="flex items-center gap-2">
                   <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />

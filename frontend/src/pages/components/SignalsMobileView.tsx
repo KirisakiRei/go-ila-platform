@@ -138,7 +138,7 @@ export function SignalsMobileView({
       <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-3.5 shadow-xs">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background shrink-0">
-            <Radio className="h-4.5 w-4.5 animate-pulse" />
+            <Radio className="h-[1.125rem] w-[1.125rem] animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -196,7 +196,7 @@ export function SignalsMobileView({
             <span>Semua Pair</span>
             <span
               className={cn(
-                'ml-0.5 rounded-full px-1.5 py-0.2 text-[9px]',
+                'ml-0.5 rounded-full px-1.5 py-[1px] text-[9px]',
                 !activePair
                   ? 'bg-background/20 text-background'
                   : 'bg-secondary text-muted-foreground',
@@ -232,7 +232,7 @@ export function SignalsMobileView({
                 {pairSignalCount > 0 && (
                   <span
                     className={cn(
-                      'ml-0.5 rounded-full px-1.5 py-0.2 text-[9px]',
+                      'ml-0.5 rounded-full px-1.5 py-[1px] text-[9px]',
                       isPairActive
                         ? 'bg-background/20 text-background'
                         : 'bg-secondary text-muted-foreground',
@@ -530,7 +530,7 @@ export function SignalsMobileView({
                     <Clock className="h-3 w-3" />
                     <span>{formatDateTime(signal.published_at)}</span>
                     {signal.delayed && (
-                      <span className="rounded bg-amber-500/10 px-1.5 py-0.2 text-[9.5px] font-bold text-amber-700 dark:text-amber-400">
+                      <span className="rounded bg-amber-500/10 px-1.5 py-[1px] text-[9.5px] font-bold text-amber-700 dark:text-amber-400">
                         Delayed
                       </span>
                     )}

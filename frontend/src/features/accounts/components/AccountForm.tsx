@@ -181,7 +181,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
         >
           <Sparkles className="h-3.5 w-3.5" />
           <span>cTrader</span>
-          <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.2 text-[10px] font-bold text-emerald-400">
+          <span className="rounded-full bg-emerald-500/20 px-1.5 py-[1px] text-[10px] font-bold text-emerald-400">
             OAuth
           </span>
         </button>
@@ -200,7 +200,7 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
         >
           <KeyRound className="h-3.5 w-3.5" />
           <span>Match-Trader</span>
-          <span className="rounded-full bg-zinc-500/20 px-1.5 py-0.2 text-[10px] font-medium text-muted-foreground">
+          <span className="rounded-full bg-zinc-500/20 px-1.5 py-[1px] text-[10px] font-medium text-muted-foreground">
             Token
           </span>
         </button>
