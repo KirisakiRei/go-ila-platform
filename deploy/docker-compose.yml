@@ -181,20 +181,23 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    # Hanya dua variabel ini yang dibutuhkan. Kredensial database sengaja
-    # tidak diwariskan agar tidak ada rahasia di container yang tidak butuh.
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
-      # Cadangan bila email akun ACME kosong: Caddy menolak nilai kosong.
-      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    # Caddy tidak lagi butuh variabel lingkungan apa pun: alamat situs sudah
+    # dipaku ke `:80` di Caddyfile dan sertifikat dipegang Cloudflare. Kredensial
+    # database sengaja tidak diwariskan agar tidak ada rahasia di container
+    # yang tidak membutuhkannya.
     mem_limit: 64m
     logging: *default-logging
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+    # Port publik sengaja dilepas. Trafik masuk lewat Cloudflare Tunnel, jadi
+    # Caddy hanya perlu dijangkau cloudflared di jaringan internal. Selama
+    # 80/443 masih terbuka, alamat IP origin tetap bisa dipindai langsung dan
+    # seluruh manfaat proxy Cloudflare (skema, WAF, penyembunyian asal) hilang.
+    expose:
+      - "80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Halaman "tidak ditemukan" untuk permintaan ber-Host asing. Dipasang
+      # read-only karena Caddy hanya membacanya, tidak pernah menulis.
+      - ./error:/srv/error:ro
       - caddy_data:/data
       - caddy_config:/config
       # Log akses HTTP ikut ke folder yang sama dengan log layanan.
@@ -263,6 +266,27 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  # Terowongan keluar ke edge Cloudflare. Container ini membuka koneksi keluar
+  # ke Cloudflare dan tidak membuka port apa pun ke internet, sehingga server
+  # ini tidak lagi punya permukaan masuk yang bisa dipindai dari luar.
+  #
+  # Token dititipkan lewat .env (tidak pernah masuk git) karena berisi
+  # kredensial terowongan. Bila token bocor, rotasi dari dasbor Cloudflare
+  # lalu perbarui nilainya di .env dan jalankan ulang container ini.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN wajib diisi}
+    # Hanya meneruskan byte; 64 MB cukup dan sisanya disisakan untuk Postgres.
+    mem_limit: 64m
+    logging: *default-logging
+    depends_on:
+      caddy:
+        condition: service_started
+    networks: [platform]
 
 networks:
   platform:

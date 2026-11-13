@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Tidak ditemukan — Rekavia</title>
+<!--
+  Halaman ini disajikan Caddy untuk permintaan yang Host-nya bukan
+  rekavia.com atau www.rekavia.com, dan untuk path yang tidak dikenal.
+
+  Tujuannya bukan mempercantik pesan galat, tapi memastikan server ini tidak
+  memberi kesan bahwa ia adalah host virtual terbuka. Permintaan dengan Host
+  asing (hasil pemindaian, akses lewat alamat IP, atau percobaan enumerasi
+  virtual host) mendapat satu jawaban yang sama dan tidak membocorkan apa pun
+  tentang situs yang sebenarnya berjalan di sini.
+
+  Seluruh gaya ditulis inline dan tanpa skrip justru karena itu: halaman ini
+  harus tampil benar meski tidak ada aset, tidak ada jaringan, dan tidak ada
+  JavaScript. Tidak ada referensi ke domain lain.
+-->
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d12;
+    --panel: #11141b;
+    --line: #1e2430;
+    --text: #e6edf7;
+    --muted: #8b97a8;
+    --accent: #f6821f;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(246, 130, 31, 0.10), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main {
+    width: 100%;
+    max-width: 460px;
+    padding: 40px 32px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+    text-align: center;
+  }
+
+  .mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 22px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--accent);
+  }
+
+  .mark svg { width: 20px; height: 20px; }
+
+  h1 {
+    margin: 0 0 10px;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  p:last-of-type { margin-bottom: 0; }
+
+  .code {
+    margin-top: 26px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5d6b7d;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 8v4"></path>
+        <path d="M12 16h.01"></path>
+      </svg>
+    </div>
+
+    <h1>Halaman tidak ditemukan</h1>
+    <p>Alamat ini tidak mel</h1></p>ayani permintaan apa pun.</p>
+    <p>Silakan kembali ke situs utama.</p>
+
+    <div class="code">HTTP 404 &middot; Not Found</div>
+  </main>
+</body>
+</html>

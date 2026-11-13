@@ -7,9 +7,9 @@
 # Urutan `handle` penting: Caddy memakai blok pertama yang cocok, sehingga
 # path paling spesifik harus ditulis lebih dulu.
 #
-# Catatan: email ACME sengaja TIDAK ditulis di sini. Blok global `email`
-# menolak nilai kosong dan membuat Caddy gagal start, sehingga email didaftarkan
-# lewat direktif `tls` di blok situs yang hanya aktif bila nilainya terisi.
+# Catatan: email ACME sengaja TIDAK ditulis di sini. Sertifikat HTTPS kini
+# diterbitkan Cloudflare di edge, jadi Caddy tidak lagi memegang ACME dan
+# variabel ACME_EMAIL sudah tidak dipakai.
 
 # ---------------------------------------------------------------------------
 # Log akses HTTP.
@@ -22,6 +22,16 @@
 # (output file dengan roll_*), sehingga akses HTTP tetap terbaca per hari.
 # ---------------------------------------------------------------------------
 {
+	# trusted_proxies: setelah trafik masuk lewat Cloudflare Tunnel, semua
+	# koneksi datang dari cloudflared. Tanpa ini Caddy menganggap seluruh
+	# pengunjung berasal dari satu IP, sehingga rate limit login akan memblokir
+	# semua orang begitu satu orang gagal beberapa kali. Cloudflare mengirim
+	# IP asli di X-Forwarded-For.
+	servers {
+		trusted_proxies static private_ranges
+		trusted_proxies static 172.16.0.0/12 192.168.0.0/16
+	}
+
 	log default {
 		output file /var/log/ila/caddy.log {
 			roll_size 10mb
@@ -32,21 +42,55 @@
 	}
 }
 
-{$SITE_ADDRESS:localhost}, www.{$SITE_ADDRESS} {
-	# www ikut didaftarkan di alamat situs, bukan hanya di `redir`: TLS handshake
-	# terjadi sebelum aturan redirect, jadi tanpa nama itu sertifikat untuk www
-	# tidak pernah diterbitkan dan browser menolak koneksi.
-	#
-	# `tls` cukup menuliskan email ACME. Bila ACME_EMAIL kosong (pengembangan),
-	# Caddy memakai sertifikat internal dan tidak menunggu penerbitan.
-	# Blok kondisional tidak dipakai karena nilai default kosong `{$VAR:}`
-	# diteruskan mentah oleh Caddy dan membuat berkas ini gagal di-parse.
-	tls {$ACME_EMAIL:internal}
+# Alamat situs sengaja hanya `:80` (HTTP polos), bukan nama domain dengan
+# TLS: sertifikat kini dipegang Cloudflare di edge, dan koneksi dari
+# cloudflared ke Caddy berjalan di jaringan internal yang sudah terisolasi.
+# Memasang TLS di sini justru memaksa Caddy menerbitkan sertifikat sendiri
+# yang tidak akan pernah dilihat pengunjung.
+:80 {
+	# Catatan: nama www tidak lagi didaftarkan di sini. Pengunjung tidak pernah
+	# mencapai Caddy lewat nama host secara langsung; Cloudflare yang memutuskan
+	# host mana yang diteruskan ke terowongan.
 
 	# www diarahkan permanen ke domain utama agar cookie sesi tidak terbagi
 	# ke dua host dan tautan yang dibagikan selalu satu bentuk.
-	@www host www.{$SITE_ADDRESS}
-	redir @www https://{$SITE_ADDRESS}{uri} permanent
+	@www host www.rekavia.com
+	redir @www https://rekavia.com{uri} permanent
+
+	# -----------------------------------------------------------------------
+	# Tameng Host asing.
+	#
+	# Terowongan meneruskan setiap permintaan yang lolos di edge, termasuk
+	# permintaan yang Host-nya berupa alamat IP atau domain lain. Tanpa aturan
+	# ini server menjawab 200 untuk nama apa pun, yang berarti:
+	#   - pemindai bisa memetakan situs lewat alamat IP Cloudflare,
+	#   - HSTS terlewati karena pengunjung tidak pernah menyentuh nama domain,
+	#   - log tercampur trafik yang tidak bisa ditelusuri asalnya.
+	#
+	# `respond` di sini sengaja tidak dipakai untuk menyajikan berkas: direktif
+	# itu mengirim teks statis, bukan isi berkas, sehingga yang keluar justru
+	# badan kosong. Yang dipakai adalah `error` lalu `handle_errors` di bawah,
+	# yang menyajikan berkas lewat `file_server` dan tetap mengembalikan 404.
+	# Jawabannya 404, bukan 421: pemindai tidak perlu tahu bahwa ada virtual
+	# host lain yang bisa dituju dengan Host yang tepat.
+	# -----------------------------------------------------------------------
+	@hostAsing not host rekavia.com www.rekavia.com
+	handle @hostAsing {
+		error 404
+	}
+
+	# Halaman galat untuk semua status 4xx/5xx, termasuk Host asing di atas.
+	# Diarahkan ke satu berkas statis supaya tidak ada jalur yang membocorkan
+	# detail internal (nama layanan, versi, atau pesan bawaan Caddy).
+	handle_errors {
+		root * /srv/error
+		header Content-Type "text/html; charset=utf-8"
+		header Cache-Control "no-store"
+		rewrite * /not-found.html
+		file_server {
+			status {http.error.status_code}
+		}
+	}
 
 	# Kompresi untuk aset teks.
 	encode zstd gzip
