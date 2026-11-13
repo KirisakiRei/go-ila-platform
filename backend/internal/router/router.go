@@ -32,6 +32,11 @@ import (
 // adminPrefix adalah awalan tunggal seluruh endpoint administrasi.
 const adminPrefix = "/api/v1/admin"
 
+// emailAccountMaxPerMinute membatasi alur surel (lupa sandi, reset, verifikasi)
+// per alamat IP. Endpoint ini mengirim surel, jadi batasnya jauh di bawah
+// grup publik lain yang hanya membaca data.
+const emailAccountMaxPerMinute = 3
+
 // Billing returns the billing service so a background sweeper can run without
 // duplicating the wiring in cmd.
 func Billing(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.BillingService {
@@ -471,7 +476,14 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		auth.POST("/logout", authHandler.Logout)
 		auth.GET("/csrf", authHandler.CSRF)
 		// Lupa sandi & verifikasi email: dibatasi per IP karena tanpa sesi.
-		emailAccountHandler.RegisterPublic(auth, middleware.RateLimitByIP(middleware.NewRateLimiter(0, 0)))
+		//
+		// Batasnya sengaja jauh lebih ketat daripada grup publik lain: tiap
+		// permintaan memicu pengiriman surel, sehingga banjir permintaan bukan
+		// hanya membebani server tapi juga mengirim surel massal ke alamat
+		// yang tidak pernah meminta. Tiga permintaan per menit cukup untuk
+		// pengguna yang salah ketik, tapi menutup penyalahgunaan.
+		emailAccountLimiter := middleware.NewRateLimiter(emailAccountMaxPerMinute, time.Minute)
+		emailAccountHandler.RegisterPublic(auth, middleware.RateLimitByIP(emailAccountLimiter))
 	}
 
 	me := r.Group("/api/v1")

@@ -78,6 +78,22 @@
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		# HSTS: setelah kunjungan pertama, browser menolak HTTP polos ke domain
+		# ini selama satu tahun. Tanpa ini, redirect 308 masih bisa didahului
+		# permintaan HTTP yang disadap. `includeSubDomains` belum dipasang
+		# karena hanya www yang dipakai; menambahkannya sekarang akan mengunci
+		# subdomain yang mungkin dibuat nanti.
+		Strict-Transport-Security "max-age=31536000"
+		# CSP: kode aplikasi tidak memuat skrip pihak ketiga, tidak memakai
+		# inline script, dan tidak mengevaluasi string sebagai kode. Karena itu
+		# script-src bisa 'self' penuh tanpa pengecualian. Lapisan ini yang
+		# menahan dampak bila suatu saat ada HTML tak tersanitasi lolos ke DOM.
+		#
+		# 'unsafe-inline' pada style tetap dibutuhkan karena Tailwind dan
+		# lightweight-charts menulis atribut style langsung ke elemen.
+		# connect-src 'self' mengizinkan API (satu origin) sekaligus menutup
+		# pengiriman data ke host lain bila ada skrip yang berhasil disuntikkan.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
 		# Versi server tidak perlu dibocorkan.
 		-Server
 	}
