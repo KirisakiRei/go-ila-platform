@@ -144,10 +144,41 @@ function FooterWatermark() {
  * Halaman publik memakai bundel terpisah dari dashboard, sehingga pengunjung
  * tanpa akun tidak mengunduh kode panel yang tidak dibutuhkannya (plans/11 J5b).
  */
+/**
+ * Rute yang benar-benar dilayani situs publik.
+ *
+ * Dipakai untuk membedakan "halaman yang tidak ada" dari halaman sah. Daftar
+ * ini harus ikut diperbarui setiap ada rute publik baru: kalau tertinggal,
+ * halaman baru tersebut akan kehilangan footer tanpa ada yang menyadarinya.
+ * Pasangannya ada di PublicApp.tsx.
+ */
+const RUTE_PUBLIK = [
+  '/',
+  '/fitur',
+  '/harga',
+  '/tentang',
+  '/bantuan',
+  '/legal',
+  '/lupa-sandi',
+  '/reset-password',
+  '/verifikasi',
+  '/daftar',
+] as const
+
+/** ruteDikenal memeriksa pathname terhadap daftar rute publik, termasuk anaknya. */
+function ruteDikenal(pathname: string): boolean {
+  const bersih = pathname !== '/' && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  return RUTE_PUBLIK.some((rute) => bersih === rute || bersih.startsWith(`${rute}/`))
+}
+
 export function PublicLayout() {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
   const isHome = pathname === '/'
+  // Halaman 404 tidak menampilkan footer. Footer penuh tautan di bawah pesan
+  // "tidak ditemukan" mengalihkan perhatian dari satu-satunya tindakan yang
+  // berguna, yaitu kembali ke beranda.
+  const tampilkanFooter = ruteDikenal(pathname)
   const [homeHeaderTheme, setHomeHeaderTheme] = useState<HeaderTheme>('top')
   const status = useQuery({ queryKey: ['public', 'status'], queryFn: publicContentApi.status })
 
@@ -365,7 +396,8 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="relative z-0 border-t border-zinc-200/80 bg-[#f5f5f7] text-[#09090b]">
+      {tampilkanFooter && (
+        <footer className="relative z-0 border-t border-zinc-200/80 bg-[#f5f5f7] text-[#09090b]">
         {/* Konten tautan footer: lebih rapat dan tetap berada di zona kontras tinggi */}
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-10 pb-10 sm:px-6 sm:pt-12 sm:pb-12">
           {/* Logo & Brand Header Footer */}
@@ -497,7 +529,8 @@ export function PublicLayout() {
 
         {/* Watermark raksasa IMAGINARY, full-width tanpa celah dengan animasi scroll */}
         <FooterWatermark />
-      </footer>
+        </footer>
+      )}
     </div>
   )
 }
