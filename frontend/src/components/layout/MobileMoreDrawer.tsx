@@ -209,7 +209,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
             <div className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold text-foreground">{user.name}</p>
-                <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+                <p className="truncate text-micro text-muted-foreground">{user.email}</p>
               </div>
               <Badge variant="muted">{TIER_LABEL[user.tier]}</Badge>
             </div>

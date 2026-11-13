@@ -135,7 +135,7 @@ function TrialCard() {
 
   if (isError) {
     return (
-      <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-3.5 text-[11.5px] text-destructive">
+      <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-3.5 text-caption text-destructive">
         {(error as Error).message}
       </div>
     )
@@ -294,7 +294,7 @@ export function SettingsMobileView() {
       {/* Header */}
       <div>
         <h1 className="text-lg font-bold tracking-tight text-foreground">Pengaturan</h1>
-        <p className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
+        <p className="mt-0.5 text-caption leading-relaxed text-muted-foreground">
           Kelola akun, preferensi trading, dan keamanan Anda.
         </p>
       </div>

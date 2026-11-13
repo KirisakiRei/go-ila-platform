@@ -220,7 +220,7 @@ function PasswordCard() {
               onChange={(event) => setForm({ ...form, confirm: event.target.value })}
               className="mt-1"
             />
-            {mismatch && <p className="mt-1 text-[11px] text-muted-foreground">Belum sama.</p>}
+            {mismatch && <p className="mt-1 text-micro text-muted-foreground">Belum sama.</p>}
           </div>
         </div>
         <Button size="sm" disabled={!canSubmit || change.isPending} onClick={() => change.mutate()}>
@@ -465,7 +465,7 @@ function TwoFactorCard() {
                   Jika kamera Anda bermasalah, masukkan kunci rahasia berikut secara manual pada aplikasi Google Authenticator (pilih opsi <strong>"Masukkan kunci penyiapan"</strong>):
                 </p>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground">Kunci Rahasia (Secret Key)</Label>
+                  <Label className="text-micro text-muted-foreground">Kunci Rahasia (Secret Key)</Label>
                   <div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/50 p-2.5">
                     <span className="select-all font-mono text-sm font-semibold tracking-wider text-foreground">
                       {setup.secret}
@@ -485,7 +485,7 @@ function TwoFactorCard() {
                     </Button>
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-micro text-muted-foreground">
                   Jenis kunci: <strong>Berbasis waktu (TOTP)</strong> · Interval: <strong>30 detik</strong>
                 </p>
               </div>
@@ -589,7 +589,7 @@ function SessionsCard() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-micro text-muted-foreground">
                         Terakhir aktif {formatDateTime(row.last_seen_at)}
                       </p>
                     </div>
@@ -725,7 +725,7 @@ function IdleWarningCard() {
           />
           <div className="space-y-0.5">
             <span className="font-medium">Tampilkan peringatan konfirmasi sebelum keluar otomatis</span>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-micro text-muted-foreground">
               Dialog interaktif "Anda masih di sini?" dengan hitung mundur 60 detik akan ditampilkan sebelum sesi benar-benar ditutup.
             </p>
           </div>

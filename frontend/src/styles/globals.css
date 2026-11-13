@@ -67,6 +67,15 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Hindari baris terakhir yang hanya berisi satu kata. */
+    text-wrap: pretty;
+  }
+
+  /* Judul mendapat pemenggalan baris yang seimbang, bukan menggantung. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 
   /* Angka rata kolom agar tabel harga mudah dibandingkan. */

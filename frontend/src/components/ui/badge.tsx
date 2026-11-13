@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
  * bukan warna, sehingga tetap terbaca pada layar apa pun.
  */
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-4',
+  'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-micro font-medium leading-4',
   {
     variants: {
       variant: {

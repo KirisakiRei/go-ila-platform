@@ -59,7 +59,7 @@ export function AccountStatusCard() {
               <h2 className="text-sm font-semibold tracking-tight">{user.name}</h2>
               <Badge variant={meta.badgeVariant}>{meta.label}</Badge>
               {isTrialActive && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-micro font-semibold text-emerald-700 dark:text-emerald-400">
                   <Sparkles className="h-3 w-3" />
                   Trial Aktif ({trial.data?.days_remaining} hari lagi)
                 </span>
@@ -68,7 +68,7 @@ export function AccountStatusCard() {
 
             <p className="text-[12.5px] text-muted-foreground">{meta.description}</p>
 
-            <div className="flex flex-wrap items-center gap-3 pt-1 text-[11.5px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-caption text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-foreground" />
                 Mode: <strong className="font-medium text-foreground">{isSimulated ? 'Simulasi' : 'Live Broker'}</strong>

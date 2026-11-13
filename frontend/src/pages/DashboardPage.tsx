@@ -52,7 +52,7 @@ function RecentPositions() {
           <span className="font-semibold">{position.symbol}</span>
           <span className="text-muted-foreground">{position.direction}</span>
           {position.is_dry_run && (
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span className="text-micro uppercase tracking-wide text-muted-foreground">
               Demo
             </span>
           )}

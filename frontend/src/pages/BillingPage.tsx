@@ -216,14 +216,14 @@ export default function BillingPage() {
                           </span>
                           <span className="text-xs text-muted-foreground">/ 30 hari</span>
                         </div>
-                        <p className="mt-1 text-[11px] text-muted-foreground">
+                        <p className="mt-1 text-micro text-muted-foreground">
                           {plan.code === 'free' ? 'Akses selamanya tanpa biaya' : 'Pembayaran per bulan, batalkan kapan saja'}
                         </p>
                       </div>
 
                       {/* Benefit Checklist */}
                       <div className="space-y-2 border-t border-border pt-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <p className="text-micro font-semibold uppercase tracking-wider text-muted-foreground">
                           Benefit Termasuk:
                         </p>
                         <ul className="space-y-2 text-xs">
@@ -310,7 +310,7 @@ export default function BillingPage() {
                           <TableCell className="text-xs">
                             <Badge
                               variant={row.status === 'paid' ? 'solid' : row.status === 'pending' ? 'outline' : 'muted'}
-                              className="text-[10.5px]"
+                              className="text-micro"
                             >
                               {STATUS_TEXT[row.status] ?? row.status}
                             </Badge>
@@ -388,7 +388,7 @@ export default function BillingPage() {
               className="font-mono text-xs"
             />
           </div>
-          <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+          <p className="text-caption text-muted-foreground leading-relaxed">
             Saldo kredit yang Anda peroleh dapat digunakan untuk memotong total tagihan saat melakukan checkout paket.
           </p>
         </div>
