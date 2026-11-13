@@ -55,7 +55,7 @@ function directionMeta(direction: string | undefined) {
       icon: ArrowUpRight,
       borderClass: 'border-emerald-300 dark:border-emerald-800',
       bgClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-      badgeClass: 'bg-emerald-600 text-white',
+      badgeClass: 'bg-emerald-700 text-white',
     }
   }
   if (dir === 'BEARISH' || dir === 'SELL' || dir === 'SHORT') {
@@ -64,7 +64,7 @@ function directionMeta(direction: string | undefined) {
       icon: ArrowDownRight,
       borderClass: 'border-rose-300 dark:border-rose-800',
       bgClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400',
-      badgeClass: 'bg-rose-600 text-white',
+      badgeClass: 'bg-rose-700 text-white',
     }
   }
   return {

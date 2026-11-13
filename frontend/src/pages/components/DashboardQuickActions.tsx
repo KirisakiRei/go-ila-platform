@@ -122,7 +122,7 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             >
               <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
                 <CreditCard className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white ring-1 ring-card leading-tight">
+                <span className="absolute -top-1 -right-1 rounded-full bg-emerald-700 px-1.5 text-[11px] font-bold text-white ring-1 ring-card leading-tight">
                   {tierLabel}
                 </span>
               </div>
