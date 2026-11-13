@@ -203,8 +203,7 @@ export function SignalOverviewCard({
               Sedang dipantau
             </p>
             <p className="mt-1.5 text-[12px] leading-relaxed text-[#52525b]">
-              Belum ada arah terkonfirmasi. Platform memantau pergerakan struktur harga instrumen ini
-              secara kontinu.
+              Belum ada arah terkunci. Kartu ini berubah begitu struktur terkonfirmasi.
             </p>
           </>
         )}

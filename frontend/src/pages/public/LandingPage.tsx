@@ -70,8 +70,8 @@ const FEATURE_STATS = [
     detail: 'Masa uji coba fitur setara Plus dalam mode simulasi sebelum memilih paket.',
   },
   {
-    value: '100%',
-    detail: 'Setiap sinyal, persetujuan, dan riwayat order tercatat rapi untuk evaluasi.',
+    value: 'Jejak',
+    detail: 'Setiap sinyal, persetujuan, dan riwayat order tercatat untuk dievaluasi.',
   },
 ]
 
@@ -129,7 +129,7 @@ export default function LandingPage() {
             <div className="relative z-10 mt-12 flex flex-col justify-between gap-6 border-t border-white/15 pt-8 md:mt-16 md:flex-row md:items-end">
               <div className="max-w-xl">
                 <p className="text-[15px] leading-relaxed text-zinc-200">
-                  Analisis struktur likuiditas real-time dan eksekusi presisi langsung di akun broker Anda.
+                  Sinyal sweep likuiditas dan eksekusi order, langsung di akun broker Anda.
                 </p>
               </div>
 
@@ -160,11 +160,11 @@ export default function LandingPage() {
         >
           <div className="max-w-2xl space-y-5">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight text-[#09090b] sm:text-4xl lg:text-[2.75rem]">
-              Trading lebih sistematis dengan aturan risiko terukur
+              Atur batas risikonya, sistem yang menagih disiplinnya.
             </h2>
             <p className="max-w-lg text-[14px] leading-relaxed text-[#3f3f46]">
-              Dari analisis struktur chart hingga eksekusi posisi, semua keputusan tercatat
-              transparan di akun trading Anda.
+              Setiap setup punya jejak: kapan terbit, kapan Anda setujui, di harga berapa masuk,
+              dan bagaimana posisi ditutup.
             </p>
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <a
@@ -217,14 +217,13 @@ export default function LandingPage() {
           <div className="grid gap-6 border-t border-zinc-200 pt-14 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-6">
               <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                <span className="text-[#09090b]">Kami buat eksekusi</span>{' '}
-                <span className="text-[#52525b]">mudah dikendalikan</span>
+                <span className="text-[#09090b]">Eksekusi cepat,</span>{' '}
+                <span className="text-[#52525b]">keputusan tetap di tangan Anda.</span>
               </h2>
             </div>
             <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center lg:col-span-6">
               <p className="max-w-sm text-[14px] leading-relaxed text-[#52525b]">
-                Dari pembacaan struktur pasar hingga persetujuan sekali ketuk, semua langkah tetap
-                berada di bawah kendali penuh Anda.
+                Pilih otomatis tanpa jeda, atau konfirmasi manual sekali ketuk.
               </p>
               <Link
                 to="/fitur"
@@ -285,7 +284,7 @@ export default function LandingPage() {
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6">
             <p className="text-[13px] text-[#71717a]">
-              Parameter lengkap entry price, stop loss, dan take profit tersedia di dashboard member.
+              Angka entry, SL, dan TP masuk ke dashboard begitu sinyal Anda terima.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link
@@ -304,9 +303,9 @@ export default function LandingPage() {
           </div>
 
           <h2 className="mt-14 max-w-3xl text-3xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-            <span className="text-[#09090b]">Satu tempat untuk pantau,</span>
+            <span className="text-[#09090b]">Pantau setup, eksekusi,</span>
             <br />
-            <span className="text-[#52525b]">setujui, dan jaga risiko</span>
+            <span className="text-[#52525b]">tinjau hasilnya.</span>
           </h2>
         </div>
       </section>
@@ -318,12 +317,11 @@ export default function LandingPage() {
             <div className="flex flex-col justify-between gap-8 lg:col-span-5">
               <div className="space-y-4">
                 <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                  <span className="text-[#09090b]">Dua metode analisis,</span>{' '}
-                  <span className="text-[#52525b]">satu disiplin risiko</span>
+                  <span className="text-[#09090b]">Dua mesin analisis,</span>{' '}
+                  <span className="text-[#52525b]">satu kerangka risiko.</span>
                 </h2>
                 <p className="text-[14px] leading-relaxed text-[#52525b]">
-                  Metode ILA memetakan area likuiditas dan menunggu konfirmasi pergerakan harga
-                  sebelum mengirim setup — tanpa spekulasi berlebihan.
+                  Sinyal baru terbit setelah harga menyapu level acuan dan struktur bergerak searah.
                 </p>
               </div>
 
@@ -360,8 +358,7 @@ export default function LandingPage() {
                     ILA 2.0 · Tersedia Sekarang
                   </h3>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
-                    Menyaring liquidity sweep dan konfirmasi struktur pasar secara konsisten pada
-                    seluruh paket langganan.
+                    Saringan sweep likuiditas dan konfirmasi struktur. Aturannya sama di semua paket.
                   </p>
                 </div>
                 <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
@@ -369,8 +366,7 @@ export default function LandingPage() {
                     ILA 3.0 · Hadir Bertahap
                   </h3>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
-                    Penyaringan struktur multi-frame lanjutan yang disiapkan bertahap sebagai pilihan
-                    tambahan di paket Plus.
+                    Penyaringan multi-timeframe lanjutan di paket Plus, dirilis bertahap.
                   </p>
                 </div>
               </div>
@@ -391,8 +387,8 @@ export default function LandingPage() {
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-              <span className="text-[#09090b]">Dirancang untuk</span>{' '}
-              <span className="text-[#52525b]">trading yang terukur</span>
+              <span className="text-[#09090b]">Cakupan pantauan dan</span>{' '}
+              <span className="text-[#52525b]">batas risiko Anda.</span>
             </h2>
             <p className="mt-3 text-[14px] leading-relaxed text-[#52525b]">
               Membantu Anda menjalankan rencana trading yang sudah ditulis, mulai dari pemindaian
@@ -426,8 +422,7 @@ export default function LandingPage() {
                   Peringatan &amp; Persetujuan Telegram
                 </h3>
                 <p className="mt-2 text-[13px] leading-relaxed text-[#52525b]">
-                  Terima notifikasi sinyal real-time dan setujui eksekusi lewat satu ketukan tanpa
-                  perlu menatap layar terus-menerus.
+                  Sinyal sampai ke Telegram, setujui dengan satu ketukan.
                 </p>
               </div>
 
@@ -468,12 +463,12 @@ export default function LandingPage() {
           <div className="flex flex-col justify-between gap-4 pb-10 sm:flex-row sm:items-end">
             <div className="space-y-2">
               <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                <span className="text-[#09090b]">Pilihan Paket</span>{' '}
-                <span className="text-[#52525b]">Sesuai Kebutuhan</span>
+                <span className="text-[#09090b]">Pilih paket sesuai</span>{' '}
+                <span className="text-[#52525b]">cara Anda bertrading.</span>
               </h2>
               <p className="max-w-xl text-[14px] text-[#52525b]">
-                Harga mengikuti katalog aktif di server. Mulai dari simulasi gratis atau langsung
-                coba uji coba 7 hari setara Plus.
+                Mulai gratis dengan data simulasi, atau uji coba 7 hari setara Plus tanpa kartu
+                kredit.
               </p>
             </div>
             <Link
@@ -569,7 +564,7 @@ export default function LandingPage() {
             </div>
           ) : (
             <p className="border-t border-zinc-200 pt-6 text-[13px] text-[#52525b]">
-              Daftar paket dapat dilihat langsung pada halaman{' '}
+              Perbandingan paket lengkap ada di halaman{' '}
               <Link to="/harga" className="font-medium text-[#09090b] underline">
                 Harga
               </Link>
@@ -585,19 +580,18 @@ export default function LandingPage() {
           <div className="rounded-3xl bg-[#050507] px-6 py-12 text-white shadow-2xl shadow-black/15 sm:px-12 sm:py-16">
             <div className="max-w-2xl space-y-6">
               <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl lg:text-[2.6rem]">
-                <span className="text-white">Siap menjalankan trading</span>{' '}
-                <span className="text-zinc-400">dengan aturan lebih jelas?</span>
+                <span className="text-white">Tujuh hari untuk melihat</span>{' '}
+                <span className="text-zinc-400">apakah cara kerja ini cocok.</span>
               </h2>
 
               <p className="text-[14px] leading-relaxed text-zinc-300">
-                Mulai trial simulasi 7 hari tanpa kartu kredit. Hubungkan akun broker Anda saat sudah
-                siap menjalankan trading.
+                Mulai di mode simulasi tanpa kartu kredit. Broker dihubungkan saat Anda siap eksekusi.
               </p>
 
               <p className="border-l-2 border-zinc-700 pl-4 text-[12px] leading-relaxed text-zinc-300">
                 <strong className="font-semibold text-white">Disclaimer Risiko Trading:</strong>{' '}
                 Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi. Platform ini
-                adalah alat bantu analisis dan eksekusi—bukan jaminan keuntungan dan bukan nasihat
+                adalah alat bantu analisis dan eksekusi. Tidak menjamin hasil, bukan nasihat
                 keuangan.
               </p>
 

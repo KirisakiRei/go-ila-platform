@@ -7,8 +7,8 @@ export type PlanBenefit = {
 
 const TIER_AUDIENCE: Record<string, string> = {
   free: 'Untuk mengevaluasi cara kerja sinyal dalam mode demo.',
-  basic: 'Untuk trader aktif dengan eksekusi terarah & sinyal real-time.',
-  plus: 'Untuk otomasi penuh, multi-akun, dan kontrol risiko fleksibel.',
+  basic: 'Untuk trader aktif yang eksekusi sendiri dengan konfirmasi sinyal.',
+  plus: 'Untuk otomasi penuh di beberapa akun, dengan batas risiko per akun.',
 }
 
 /**
@@ -25,7 +25,7 @@ export function formatPlanBenefits(plan: PublicPlan): PlanBenefit[] {
 
   const delay = f.signal_delay_minutes
   if (delay === '0') {
-    benefits.push({ label: 'Sinyal real-time tanpa jeda', included: true })
+    benefits.push({ label: 'Sinyal tanpa jeda', included: true })
   } else if (delay) {
     benefits.push({ label: `Sinyal demo (jeda ${delay} menit)`, included: true })
   }

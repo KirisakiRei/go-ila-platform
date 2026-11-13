@@ -105,7 +105,7 @@ describe('LandingPage & PublicLayout', () => {
     expect(await screen.findByText('Plus')).toBeInTheDocument()
     expect(screen.getByText(/Rp\s?299\.000/)).toBeInTheDocument()
     expect(screen.getByText(/Eksekusi otomatis & konfirmasi manual/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sinyal real-time tanpa jeda/i)).toBeInTheDocument()
+    expect(screen.getByText(/Sinyal tanpa jeda/i)).toBeInTheDocument()
     expect(screen.queryByText(/auto_execute/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/signal_delay_minutes/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/AES-256/i)).not.toBeInTheDocument()
