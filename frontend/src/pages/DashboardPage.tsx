@@ -6,22 +6,25 @@ import { usePositions, useSystemStatus } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatR } from '@/lib/format'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { PageHeaderActions } from './components/PageHeaderActions'
-import { DailyLimitCard } from './components/DailyLimitCard'
-import { SystemHealthCard } from './components/SystemHealthCard'
-import { MarketSessionCard } from '@/features/trading/components/MarketSessionCard'
 import { OnboardingCard, OnboardingModal } from '@/features/onboarding'
 import { AccountStatusCard } from './components/AccountStatusCard'
 import { DashboardGreetingBar } from './components/DashboardGreetingBar'
 import { DashboardRadarHero } from './components/DashboardRadarHero'
 import { DashboardQuickActions } from './components/DashboardQuickActions'
-import { DashboardSummaryMetrics } from './components/DashboardSummaryMetrics'
+import { KondisiHariIni, KondisiHariIniRingkas } from './components/KondisiHariIni'
 import { DashboardOnboardingWidget } from './components/DashboardOnboardingWidget'
 import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
+import { POSISI_LIMIT_DASHBOARD } from '@/features/signals/lib/kondisi-pasar'
+
+export { POSISI_LIMIT_DASHBOARD }
 
 
 
 function RecentPositions() {
-  const { data, isLoading } = usePositions(5)
+  // Limit disamakan dengan KondisiHariIni agar keduanya berbagi satu cache.
+  // Kunci cache menyertakan limit, jadi angka berbeda berarti dua permintaan
+  // terpisah ke /positions setiap kali data disegarkan.
+  const { data, isLoading } = usePositions(POSISI_LIMIT_DASHBOARD)
 
   if (isLoading) return <Skeleton className="h-32 w-full" />
 
@@ -96,8 +99,14 @@ export default function DashboardPage() {
           onOpenOnboarding={() => setOnboardingOpen(true)}
         />
 
-        {/* 2.d Ringkasan Trading Hari Ini (Grid 2x2) */}
-        <DashboardSummaryMetrics />
+        {/*
+         * 2.d Ringkasan hari ini.
+         *
+         * Susunan mobile dipertahankan, tetapi angka yang dulu tersebar di
+         * tiga kartu (status pasar, kuota, win/loss, broker) kini diringkas
+         * jadi satu baris agar tidak berulang.
+         */}
+        <KondisiHariIniRingkas />
 
         {/* 2.e Widget Tipis Penyiapan Akun */}
         <DashboardOnboardingWidget onOpenOnboarding={() => setOnboardingOpen(true)} />
@@ -117,22 +126,15 @@ export default function DashboardPage() {
 
         <OnboardingCard />
 
-        {/* Hero Radar Pasar & Ringkasan Trading di Desktop (Quick Actions khusus mobile & tab portrait) */}
+        {/* Hero Radar Pasar & Kondisi Hari Ini di Desktop (Quick Actions khusus mobile & tab portrait) */}
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-7">
             <DashboardRadarHero />
           </div>
           <div className="lg:col-span-5">
-            <DashboardSummaryMetrics />
+            <KondisiHariIni />
           </div>
         </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <DailyLimitCard />
-          <SystemHealthCard />
-        </div>
-
-        <MarketSessionCard />
 
         <Section
           title="Posisi Terkini"
