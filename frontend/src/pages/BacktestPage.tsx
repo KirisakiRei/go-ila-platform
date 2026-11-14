@@ -88,15 +88,13 @@ export default function BacktestPage() {
 
           <Section title="Entry" description="Pilih satu baris untuk melihat potongan chart dan tahapannya.">
             {trades ? (
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-                <div className="min-w-0">
-                  <BacktestTradeTable
-                    trades={trades}
-                    seqTerpilih={seqAktif}
-                    onPilih={setSeqTerpilih}
-                  />
-                </div>
-                <div className="min-w-0">
+              <div className="flex flex-col gap-5">
+                <BacktestTradeTable
+                  trades={trades}
+                  seqTerpilih={seqAktif}
+                  onPilih={setSeqTerpilih}
+                />
+                <div className="min-w-0 border-t border-border pt-4">
                   {seqAktif ? (
                     <BacktestTradeChart
                       runID={runID ?? ''}

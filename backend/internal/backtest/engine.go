@@ -105,6 +105,11 @@ func (e *Engine) Run(params Params, htfCandles, ltfCandles []indicators.Candle) 
 			if selesai, exitPrice, outcome, ambiguous := nilaiExit(posisiAktif, candleLTF); selesai {
 				tutupPosisi(posisiAktif, candleLTF.Timestamp, exitPrice, outcome, ambiguous, params, &modal)
 				hasil.Entries = append(hasil.Entries, *posisiAktif)
+				// Jendela candle dibuat di sini, saat exit sudah diketahui, supaya
+				// chart memuat seluruh perjalanan posisi. Membuatnya saat entry
+				// dibuka akan memotong trade panjang sebelum target atau batas
+				// rugi tercapai, sehingga penanda exit jatuh di luar chart.
+				gambar = append(gambar, jendelaChart(posisiAktif, htfCandles, ltfCandles))
 				penjaga.catat(posisiAktif.Outcome, candleLTF.Timestamp)
 				perPosisiSelesai = iLTF
 				posisiAktif = nil
@@ -183,12 +188,6 @@ func (e *Engine) Run(params Params, htfCandles, ltfCandles []indicators.Candle) 
 			Levels:     levelDariSetup(setup),
 		}
 		posisiAktif = &entry
-
-		// Simpan jendela candle untuk chart.
-		gambar = append(gambar, CandleWindow{
-			HTF: potongJendela(htfSampai, candleLTF.Timestamp, candleJendelaChart),
-			LTF: potongJendela(ltfSampai, candleLTF.Timestamp, candleJendelaChart),
-		})
 	}
 
 	// Posisi yang belum selesai saat data habis tetap dicatat sebagai EXPIRED
@@ -198,10 +197,7 @@ func (e *Engine) Run(params Params, htfCandles, ltfCandles []indicators.Candle) 
 		tutupPosisi(posisiAktif, ltfCandles[len(ltfCandles)-1].Timestamp, hargaAkhir,
 			OutcomeExpired, false, params, &modal)
 		hasil.Entries = append(hasil.Entries, *posisiAktif)
-		gambar = append(gambar, CandleWindow{
-			HTF: potongJendela(htfCandles, posisiAktif.EntryTime, candleJendelaChart),
-			LTF: potongJendela(ltfCandles, posisiAktif.EntryTime, candleJendelaChart),
-		})
+		gambar = append(gambar, jendelaChart(posisiAktif, htfCandles, ltfCandles))
 	}
 
 	hitungStatistik(hasil, params.Equity)
@@ -288,6 +284,56 @@ func potongSampai(candles []indicators.Candle, batas time.Time) []indicators.Can
 }
 
 // potongJendela mengambil sejumlah candle di kiri dan kanan sebuah titik waktu.
+// jendelaChart memotong candle di sekitar satu posisi untuk kebutuhan gambar.
+//
+// Jendelanya membentang dari beberapa candle sebelum entry sampai beberapa
+// candle sesudah exit, bukan hanya di sekitar entry. Tanpa rentang penuh,
+// trade yang berjalan berhari-hari kehilangan candle saat target atau batas
+// rugi tersentuh; chart lalu tampak seperti posisi yang menggantung tanpa
+// akhir, padahal mesin sudah menutupnya.
+//
+// HTF dan LTF dipotong dengan titik yang sama, sehingga dua seri dalam satu
+// chart benar-benar sejajar waktunya.
+func jendelaChart(posisi *Entry, htfCandles, ltfCandles []indicators.Candle) CandleWindow {
+	akhir := posisi.ExitTime
+	if akhir.IsZero() || akhir.Before(posisi.EntryTime) {
+		akhir = posisi.EntryTime
+	}
+	return CandleWindow{
+		HTF: potongRentang(htfCandles, posisi.EntryTime, akhir, candleJendelaChart),
+		LTF: potongRentang(ltfCandles, posisi.EntryTime, akhir, candleJendelaChart),
+	}
+}
+
+// potongRentang mengambil candle dari beberapa butir sebelum mulai sampai
+// beberapa butir sesudah selesai.
+func potongRentang(candles []indicators.Candle, mulai, selesai time.Time, jendela int) []indicators.Candle {
+	titikMulai := sort.Search(len(candles), func(i int) bool {
+		return !candles[i].Timestamp.Before(mulai)
+	})
+	// Search mengembalikan posisi pertama yang >= mulai; satu butir sebelumnya
+	// ikut diambil karena candle sweep sering tepat di detik yang dicari.
+	awal := titikMulai - jendela
+	if awal < 0 {
+		awal = 0
+	}
+
+	titikSelesai := sort.Search(len(candles), func(i int) bool {
+		return candles[i].Timestamp.After(selesai)
+	})
+	akhir := titikSelesai + jendela
+	if akhir > len(candles) {
+		akhir = len(candles)
+	}
+
+	if awal >= akhir {
+		return nil
+	}
+	hasil := make([]indicators.Candle, akhir-awal)
+	copy(hasil, candles[awal:akhir])
+	return hasil
+}
+
 func potongJendela(candles []indicators.Candle, titik time.Time, jendela int) []indicators.Candle {
 	posisi := sort.Search(len(candles), func(i int) bool {
 		return !candles[i].Timestamp.Before(titik)
