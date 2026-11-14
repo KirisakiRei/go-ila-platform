@@ -272,7 +272,12 @@ func (s *BacktestService) Buat(ctx context.Context, userID string, req dto.Backt
 	if batasBulan > BatasBulanPlus {
 		batasBulan = BatasBulanPlus
 	}
-	batasAwal := time.Now().UTC().AddDate(0, -batasBulan, 0)
+	// Toleransi satu hari, bukan kelonggaran: tanggal akhir boleh sampai
+	// esok, sehingga awal rentang enam bulan lalu jatuh sedikit lebih tua
+	// daripada AddDate(0,-6,0). Tanpa toleransi ini, pengguna yang memilih
+	// "enam bulan terakhir" persis ditolak karena selisih beberapa detik —
+	// dan pesan "hanya enam bulan terakhir" terbaca seperti salah sistem.
+	batasAwal := time.Now().UTC().AddDate(0, -batasBulan, -1)
 	if dari.Before(batasAwal) {
 		return dto.BacktestRunResponse{}, fmt.Errorf("%w: paket %s hanya bisa menguji %d bulan terakhir", apperror.ErrBadRequest, hak.Tier, batasBulan)
 	}
@@ -556,6 +561,10 @@ func (s *BacktestService) ringkas(run *model.BacktestRun, _ backtest.Result) dto
 			MaksDrawdown:  run.MaxDrawdown,
 			ProfitFactor:  run.ProfitFactor,
 			EkuitasMulai:  run.Equity,
+			// Ekuitas akhir adalah titik terakhir kurva. Tanpa ini UI menerima
+			// nol dan menampilkannya sebagai modal habis — padahal nol berarti
+			// "belum dihitung", bukan "bangkrut".
+			EkuitasAkhir: ekuitasTerakhir(run),
 		},
 	}
 	if run.StartedAt != nil {
@@ -615,3 +624,20 @@ func parseAngka(nilai string, cadangan int) int {
 // parsinganDipakai menandai parseAngka disimpan untuk pembacaan kuota dari
 // katalog paket pada pengembangan berikutnya.
 var _ = parseAngka
+
+// ekuitasTerakhir membaca titik terakhir kurva ekuitas.
+//
+// Kurva disimpan sebagai JSON di baris run, bukan sebagai kolom angka: satu
+// titik per trade sudah cukup untuk digambar, dan kolom tambahan hanya
+// menduplikasi nilai yang bisa dihitung dari baris trade terakhir. Bila kurva
+// kosong (run tanpa trade), modal awal dipakai agar UI tidak menampilkan nol.
+func ekuitasTerakhir(run *model.BacktestRun) float64 {
+	if run.EquityCurveJSON == "" {
+		return run.Equity
+	}
+	var kurva []backtest.EquityPoint
+	if err := json.Unmarshal([]byte(run.EquityCurveJSON), &kurva); err != nil || len(kurva) == 0 {
+		return run.Equity
+	}
+	return kurva[len(kurva)-1].Equity
+}
