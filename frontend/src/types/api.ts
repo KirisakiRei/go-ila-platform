@@ -669,3 +669,149 @@ export type SubscriptionBanner = {
   days_left: number
   level: 'info' | 'warning' | 'critical'
 }
+
+/**
+ * Backtest ILA 2.0 atas data historis.
+ *
+ * Semua waktu datang sebagai Unix detik UTC karena itu yang dipakai pemilih
+ * tanggal dan chart; mengubahnya ke teks di server akan memaksa UI menebak
+ * zona waktu.
+ */
+export type BacktestTimeframeCoverage = {
+  timeframe: string
+  mulai: number
+  selesai: number
+  jumlah: number
+}
+
+export type BacktestPairOption = {
+  htf: string
+  ltf: string
+  label: string
+  mulai: number
+  selesai: number
+  tersedia: boolean
+}
+
+export type BacktestCoverage = {
+  symbol: string
+  feed: string
+  mulai: number
+  selesai: number
+  rentang: BacktestTimeframeCoverage[]
+  pasangan: BacktestPairOption[]
+  diperiksa_pada: number
+}
+
+export type BacktestQuota = {
+  tier: string
+  batas_harian: number
+  terpakai: number
+  /** Negatif berarti tanpa batas (admin). */
+  sisa: number
+  maks_hari: number
+  rentang_maks_bulan: number
+  bisa_jalankan: boolean
+  alasan?: string
+}
+
+export type BacktestStats = {
+  total_trade: number
+  menang: number
+  kalah: number
+  kedaluwarsa: number
+  candle_ambigu: number
+  sinyal_ditolak: number
+  win_rate: number
+  total_r: number
+  maks_drawdown: number
+  profit_factor: number
+  ekuitas_akhir: number
+  ekuitas_mulai: number
+}
+
+export type BacktestStatus = 'queued' | 'running' | 'done' | 'failed'
+
+export type BacktestRun = {
+  id: string
+  symbol: string
+  htf: string
+  ltf: string
+  status: BacktestStatus
+  error?: string
+  dari: number
+  sampai: number
+  equity: number
+  risk: number
+  mulai_pada?: number
+  selesai_pada?: number
+  dibuat_pada: number
+  statistik: BacktestStats
+  strategi: string
+  versi: string
+  kode_commit?: string
+}
+
+export type BacktestEquityPoint = {
+  waktu: number
+  ekuitas: number
+  drawdown: number
+}
+
+export type BacktestRunDetail = BacktestRun & {
+  kurva_ekuitas: BacktestEquityPoint[]
+}
+
+export type BacktestTrade = {
+  seq: number
+  arah: 'BUY' | 'SELL'
+  waktu_masuk: number
+  waktu_keluar: number
+  entry: number
+  stop_loss: number
+  take_profit: number
+  rr_rencana: number
+  hasil: 'TP' | 'SL' | 'EXPIRED'
+  r: number
+  durasi_detik: number
+  ekuitas_akhir: number
+  ambigu: boolean
+  ringkasan: string
+  langkah_berikut: string
+  chart_tersedia: boolean
+}
+
+export type BacktestZone = {
+  top: number
+  bottom: number
+  dari: number
+  sampai: number
+  label: string
+}
+
+export type BacktestMarker = {
+  waktu: number
+  harga: number
+  label: string
+}
+
+export type BacktestTradeDetail = BacktestTrade & {
+  htf: string
+  ltf: string
+  candle_htf: MarketCandle[]
+  candle_ltf: MarketCandle[]
+  zona_fvg?: BacktestZone
+  sweep?: BacktestMarker
+  cisd?: BacktestMarker
+  dibersihkan_pada?: number
+}
+
+export type BacktestCreatePayload = {
+  symbol: string
+  htf: string
+  ltf: string
+  dari: number
+  sampai: number
+  equity?: number
+  risk?: number
+}

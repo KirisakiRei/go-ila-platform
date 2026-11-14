@@ -1,6 +1,13 @@
-import { request } from './http'
+import { request, requestList } from './http'
 import type {
   AccountPairSelectionResponse,
+  BacktestCoverage,
+  BacktestCreatePayload,
+  BacktestQuota,
+  BacktestRun,
+  BacktestRunDetail,
+  BacktestTrade,
+  BacktestTradeDetail,
   Approval,
   ApprovalIssue,
   ApprovalResult,
@@ -146,6 +153,35 @@ export const tradingApi = {
  * Feed tidak dikirim dari klien: server memakai feed milik pair yang dipilih
  * admin, lalu mengembalikan feed yang benar-benar dipakai.
  */
+/**
+ * Backtest ILA 2.0 atas data historis.
+ *
+ * Cakupan dibaca sekali per pasangan lalu dipakai untuk mengunci pemilih
+ * tanggal: pengguna tidak bisa memilih rentang yang datanya tidak ada.
+ */
+export const backtestApi = {
+  coverage: (symbol: string, periksaUlang = false) =>
+    request<BacktestCoverage>('/backtest/coverage', {
+      query: { symbol, periksa_ulang: periksaUlang },
+      // Pemeriksaan pertama menghubungi feed empat kali, jadi butuh waktu jauh
+      // lebih panjang daripada permintaan biasa.
+      timeoutMs: 60_000,
+    }),
+  quota: () => request<BacktestQuota>('/backtest/quota'),
+  create: (payload: BacktestCreatePayload) =>
+    request<BacktestRun>('/backtest', { method: 'POST', body: payload }),
+  detail: (id: string) => request<BacktestRunDetail>(`/backtest/${encodeURIComponent(id)}`),
+  trades: (id: string, limit = 200, offset = 0) =>
+    requestList<BacktestTrade>(`/backtest/${encodeURIComponent(id)}/trades`, {
+      query: { limit, offset },
+    }),
+  trade: (id: string, seq: number) =>
+    request<BacktestTradeDetail>(`/backtest/${encodeURIComponent(id)}/trades/${seq}`),
+  history: (limit = 20) =>
+    requestList<BacktestRun>('/backtest/history', { query: { limit } }),
+  remove: (id: string) => request<void>(`/backtest/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+}
+
 export const marketApi = {
   candles: (symbol: string, tf: string, limit = 200) =>
     request<MarketCandlesResponse>('/market/candles', {

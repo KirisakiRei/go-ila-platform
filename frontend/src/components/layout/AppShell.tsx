@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { BarChart3, Bot, Bug, CreditCard, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
+import { BarChart3, Bot, Bug, CreditCard, FlaskConical, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
 import { Logo } from '@/components/brand/Logo'
@@ -24,6 +24,7 @@ const TITLES: Record<string, string> = {
   '/posisi': 'Positions',
   '/akun': 'Broker Accounts',
   '/strategi': 'Watchlist Pair',
+  '/backtest': 'Backtest ILA 2.0',
   '/langganan': 'Subscription & Billing',
   '/langganan/bayar': 'Checkout Langganan',
   '/pengaturan': 'Settings',
@@ -61,6 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/posisi', label: 'Positions', short: 'Positions', icon: BarChart3 },
       { to: '/akun', label: 'Broker Accounts', short: 'Accounts', icon: Wallet },
       { to: '/strategi', label: 'Watchlist Pair', short: 'Watchlist', icon: Bot },
+      { to: '/backtest', label: 'Backtest', short: 'Backtest', icon: FlaskConical },
     ],
   },
   {

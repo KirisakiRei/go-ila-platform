@@ -19,6 +19,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import SignalsPage from '@/pages/SignalsPage'
 import StrategiesPage from '@/pages/StrategiesPage'
 import AccountsPage from '@/pages/AccountsPage'
+import BacktestPage from '@/pages/BacktestPage'
 import AccountDetailPage from '@/pages/AccountDetailPage'
 import BillingPage from '@/pages/BillingPage'
 import CheckoutPage from '@/pages/CheckoutPage'
@@ -262,6 +263,17 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/backtest"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <BacktestPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+
         <Route
           path="/pengaturan"
           element={

@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   accountApi,
   approvalApi,
+  backtestApi,
   marketApi,
   pairApi,
   riskApi,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/api'
 import { tradingApi } from '@/lib/api'
 import type {
+  BacktestCreatePayload,
   CreateAccountPayload,
   CreateSubscriptionPayload,
   StrategyVersion,
@@ -41,6 +43,12 @@ export const queryKeys = {
   sessions: ['me', 'sessions'] as const,
   accountPairs: (id: string) => ['accounts', id, 'pairs'] as const,
   pairCatalog: ['pairs', 'catalog'] as const,
+  backtestCoverage: (symbol: string) => ['backtest', 'coverage', symbol] as const,
+  backtestQuota: ['backtest', 'quota'] as const,
+  backtestRun: (id: string) => ['backtest', 'run', id] as const,
+  backtestTrades: (id: string) => ['backtest', 'trades', id] as const,
+  backtestTrade: (id: string, seq: number) => ['backtest', 'trade', id, seq] as const,
+  backtestHistory: ['backtest', 'history'] as const,
 }
 
 export function useAccounts() {
@@ -385,6 +393,102 @@ export function useTelegramUnlink() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['me', 'onboarding'] })
       queryClient.invalidateQueries({ queryKey: ['trial'] })
+    },
+  })
+}
+
+/**
+ * Cakupan data historis satu pair.
+ *
+ * Dibaca saat pengguna memilih pair, bukan saat halaman dibuka: pemeriksaan
+ * pertama menghubungi feed empat kali sehingga tidak boleh berjalan untuk
+ * setiap pair di katalog sekaligus. Server menyimpan hasilnya sampai tengah
+ * malam WIB, jadi membuka pair yang sama lagi hampir seketika.
+ */
+export function useBacktestCoverage(symbol: string | null) {
+  return useQuery({
+    queryKey: queryKeys.backtestCoverage(symbol ?? ''),
+    queryFn: () => backtestApi.coverage(symbol ?? ''),
+    enabled: Boolean(symbol),
+    staleTime: 30 * 60_000,
+    retry: 1,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Sisa jatah backtest hari ini. */
+export function useBacktestQuota() {
+  return useQuery({
+    queryKey: queryKeys.backtestQuota,
+    queryFn: backtestApi.quota,
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * Satu run backtest. Selama statusnya belum selesai, hook ini memeriksa ulang
+ * secara berkala; setelah selesai, polling berhenti sendiri.
+ */
+export function useBacktestRun(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.backtestRun(id ?? ''),
+    queryFn: () => backtestApi.detail(id ?? ''),
+    enabled: Boolean(id),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'queued' || status === 'running' ? 2_000 : false
+    },
+  })
+}
+
+/** Daftar entry sebuah run. */
+export function useBacktestTrades(id: string | null, aktif: boolean) {
+  return useQuery({
+    queryKey: queryKeys.backtestTrades(id ?? ''),
+    queryFn: async () => (await backtestApi.trades(id ?? '', 200, 0)).data,
+    enabled: Boolean(id) && aktif,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** Detail satu entry beserta candle dan levelnya untuk chart. */
+export function useBacktestTrade(id: string | null, seq: number | null) {
+  return useQuery({
+    queryKey: queryKeys.backtestTrade(id ?? '', seq ?? 0),
+    queryFn: () => backtestApi.trade(id ?? '', seq ?? 0),
+    enabled: Boolean(id) && Boolean(seq) && (seq ?? 0) > 0,
+    staleTime: 10 * 60_000,
+  })
+}
+
+/** Riwayat run milik pengguna. */
+export function useBacktestHistory() {
+  return useQuery({
+    queryKey: queryKeys.backtestHistory,
+    queryFn: async () => (await backtestApi.history(30)).data,
+    staleTime: 30_000,
+  })
+}
+
+/** Membuat backtest baru. */
+export function useCreateBacktest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: BacktestCreatePayload) => backtestApi.create(payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.backtestQuota })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.backtestHistory })
+    },
+  })
+}
+
+/** Menghapus satu run. */
+export function useDeleteBacktest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => backtestApi.remove(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.backtestHistory })
     },
   })
 }
