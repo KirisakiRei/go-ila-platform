@@ -67,6 +67,8 @@ type OpsiBackendAPI func(*konfigurasiBackendAPI)
 type konfigurasiBackendAPI struct {
 	strategi *runner.Settings
 	tgClient *telegram.Client
+	// latar menerima pekerjaan latar yang perlu dijalankan pemanggil.
+	latar func([]func(ctx context.Context))
 }
 
 // DenganStrategi memakai pengaturan strategi yang sudah dimuat pemanggil.
@@ -74,6 +76,17 @@ type konfigurasiBackendAPI struct {
 // paket) harus memakai opsi ini agar panel user melihat tahap yang sama.
 func DenganStrategi(s *runner.Settings) OpsiBackendAPI {
 	return func(k *konfigurasiBackendAPI) { k.strategi = s }
+}
+
+// DenganPekerjaanLatar menyerahkan pekerjaan latar (worker, penyapu) ke
+// pemanggil alih-alih menjalankannya saat perakitan.
+//
+// Tanpa opsi ini pekerjaan tetap tidak dijalankan; server hanya melayani HTTP.
+// Pemisahan ini mencegah worker ganda saat NewBackendAPI dipanggil lebih dari
+// sekali (mis. di pengujian) dan membuat siklus hidupnya jelas dimiliki
+// proses utama.
+func DenganPekerjaanLatar(terima func([]func(ctx context.Context))) OpsiBackendAPI {
+	return func(k *konfigurasiBackendAPI) { k.latar = terima }
 }
 
 // DenganTelegramClient memakai klien telegram yang sudah disiapkan pemanggil.
@@ -92,6 +105,11 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
+
+	// backgroundWorkers dikumpulkan selama perakitan lalu diserahkan ke
+	// pemanggil lewat opsi; tidak dijalankan di sini agar perakitan ulang (mis.
+	// di pengujian) tidak menyalakan worker ganda.
+	var backgroundWorkers []func(ctx context.Context)
 
 	r := gin.New()
 	r.Use(middleware.RequestID())
@@ -332,6 +350,26 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	adminPairHandler := handler.NewAdminPairHandler(service.NewPairAdminService(pairRepo, auditRepo))
 	tradingHandler := handler.NewTradingHandler(tradingService)
 
+	// Backtest ILA 2.0: mesin simulasi hidup di proses ini, bukan di Runner.
+	// Runner mengurus uang sungguhan; backtest hanya membaca data historis dan
+	// tidak boleh berbagi jalur dengan eksekusi live.
+	backtestRepo := repository.NewBacktestRepository(db)
+	backtestProvider := market.NewTradingViewProvider()
+	backtestService := service.NewBacktestService(service.BacktestServiceDeps{
+		Runs:     backtestRepo,
+		Users:    userRepo,
+		Coverage: service.NewBacktestCoverageService(backtestProvider),
+		Provider: backtestProvider,
+		Features: repository.NewTierFeatureReader(db),
+		Logger:   logger,
+	})
+	backtestHandler := handler.NewBacktestHandler(backtestService)
+	backgroundWorkers = append(backgroundWorkers, func(ctx context.Context) {
+		service.RunBacktestWorker(ctx, backtestService)
+	}, func(ctx context.Context) {
+		service.RunBacktestSweeper(ctx, backtestService, logger)
+	})
+
 	// Data candle untuk chart dashboard. Cache pendek disimpan di proses ini
 	// agar satu halaman yang terus diperbarui tidak menembak feed untuk setiap
 	// permintaan.
@@ -551,6 +589,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		// Saklar pasangan timeframe per akun × pair.
 		timeframeSwitchHandler.Register(me)
 
+		// Backtest ILA 2.0 atas data historis.
+		backtestHandler.Register(me)
+
 		// Penghubungan Telegram.
 		me.POST("/telegram/link", telegramHandler.CreateLink)
 		me.DELETE("/telegram/link", telegramHandler.Disconnect)
@@ -599,6 +640,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
 	if missing := middleware.UndeclaredAdminRoutes(r.Routes()); len(missing) > 0 {
 		panic(fmt.Sprintf("route admin tanpa permission: %v", missing))
+	}
+
+	if pilihan.latar != nil {
+		pilihan.latar(backgroundWorkers)
 	}
 
 	return r

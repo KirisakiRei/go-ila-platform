@@ -97,6 +97,7 @@ func main() {
 		&model.TradingPair{},
 		&model.AccountPairStrategy{},
 		&model.AccountPairTimeframe{},
+		&model.BacktestRun{}, &model.BacktestTrade{}, &model.BacktestQuota{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

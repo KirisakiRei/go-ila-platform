@@ -116,13 +116,21 @@ func main() {
 		}
 	}()
 
+	// Pekerjaan latar (backtest) dikumpulkan saat perakitan lalu dijalankan di
+	// sini, supaya siklus hidupnya jelas milik proses utama dan tidak berlipat
+	// saat router dirakit ulang.
+	var pekerjaanLatar []func(ctx context.Context)
 	srv := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
-		Handler:           router.NewBackendAPI(cfg, db, logger, router.DenganStrategi(strategiSettings), router.DenganTelegramClient(tgClient)),
+		Handler:           router.NewBackendAPI(cfg, db, logger, router.DenganStrategi(strategiSettings), router.DenganTelegramClient(tgClient), router.DenganPekerjaanLatar(func(daftar []func(ctx context.Context)) { pekerjaanLatar = daftar })),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
+	}
+
+	for _, mulai := range pekerjaanLatar {
+		go mulai(ctx)
 	}
 
 	go func() {
