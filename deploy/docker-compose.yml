@@ -61,7 +61,12 @@ services:
       LOG_DIR: /var/log/ila
       LOG_HARI: "30"
       LOG_BATAS_MB: "1024"
-    mem_limit: 160m
+    # Worker backtest hidup di proses ini dan menahan dua deret candle (sampai
+    # 5000 baris per timeframe) selama satu run berjalan. Pengukuran di
+    # internal/backtest/memori_test.go menunjukkan data terburuk sekitar 4 MB,
+    # tetapi Go tidak mengembalikan seluruh memori ke sistem setelah puncak.
+    # 224 MB memberi ruang itu tanpa menggeser anggaran container lain.
+    mem_limit: 224m
     cpus: "0.8"
     pids_limit: 200
     logging: *default-logging
