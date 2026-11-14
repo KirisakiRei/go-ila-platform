@@ -169,36 +169,55 @@ func TestFVGTerpilihYangTermuda(t *testing.T) {
 }
 
 // TestFVGDijangkauHarga menguji syarat sentuhan zona secara langsung.
+//
+// Kontrak fungsi ini memakai INDEKS candle (Candle3Index) untuk tahu sejak
+// kapan harga boleh dianggap menyentuh zona, jadi slice yang diberikan harus
+// slice candle lengkap yang memuat Candle 1..3 pembentuk FVG.
 func TestFVGDijangkauHarga(t *testing.T) {
 	awal := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	bearish := fvgUji(FVGBearish, 3887.64, 3924.74, 0, 1, 2, awal)
 
+	// Tiga candle pembentuk FVG bearish 3887.64-3924.74.
+	pembentuk := []indicators.Candle{
+		{Timestamp: awal, Open: 3965.88, High: 3972.51, Low: 3940.00, Close: 3954.01, IsClosed: true},
+		{Timestamp: awal.Add(4 * time.Hour), Open: 3954.01, High: 3955.51, Low: 3887.00, Close: 3890.00, IsClosed: true},
+		{Timestamp: awal.Add(8 * time.Hour), Open: 3890.00, High: 3887.64, Low: 3852.64, Close: 3882.88, IsClosed: true},
+	}
+
 	kasus := []struct {
-		nama    string
-		candles []indicators.Candle
-		harap   bool
+		nama   string
+		lanjut []indicators.Candle
+		harap  bool
 	}{
 		{
 			// Zona bearish ada di 3887.64-3924.74; harga harus NAIK masuk zona.
 			// Candle yang seluruh rentangnya di bawah 3887.64 belum menyentuhnya.
 			nama: "harga masih jauh di bawah zona",
-			candles: []indicators.Candle{
-				{Timestamp: awal.Add(4 * time.Hour), Open: 3800, High: 3820, Low: 3780, Close: 3810, IsClosed: true},
-				{Timestamp: awal.Add(8 * time.Hour), Open: 3810, High: 3870, Low: 3800, Close: 3860, IsClosed: true},
+			lanjut: []indicators.Candle{
+				{Timestamp: awal.Add(12 * time.Hour), Open: 3800, High: 3820, Low: 3780, Close: 3810, IsClosed: true},
+				{Timestamp: awal.Add(16 * time.Hour), Open: 3810, High: 3870, Low: 3800, Close: 3860, IsClosed: true},
 			},
 			harap: false,
 		},
 		{
+			// Candle pembentuk saja tidak boleh dianggap menyentuh zona: pembentuk
+			// secara definisi berada di dalam zonanya sendiri.
+			nama:   "tanpa candle setelah pembentuk",
+			lanjut: nil,
+			harap:  false,
+		},
+		{
 			nama: "harga naik menyentuh zona",
-			candles: []indicators.Candle{
-				{Timestamp: awal.Add(4 * time.Hour), Open: 3800, High: 3890, Low: 3780, Close: 3885, IsClosed: true},
+			lanjut: []indicators.Candle{
+				{Timestamp: awal.Add(12 * time.Hour), Open: 3800, High: 3890, Low: 3780, Close: 3885, IsClosed: true},
 			},
 			harap: true,
 		},
 	}
 
 	for _, k := range kasus {
-		if dapat := fvgMasihDijangkauHarga(bearish, k.candles); dapat != k.harap {
+		candles := append(append([]indicators.Candle{}, pembentuk...), k.lanjut...)
+		if dapat := fvgMasihDijangkauHarga(bearish, candles); dapat != k.harap {
 			t.Errorf("%s: dapat %v, ingin %v", k.nama, dapat, k.harap)
 		}
 	}

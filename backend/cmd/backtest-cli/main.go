@@ -42,15 +42,20 @@ func main() {
 	risk := flag.Float64("risk", 0.5, "risiko per trade dalam persen")
 	maxTrade := flag.Int("max-trade", 2, "maksimum trade per hari (aturan live)")
 	maxLoss := flag.Int("max-loss", 2, "maksimum loss per hari (aturan live)")
+	// -dari dan -sampai mengunci rentang persis (RFC3339, mis. 2026-09-30T17:00:00Z).
+	// Berguna saat membandingkan dua versi aturan pada rentang yang identik;
+	// tanpa ini rentang ikut bergeser mengikuti jam saat alat dijalankan.
+	dari := flag.String("dari", "", "awal rentang (RFC3339), kosong = pakai -bulan")
+	sampai := flag.String("sampai", "", "akhir rentang (RFC3339), kosong = candle terakhir")
 	flag.Parse()
 
-	if err := jalankan(*symbol, *htf, *ltf, *feed, *bulan, *equity, *risk, *maxTrade, *maxLoss); err != nil {
+	if err := jalankan(*symbol, *htf, *ltf, *feed, *bulan, *equity, *risk, *maxTrade, *maxLoss, *dari, *sampai); err != nil {
 		fmt.Fprintf(os.Stderr, "gagal: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func jalankan(symbol, htf, ltf, feed string, bulan int, equity, risk float64, maxTrade, maxLoss int) error {
+func jalankan(symbol, htf, ltf, feed string, bulan int, equity, risk float64, maxTrade, maxLoss int, dariTeks, sampaiTeks string) error {
 	timezone.SetDaily("Asia/Jakarta")
 
 	fmt.Printf("Mengambil candle %s %s->%s dari %s ...\n", symbol, htf, ltf, feed)
@@ -83,11 +88,30 @@ func jalankan(symbol, htf, ltf, feed string, bulan int, equity, risk float64, ma
 
 	diminta := time.Now().AddDate(0, -bulan, 0)
 	awal := diminta.Unix()
+	if dariTeks != "" {
+		t, err := time.Parse(time.RFC3339, dariTeks)
+		if err != nil {
+			return fmt.Errorf("parameter -dari: %w", err)
+		}
+		awal = t.Unix()
+	}
 	if awal < awalTersedia {
 		awal = awalTersedia
 	}
 
-	if awal >= akhirTersedia {
+	akhir := akhirTersedia
+	if sampaiTeks != "" {
+		t, err := time.Parse(time.RFC3339, sampaiTeks)
+		if err != nil {
+			return fmt.Errorf("parameter -sampai: %w", err)
+		}
+		akhir = t.Unix()
+		if akhir > akhirTersedia {
+			akhir = akhirTersedia
+		}
+	}
+
+	if awal >= akhir {
 		return fmt.Errorf("data tidak mencukupi: tersedia mulai %s", waktu(awalTersedia))
 	}
 
@@ -96,7 +120,7 @@ func jalankan(symbol, htf, ltf, feed string, bulan int, equity, risk float64, ma
 		HTF:             htf,
 		LTF:             ltf,
 		From:            time.Unix(awal, 0).UTC(),
-		To:              time.Unix(akhirTersedia, 0).UTC(),
+		To:              time.Unix(akhir, 0).UTC(),
 		Equity:          equity,
 		RiskPercent:     risk,
 		MaxTradesPerDay: maxTrade,
@@ -105,8 +129,8 @@ func jalankan(symbol, htf, ltf, feed string, bulan int, equity, risk float64, ma
 	}
 
 	fmt.Printf("\nRentang efektif: %s s/d %s (%.0f hari)\n",
-		waktu(awal), waktu(akhirTersedia),
-		(float64(akhirTersedia-awal) / 86400))
+		waktu(awal), waktu(akhir),
+		(float64(akhir-awal) / 86400))
 
 	mesin := backtest.NewEngine()
 	hasil, jendela, err := mesin.Run(params, keIndikator(candleHTF), keIndikator(candleLTF))
