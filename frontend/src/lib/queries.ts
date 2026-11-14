@@ -49,6 +49,9 @@ export const queryKeys = {
   backtestTrades: (id: string) => ['backtest', 'trades', id] as const,
   backtestTrade: (id: string, seq: number) => ['backtest', 'trade', id, seq] as const,
   backtestHistory: ['backtest', 'history'] as const,
+  /** Satu halaman riwayat. Awalan yang sama membuat penghapusan run menyegarkan semua halaman. */
+  backtestHistoryPage: (limit: number, offset: number) =>
+    ['backtest', 'history', limit, offset] as const,
 }
 
 export function useAccounts() {
@@ -461,11 +464,20 @@ export function useBacktestTrade(id: string | null, seq: number | null) {
   })
 }
 
-/** Riwayat run milik pengguna. */
-export function useBacktestHistory() {
+/**
+ * Riwayat run milik pengguna.
+ *
+ * Halaman dan jumlah per halaman ikut jadi bagian kunci query: berpindah
+ * halaman harus memuat data lain, dan halaman yang pernah dibuka tetap
+ * tersimpan di cache supaya kembali ke sana tidak meminta ulang ke server.
+ */
+export function useBacktestHistory(limit = 20, offset = 0) {
   return useQuery({
-    queryKey: queryKeys.backtestHistory,
-    queryFn: async () => (await backtestApi.history(30)).data,
+    queryKey: queryKeys.backtestHistoryPage(limit, offset),
+    queryFn: async () => {
+      const balasan = await backtestApi.history(limit, offset)
+      return { daftar: balasan.data, total: balasan.meta?.total ?? balasan.data.length }
+    },
     staleTime: 30_000,
   })
 }
@@ -489,6 +501,8 @@ export function useDeleteBacktest() {
     mutationFn: (id: string) => backtestApi.remove(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.backtestHistory })
+      // Run yang dihapus tidak boleh terlihat lagi di halaman detailnya.
+      void queryClient.invalidateQueries({ queryKey: ['backtest', 'run'] })
     },
   })
 }

@@ -20,6 +20,9 @@ import SignalsPage from '@/pages/SignalsPage'
 import StrategiesPage from '@/pages/StrategiesPage'
 import AccountsPage from '@/pages/AccountsPage'
 import BacktestPage from '@/pages/BacktestPage'
+import BacktestHistoryPage from '@/pages/BacktestHistoryPage'
+import BacktestDetailPage from '@/pages/BacktestDetailPage'
+import BacktestEntryPage from '@/pages/BacktestEntryPage'
 import AccountDetailPage from '@/pages/AccountDetailPage'
 import BillingPage from '@/pages/BillingPage'
 import CheckoutPage from '@/pages/CheckoutPage'
@@ -269,6 +272,39 @@ export function AppRoutes() {
             <RequireAuth>
               <ShellPage>
                 <BacktestPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        {/* Riwayat didahulukan sebelum pola :id supaya "riwayat" tidak
+            terbaca sebagai ID run. Dua rute terakhir bertingkat: satu run,
+            lalu satu entry di dalamnya. */}
+        <Route
+          path="/backtest/riwayat"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <BacktestHistoryPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/backtest/:id"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <BacktestDetailPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/backtest/:id/:seq"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <BacktestEntryPage />
               </ShellPage>
             </RequireAuth>
           }

@@ -1,11 +1,15 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 
 // Riwayat harus muncul saat halaman baru dibuka, tanpa perlu menjalankan
-// backtest lebih dulu. Uji ini menjaga janji itu: data riwayat yang sudah ada
-// di server wajib tampil sejak render pertama.
+// backtest lebih dulu. Uji ini menjaga janji itu: run yang sudah ada di server
+// wajib tampil sejak render pertama.
+//
+// Sejak daftar riwayat punya halamannya sendiri, riwayat tidak lagi berada di
+// halaman kerja backtest. Karena itu uji diarahkan ke halaman riwayat.
 
 const historyResponse = vi.fn()
 
@@ -36,12 +40,22 @@ vi.mock('@/features/backtest/components/BacktestForm', () => ({
 }))
 
 import BacktestPage from '@/pages/BacktestPage'
+import BacktestHistoryPage from '@/pages/BacktestHistoryPage'
 
 function bungkus(isi: ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return <QueryClientProvider client={client}>{isi}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={['/backtest/riwayat']}>
+        <Routes>
+          <Route path="/backtest" element={isi} />
+          <Route path="/backtest/riwayat" element={isi} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  )
 }
 
 function runLama() {
@@ -75,7 +89,7 @@ function runLama() {
   }
 }
 
-describe('Riwayat backtest saat halaman baru dibuka', () => {
+describe('Halaman riwayat backtest', () => {
   beforeEach(() => {
     historyResponse.mockReset()
   })
@@ -83,22 +97,42 @@ describe('Riwayat backtest saat halaman baru dibuka', () => {
   it('menampilkan run yang sudah selesai tanpa menjalankan backtest baru', async () => {
     historyResponse.mockResolvedValue({ data: [runLama()], meta: { total: 1 } })
 
-    render(bungkus(<BacktestPage />))
+    render(bungkus(<BacktestHistoryPage />))
 
     await waitFor(() => {
       expect(screen.getByText('XAUUSD')).toBeInTheDocument()
     })
     // 7 trade dan 43% adalah angka run lama, bukan hasil run baru.
-    expect(screen.getByText(/7 trade/)).toBeInTheDocument()
+    expect(screen.getByText('7')).toBeInTheDocument()
+    expect(screen.getByText('43%')).toBeInTheDocument()
+    // Kartu membuka halaman detail run, bukan memuat ulang halaman kerja.
+    expect(screen.getByRole('link', { name: 'XAUUSD' })).toHaveAttribute(
+      'href',
+      '/backtest/run-1',
+    )
   })
 
   it('menampilkan keterangan kosong bila memang belum ada riwayat', async () => {
     historyResponse.mockResolvedValue({ data: [], meta: { total: 0 } })
 
-    render(bungkus(<BacktestPage />))
+    render(bungkus(<BacktestHistoryPage />))
 
     await waitFor(() => {
       expect(screen.getByText('Belum ada backtest')).toBeInTheDocument()
     })
+  })
+
+  it('halaman kerja tidak memuat riwayat, tetapi menautkannya', async () => {
+    historyResponse.mockResolvedValue({ data: [runLama()], meta: { total: 1 } })
+
+    render(bungkus(<BacktestPage />))
+
+    await waitFor(() => expect(screen.getByTestId('form')).toBeInTheDocument())
+    // Daftar run hanya ada di halaman riwayat.
+    expect(screen.queryByText('XAUUSD')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Riwayat/ })).toHaveAttribute(
+      'href',
+      '/backtest/riwayat',
+    )
   })
 })

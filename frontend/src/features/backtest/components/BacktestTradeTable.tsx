@@ -3,9 +3,13 @@
  *
  * Tabel, bukan kartu per entry: satu run bisa berisi puluhan entry, dan
  * menggambar puluhan chart sekaligus membuat halaman berat serta mata tidak
- * bisa membandingkan apa pun. Detail satu entry dimuat hanya ketika dipilih.
+ * bisa membandingkan apa pun.
+ *
+ * Setiap baris adalah tautan sungguhan, sehingga bisa dibuka di tab baru dan
+ * bisa disalin alamatnya. Klik di sini membuka halaman detail entry, bukan
+ * menyisipkan chart di bawah tabel.
  */
-import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Pagination,
   Table,
@@ -18,23 +22,21 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { BacktestTrade } from '@/types/api'
+import { priceDigits } from '@/lib/pricePrecision'
 import { formatDurasi, formatWaktu } from '../lib/tanggal'
 
 export function BacktestTradeTable({
   trades,
-  seqTerpilih,
-  onPilih,
+  runID,
+  symbol,
 }: {
   trades: BacktestTrade[]
-  seqTerpilih: number | null
-  onPilih: (seq: number) => void
+  /** Run pemilik entry, dipakai menyusun alamat halaman detail. */
+  runID: string
+  /** Presisi harga mengikuti pair, bukan dua desimal tetap. */
+  symbol: string
 }) {
   const paginasi = usePaginasiLokal(trades, 20)
-
-  const ringkas = useMemo(() => {
-    const menang = trades.filter((trade) => trade.hasil === 'TP').length
-    return { total: trades.length, menang }
-  }, [trades])
 
   if (trades.length === 0) {
     return (
@@ -44,6 +46,8 @@ export function BacktestTradeTable({
       </div>
     )
   }
+
+  const menang = trades.filter((trade) => trade.hasil === 'TP').length
 
   return (
     <div className="flex flex-col gap-3">
@@ -64,41 +68,38 @@ export function BacktestTradeTable({
         </TableHeader>
         <TableBody>
           {paginasi.baris.map((trade) => {
-            const terpilih = trade.seq === seqTerpilih
+            const digit = priceDigits(symbol, trade.entry)
             return (
-              <TableRow
-                key={trade.seq}
-                onClick={() => onPilih(trade.seq)}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    onPilih(trade.seq)
-                  }
-                }}
-                aria-selected={terpilih}
-                className={cn(
-                  'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                  terpilih && 'bg-secondary/60 hover:bg-secondary/60',
-                )}
-              >
+              <TableRow key={trade.seq} className="relative cursor-pointer">
                 <TableCell className="tabular text-muted-foreground">{trade.seq}</TableCell>
-                <TableCell className="tabular whitespace-nowrap">{formatWaktu(trade.waktu_masuk)}</TableCell>
+                <TableCell className="tabular whitespace-nowrap">
+                  {/* Tautan yang membentang memenuhi baris: seluruh baris bisa
+                      diklik, tetapi yang menerima fokus hanya satu elemen dan
+                      pembaca layar mendengar judul entry, bukan lima sel. */}
+                  <Link
+                    to={`/backtest/${encodeURIComponent(runID)}/${trade.seq}`}
+                    className="absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    aria-label={`Buka detail entry ${trade.seq}, ${trade.arah} pada ${formatWaktu(trade.waktu_masuk)}`}
+                  >
+                    <span className="sr-only">Buka detail entry {trade.seq}</span>
+                  </Link>
+                  {formatWaktu(trade.waktu_masuk)}
+                </TableCell>
                 <TableCell>
                   <span className="text-[12px] font-semibold">{trade.arah}</span>
                 </TableCell>
-                <TableCell className="tabular text-right">{trade.entry.toFixed(2)}</TableCell>
+                <TableCell className="tabular text-right">{trade.entry.toFixed(digit)}</TableCell>
                 <TableCell className="tabular text-right text-muted-foreground">
-                  {trade.stop_loss.toFixed(2)}
+                  {trade.stop_loss.toFixed(digit)}
                 </TableCell>
                 <TableCell className="tabular text-right text-muted-foreground">
-                  {trade.take_profit.toFixed(2)}
+                  {trade.take_profit.toFixed(digit)}
                 </TableCell>
                 <TableCell className="tabular text-right">{trade.rr_rencana.toFixed(2)}</TableCell>
                 <TableCell>
                   <HasilLabel hasil={trade.hasil} ambigu={trade.ambigu} />
                 </TableCell>
-                				<TableCell
+                <TableCell
                   className={cn(
                     'tabular text-right font-medium',
                     trade.r > 0 && 'text-foreground',
@@ -119,8 +120,8 @@ export function BacktestTradeTable({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[12px] text-muted-foreground">
-          {ringkas.menang} dari {ringkas.total} entry mencapai target. Pilih satu baris untuk melihat
-          potongan chartnya.
+          {menang} dari {trades.length} entry mencapai target. Pilih satu baris untuk melihat
+          potongan chart dan tahapannya.
         </p>
         <Pagination
           page={paginasi.page}
@@ -142,8 +143,7 @@ export function BacktestTradeTable({
  * tersedia: pembaca perlu tahu hasil itu tidak sekuat labelnya.
  */
 function HasilLabel({ hasil, ambigu }: { hasil: BacktestTrade['hasil']; ambigu: boolean }) {
-  const teks =
-    hasil === 'TP' ? 'Target' : hasil === 'SL' ? 'Batas rugi' : 'Belum tuntas'
+  const teks = hasil === 'TP' ? 'Target' : hasil === 'SL' ? 'Batas rugi' : 'Belum tuntas'
   return (
     <span className="flex items-center gap-1.5 whitespace-nowrap text-[12px]">
       <span
@@ -157,7 +157,10 @@ function HasilLabel({ hasil, ambigu }: { hasil: BacktestTrade['hasil']; ambigu: 
         {teks}
       </span>
       {ambigu && (
-        <span className="text-[11px] text-muted-foreground" title="TP dan SL tersentuh pada candle yang sama">
+        <span
+          className="text-[11px] text-muted-foreground"
+          title="TP dan SL tersentuh pada candle yang sama"
+        >
           ambigu
         </span>
       )}

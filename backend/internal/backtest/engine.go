@@ -25,9 +25,19 @@ const (
 // konteks apa pun.
 const candlePemanasan = 100
 
-// candleJendelaChart adalah jumlah candle yang disimpan di kiri dan kanan
-// sebuah entry untuk kebutuhan gambar chart.
+// candleJendelaChart adalah jumlah candle sebelum entry dan sesudah exit yang
+// ikut disimpan untuk kebutuhan gambar chart.
 const candleJendelaChart = 20
+
+// candleJendelaChartHTF adalah jumlah candle sesudah exit khusus untuk timeframe
+// besar.
+//
+// Satu candle D1 berjarak sehari; dua puluh candle D1 berarti dua puluh hari
+// sesudah exit. Itu terlalu panjang, dan lebih buruk lagi bila seluruh rentang
+// entry..exit sudah lebih pendek dari sepuluh candle HTF — chart HTF lalu
+// didominasi ruang kosong sesudah posisi ditutup. Sepuluh candle cukup untuk
+// melihat reaksi harga tepat setelah exit.
+const candleJendelaChartHTF = 10
 
 // Engine menjalankan simulasi pada deret candle yang sudah disiapkan.
 //
@@ -284,6 +294,7 @@ func potongSampai(candles []indicators.Candle, batas time.Time) []indicators.Can
 }
 
 // potongJendela mengambil sejumlah candle di kiri dan kanan sebuah titik waktu.
+
 // jendelaChart memotong candle di sekitar satu posisi untuk kebutuhan gambar.
 //
 // Jendelanya membentang dari beberapa candle sebelum entry sampai beberapa
@@ -292,28 +303,31 @@ func potongSampai(candles []indicators.Candle, batas time.Time) []indicators.Can
 // rugi tersentuh; chart lalu tampak seperti posisi yang menggantung tanpa
 // akhir, padahal mesin sudah menutupnya.
 //
-// HTF dan LTF dipotong dengan titik yang sama, sehingga dua seri dalam satu
-// chart benar-benar sejajar waktunya.
+// HTF dan LTF dipotong pada TITIK WAKTU yang sama (entry sampai exit), sehingga
+// level yang digambar di kedua panel jatuh pada momen yang sama. Sebelum
+// diperbaiki, candle HTF dipotong hingga candle LTF terakhir yang dievaluasi,
+// bukan hingga exit; pada trade yang ditutup kemudian, target atau batas rugi
+// tidak pernah tersentuh di panel HTF dan garis exit tampak keluar dari chart.
 func jendelaChart(posisi *Entry, htfCandles, ltfCandles []indicators.Candle) CandleWindow {
 	akhir := posisi.ExitTime
 	if akhir.IsZero() || akhir.Before(posisi.EntryTime) {
 		akhir = posisi.EntryTime
 	}
 	return CandleWindow{
-		HTF: potongRentang(htfCandles, posisi.EntryTime, akhir, candleJendelaChart),
-		LTF: potongRentang(ltfCandles, posisi.EntryTime, akhir, candleJendelaChart),
+		HTF: potongRentang(htfCandles, posisi.EntryTime, akhir, candleJendelaChart, candleJendelaChartHTF),
+		LTF: potongRentang(ltfCandles, posisi.EntryTime, akhir, candleJendelaChart, candleJendelaChart),
 	}
 }
 
 // potongRentang mengambil candle dari beberapa butir sebelum mulai sampai
 // beberapa butir sesudah selesai.
-func potongRentang(candles []indicators.Candle, mulai, selesai time.Time, jendela int) []indicators.Candle {
+func potongRentang(candles []indicators.Candle, mulai, selesai time.Time, sebelum, sesudah int) []indicators.Candle {
 	titikMulai := sort.Search(len(candles), func(i int) bool {
 		return !candles[i].Timestamp.Before(mulai)
 	})
 	// Search mengembalikan posisi pertama yang >= mulai; satu butir sebelumnya
 	// ikut diambil karena candle sweep sering tepat di detik yang dicari.
-	awal := titikMulai - jendela
+	awal := titikMulai - sebelum
 	if awal < 0 {
 		awal = 0
 	}
@@ -321,7 +335,7 @@ func potongRentang(candles []indicators.Candle, mulai, selesai time.Time, jendel
 	titikSelesai := sort.Search(len(candles), func(i int) bool {
 		return candles[i].Timestamp.After(selesai)
 	})
-	akhir := titikSelesai + jendela
+	akhir := titikSelesai + sesudah
 	if akhir > len(candles) {
 		akhir = len(candles)
 	}

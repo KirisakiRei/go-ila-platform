@@ -108,7 +108,7 @@ func TestJendelaChartTetapBerbatas(t *testing.T) {
 	jendela := jendelaChart(posisi, ltf, ltf)
 
 	// 20 sebelum entry + rentang entry..exit + 20 sesudah exit.
-	const batasWajar = 900 + 2*candleJendelaChart + 1
+	const batasWajar = 900 + candleJendelaChart + candleJendelaChartHTF + 1
 	if len(jendela.LTF) > batasWajar {
 		t.Fatalf("jendela LTF %d candle melebihi batas wajar %d", len(jendela.LTF), batasWajar)
 	}

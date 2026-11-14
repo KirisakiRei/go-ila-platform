@@ -25,6 +25,7 @@ const TITLES: Record<string, string> = {
   '/akun': 'Broker Accounts',
   '/strategi': 'Watchlist Pair',
   '/backtest': 'Backtest ILA 2.0',
+  '/backtest/riwayat': 'Riwayat backtest',
   '/langganan': 'Subscription & Billing',
   '/langganan/bayar': 'Checkout Langganan',
   '/pengaturan': 'Settings',

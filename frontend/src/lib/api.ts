@@ -177,8 +177,15 @@ export const backtestApi = {
     }),
   trade: (id: string, seq: number) =>
     request<BacktestTradeDetail>(`/backtest/${encodeURIComponent(id)}/trades/${seq}`),
-  history: (limit = 20) =>
-    requestList<BacktestRun>('/backtest/history', { query: { limit } }),
+  /**
+   * history mengambil daftar run yang sudah ada.
+   *
+   * `total` ikut dibaca karena halaman riwayat perlu membagi daftar menjadi
+   * halaman. Tanpa total, tombol halaman berikutnya tidak bisa ditampilkan
+   * meski server mengirimkannya.
+   */
+  history: (limit = 20, offset = 0) =>
+    requestList<BacktestRun>('/backtest/history', { query: { limit, offset } }),
   remove: (id: string) => request<void>(`/backtest/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 

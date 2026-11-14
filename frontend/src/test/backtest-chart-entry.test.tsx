@@ -4,8 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 // Chart entry backtest harus menampilkan dua panel: timeframe acuan (HTF) untuk
-// konteks dan timeframe eksekusi (LTF) untuk titik masuk. Keduanya memakai
-// level yang sama, sehingga satu kejadian terbaca dari dua jarak pandang.
+// konteks dan timeframe eksekusi (LTF) untuk titik masuk.
+//
+// Sweep dan zona imbalance hanya milik panel acuan, CISD hanya milik panel
+// eksekusi. Level harga entry, batas rugi, dan target berlaku di keduanya.
+// Setiap panel tetap memakai angka yang sama persis dengan mesin.
 
 const detailResponse = vi.fn()
 
@@ -88,9 +91,9 @@ describe('Chart entry backtest', () => {
 
     // Dua panel: acuan dan eksekusi.
     await waitFor(() => {
-      expect(screen.getByText(/D1 — timeframe acuan/)).toBeInTheDocument()
+      expect(screen.getByText('D1')).toBeInTheDocument()
     })
-    expect(screen.getByText(/H1 — timeframe eksekusi/)).toBeInTheDocument()
+    expect(screen.getByText('H1')).toBeInTheDocument()
 
     const panel = screen.getAllByTestId('price-chart')
     expect(panel).toHaveLength(2)
@@ -104,21 +107,32 @@ describe('Chart entry backtest', () => {
     }
   })
 
-  it('menandai sweep, CISD, entry, dan exit pada kedua panel', async () => {
+  it('menandai sweep, CISD, dan zona di panel asalnya', async () => {
     detailResponse.mockResolvedValue(detail())
 
     render(bungkus(<BacktestTradeChart runID="run-1" symbol="XAUUSD" seq={3} />))
 
     await waitFor(() => expect(screen.getAllByTestId('price-chart')).toHaveLength(2))
 
-    for (const satu of screen.getAllByTestId('price-chart')) {
-      const penanda = satu.querySelector('[data-testid="penanda"]')?.textContent ?? ''
-      expect(penanda).toContain('SELL 4400.00')
-      expect(penanda).toContain('sweep')
-      expect(penanda).toContain('CISD')
-      expect(penanda).toContain('TP +2.00R')
-      expect(satu.querySelector('[data-testid="zona"]')?.textContent).toBe('BEARISH')
+    const [acuan, eksekusi] = screen.getAllByTestId('price-chart')
+    const baca = (panel: HTMLElement | undefined, kunci: string) =>
+      panel?.querySelector(`[data-testid="${kunci}"]`)?.textContent ?? ''
+
+    // Kedua panel menandai arah masuk dan cara posisi berakhir.
+    for (const panel of [acuan, eksekusi]) {
+      expect(baca(panel, 'penanda')).toContain('SELL 4400.00')
+      expect(baca(panel, 'penanda')).toContain('TP +2.00R')
     }
+
+    // Sweep dan FVG terbaca di timeframe acuan saja: lilin penyapu likuiditas
+    // memang lilin besar, bukan lilin kecil di dalamnya.
+    expect(baca(acuan, 'penanda')).toContain('sweep')
+    expect(baca(acuan, 'zona')).toBe('BEARISH')
+
+    // CISD adalah konfirmasi di timeframe eksekusi.
+    expect(baca(eksekusi, 'penanda')).toContain('CISD')
+    expect(baca(eksekusi, 'penanda')).not.toContain('sweep')
+    expect(baca(eksekusi, 'zona')).toBe('')
   })
 
   it('memakai candle yang tersimpan, bukan menghitung ulang', async () => {

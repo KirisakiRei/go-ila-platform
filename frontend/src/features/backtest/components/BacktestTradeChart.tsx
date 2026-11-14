@@ -3,15 +3,19 @@
  *
  * Ditata seperti chart eksekusi live: dua panel bertumpuk, timeframe besar di
  * atas untuk konteks dan timeframe kecil di bawah untuk titik masuk. Keduanya
- * memakai level, penanda, dan zona yang SAMA, sehingga pembaca melihat satu
- * kejadian dari dua jarak pandang — bukan dua cerita berbeda.
+ * memakai level yang SAMA, sehingga pembaca melihat satu kejadian dari dua
+ * jarak pandang — bukan dua cerita berbeda.
  *
  * Semua angka diambil apa adanya dari mesin: candle yang benar-benar
  * dievaluasi, harga entry, batas rugi, target, serta koordinat FVG, sweep, dan
  * CISD. Tidak ada yang dihitung ulang di sini. Chart yang "kira-kira mirip"
  * justru membuat pengguna menyimpulkan hal yang salah.
+ *
+ * Level sengaja dipisah per panel: sweep, zona FVG, dan CISD hanya digambar di
+ * timeframe asalnya. Sweep pada HTF yang dipaksakan ke panel LTF akan muncul
+ * di lilin LTF yang salah dan membuat urutan kejadian terbaca terbalik.
  */
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Skeleton } from '@/components/ui'
 import { useBacktestTrade } from '@/lib/queries'
 import { priceDigits } from '@/lib/pricePrecision'
@@ -23,8 +27,21 @@ import {
 } from '@/features/charts/PriceChart'
 import { chartTheme } from '@/features/charts/lib/theme'
 import type { ZoneSpec } from '@/features/charts/lib/zonePrimitive'
+import { JudulChart, PanelChart } from '@/features/charts/JudulChart'
 import type { BacktestTradeDetail } from '@/types/api'
 import { formatDurasi, formatWaktu } from '../lib/tanggal'
+
+/**
+ * Tinggi kedua panel.
+ *
+ * Angka ini dipilih setelah panel lama (220 dan 280 piksel) dinilai terlalu
+ * tipis: pada lebar konten penuh, candle menjadi pipih dan sweep sulit
+ * dibedakan dari noise. Panel acuan sedikit lebih pendek karena tugasnya hanya
+ * menunjukkan struktur, sedangkan panel eksekusi perlu ruang untuk seluruh
+ * perjalanan posisi.
+ */
+const TINGGI_PANEL_ACUAN = 360
+const TINGGI_PANEL_EKSEKUSI = 460
 
 export function BacktestTradeChart({
   runID,
@@ -40,9 +57,9 @@ export function BacktestTradeChart({
 
   if (query.isLoading) {
     return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-[240px] w-full" />
-        <Skeleton className="h-[240px] w-full" />
+      <div className="flex w-full flex-col gap-4">
+        <Skeleton className="w-full" style={{ height: TINGGI_PANEL_ACUAN }} />
+        <Skeleton className="w-full" style={{ height: TINGGI_PANEL_EKSEKUSI }} />
       </div>
     )
   }
@@ -73,9 +90,10 @@ export function BacktestTradeChart({
 function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: string }) {
   const theme = chartTheme()
   const digits = priceDigits(symbol, detail.entry)
+  const isBuy = detail.arah === 'BUY'
 
-  // Level dan penanda sama untuk kedua panel: entry, batas rugi, target, sweep,
-  // CISD, dan garis perjalanan posisi.
+  // Level harga dan penanda hasil berlaku di kedua panel: entry, batas rugi,
+  // target, arah masuk, dan cara posisi berakhir.
   const bersama = useMemo(() => {
     const lines: PriceLineSpec[] = [
       {
@@ -101,7 +119,6 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
       },
     ]
 
-    const isBuy = detail.arah === 'BUY'
     const marks: ChartMarkerSpec[] = [
       {
         time: detail.waktu_masuk,
@@ -111,25 +128,6 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
         text: `${detail.arah} ${detail.entry.toFixed(digits)}`,
       },
     ]
-
-    if (detail.sweep) {
-      marks.push({
-        time: detail.sweep.waktu,
-        position: 'aboveBar',
-        color: theme.sweep,
-        shape: 'square',
-        text: detail.sweep.label || 'sweep',
-      })
-    }
-    if (detail.cisd) {
-      marks.push({
-        time: detail.cisd.waktu,
-        position: 'belowBar',
-        color: theme.cisd,
-        shape: 'square',
-        text: detail.cisd.label || 'CISD',
-      })
-    }
 
     if (detail.waktu_keluar > detail.waktu_masuk) {
       const menang = detail.hasil === 'TP'
@@ -159,26 +157,13 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
       })
     }
 
-    const zones = detail.zona_fvg
-      ? [
-          {
-            from: detail.zona_fvg.bottom,
-            to: detail.zona_fvg.top,
-            color: theme.fvg,
-            borderColor: theme.fvgBorder,
-            label: detail.zona_fvg.label || 'FVG',
-            timeFrom: detail.zona_fvg.dari || undefined,
-            timeTo: detail.zona_fvg.sampai || undefined,
-          },
-        ]
-      : []
-
-    return { lines, marks, segments, zones }
+    return { lines, marks, segments }
     // Nilai primitif sebagai dependensi: objek baru di tiap render akan
     // memicu penggambaran ulang chart tanpa perubahan apa pun.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     detail.seq,
+    detail.arah,
     detail.entry,
     detail.stop_loss,
     detail.take_profit,
@@ -190,40 +175,114 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
     digits,
   ])
 
-  const kosongLTF = detail.candle_ltf.length === 0
-  const kosongHTF = detail.candle_htf.length === 0
+  // Sweep adalah kejadian timeframe acuan: yang menyapu likuiditas adalah
+  // lilin besar, bukan lilin kecil di dalamnya.
+  const penandaAcuan = useMemo<ChartMarkerSpec[]>(() => {
+    if (!detail.sweep) return []
+    return [
+      {
+        time: detail.sweep.waktu,
+        position: isBuy ? 'aboveBar' : 'belowBar',
+        color: theme.sweep,
+        shape: 'square',
+        text: detail.sweep.label || 'sweep',
+      },
+    ]
+  }, [detail.sweep, isBuy, theme.sweep])
+
+  // CISD adalah konfirmasi perubahan struktur pada timeframe eksekusi.
+  const penandaEksekusi = useMemo<ChartMarkerSpec[]>(() => {
+    if (!detail.cisd) return []
+    return [
+      {
+        time: detail.cisd.waktu,
+        position: isBuy ? 'belowBar' : 'aboveBar',
+        color: theme.cisd,
+        shape: 'square',
+        text: detail.cisd.label || 'CISD',
+      },
+    ]
+  }, [detail.cisd, isBuy, theme.cisd])
+
+  // Zona FVG terbentuk di timeframe acuan, jadi hanya digambar di panel HTF.
+  const zonaAcuan = useMemo<ZoneSpec[]>(() => {
+    if (!detail.zona_fvg) return []
+    return [
+      {
+        from: detail.zona_fvg.bottom,
+        to: detail.zona_fvg.top,
+        color: theme.fvg,
+        borderColor: theme.fvgBorder,
+        label: detail.zona_fvg.label || 'FVG',
+        timeFrom: detail.zona_fvg.dari || undefined,
+        timeTo: detail.zona_fvg.sampai || undefined,
+      },
+    ]
+  }, [detail.zona_fvg, theme.fvg, theme.fvgBorder])
+
+  const warnaHasil =
+    detail.hasil === 'TP' ? theme.profit : detail.hasil === 'SL' ? theme.loss : theme.neutral
 
   return (
-    <div className="flex flex-col gap-4">
-      <RingkasanEntry detail={detail} />
+    <div className="flex w-full min-w-0 flex-col gap-6">
+      <RingkasanEntry detail={detail} digits={digits} warnaHasil={warnaHasil} />
 
-      <LembarChart
-        judul={`${detail.htf} — timeframe acuan`}
-        keterangan="Zona dan sapuan likuiditas terbaca dari sini."
-        candles={detail.candle_htf}
-        lines={bersama.lines}
-        markers={bersama.marks}
-        segments={bersama.segments}
-        zones={bersama.zones}
-        focusTime={detail.waktu_masuk}
-        digits={digits}
-        height={220}
-        kosong={kosongHTF}
-      />
+      <PanelChart
+        judul={
+          <JudulChart
+            timeframe={detail.htf}
+            peran={PERAN_TIMEFRAME[detail.htf] ?? 'timeframe acuan'}
+            keterangan="Zona imbalance dan sapuan likuiditas terbaca dari sini."
+          />
+        }
+        keterangan={
+          <>
+            {detail.candle_htf.length} candle tersimpan, dari sebelum masuk sampai sesudah
+            ditutup. Garis entry, batas rugi, dan target di panel ini menandai harga yang sama
+            dengan panel {detail.ltf}.
+          </>
+        }
+      >
+        <PanelIsi
+          candle={detail.candle_htf}
+          lines={bersama.lines}
+          markers={[...bersama.marks, ...penandaAcuan]}
+          segments={bersama.segments}
+          zones={zonaAcuan}
+          focusTime={detail.waktu_masuk}
+          digits={digits}
+          tinggi={TINGGI_PANEL_ACUAN}
+          pesanKosong={`Candle ${detail.htf} tidak tersedia untuk entry ini.`}
+        />
+      </PanelChart>
 
-      <LembarChart
-        judul={`${detail.ltf} — timeframe eksekusi`}
-        keterangan="Titik masuk, CISD, dan perjalanan posisi sampai ditutup."
-        candles={detail.candle_ltf}
-        lines={bersama.lines}
-        markers={bersama.marks}
-        segments={bersama.segments}
-        zones={bersama.zones}
-        focusTime={detail.waktu_masuk}
-        digits={digits}
-        height={280}
-        kosong={kosongLTF}
-      />
+      <PanelChart
+        judul={
+          <JudulChart
+            timeframe={detail.ltf}
+            peran={PERAN_TIMEFRAME[detail.ltf] ?? 'timeframe eksekusi'}
+            keterangan="Titik masuk, CISD, dan perjalanan posisi sampai ditutup."
+          />
+        }
+        keterangan={
+          <>
+            {detail.candle_ltf.length} candle tersimpan. Garis putus-putus menandai harga entry,
+            garis tebal adalah batas rugi dan target.
+          </>
+        }
+      >
+        <PanelIsi
+          candle={detail.candle_ltf}
+          lines={bersama.lines}
+          markers={[...bersama.marks, ...penandaEksekusi]}
+          segments={bersama.segments}
+          zones={[]}
+          focusTime={detail.waktu_masuk}
+          digits={digits}
+          tinggi={TINGGI_PANEL_EKSEKUSI}
+          pesanKosong={`Candle ${detail.ltf} tidak tersedia untuk entry ini.`}
+        />
+      </PanelChart>
 
       {(detail.ringkasan || detail.langkah_berikut) && (
         <div className="flex flex-col gap-2 border border-border bg-secondary/30 p-3 text-[12px] leading-relaxed">
@@ -245,73 +304,127 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
   )
 }
 
-/** RingkasanEntry menaruh angka posisi sebelum chart, seperti panel live. */
-function RingkasanEntry({ detail }: { detail: BacktestTradeDetail }) {
+/** PERAN_TIMEFRAME menjelaskan tugas tiap timeframe dalam satu kalimat pendek. */
+const PERAN_TIMEFRAME: Record<string, string> = {
+  W: 'acuan mingguan',
+  D1: 'acuan harian',
+  H4: 'acuan empat jam',
+  H1: 'acuan per jam',
+  M15: 'eksekusi lima belas menit',
+  M5: 'eksekusi lima menit',
+}
+
+/**
+ * RingkasanEntry menaruh angka posisi sebelum chart, seperti panel live.
+ *
+ * Urutannya mengikuti cara trader membaca satu posisi: arah dan harga, lalu
+ * waktu, lalu hasilnya.
+ */
+function RingkasanEntry({
+  detail,
+  digits,
+  warnaHasil,
+}: {
+  detail: BacktestTradeDetail
+  digits: number
+  warnaHasil: string
+}) {
+  const harga = (angka: number) => angka.toFixed(digits)
+  const teksHasil =
+    detail.hasil === 'TP' ? 'target tercapai' : detail.hasil === 'SL' ? 'batas rugi' : 'belum tuntas'
+
   return (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border pb-2 text-[12px]">
-      <span className="text-[13px] font-semibold text-foreground">
-        Entry {detail.seq} · {detail.arah}
-      </span>
-      <span className="text-muted-foreground">{formatWaktu(detail.waktu_masuk)}</span>
-      <span className="text-muted-foreground">ditutup {formatWaktu(detail.waktu_keluar)}</span>
-      <span className="text-muted-foreground">{formatDurasi(detail.durasi_detik)}</span>
-      <span className="tabular text-muted-foreground">RR rencana {detail.rr_rencana.toFixed(2)}</span>
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-y border-border py-3 sm:grid-cols-3 lg:grid-cols-6">
+      <Kolom label="Arah" nilai={<span className="font-semibold">{detail.arah}</span>} />
+      <Kolom label="Entry" nilai={harga(detail.entry)} />
+      <Kolom label="Batas rugi" nilai={harga(detail.stop_loss)} />
+      <Kolom label="Target" nilai={harga(detail.take_profit)} />
+      <Kolom
+        label="Hasil"
+        nilai={
+          <span className="font-semibold" style={{ color: warnaHasil }}>
+            {teksHasil} ({detail.r > 0 ? '+' : ''}
+            {detail.r.toFixed(2)}R)
+          </span>
+        }
+      />
+      <Kolom
+        label="Terbuka"
+        nilai={`${formatDurasi(detail.durasi_detik)} · RR ${detail.rr_rencana.toFixed(2)}`}
+      />
+      <Kolom label="Masuk" nilai={formatWaktu(detail.waktu_masuk)} lebarPenuh />
+      <Kolom label="Ditutup" nilai={formatWaktu(detail.waktu_keluar)} lebarPenuh />
+    </dl>
+  )
+}
+
+function Kolom({
+  label,
+  nilai,
+  lebarPenuh,
+}: {
+  label: string
+  nilai: ReactNode
+  lebarPenuh?: boolean
+}) {
+  return (
+    <div className={lebarPenuh ? 'col-span-2 flex flex-col gap-0.5 sm:col-span-1' : 'flex flex-col gap-0.5'}>
+      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dd className="tabular truncate text-[13px] text-foreground">{nilai}</dd>
     </div>
   )
 }
 
-/** LembarChart adalah satu panel: judul, chart, dan keterangannya. */
-function LembarChart({
-  judul,
-  keterangan,
-  candles,
+/**
+ * PanelIsi menggambar satu bidang chart atau keterangan penggantinya.
+ *
+ * Tinggi maksimal tetapi lebar penuh: chart harga butuh ruang horizontal untuk
+ * menyebar waktu, dan membatasi lebarnya justru membuat candle kembali pipih.
+ */
+function PanelIsi({
+  candle,
   lines,
   markers,
   segments,
   zones,
   focusTime,
   digits,
-  height,
-  kosong,
+  tinggi,
+  pesanKosong,
 }: {
-  judul: string
-  keterangan: string
-  candles: BacktestTradeDetail['candle_ltf']
+  candle: BacktestTradeDetail['candle_ltf']
   lines: PriceLineSpec[]
   markers: ChartMarkerSpec[]
   segments: SegmentSpec[]
-  	zones: ZoneSpec[]
+  zones: ZoneSpec[]
   focusTime: number
   digits: number
-  height: number
-  kosong: boolean
+  tinggi: number
+  pesanKosong: string
 }) {
-  return (
-    <section className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[12px] font-semibold">{judul}</h2>
-        <p className="text-[11px] text-muted-foreground">{keterangan}</p>
+  if (candle.length === 0) {
+    return (
+      <div
+        className="flex w-full items-center justify-center border border-dashed border-border text-[12px] text-muted-foreground"
+        style={{ height: tinggi }}
+      >
+        {pesanKosong}
       </div>
-      {kosong ? (
-        <div
-          className="flex items-center justify-center border border-dashed border-border text-[12px] text-muted-foreground"
-          style={{ height }}
-        >
-          Candle timeframe ini tidak tersedia untuk entry tersebut.
-        </div>
-      ) : (
-        <PriceChart
-          candles={candles}
-          priceLines={lines}
-          markers={markers}
-          segments={segments}
-          zones={zones}
-          focusTime={focusTime}
-          digits={digits}
-          height={height}
-          emptyMessage="Candle timeframe ini tidak tersedia."
-        />
-      )}
-    </section>
+    )
+  }
+
+  return (
+    <PriceChart
+      candles={candle}
+      priceLines={lines}
+      markers={markers}
+      segments={segments}
+      zones={zones}
+      focusTime={focusTime}
+      digits={digits}
+      height={tinggi}
+      className="w-full"
+      emptyMessage={pesanKosong}
+    />
   )
 }
