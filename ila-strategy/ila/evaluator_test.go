@@ -218,9 +218,14 @@ func TestILASetupLanjutDiCandle6Running(t *testing.T) {
 	}
 }
 
-// TestILASetupExpiredWhenCandle6Closed mengunci batas akhir jendela: setelah
-// Candle 6 CLOSED resmi tanpa CISD, setup barulah hangus.
-func TestILASetupExpiredWhenCandle6Closed(t *testing.T) {
+// TestILASetupMasihHidupSaatCandle6Closed mengunci jendela eksekusi: Candle 6
+// yang SUDAH tutup belum membuang setup, karena break body di Candle 6 masih sah
+// sampai Candle 7 muncul.
+//
+// Sebelum diperbaiki, setup dibuang tepat saat Candle 6 tutup. Pada XAUUSD
+// 4 Nov 2026 itu menghapus entry yang sah: CISD origin 13:15 baru ditembus
+// close 4080.30 pukul 19:15 NY, setelah Candle 6 (18:00) mulai.
+func TestILASetupMasihHidupSaatCandle6Closed(t *testing.T) {
 	eval := NewEvaluator()
 	now := time.Now()
 
@@ -235,11 +240,48 @@ func TestILASetupExpiredWhenCandle6Closed(t *testing.T) {
 	}
 
 	setup := eval.EvaluateILA(htfCandles, nil, "H4", "M15", "XAUUSD")
-	if setup.Status != "WAIT_HTF_SWEEP" {
-		t.Fatalf("expected status WAIT_HTF_SWEEP (expired setelah Candle 6 closed), got %s", setup.Status)
+	if setup.Status != "WAIT_LTF_CISD" && setup.Status != "INVALIDATED" {
+		t.Fatalf("Candle 6 closed tanpa CISD seharusnya masih mencari CISD, got %s", setup.Status)
 	}
-	if !strings.Contains(setup.NextAction, "kadaluarsa") {
-		t.Errorf("expected NextAction mengandung 'kadaluarsa', got %s", setup.NextAction)
+	if strings.Contains(setup.NextAction, "kadaluarsa") {
+		t.Errorf("setup belum boleh kadaluarsa saat Candle 6 baru saja tutup, got %s", setup.NextAction)
+	}
+}
+
+// TestILASetupExpiredSaatCandle7Muncul mengunci bahwa siklus benar-benar hangus
+// ketika Candle 7 sudah ada: tidak boleh lagi mencari CISD, apalagi entry.
+//
+// Strukturnya 7 candle HTF: FVG bearish dibentuk C1-C3, sweep di Candle 4
+// (indeks 3), lalu Candle 5, 6, dan 7 menyusul tanpa CISD. Saat Candle 7 muncul,
+// sweep Candle 4 sudah di luar jangkauan penelusuran sehingga hasil akhirnya
+// WAIT_HTF_SWEEP. Pesan "kadaluarsa" dari EvaluateILA dan jalur penjagaan sweep
+// sama-sama menolak entry; yang dikunci tes ini adalah tidak adanya entry palsu.
+func TestILASetupExpiredSaatCandle7Muncul(t *testing.T) {
+	eval := NewEvaluator()
+	now := time.Now()
+
+	htfCandles := []indicators.Candle{
+		{Timestamp: now.Add(-24 * time.Hour), Open: 4250, High: 4260, Low: 4240, Close: 4245, IsClosed: true}, // C1
+		{Timestamp: now.Add(-20 * time.Hour), Open: 4245, High: 4245, Low: 4150, Close: 4155, IsClosed: true}, // C2
+		{Timestamp: now.Add(-16 * time.Hour), Open: 4155, High: 4212, Low: 4150, Close: 4160, IsClosed: true}, // C3
+		{Timestamp: now.Add(-12 * time.Hour), Open: 4160, High: 4230, Low: 4160, Close: 4190, IsClosed: true}, // Candle 4 (sweep)
+		{Timestamp: now.Add(-8 * time.Hour), Open: 4190, High: 4210, Low: 4180, Close: 4205, IsClosed: true},  // Candle 5
+		{Timestamp: now.Add(-4 * time.Hour), Open: 4205, High: 4215, Low: 4200, Close: 4210, IsClosed: true},  // Candle 6
+		{Timestamp: now.Add(0), Open: 4210, High: 4216, Low: 4202, Close: 4212, IsClosed: true},               // Candle 7
+	}
+
+	setup := eval.EvaluateILA(htfCandles, nil, "H4", "M15", "XAUUSD")
+	if setup.Status == "WAIT_LTF_CISD" || setup.Status == "READY_TO_ENTRY" {
+		t.Fatalf("Candle 7 muncul seharusnya tidak lagi mencari CISD, got %s", setup.Status)
+	}
+	if setup.Status != "WAIT_HTF_SWEEP" {
+		t.Fatalf("expected WAIT_HTF_SWEEP setelah siklus lewat, got %s (%s)", setup.Status, setup.NextAction)
+	}
+	// Candle 7 yang muncul membuat Candle 4 di luar jangkauan penelusuran sweep
+	// (hanya tiga candle terakhir). Jadi pesan yang tampil adalah tunggu sweep baru,
+	// bukan "kadaluarsa". Keduanya berarti hal yang sama: siklus sudah lewat.
+	if !strings.Contains(setup.NextAction, "Menunggu") {
+		t.Errorf("expected NextAction meminta menunggu sweep baru, got %s", setup.NextAction)
 	}
 }
 

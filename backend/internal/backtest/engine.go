@@ -458,11 +458,16 @@ func levelDariSetup(setup *ila.ILASetup) LevelSpec {
 	}
 
 	if setup.CISD != nil && setup.CISD.Detected {
-		waktu := setup.CISD.RefCandle.Timestamp
+		// Yang ditandai adalah candle BREAK, bukan RefCandle. RefCandle adalah
+		// lilin acuan yang ditembus (bisa berada jauh sebelum jendela eksekusi),
+		// sedangkan BreakCandle adalah candle yang menembusnya by body dan
+		// close-nya menjadi harga masuk. Memakai RefCandle membuat penanda CISD
+		// meleset ke harga acuan yang tidak pernah ditransaksikan.
+		waktu := setup.CISD.BreakCandle.Timestamp
 		if !waktu.IsZero() {
 			spek.CISD = &CISDSpec{
 				Time:  waktu.Unix(),
-				Price: setup.CISD.RefCandle.Close,
+				Price: setup.CISD.BreakCandle.Close,
 				Label: "CISD",
 			}
 		}
