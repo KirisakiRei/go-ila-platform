@@ -188,16 +188,21 @@ func dataSkenario(t *testing.T) ([]indicators.Candle, []indicators.Candle, Param
 
 	// M15 mengisi seluruh rentang H4 di atas. Bagian eksekusi dirancang supaya
 	// di dalam FVG bearish terbentuk deretan bullish yang kemudian ditembus.
-	mulaiLTF := awal.Add(12 * time.Hour) // sesudah Candle 4 (sweep) tutup
+	// Candle 4 (sweep) tutup di +16 jam; Candle 5 dimulai tepat di situ. M15
+	// diberi sedikit ruang sebelumnya agar indikator punya konteks.
+	mulaiLTF := awal.Add(15 * time.Hour)
 	daftar := make([][4]float64, 0, 96)
-	// Fase naik: deretan bullish (high naik) yang membentuk CISD sell.
-	for i := 0; i < 12; i++ {
-		basis := 4180.0 + float64(i)*6
-		daftar = append(daftar, [4]float64{basis, basis + 5, basis - 2, basis + 4})
+	// Fase naik: deretan bullish yang membentuk CISD sell. Puncaknya (4215)
+	// dijaga di bawah High Candle 4 (4230) supaya setup tidak dibatalkan aturan
+	// invalidation "High Candle 5 menembus ekor sweep".
+	for i := 0; i < 6; i++ {
+		basis := 4182.0 + float64(i)*6
+		daftar = append(daftar, [4]float64{basis, basis + 4, basis - 2, basis + 3})
 	}
-	// Fase turun: close menembus body deretan bullish, memicu konfirmasi CISD.
+	// Fase turun: close menembus body deretan bullish (level 4182), memicu
+	// konfirmasi CISD sell.
 	for i := 0; i < 24; i++ {
-		basis := 4252.0 - float64(i)*14
+		basis := 4214.0 - float64(i)*14
 		daftar = append(daftar, [4]float64{basis, basis + 4, basis - 12, basis - 10})
 	}
 	// Fase lanjut turun ke arah DOL agar TP dan SL sama-sama teruji.

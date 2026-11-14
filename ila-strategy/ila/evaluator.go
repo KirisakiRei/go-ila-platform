@@ -47,6 +47,52 @@ func NewEvaluator() *Evaluator {
 	return &Evaluator{}
 }
 
+// umurMaksimalFVG adalah batas umur sebuah FVG, dihitung dalam candle HTF sejak
+// Candle 3 pembentuknya, sampai candle terakhir yang sedang dievaluasi.
+//
+// Enam candle dipilih dari pengukuran, bukan tebakan. Batas empat sempat dicoba
+// dan ternyata membuang setup yang sah: pada EURUSD 12 Nov 2026 09:45 NY, FVG
+// acuan baru berumur lima candle sehingga entry SELL yang berakhir TP ikut
+// hilang. Enam adalah yang terkecil untuk mencakup kasus itu tanpa melonggarkan
+// sampai FVG berumur belasan hari kembali terpakai.
+//
+// Mengukur dalam jumlah candle, bukan jam atau poin, membuat batas ini berlaku
+// sama untuk semua timeframe dan semua pasangan tanpa angka khusus per simbol.
+const umurMaksimalFVG = 6
+
+// fvgMasihDijangkauHarga menjawab apakah harga masih berurusan dengan zona FVG.
+//
+// FVG baru berguna sebagai acuan bila harga berada di dalam, atau setidaknya
+// menyentuh, zonanya. Inilah syarat yang sama dengan definisi sweep itu sendiri:
+// sebuah candle hanya bisa menyapu likuiditas di dalam FVG kalau ia benar-benar
+// masuk ke zona tersebut. Menjadikannya syarat pemilihan membuat acuan otomatis
+// mengikuti skala tiap instrumen, karena yang diuji adalah sentuhan terhadap
+// batas zona, bukan jarak poin.
+func fvgMasihDijangkauHarga(fvg FVG, candles []indicators.Candle) bool {
+	tol := getFVGTolerance(fvg.Top)
+	for _, c := range candles {
+		if c.Timestamp.Before(fvg.Candle3Time) {
+			continue
+		}
+		if fvg.Type == FVGBearish {
+			// FVG bearish (SIBI) berada DI BAWAH candle displacement. Harga baru
+			// bisa menyapu likuiditas di zona ini setelah naik masuk ke dalamnya,
+			// yaitu saat High menembus batas bawah zona. Ini syarat masuk zona
+			// yang sama dengan yang dipakai detectSweepPadaFVGInti.
+			if c.High >= fvg.Bottom-tol {
+				return true
+			}
+			continue
+		}
+		// FVG bullish (BISI) berada DI ATAS candle displacement; harga
+		// menyentuhnya saat turun menembus batas atas zona.
+		if c.Low <= fvg.Top+tol {
+			return true
+		}
+	}
+	return false
+}
+
 // getFVGTolerance menentukan toleransi spread/noise sebelum sebuah ekor dianggap
 // benar-benar menutup FVG. Tanpa toleransi, selisih mikroskopis quote antar broker
 // sudah cukup untuk menghanguskan FVG yang secara riil belum tertutup.
@@ -204,7 +250,7 @@ func (e *Evaluator) DetectHTFIlaSweep(candles []indicators.Candle) *HTFSweep {
 		return nil
 	}
 
-	// Strict ILA rule: Filter out fully mitigated FVGs, focus ONLY on the latest active UNMITIGATED FVG
+	// Hanya FVG yang masih hidup (belum termitigasi) yang boleh jadi acuan.
 	var activeFVGs []FVG
 	for _, f := range fvgs {
 		if !f.Mitigated {
@@ -215,8 +261,51 @@ func (e *Evaluator) DetectHTFIlaSweep(candles []indicators.Candle) *HTFSweep {
 		return nil // Tidak ada FVG aktif yang valid (semua sudah termitigasi)
 	}
 
-	// Kunci murni pada FVG aktif TERBARU
-	latestFVG := activeFVGs[len(activeFVGs)-1]
+	// Batas umur FVG.
+	//
+	// FVG hanya berguna selama harganya masih berurusan dengan zona itu. Semua
+	// FVG dalam daftar memang belum termitigasi (belum ditembus sampai batas
+	// jauhnya), tetapi bisa saja harga sudah meninggalkannya ratusan poin jauh
+	// dan hanya tidak pernah kembali. FVG seperti itu tetap "hidup" secara
+	// teknis dan bisa terpilih sebagai acuan, lalu menghasilkan bias dan entry
+	// dari struktur berhari-hari lalu.
+	//
+	// Contoh nyata: USTEC 9 Okt 2026, FVG bullish 29987.00-30366.65 dari 21 Sep
+	// terpilih sebagai acuan saat harga sudah 525 poin di atasnya, umurnya 80
+	// candle H4. Akibatnya arah setup berbalik dan entry lahir dari zona yang
+	// tidak lagi disentuh pasar.
+	//
+	// Umur dihitung dalam candle HTF sejak Candle 3 pembentuk FVG, dan diukur
+	// relatif sehingga berlaku sama untuk semua pasangan tanpa perlu angka
+	// khusus per simbol.
+	idxTerakhir := len(candles) - 1
+	var fvgTerpakai []FVG
+	for _, f := range activeFVGs {
+		if idxTerakhir-f.Candle3Index > umurMaksimalFVG {
+			continue
+		}
+		// FVG yang harga sudah lama meninggalkan zonanya bukan acuan yang jujur:
+		// tidak ada likuiditas di sana yang bisa disapu.
+		if !fvgMasihDijangkauHarga(f, candles) {
+			continue
+		}
+		fvgTerpakai = append(fvgTerpakai, f)
+	}
+	if len(fvgTerpakai) == 0 {
+		return nil // Semua FVG aktif sudah terlalu tua
+	}
+
+	// Kunci pada FVG aktif TERBARU, yaitu yang candle pembentuknya paling akhir.
+	//
+	// Urutan daftar sudah kronologis, tetapi memilih "elemen terakhir" saja
+	// rapuh: begitu FVG terbaru termitigasi, pilihannya melompat ke FVG aktif
+	// paling tua yang masih tersisa. Yang dicari selalu yang paling muda.
+	latestFVG := fvgTerpakai[0]
+	for _, f := range fvgTerpakai[1:] {
+		if f.Candle3Index > latestFVG.Candle3Index {
+			latestFVG = f
+		}
+	}
 
 	// Deteksi apakah terjadi Double / Stacked FVG (displacements berturut-turut pada arah yang sama).
 	// Pada kondisi Double FVG, Candle 3 dari FVG terbaru adalah batas/lantai FVG yang sah disapu
@@ -263,8 +352,11 @@ func (e *Evaluator) DetectHTFIlaSweep(candles []indicators.Candle) *HTFSweep {
 	// (displacement bersambung). Karena itu FVG sebelumnya diterima bila Candle 3-nya
 	// tidak melewati Candle 1 FVG terbaru (Candle3Index <= latest.Candle1Index),
 	// bukan harus lebih kecil secara ketat.
-	for i := len(activeFVGs) - 2; i >= 0 && len(kandidat) < 2; i-- {
-		fvg := activeFVGs[i]
+	for i := len(fvgTerpakai) - 1; i >= 0 && len(kandidat) < 2; i-- {
+		fvg := fvgTerpakai[i]
+		if fvg.Candle3Index >= latestFVG.Candle3Index {
+			continue // kandidat utama sendiri
+		}
 		if fvg.Candle3Index > latestFVG.Candle1Index {
 			continue // bukan FVG sebelumnya secara kronologis
 		}
@@ -645,19 +737,13 @@ func (e *Evaluator) DetectDynamicCISD(candles []indicators.Candle, direction str
 		}
 
 		if firstBear == nil {
-			for k := lowestIdx; k >= 0; k-- {
-				if !sweepCandle.Timestamp.IsZero() && candles[k].Timestamp.Before(sweepCandle.Timestamp) {
-					break
-				}
-				if candles[k].Close < candles[k].Open {
-					firstBear = &candles[k]
-					break
-				}
-			}
-		}
-
-		if firstBear == nil {
-			// Belum ada deretan candle bearish internal di dalam Candle 5
+			// Belum ada deretan candle bearish yang bersambung menuju ekstrem.
+			//
+			// Dulu ada blok cadangan di sini yang mengambil candle bearish PERTAMA
+			// yang ditemui saat menelusuri mundur. Blok itu keliru karena bisa
+			// meminjam candle dari Candle 4 lalu menjadikan candle ekstrem sendiri
+			// sebagai penembusnya, sehingga lahir CISD dari deretan yang tidak ada.
+			// Tanpa deretan, memang belum ada CISD.
 			return nil, false
 		}
 
@@ -741,19 +827,15 @@ func (e *Evaluator) DetectDynamicCISD(candles []indicators.Candle, direction str
 		}
 
 		if firstBull == nil {
-			for k := highestIdx; k >= 0; k-- {
-				if !sweepCandle.Timestamp.IsZero() && candles[k].Timestamp.Before(sweepCandle.Timestamp) {
-					break
-				}
-				if candles[k].Close > candles[k].Open {
-					firstBull = &candles[k]
-					break
-				}
-			}
-		}
-
-		if firstBull == nil {
-			// Belum ada deretan candle bullish internal di dalam Candle 5
+			// Belum ada deretan candle bullish yang bersambung menuju ekstrem.
+			//
+			// Dulu ada blok cadangan yang menelusuri mundur dari highestIdx dan
+			// mengambil candle bullish PERTAMA yang ditemui. Blok itu keliru:
+			// pada USTEC 9 Okt 2026 21:00 NY, Candle 5 baru berisi satu candle
+			// bearish sehingga tidak ada deretan bullish sama sekali, tetapi blok
+			// cadangan mengambil candle dari Candle 4 lalu menjadikan candle
+			// bearish itu sendiri sebagai penembusnya. Hasilnya entry palsu
+			// dengan SL hanya 8,7 poin. Tanpa deretan, memang belum ada CISD.
 			return nil, false
 		}
 
