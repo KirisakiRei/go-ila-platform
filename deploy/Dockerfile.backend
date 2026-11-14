@@ -3,9 +3,14 @@
 # Build stage
 FROM golang:1.24-alpine AS builder
 
-WORKDIR /src
+WORKDIR /src/backend
 
 RUN apk add --no-cache git ca-certificates
+
+# ila-strategy adalah module terpisah di dalam repo yang sama. Ia disalin lebih
+# dulu dan diletakkan persis di ../ila-strategy, sesuai baris `replace` di
+# backend/go.mod. Tanpa ini build gagal karena Go mencari folder yang tidak ada.
+COPY ila-strategy/ /src/ila-strategy/
 
 COPY backend/go.mod backend/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
