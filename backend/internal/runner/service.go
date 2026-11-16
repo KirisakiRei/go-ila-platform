@@ -568,7 +568,12 @@ func (s *Service) fanOutIntermediate(ctx context.Context, signal *model.Signal) 
 		if existing != nil && IsTerminal(existing.Status) {
 			continue
 		}
-		s.recordUserSignal(ctx, user.ID, signal.SignalID, signal.Status, "", nil)
+		// Kiriman dengan status yang sama tidak dicatat ulang dan tidak
+		// dinotifikasi lagi; hanya perpindahan tahap, termasuk mundur ke tahap
+		// sebelumnya, yang layak dikabari.
+		if !s.recordUserSignal(ctx, user.ID, signal.SignalID, signal.Status, "", nil) {
+			continue
+		}
 		s.pub.PublishSignal(ctx, user.ID, signal.SignalID, signal.Status, "")
 	}
 }
@@ -1797,8 +1802,27 @@ func (s *Service) SetAckSender(strategy string, sender AckSender) {
 	s.mu.Unlock()
 }
 
-func (s *Service) recordUserSignal(ctx context.Context, userID, signalID, status, reason string, accountID *string) {
+// recordUserSignal menyimpan status sinyal untuk satu user dan mencatat
+// peralihannya.
+//
+// Peristiwa hanya dicatat saat status benar-benar berubah. Engine mengirim
+// kemajuan radar berulang dengan status yang sama; mencatatnya sebagai
+// peristiwa membuat tabel jejak penuh baris identik dan menyamarkan kapan
+// setup sebenarnya berpindah tahap. Pemanggil tidak perlu memeriksa perubahan
+// sendiri.
+//
+// Nilai balik kedua menunjukkan apakah status berubah, sehingga pemanggil tahu
+// kapan notifikasi masih perlu dikirim.
+func (s *Service) recordUserSignal(ctx context.Context, userID, signalID, status, reason string, accountID *string) bool {
 	now := s.opts.Clock()
+
+	// Status tersimpan dibaca untuk mengetahui tahap asal dan mendeteksi kiriman
+	// berulang. Kegagalan baca diperlakukan sebagai "belum ada": status tetap
+	// disimpan, hanya jejak asalnya yang kosong.
+	asal := ""
+	if lama, err := s.store.FindUserSignal(ctx, userID, signalID); err == nil && lama != nil {
+		asal = lama.Status
+	}
 
 	us := &model.UserSignal{
 		UserID:       userID,
@@ -1810,23 +1834,27 @@ func (s *Service) recordUserSignal(ctx context.Context, userID, signalID, status
 	if accountID != nil {
 		us.BrokerAccountID = *accountID
 	}
-
 	if err := s.store.UpsertUserSignal(ctx, us); err != nil {
 		s.logger.Error("gagal menyimpan status sinyal user",
 			"user_id", userID, "signal_id", signalID, "error", err.Error())
-		return
+		return false
+	}
+	if asal == status {
+		return false
 	}
 
 	event := &model.SignalEvent{
-		UserID:    userID,
-		SignalID:  signalID,
-		ToStatus:  status,
-		Reason:    truncate(reason, model.RejectReasonMaxLen),
-		CreatedAt: now,
+		UserID:     userID,
+		SignalID:   signalID,
+		FromStatus: asal,
+		ToStatus:   status,
+		Reason:     truncate(reason, model.RejectReasonMaxLen),
+		CreatedAt:  now,
 	}
 	if err := s.store.RecordSignalEvent(ctx, event); err != nil {
 		s.logger.Error("gagal mencatat peristiwa sinyal", "error", err.Error())
 	}
+	return true
 }
 
 func (s *Service) updateUserSignalPosition(ctx context.Context, userID, signalID, positionID string) error {

@@ -124,6 +124,18 @@ func (s *fakeStore) PerpanjangMasaBerlaku(_ context.Context, signalID string, ex
 	return nil
 }
 
+func (s *fakeStore) HitungKejadianSinyal(_ context.Context, userID, signalID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	jumlah := 0
+	for _, ev := range s.events {
+		if ev.UserID == userID && ev.SignalID == signalID {
+			jumlah++
+		}
+	}
+	return jumlah, nil
+}
+
 func (s *fakeStore) FindSignal(_ context.Context, signalID string) (*model.Signal, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

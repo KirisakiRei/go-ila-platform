@@ -49,6 +49,12 @@ type RunnerRepository interface {
 	FindUserSignal(ctx context.Context, userID, signalID string) (*model.UserSignal, error)
 	FindUserSignalByPosition(ctx context.Context, positionID string) (*model.UserSignal, error)
 	RecordSignalEvent(ctx context.Context, event *model.SignalEvent) error
+	// HitungKejadianSinyal mengembalikan jumlah peralihan status yang sudah
+	// tercatat untuk satu sinyal dan user. Dipakai sebagai penanda kejadian pada
+	// kunci notifikasi: status yang kembali ke tahap sebelumnya adalah kejadian
+	// baru dan harus bisa dikirim lagi, sementara kiriman berulang dengan status
+	// yang sama tetap tertahan.
+	HitungKejadianSinyal(ctx context.Context, userID, signalID string) (int, error)
 
 	// Posisi.
 	CreatePosition(ctx context.Context, pos *model.Position) error
@@ -412,6 +418,18 @@ func (r *runnerRepository) RecordSignalEvent(ctx context.Context, event *model.S
 		return fmt.Errorf("mencatat peristiwa sinyal: %w", err)
 	}
 	return nil
+}
+
+func (r *runnerRepository) HitungKejadianSinyal(ctx context.Context, userID, signalID string) (int, error) {
+	var jumlah int64
+	err := r.db.WithContext(ctx).
+		Model(&model.SignalEvent{}).
+		Where("user_id = ? AND signal_id = ?", userID, signalID).
+		Count(&jumlah).Error
+	if err != nil {
+		return 0, fmt.Errorf("menghitung peristiwa sinyal: %w", err)
+	}
+	return int(jumlah), nil
 }
 
 func (r *runnerRepository) CreatePosition(ctx context.Context, pos *model.Position) error {

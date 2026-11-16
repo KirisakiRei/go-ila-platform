@@ -66,7 +66,11 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 		return
 	}
 
-	messageKey := "sig:" + signalID + ":" + userID + ":" + status
+	// Penanda kejadian membuat tahap yang sama bisa dikirim lagi setelah setup
+	// mundur ke tahap itu: kunci `WAIT_HTF_SWEEP` pertama dan `WAIT_HTF_SWEEP`
+	// setelah gagal di tahap 3 adalah dua kejadian berbeda. Tanpa penanda ini,
+	// kabar bahwa setup kembali menunggu struktur tidak pernah sampai.
+	messageKey := fmt.Sprintf("sig:%s:%s:%s:%d", signalID, userID, status, p.kejadianSinyal(ctx, userID, signalID))
 
 	p.notifier.EnqueueSignal(userID, messageKey, signalID, func(chatID string) telegram.Message {
 		_ = chatID
@@ -383,6 +387,23 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 			RiwayatLink: posisiLink,
 		})
 	})
+}
+
+// kejadianSinyal mengembalikan nomor peralihan status terakhir untuk satu
+// sinyal dan user. Nilainya stabil selama status tidak berpindah, sehingga
+// kiriman berulang tetap memakai kunci yang sama dan tertahan oleh pengklaim
+// pesan.
+//
+// Kegagalan membaca dianggap 0: notifikasi lebih baik terkirim sekali lebih
+// sering daripada hilang sama sekali.
+func (p *runnerPublisher) kejadianSinyal(ctx context.Context, userID, signalID string) int {
+	jumlah, err := p.store.HitungKejadianSinyal(ctx, userID, signalID)
+	if err != nil {
+		p.logger.Warn("gagal menghitung peristiwa sinyal",
+			"signal_id", signalID, "error", err.Error())
+		return 0
+	}
+	return jumlah
 }
 
 // sudahPunyaPosisiSejenis melaporkan apakah user sudah memegang posisi terbuka
