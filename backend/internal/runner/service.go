@@ -135,6 +135,14 @@ type Service struct {
 
 	mu     sync.Mutex
 	market enginev1.MarketState
+	// marketAt adalah waktu status pasar terakhir DITERIMA dari engine.
+	//
+	// Kata "diterima", bukan "berubah": Runner perlu tahu kapan terakhir
+	// mendengar kabar, bukan kapan nilainya terakhir berbeda. Tanpa ini ia
+	// memegang status lama tanpa batas waktu -- kasus nyata 16 Nov 2026:
+	// Runner memakai CLOSED dari snapshot Sabtu 14 Nov sampai Senin siang,
+	// sehingga semua setup ditahan dengan alasan "Pasar sedang tutup".
+	marketAt time.Time
 	// engineVers, acks, dan syncStates dipisah per strategi karena satu Runner
 	// melayani lebih dari satu engine (ila-2.0 dan ila-3.0) sekaligus. Bila
 	// state-nya digabung, penyelarasan satu engine akan memakai daftar simbol
@@ -186,6 +194,7 @@ func (s *Service) SetMarketState(state enginev1.MarketState) {
 	s.mu.Lock()
 	changed := s.market != state
 	s.market = state
+	s.marketAt = s.opts.Clock()
 	s.mu.Unlock()
 
 	// Perubahan status pasar jarang; hanya dicatat saat benar-benar berubah
@@ -283,11 +292,54 @@ func (s *Service) EngineVersion(strategy string) string {
 	return s.engineVers[strategy]
 }
 
+// MarketOpen melaporkan apakah pasar boleh dieksekusi saat ini.
+//
+// Diekspor agar console dan tes memakai keputusan yang sama persis dengan
+// jalur eksekusi, bukan salinan logika yang bisa berbeda.
+func (s *Service) MarketOpen() bool {
+	return s.marketOpen()
+}
+
+// marketStatusMaxAge adalah batas umur status pasar yang masih dipercaya.
+//
+// Engine mengirim status pada setiap denyut (30 detik), jadi status yang lebih
+// tua dari ini berarti kabar dari engine sudah berhenti -- misalnya stream
+// tergantung tanpa terdeteksi putus. Dalam keadaan itu jadwal pasar lokal yang
+// menentukan, bukan nilai lama yang bisa sama sekali tidak relevan.
+const marketStatusMaxAge = 3 * time.Minute
+
+// marketOpen memutuskan apakah pasar boleh dieksekusi saat ini.
+//
+// Sumber utamanya status dari engine. Bila status itu sudah terlalu tua,
+// keputusan jatuh ke jadwal pasar lokal (ExpectedOpen, berbasis jam New York)
+// alih-alih memakai nilai basi.
+//
+// Sebelumnya fungsi ini hanya membaca nilai terakhir tanpa memeriksa umurnya,
+// sehingga koneksi engine yang bertahan lama membuat Runner menahan semua
+// sinyal dengan alasan "Pasar sedang tutup" padahal pasar sudah buka.
 func (s *Service) marketOpen() bool {
 	s.mu.Lock()
-	state := s.market
+	state, at := s.market, s.marketAt
 	s.mu.Unlock()
+
+	now := s.opts.Clock()
+	if at.IsZero() || now.Sub(at) > marketStatusMaxAge {
+		if s.logger != nil {
+			s.logger.Warn("status pasar dari engine basi, memakai jadwal lokal",
+				"umur", now.Sub(at).String(), "dari_engine", state.String())
+		}
+		return ingest.MarketOpen(s.localMarketState(now))
+	}
 	return ingest.MarketOpen(state)
+}
+
+// localMarketState menerjemahkan jadwal pasar New York menjadi status kontrak
+// engine, dipakai saat status dari engine tidak tersedia atau sudah basi.
+func (s *Service) localMarketState(now time.Time) enginev1.MarketState {
+	if !ExpectedOpen(now) {
+		return enginev1.MarketState_MARKET_CLOSED
+	}
+	return enginev1.MarketState_MARKET_OPEN
 }
 
 // ---------------------------------------------------------------------------
