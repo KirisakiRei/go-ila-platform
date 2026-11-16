@@ -79,6 +79,11 @@ function hasilHipotetis(item: JournalSkipped): { label: string; tone: 'positif' 
     case 'UNKNOWN':
       return { label: 'Hasil ambigu', tone: 'netral' }
     default:
+      // Tahap radar awal belum punya level entry, jadi TP/SL memang tidak bisa
+      // dinilai. Ditampilkan apa adanya agar baris tidak terlihat kosong.
+      if (!(item.entry_price > 0) && item.status.startsWith('WAIT')) {
+        return { label: 'Belum ada level entry', tone: 'netral' }
+      }
       return null
   }
 }
