@@ -170,9 +170,12 @@ func (s *telegramMenuService) setupMenunggu(ctx context.Context, userID string, 
 		if tahap == "" {
 			continue
 		}
-		mulai := sig.UpdatedAt
+		// Acuan "sejak" adalah publikasi slot pertama, bukan pembaruan terakhir:
+		// setup duplikat yang ditahan tetap memakai slot yang sama, jadi jamnya
+		// tidak meloncat setiap tahap maju.
+		mulai := sig.PublishedAt
 		if mulai.IsZero() {
-			mulai = sig.PublishedAt
+			mulai = sig.UpdatedAt
 		}
 		baris = append(baris, telegram.BarisMenunggu{
 			Symbol:       sig.Symbol,
