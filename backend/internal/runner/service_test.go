@@ -124,12 +124,12 @@ func (s *fakeStore) TouchSignal(_ context.Context, _ string, _ time.Time) error 
 
 // ExpireStaleSignals meniru penyapu database: hanya READY_TO_ENTRY dan
 // OPPORTUNITY yang lewat masa berlaku yang ditutup.
-func (s *fakeStore) ExpireStaleSignals(_ context.Context, now time.Time) (int64, error) {
+func (s *fakeStore) ExpireStaleSignals(_ context.Context, now time.Time) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var jumlah int64
-	for _, sig := range s.signals {
+	var hangus []string
+	for id, sig := range s.signals {
 		if sig.Status != model.SignalStatusReadyToEntry && sig.Status != model.SignalStatusOpportunity {
 			continue
 		}
@@ -137,9 +137,35 @@ func (s *fakeStore) ExpireStaleSignals(_ context.Context, now time.Time) (int64,
 			continue
 		}
 		sig.Status = model.SignalStatusExpired
-		jumlah++
+		hangus = append(hangus, id)
 	}
-	return jumlah, nil
+	return hangus, nil
+}
+
+// SlippageWaitingUsers meniru query user yang tertahan karena harga sudah lewat.
+func (s *fakeStore) SlippageWaitingUsers(_ context.Context, signalIDs []string) (map[string][]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	diminta := make(map[string]bool, len(signalIDs))
+	for _, id := range signalIDs {
+		diminta[id] = true
+	}
+
+	hasil := make(map[string][]string)
+	for _, us := range s.userSignals {
+		if !diminta[us.SignalID] {
+			continue
+		}
+		if us.Status != model.SignalStatusRejected {
+			continue
+		}
+		if us.RejectReason != "Harga sudah bergerak terlalu jauh dari level entry." {
+			continue
+		}
+		hasil[us.SignalID] = append(hasil[us.SignalID], us.UserID)
+	}
+	return hasil, nil
 }
 
 func (s *fakeStore) UpsertUserSignal(_ context.Context, us *model.UserSignal) error {

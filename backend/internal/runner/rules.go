@@ -464,3 +464,84 @@ func MaxAccounts(tier string) int {
 		return 0
 	}
 }
+
+// RejectGroup mengelompokkan alasan penolakan menurut apa artinya bagi user.
+//
+// User membaca satu kalimat penutup per grup, bukan satu kalimat untuk semua
+// alasan. Tanpa pengelompokan, setup yang masih hidup dan setup yang sudah mati
+// mendapat kalimat penutup yang sama sehingga status sebenarnya kabur.
+type RejectGroup string
+
+const (
+	// GroupNone berarti tidak ada penolakan.
+	GroupNone RejectGroup = ""
+	// GroupBatal: setup sudah tidak berlaku dan tidak dipantau lagi.
+	GroupBatal RejectGroup = "batal"
+	// GroupHarga: harga sudah melewati level entry, setup menunggu kembali.
+	// Berbeda dari GroupBatal karena sinyalnya masih READY sampai ExpiresAt.
+	GroupHarga RejectGroup = "harga"
+	// GroupKuota: setup valid, eksekusi ditahan aturan risiko harian.
+	GroupKuota RejectGroup = "kuota"
+	// GroupPosisi: setup valid, eksekusi ditahan karena posisi lain berjalan.
+	GroupPosisi RejectGroup = "posisi"
+	// GroupAkun: setup valid, akun atau dokumen user perlu dibereskan dulu.
+	GroupAkun RejectGroup = "akun"
+	// GroupTerkunci: hak akses tier atau metode. Tidak dikirim ke Telegram;
+	// mengirimnya berulang hanya mengganggu user yang memang belum berhak.
+	GroupTerkunci RejectGroup = "terkunci"
+	// GroupPasar: pasar tutup. Sementara, setup diulang saat pasar dibuka.
+	GroupPasar RejectGroup = "pasar"
+	// GroupSistem: pemeliharaan atau mode hanya-baca.
+	GroupSistem RejectGroup = "sistem"
+)
+
+// RejectGroupOf memetakan alasan penolakan ke grupnya.
+//
+// Alasan yang belum dikenal jatuh ke GroupBatal: lebih aman menyatakan setup
+// berakhir daripada menjanjikan setup masih dipantau padahal tidak.
+func RejectGroupOf(reason RejectReason) RejectGroup {
+	switch reason {
+	case RejectNone:
+		return GroupNone
+
+	case RejectSlippage:
+		return GroupHarga
+
+	case RejectDailyQuota, RejectDailyWin, RejectTwoStrike:
+		return GroupKuota
+
+	case RejectOpenPosition:
+		return GroupPosisi
+
+	case RejectLegalPending, RejectAccountFrozen, RejectSuspended,
+		RejectAccountBanned, RejectDuplicate:
+		return GroupAkun
+
+	case RejectEntitlement, RejectStrategyTier, RejectStrategyDisabled:
+		return GroupTerkunci
+
+	case RejectMarketClosed:
+		return GroupPasar
+
+	case RejectMaintenance, RejectReadOnly:
+		return GroupSistem
+
+	case RejectExpired, RejectWaitingNext, RejectNotReady, RejectTerminal,
+		RejectBadSignal:
+		return GroupBatal
+
+	default:
+		return GroupBatal
+	}
+}
+
+// RejectTerkirimKeTelegram menandai alasan yang layak dikirim sebagai pesan.
+// Penahanan karena tier atau metode hanya tampil di dashboard.
+func RejectTerkirimKeTelegram(reason RejectReason) bool {
+	return RejectGroupOf(reason) != GroupTerkunci
+}
+
+// Teks mengembalikan kalimat alasan yang siap ditampilkan ke user.
+func (r RejectReason) Teks() string {
+	return string(r)
+}

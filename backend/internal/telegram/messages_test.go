@@ -55,7 +55,7 @@ func TestFormatSetupMessageNumbers(t *testing.T) {
 	if !strings.Contains(msg.Text, "$51,25") {
 		t.Fatalf("nominal risiko tidak diformat:\n%s", msg.Text)
 	}
-	if !strings.Contains(msg.Text, "2,30") {
+	if !strings.Contains(msg.Text, "1:2,30") {
 		t.Fatalf("RR tidak diformat:\n%s", msg.Text)
 	}
 	if len(msg.Buttons) == 0 || len(msg.Buttons[0]) == 0 || msg.Buttons[0][0].URL != "https://app.test/approve/abc" {
@@ -75,13 +75,79 @@ func TestFormatSetupWithoutLink(t *testing.T) {
 }
 
 func TestFormatHeldMessageAlwaysExplainsReason(t *testing.T) {
-	msg := FormatHeldMessage("USTEC", "SELL", "ILA 2.0", 2.1, "masih ada posisi terbuka")
+	msg := FormatHeldMessage(HeldParams{
+		Symbol: "USTEC", Direction: "SELL", StrategyVersion: "ila-2.0",
+		Htf: "H4", Ltf: "M15", RiskReward: 2.1,
+		Alasan:     PenahananPosisi,
+		Keterangan: "Masih ada posisi terbuka. Tunggu sampai ditutup.",
+	})
 
-	if !strings.Contains(msg.Text, "masih ada posisi terbuka") {
+	if !strings.Contains(msg.Text, "Masih ada posisi terbuka") {
 		t.Fatalf("alasan penolakan harus tampil:\n%s", msg.Text)
 	}
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatal("pesan memuat istilah internal")
+	}
+	if !strings.Contains(msg.Text, "Tahap 4/6") {
+		t.Errorf("tahap siklus harus tampil:\n%s", msg.Text)
+	}
+}
+
+// TestHeldKuotaMenampilkanAngka memastikan penahanan kuota menyebut besar
+// kuotanya, bukan hanya "sudah habis".
+func TestHeldKuotaMenampilkanAngka(t *testing.T) {
+	msg := FormatHeldMessage(HeldParams{
+		Symbol: "GBPUSD", Direction: "BUY", Htf: "H4", Ltf: "M15",
+		EntryPrice: 1.2845, StopLoss: 1.2810, TakeProfit: 1.2915, RiskReward: 2,
+		Alasan: PenahananKuota, KuotaTerpakai: 2, KuotaMaks: 2,
+	})
+
+	if ContainsForbiddenTerms(msg.Text) {
+		t.Fatalf("pesan memuat istilah internal:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "2 dari 2 trade terpakai") {
+		t.Errorf("angka kuota tidak tampil:\n%s", msg.Text)
+	}
+	if strings.Contains(msg.Text, "Tidak dieksekusi:") {
+		t.Errorf("kalimat penolakan lama tidak boleh dipakai:\n%s", msg.Text)
+	}
+}
+
+// TestCancelledTidakMenjanjikanPemantauan memastikan setup yang sudah mati
+// tidak diberi kalimat "tetap dipantau".
+func TestCancelledTidakMenjanjikanPemantauan(t *testing.T) {
+	msg := FormatCancelledMessage(HeldParams{
+		Symbol: "EURUSD", Direction: "SELL", Htf: "H4", Ltf: "M15",
+		Alasan:     PenahananBatal,
+		Keterangan: "Struktur ditembus.",
+	})
+
+	if strings.Contains(msg.Text, "tetap dipantau") {
+		t.Errorf("setup batal tidak boleh dijanjikan dipantau:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "Setup tidak berlaku lagi") {
+		t.Errorf("pesan batal harus tegas:\n%s", msg.Text)
+	}
+}
+
+// TestHeldHargaMenungguKembali memastikan penahanan karena harga lewat memakai
+// bahasa menunggu, bukan bahasa batal.
+func TestHeldHargaMenungguKembali(t *testing.T) {
+	msg := FormatHeldMessage(HeldParams{
+		Symbol: "USTEC", Direction: "SELL", Htf: "H4", Ltf: "M15",
+		EntryPrice: 24812.5, StopLoss: 24905, TakeProfit: 24627.5, RiskReward: 2,
+		Alasan:      PenahananHarga,
+		BatasTunggu: "11 Nov 15:40 WIB",
+	})
+
+	if !strings.Contains(msg.Text, "Menunggu harga kembali") {
+		t.Errorf("judul harus menyebut menunggu harga:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "11 Nov 15:40 WIB") {
+		t.Errorf("batas tunggu harus tampil:\n%s", msg.Text)
+	}
+	if ContainsForbiddenTerms(msg.Text) {
+		t.Fatalf("pesan memuat istilah internal:\n%s", msg.Text)
 	}
 }
 
@@ -128,7 +194,7 @@ func TestFormatRadarHTFMessage(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
 	}
-	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "BUY", "H4 (HTF) ➔ M15 (LTF)", "1/4", "2.765,50", "2.738,20"} {
+	for _, want := range []string{"XAUUSD · H4 ➔ M15", "Tahap 1/6", "BUY", "2.765,50", "2.738,20"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("pesan HTF tidak memuat %q:\n%s", want, msg.Text)
 		}
@@ -157,7 +223,7 @@ func TestFormatRadarLTFMessage(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
 	}
-	for _, want := range []string{"RADAR ILA 2.0 — XAUUSD", "2/4", "H4 ➔ M15", "2.747,50", "2.737,80", "2.765,50", "2,85"} {
+	for _, want := range []string{"XAUUSD · H4 ➔ M15", "Tahap 3/6", "2.737,80", "2.765,50", "2.746,80"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("pesan LTF tidak memuat %q:\n%s", want, msg.Text)
 		}
@@ -186,7 +252,7 @@ func TestFormatPositionOpenedMessage(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal: %s", msg.Text)
 	}
-	for _, want := range []string{"POSISI TERPASANG — XAUUSD", "BUY #8492015", "cTrader Live", "4/4", "0,10 Lot", "2.748,15", "2.737,80", "2.765,50", "+2,72R"} {
+	for _, want := range []string{"XAUUSD", "Tahap 5/6", "BUY #8492015", "cTrader Live", "0,10 lot", "2.748,15", "2.737,80", "2.765,50", "1:2,72"} {
 		if !strings.Contains(msg.Text, want) {
 			t.Errorf("pesan posisi terpasang tidak memuat %q:\n%s", want, msg.Text)
 		}
@@ -229,7 +295,7 @@ func TestFormatOpportunityMessageMenyebutTimeframe(t *testing.T) {
 	msg := FormatOpportunityMessage("XAUUSD", "BUY", "ila-2.0", "W1", "H4",
 		4120.5, 4112.3, 4149.2, 2.3, "https://rekavia.com/approve/abc")
 
-	for _, ingin := range []string{"PELUANG ENTRY", "XAUUSD", "W1-H4"} {
+	for _, ingin := range []string{"XAUUSD · W1 ➔ H4", "Tahap 4/6", "4.120,50"} {
 		if !strings.Contains(msg.Text, ingin) {
 			t.Errorf("pesan tidak memuat %q:\n%s", ingin, msg.Text)
 		}

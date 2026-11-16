@@ -56,31 +56,10 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 
 		switch status {
 		case model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_MTF_REVERSAL":
-			dashboardLink := telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
-			var htfSweep dto.SignalHtfSweep
-			if signal.HtfSweepJSON != "" {
-				_ = json.Unmarshal([]byte(signal.HtfSweepJSON), &htfSweep)
-			}
-			targetDOL := htfSweep.TargetDOL
-			stopLoss := htfSweep.StopLoss
-			if stopLoss == 0 {
-				stopLoss = signal.StopLoss
-			}
-			details := htfSweep.Details
-			if details == "" {
-				details = signal.Summary
-			}
-			return telegram.FormatRadarHTFMessage(telegram.RadarHTFParams{
-				Symbol:          signal.Symbol,
-				Direction:       signal.Direction,
-				StrategyVersion: signal.StrategyVersion,
-				Htf:             signal.Htf,
-				Ltf:             signal.Ltf,
-				TargetDOL:       targetDOL,
-				StopLoss:        stopLoss,
-				Details:         details,
-				DashboardLink:   dashboardLink,
-			})
+			return telegram.FormatRadarHTFMessage(p.radarHTFParams(ctx, signal))
+
+		case "WAIT_HTF_SWEEP":
+			return telegram.FormatRadarSweepMessage(p.radarHTFParams(ctx, signal))
 
 		case model.SignalStatusWaitLTFCISD, "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2":
 			dashboardLink := telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
@@ -132,7 +111,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 					Symbol:       pos.Symbol,
 					Direction:    pos.Direction,
 					TicketNumber: pos.TicketNumber,
-					BrokerType:   "",
+					BrokerType:   p.namaBroker(ctx, pos.BrokerAccountID, pos.UserID),
 					LotSize:      pos.LotSize,
 					OpenPrice:    pos.OpenPrice,
 					StopLoss:     pos.StopLoss,
@@ -157,10 +136,29 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			})
 
 		case model.SignalStatusRejected:
-			return telegram.FormatHeldMessage(
-				signal.Symbol, signal.Direction, signal.StrategyVersion,
-				signal.RiskReward, reason,
-			)
+			alasan := runner.RejectReason(reason)
+			// Penahanan karena tier atau metode hanya tampil di dashboard.
+			// Mengirimnya berulang kali mengganggu user yang memang belum berhak.
+			if !runner.RejectTerkirimKeTelegram(alasan) {
+				return telegram.Message{}
+			}
+			return telegram.FormatHeldMessage(telegram.HeldParams{
+				Symbol:          signal.Symbol,
+				Direction:       signal.Direction,
+				StrategyVersion: signal.StrategyVersion,
+				Htf:             signal.Htf,
+				Ltf:             signal.Ltf,
+				EntryPrice:      signal.EntryPrice,
+				StopLoss:        signal.StopLoss,
+				TakeProfit:      signal.TakeProfit,
+				RiskReward:      signal.RiskReward,
+				Alasan:          alasanPenahanan(alasan),
+				Keterangan:      alasan.Teks(),
+				KuotaTerpakai:   p.kuotaAngka(ctx, userID, alasan, false),
+				KuotaMaks:       p.kuotaAngka(ctx, userID, alasan, true),
+				BatasTunggu:     batasTunggu(signal.ExpiresAt),
+				Link:            p.tautanTindakan(ctx, userID, signalID, signal.Symbol),
+			})
 
 		case model.SignalStatusOpportunity:
 			// Peluang bukan penolakan: pesannya menawarkan langkah berikutnya.
@@ -180,9 +178,131 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			if text == "" {
 				text = "Setup tidak lagi berlaku."
 			}
-			return telegram.FormatFinishedMessage(signal.Symbol, text)
+			return telegram.FormatCancelledMessage(telegram.HeldParams{
+				Symbol:          signal.Symbol,
+				Direction:       signal.Direction,
+				StrategyVersion: signal.StrategyVersion,
+				Htf:             signal.Htf,
+				Ltf:             signal.Ltf,
+				Keterangan:      text,
+				Alasan:          telegram.PenahananBatal,
+				Link:            telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol),
+			})
 		}
 	})
+}
+
+// radarHTFParams menyusun parameter radar tahap 1 dan 2 dari baris sinyal.
+func (p *runnerPublisher) radarHTFParams(ctx context.Context, signal *model.Signal) telegram.RadarHTFParams {
+	_ = ctx
+	var htfSweep dto.SignalHtfSweep
+	if signal.HtfSweepJSON != "" {
+		_ = json.Unmarshal([]byte(signal.HtfSweepJSON), &htfSweep)
+	}
+
+	batas := htfSweep.StopLoss
+	if batas == 0 {
+		batas = signal.StopLoss
+	}
+	detail := htfSweep.Details
+	if detail == "" {
+		// Summary engine memuat istilah internal, jadi disaring lebih dulu.
+		detail = telegram.Sanitize(signal.Summary)
+	}
+
+	return telegram.RadarHTFParams{
+		Symbol:          signal.Symbol,
+		Direction:       signal.Direction,
+		StrategyVersion: signal.StrategyVersion,
+		Htf:             signal.Htf,
+		Ltf:             signal.Ltf,
+		TargetDOL:       htfSweep.TargetDOL,
+		StopLoss:        batas,
+		Details:         detail,
+		Siklus:          siklusCandle(signal.Htf, signal.PublishedAt),
+		DashboardLink:   telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol),
+	}
+}
+
+// siklusCandle menyebut lilin yang sedang berjalan beserta sesi New York-nya.
+func siklusCandle(htf string, terbit time.Time) string {
+	if htf == "" || terbit.IsZero() {
+		return ""
+	}
+	ny := terbit.UTC().Add(-5 * time.Hour)
+	return fmt.Sprintf("Candle %s (%s NY)", htf, ny.Format("15:04"))
+}
+
+// alasanPenahanan menerjemahkan grup alasan Runner ke kelompok tampilan.
+func alasanPenahanan(reason runner.RejectReason) telegram.AlasanPenahanan {
+	switch runner.RejectGroupOf(reason) {
+	case runner.GroupKuota:
+		return telegram.PenahananKuota
+	case runner.GroupPosisi:
+		return telegram.PenahananPosisi
+	case runner.GroupAkun:
+		return telegram.PenahananAkun
+	case runner.GroupPasar:
+		return telegram.PenahananPasar
+	case runner.GroupSistem:
+		return telegram.PenahananSistem
+	case runner.GroupHarga:
+		return telegram.PenahananHarga
+	default:
+		return telegram.PenahananBatal
+	}
+}
+
+// batasTunggu menampilkan batas waktu dalam WIB; kosong bila tidak ada.
+func batasTunggu(expiresAt time.Time) string {
+	if expiresAt.IsZero() {
+		return ""
+	}
+	wib := expiresAt.In(time.FixedZone("WIB", 7*3600))
+	return wib.Format("02 Jan 15:04") + " WIB"
+}
+
+// tautanTindakan memilih tombol: approve bila masih boleh dieksekusi manual,
+// dashboard bila tidak.
+func (p *runnerPublisher) tautanTindakan(ctx context.Context, userID, signalID, symbol string) string {
+	if link := p.approveLink(ctx, userID, signalID); link != "" {
+		return link
+	}
+	return telegram.AppURL(p.baseURL, "/sinyal?pair="+symbol)
+}
+
+// namaBroker membaca label broker akun untuk notifikasi posisi.
+// Gagal membaca bukan alasan menahan notifikasi; baris broker hanya dilewati.
+func (p *runnerPublisher) namaBroker(ctx context.Context, accountID, userID string) string {
+	if accountID == "" || userID == "" {
+		return ""
+	}
+	akun, err := p.store.FindBrokerAccount(ctx, accountID, userID)
+	if err != nil || akun == nil {
+		return ""
+	}
+	return akun.BrokerType
+}
+
+// kuotaAngka mengisi baris kuota harian untuk penahanan karena aturan harian.
+//
+// Angka hanya diambil saat memang relevan: membaca ringkasan harian untuk
+// alasan lain hanya menambah query tanpa mengubah isi pesan.
+func (p *runnerPublisher) kuotaAngka(ctx context.Context, userID string, alasan runner.RejectReason, mauMaks bool) int {
+	if runner.RejectGroupOf(alasan) != runner.GroupKuota {
+		return 0
+	}
+
+	summary, err := p.store.FindDailySummary(ctx, userID, runner.DayKey(time.Now()))
+	if err != nil {
+		p.logger.Warn("kuota harian tidak terbaca untuk notifikasi", "user_id", userID, "error", err.Error())
+		return 0
+	}
+
+	if mauMaks {
+		return runner.DefaultDailyPolicy().Clamp().MaxTrades
+	}
+	return summary.TotalTrades
 }
 
 // PublishTelemetry hanya mencatat perubahan; backend-api membaca langsung
@@ -205,17 +325,45 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 	p.notifier.Enqueue(pos.UserID, messageKey, func(chatID string) telegram.Message {
 		_ = chatID
 		posisiLink := telegram.AppURL(p.baseURL, "/posisi")
-		return telegram.FormatClosedMessage(
-			pos.Symbol,
-			positionResultLabel(pos.Status),
-			pos.OpenPrice,
-			pos.ExitPrice,
-			pos.ProfitLoss,
-			pos.OutcomeR,
-			dailyNote,
-			posisiLink,
-		)
+		return telegram.FormatClosedMessage(telegram.ClosedParams{
+			Symbol:      pos.Symbol,
+			Direction:   pos.Direction,
+			Result:      positionResultLabel(pos.Status),
+			EntryPrice:  pos.OpenPrice,
+			ExitPrice:   pos.ExitPrice,
+			ProfitLoss:  pos.ProfitLoss,
+			OutcomeR:    pos.OutcomeR,
+			Duration:    durasiPosisi(pos.OpenedAt, pos.ClosedAt),
+			DailyNote:   dailyNote,
+			RiwayatLink: posisiLink,
+		})
 	})
+}
+
+// durasiPosisi menghitung lama posisi terbuka dalam bahasa yang ringkas.
+func durasiPosisi(buka time.Time, tutup *time.Time) string {
+	if buka.IsZero() {
+		return ""
+	}
+	akhir := time.Now()
+	if tutup != nil && !tutup.IsZero() {
+		akhir = *tutup
+	}
+	lama := akhir.Sub(buka)
+	if lama < 0 {
+		return ""
+	}
+
+	jam := int(lama.Hours())
+	menit := int(lama.Minutes()) % 60
+	switch {
+	case jam >= 24:
+		return fmt.Sprintf("%d hari %d jam", jam/24, jam%24)
+	case jam > 0:
+		return fmt.Sprintf("%d jam %d menit", jam, menit)
+	default:
+		return fmt.Sprintf("%d menit", menit)
+	}
 }
 
 // positionResultLabel menerjemahkan status teknis menjadi bahasa user.

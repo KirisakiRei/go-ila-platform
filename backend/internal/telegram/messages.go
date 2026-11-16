@@ -49,6 +49,110 @@ type Message struct {
 	Buttons [][]InlineButton
 }
 
+// ---------------------------------------------------------------------------
+// Kerangka pesan
+// ---------------------------------------------------------------------------
+
+// Tahap siklus setup yang ditampilkan di setiap notifikasi.
+//
+// Nomor tahap dipakai user untuk tahu sedang di mana prosesnya, jadi nilainya
+// harus sama dengan urutan cerita di dashboard: struktur besar, konfirmasi
+// arah, tunggu trigger, siap masuk, posisi jalan, posisi selesai.
+const (
+	tahapStruktur   = "1/6"
+	tahapKonfirmasi = "2/6"
+	tahapTrigger    = "3/6"
+	tahapSiap       = "4/6"
+	tahapPosisi     = "5/6"
+	tahapSelesai    = "6/6"
+)
+
+// judulPesan menyusun baris pertama: emoji, pair, pasangan timeframe, lalu
+// keadaan sekarang. Dua baris ini yang dibaca user duluan di notifikasi.
+func judulPesan(emoji, symbol, htf, ltf, keadaan string) string {
+	pasangan := strings.TrimSpace(htf)
+	if ltf != "" {
+		if pasangan != "" {
+			pasangan += " ➔ " + ltf
+		} else {
+			pasangan = ltf
+		}
+	}
+	if pasangan == "" {
+		return fmt.Sprintf("%s %s\n%s\n", emoji, symbol, keadaan)
+	}
+	return fmt.Sprintf("%s %s · %s\n%s\n", emoji, symbol, pasangan, keadaan)
+}
+
+// makeBox merender baris label-nilai sebagai satu blok.
+//
+// Baris yang nilainya kosong dilewati supaya tidak muncul "│ Target │ │" saat
+// engine belum mengirim angka. Lebar label disamakan agar kolom kanan rata.
+func makeBox(rows [][2]string) string {
+	lebar := 0
+	for _, row := range rows {
+		if row[1] == "" {
+			continue
+		}
+		if len(row[0]) > lebar {
+			lebar = len(row[0])
+		}
+	}
+	if lebar == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("```\n")
+	for _, row := range rows {
+		if row[1] == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "│ %-*s │ %s\n", lebar, row[0], row[1])
+	}
+	b.WriteString("```\n")
+	return b.String()
+}
+
+// arahTampil menyeragamkan arah posisi untuk ditampilkan.
+func arahTampil(direction string) string {
+	arah := strings.ToUpper(strings.TrimSpace(direction))
+	switch arah {
+	case "":
+		return "NETRAL"
+	case "BULLISH":
+		return "BUY"
+	case "BEARISH":
+		return "SELL"
+	default:
+		return arah
+	}
+}
+
+// risikoTampil menyusun baris risiko, kosong bila angkanya belum ada.
+func risikoTampil(persen, nominal float64, lot float64) string {
+	bagian := make([]string, 0, 2)
+	if persen > 0 || nominal > 0 {
+		bagian = append(bagian, fmt.Sprintf("%s%% (%s)", formatFrom(persen), formatMoney(nominal)))
+	}
+	if lot > 0 {
+		bagian = append(bagian, formatThousands(lot, 2)+" lot")
+	}
+	return strings.Join(bagian, " · ")
+}
+
+// tombolRadar membungkus satu tombol tautan opsional.
+func tombolRadar(label, link string) [][]InlineButton {
+	if link == "" {
+		return nil
+	}
+	return [][]InlineButton{{{Text: label, URL: link}}}
+}
+
+// ---------------------------------------------------------------------------
+// Tahap 4 — Setup siap dieksekusi
+// ---------------------------------------------------------------------------
+
 // SetupMessageParams memuat parameter lengkap notifikasi setup valid.
 type SetupMessageParams struct {
 	Symbol          string
@@ -62,53 +166,38 @@ type SetupMessageParams struct {
 	RiskReward      float64
 	RiskPercent     float64
 	RiskAmount      float64
+	LotSize         float64
 	ApprovalLink    string
 }
 
-// FormatSetupDetailedMessage menyusun pesan "setup valid" lengkap untuk Tahap 3 (Ready to Entry).
+// FormatSetupDetailedMessage menyusun pesan Tahap 4: setup lengkap dan siap masuk.
 func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 	var b strings.Builder
 
-	strategy := p.StrategyVersion
-	if strategy == "" {
-		strategy = "ILA"
+	strategi := p.StrategyVersion
+	if strategi == "" {
+		strategi = "ILA"
 	}
-	fmt.Fprintf(&b, "🟢 SETUP VALID — %s\n", p.Symbol)
-	fmt.Fprintf(&b, "Arah: %s  |  Strategi: %s\n", strings.ToUpper(p.Direction), strategy)
-
-	if p.Htf != "" && p.Ltf != "" {
-		if p.StrategyVersion == "ila-3.0" {
-			mtf := getILA3MTF(p.Htf, p.Ltf)
-			fmt.Fprintf(&b, "Timeframe: %s ➔ %s ➔ %s\n", p.Htf, mtf, p.Ltf)
-		} else {
-			fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n", p.Htf, p.Ltf)
-		}
-	}
-
-	b.WriteString("\nTahap: 3/4 — Setup Sempurna (Ready to Entry)\n")
-	b.WriteString("Kondisi: Konfirmasi struktur lengkap. Siap masuk pada open candle berikutnya!\n\n")
-
-	b.WriteString("💎 Rincian Eksekusi:\n")
-	fmt.Fprintf(&b, "• Entry Price: %s\n", formatPrice(p.EntryPrice))
-	fmt.Fprintf(&b, "• Stop Loss (SL): %s\n", formatPrice(p.StopLoss))
-	fmt.Fprintf(&b, "• Take Profit (TP): %s\n", formatPrice(p.TakeProfit))
-	fmt.Fprintf(&b, "• Risk to Reward: 1:%s\n", formatFrom(p.RiskReward))
-
-	if p.RiskPercent > 0 || p.RiskAmount > 0 {
-		fmt.Fprintf(&b, "• Risiko Akun: %s%% ≈ %s\n", formatFrom(p.RiskPercent), formatMoney(p.RiskAmount))
-	}
+	b.WriteString(judulPesan("🟢", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapSiap+" · Siap dieksekusi"))
 	b.WriteString("\n")
 
-	b.WriteString("⚠️ Pintu konfirmasi terbuka maksimal 5 menit dari sekarang.\n")
+	b.WriteString(makeBox([][2]string{
+		{"Arah", arahTampil(p.Direction)},
+		{"Metode", strategi},
+		{"Entry", formatPrice(p.EntryPrice)},
+		{"Stop", formatPrice(p.StopLoss)},
+		{"Target", formatPrice(p.TakeProfit)},
+		{"RR", "1:" + formatFrom(p.RiskReward)},
+		{"Risiko", risikoTampil(p.RiskPercent, p.RiskAmount, p.LotSize)},
+	}))
 
-	var buttons [][]InlineButton
+	b.WriteString("\nPintu konfirmasi terbuka singkat. Eksekusi sekarang atau lewati.\n")
+
+	label := "🔍 Detail Setup"
 	if p.ApprovalLink != "" {
-		buttons = append(buttons, []InlineButton{
-			{Text: "⚡ EKSEKUSI ORDER SEKARANG", URL: p.ApprovalLink},
-		})
+		label = "⚡ Eksekusi Manual"
 	}
-
-	return Message{Text: b.String(), Buttons: buttons}
+	return Message{Text: b.String(), Buttons: tombolRadar(label, p.ApprovalLink)}
 }
 
 // FormatSetupMessage menyusun pesan "setup valid" untuk mode manual (kompatibilitas mundur).
@@ -128,6 +217,10 @@ func FormatSetupMessage(symbol, side, strategy string, entry, sl, tp, rr, riskPe
 	})
 }
 
+// ---------------------------------------------------------------------------
+// Tahap 1 & 2 — Struktur timeframe besar
+// ---------------------------------------------------------------------------
+
 // RadarHTFParams adalah masukan untuk notifikasi radar tahap 1 (Cek HTF).
 type RadarHTFParams struct {
 	Symbol          string
@@ -138,75 +231,76 @@ type RadarHTFParams struct {
 	TargetDOL       float64
 	StopLoss        float64
 	Details         string
+	Siklus          string // e.g. "Candle H4 (20:00 NY)"
 	DashboardLink   string
 }
 
-// FormatRadarHTFMessage menyusun pesan Tahap 1: Pemantauan Struktur Timeframe Besar (HTF).
+// FormatRadarHTFMessage menyusun pesan Tahap 1: memantau struktur timeframe besar.
 func FormatRadarHTFMessage(p RadarHTFParams) Message {
-	var b strings.Builder
-
-	strategy := p.StrategyVersion
-	if strategy == "" {
-		strategy = "ILA"
-	}
-	fmt.Fprintf(&b, "⏳ RADAR %s — %s\n", strings.ToUpper(strategy), p.Symbol)
-
-	arah := strings.ToUpper(p.Direction)
-	if arah == "" || arah == "NEUTRAL" {
-		b.WriteString("Arah Pantauan: Memantau Reaksi Harga\n")
-	} else {
-		fmt.Fprintf(&b, "Arah Pantauan: %s (Potensi Reversal)\n", arah)
-	}
-
 	htf := p.Htf
 	if htf == "" {
 		htf = "HTF"
 	}
-	ltf := p.Ltf
-	if ltf == "" {
-		ltf = "LTF"
-	}
-	if p.StrategyVersion == "ila-3.0" {
-		mtf := getILA3MTF(htf, ltf)
-		fmt.Fprintf(&b, "Timeframe: %s (HTF) ➔ %s (MTF) ➔ %s (LTF)\n\n", htf, mtf, ltf)
-	} else {
-		fmt.Fprintf(&b, "Timeframe: %s (HTF) ➔ %s (LTF)\n\n", htf, ltf)
+
+	bias := arahTampil(p.Direction)
+	if bias == "" {
+		bias = "NETRAL"
 	}
 
-	fmt.Fprintf(&b, "Tahap: 1/4 — Pemantauan Struktur Timeframe Besar (%s)\n", htf)
-	fmt.Fprintf(&b, "Status: Menunggu Penutupan Candle %s\n\n", htf)
+	var b strings.Builder
+	b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapStruktur+" · Menunggu struktur "+htf))
+	b.WriteString("\n")
 
-	b.WriteString("📊 Kondisi Market Saat Ini:\n")
-	details := Sanitize(p.Details)
-	if details == "" {
-		fmt.Fprintf(&b, "• %s: Reaksi harga di area likuiditas penting sedang berlangsung.\n", htf)
-	} else {
-		fmt.Fprintf(&b, "• %s: %s\n", htf, details)
-	}
-	fmt.Fprintf(&b, "• Syarat Validasi: Candle %s harus resmi closed untuk konfirmasi arah.\n", htf)
-	fmt.Fprintf(&b, "• %s: Belum aktif dipindai (standby menunggu konfirmasi %s).\n\n", ltf, htf)
+	b.WriteString(makeBox([][2]string{
+		{"Tahap", tahapStruktur + " · Struktur " + htf},
+		{"Siklus", p.Siklus},
+		{"Bias", bias},
+		{"Target", formatHargaOpsional(p.TargetDOL)},
+		{"Batas", formatHargaOpsional(p.StopLoss)},
+	}))
 
-	if p.TargetDOL > 0 || p.StopLoss > 0 {
-		b.WriteString("🎯 Rencana Setup Sementara:\n")
-		if p.TargetDOL > 0 {
-			fmt.Fprintf(&b, "• Target Likuiditas: %s\n", formatPrice(p.TargetDOL))
-		}
-		if p.StopLoss > 0 {
-			fmt.Fprintf(&b, "• Batas Area Aman: %s\n", formatPrice(p.StopLoss))
-		}
-		b.WriteString("\n")
+	b.WriteString("\nMemantau reaksi harga di area likuiditas " + htf + ".\n")
+	fmt.Fprintf(&b, "Candle %s harus tutup dulu sebelum arah ditetapkan.\n", htf)
+
+	if detail := Sanitize(p.Details); detail != "" {
+		fmt.Fprintf(&b, "\n%s\n", detail)
 	}
 
-	var buttons [][]InlineButton
-	if p.DashboardLink != "" {
-		label := fmt.Sprintf("🔍 Buka Chart %s di Dashboard", htf)
-		buttons = append(buttons, []InlineButton{
-			{Text: label, URL: p.DashboardLink},
-		})
-	}
-
-	return Message{Text: b.String(), Buttons: buttons}
+	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar "+htf, p.DashboardLink)}
 }
+
+// FormatRadarSweepMessage menyusun pesan Tahap 2: likuiditas HTF sudah tersentuh.
+//
+// Dipisah dari Tahap 1 karena keadaannya berbeda: arah sudah mengarah, tinggal
+// menunggu candle HTF tutup. Menyatukannya membuat user tidak bisa membedakan
+// "belum ada reaksi" dan "reaksi sudah terjadi".
+func FormatRadarSweepMessage(p RadarHTFParams) Message {
+	htf := p.Htf
+	if htf == "" {
+		htf = "HTF"
+	}
+
+	var b strings.Builder
+	b.WriteString(judulPesan("👀", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapKonfirmasi+" · Likuiditas "+htf+" tersentuh"))
+	b.WriteString("\n")
+
+	b.WriteString(makeBox([][2]string{
+		{"Tahap", tahapKonfirmasi + " · Tunggu candle " + htf},
+		{"Siklus", p.Siklus},
+		{"Bias", arahTampil(p.Direction)},
+		{"Target", formatHargaOpsional(p.TargetDOL)},
+		{"Batas", formatHargaOpsional(p.StopLoss)},
+	}))
+
+	fmt.Fprintf(&b, "\nArea likuiditas %s sudah tersentuh.\n", htf)
+	fmt.Fprintf(&b, "Menunggu candle %s tutup untuk mengonfirmasi arah %s.\n", htf, arahTampil(p.Direction))
+
+	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar "+htf, p.DashboardLink)}
+}
+
+// ---------------------------------------------------------------------------
+// Tahap 3 — Menunggu trigger timeframe kecil
+// ---------------------------------------------------------------------------
 
 // RadarLTFParams adalah masukan untuk notifikasi radar tahap 2 (Cek LTF).
 type RadarLTFParams struct {
@@ -221,84 +315,193 @@ type RadarLTFParams struct {
 	RiskReward      float64
 	CISDLevel       float64
 	Details         string
+	Siklus          string
 	DashboardLink   string
 }
 
-// FormatRadarLTFMessage menyusun pesan Tahap 2: Menunggu Konfirmasi Timeframe Kecil (LTF).
+// FormatRadarLTFMessage menyusun pesan Tahap 3: menunggu trigger di timeframe kecil.
 func FormatRadarLTFMessage(p RadarLTFParams) Message {
-	var b strings.Builder
-
-	strategy := p.StrategyVersion
-	if strategy == "" {
-		strategy = "ILA"
-	}
-	fmt.Fprintf(&b, "⏳ RADAR %s — %s\n", strings.ToUpper(strategy), p.Symbol)
-
-	arah := strings.ToUpper(p.Direction)
-	if arah == "" || arah == "NEUTRAL" {
-		arah = "PEMBALIKAN ARAH"
-	}
-	fmt.Fprintf(&b, "Arah Setup: %s\n", arah)
-
-	htf := p.Htf
-	if htf == "" {
-		htf = "HTF"
-	}
 	ltf := p.Ltf
 	if ltf == "" {
 		ltf = "LTF"
 	}
-	if p.StrategyVersion == "ila-3.0" {
-		mtf := getILA3MTF(htf, ltf)
-		fmt.Fprintf(&b, "Timeframe: %s ➔ %s ➔ %s\n\n", htf, mtf, ltf)
-	} else {
-		fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n\n", htf, ltf)
-	}
 
-	fmt.Fprintf(&b, "Tahap: 2/4 — Menunggu Konfirmasi Timeframe Kecil (%s)\n", ltf)
-	fmt.Fprintf(&b, "Status: %s Valid! Menunggu Trigger Entry di %s\n\n", htf, ltf)
-
-	b.WriteString("📊 Analisis Multi-Timeframe:\n")
-	fmt.Fprintf(&b, "• %s [TERKONFIRMASI]: Struktur timeframe besar valid dengan bias %s.\n", htf, arah)
-	details := Sanitize(p.Details)
-	if details != "" {
-		fmt.Fprintf(&b, "• %s [DALAM PROSES]: %s\n", ltf, details)
-	} else if p.CISDLevel > 0 {
-		fmt.Fprintf(&b, "• %s [DALAM PROSES]: Perubahan arah struktur di level %s. Menunggu candle %s closed menembus level tersebut.\n", ltf, formatPrice(p.CISDLevel), ltf)
-	} else {
-		fmt.Fprintf(&b, "• %s [DALAM PROSES]: Memantau konfirmasi penembusan struktur momentum.\n", ltf)
-	}
+	var b strings.Builder
+	b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapTrigger+" · Menunggu trigger "+ltf))
 	b.WriteString("\n")
 
-	if p.EntryPrice > 0 || p.StopLoss > 0 || p.TakeProfit > 0 {
-		b.WriteString("🎯 Proyeksi Parameter:\n")
-		if p.EntryPrice > 0 {
-			fmt.Fprintf(&b, "• Estimasi Entry: ~%s\n", formatPrice(p.EntryPrice))
-		}
-		if p.StopLoss > 0 {
-			fmt.Fprintf(&b, "• Stop Loss (SL): %s\n", formatPrice(p.StopLoss))
-		}
-		if p.TakeProfit > 0 {
-			fmt.Fprintf(&b, "• Take Profit (TP): %s\n", formatPrice(p.TakeProfit))
-		}
-		if p.RiskReward > 0 {
-			fmt.Fprintf(&b, "• Estimasi RR: 1:%s\n", formatFrom(p.RiskReward))
-		}
-		b.WriteString("\n")
+	b.WriteString(makeBox([][2]string{
+		{"Tahap", tahapTrigger + " · Trigger " + ltf},
+		{"Siklus", p.Siklus},
+		{"Bias", arahTampil(p.Direction)},
+		{"Target", formatHargaOpsional(p.TakeProfit)},
+		{"Batas", formatHargaOpsional(p.StopLoss)},
+		{"Pantau", formatHargaOpsional(p.CISDLevel)},
+	}))
+
+	if p.CISDLevel > 0 {
+		fmt.Fprintf(&b, "\nMenunggu candle %s tutup menembus %s untuk konfirmasi perubahan arah.\n",
+			ltf, formatPrice(p.CISDLevel))
+	} else if detail := Sanitize(p.Details); detail != "" {
+		fmt.Fprintf(&b, "\n%s\n", detail)
+	} else {
+		fmt.Fprintf(&b, "\nMemantau konfirmasi perubahan arah di %s.\n", ltf)
 	}
 
-	var buttons [][]InlineButton
-	if p.DashboardLink != "" {
-		label := fmt.Sprintf("🔍 Pantau Radar %s di Dashboard", ltf)
-		buttons = append(buttons, []InlineButton{
-			{Text: label, URL: p.DashboardLink},
-		})
-	}
-
-	return Message{Text: b.String(), Buttons: buttons}
+	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Pantau "+ltf, p.DashboardLink)}
 }
 
-// PositionOpenedParams adalah masukan untuk notifikasi order yang sudah live di pasar (Tahap 4).
+// ---------------------------------------------------------------------------
+// Penahanan eksekusi & pembatalan setup
+// ---------------------------------------------------------------------------
+
+// AlasanPenahanan mengelompokkan alasan tertahannya eksekusi.
+//
+// Nilainya sengaja berupa string biasa, bukan tipe dari paket runner, supaya
+// paket telegram tidak bergantung pada aturan bisnis Runner.
+type AlasanPenahanan string
+
+const (
+	PenahananKuota  AlasanPenahanan = "kuota"
+	PenahananPosisi AlasanPenahanan = "posisi"
+	PenahananAkun   AlasanPenahanan = "akun"
+	PenahananPasar  AlasanPenahanan = "pasar"
+	PenahananSistem AlasanPenahanan = "sistem"
+	PenahananHarga  AlasanPenahanan = "harga"
+	PenahananBatal  AlasanPenahanan = "batal"
+)
+
+// HeldParams adalah masukan notifikasi setup yang tertahan atau batal.
+type HeldParams struct {
+	Symbol          string
+	Direction       string
+	StrategyVersion string
+	Htf             string
+	Ltf             string
+	EntryPrice      float64
+	StopLoss        float64
+	TakeProfit      float64
+	RiskReward      float64
+	Alasan          AlasanPenahanan
+	// Keterangan adalah kalimat dari Runner yang menjelaskan keadaannya.
+	Keterangan string
+	// KuotaTerpakai dan KuotaMaks diisi bila alasan tertahan karena aturan harian.
+	KuotaTerpakai int
+	KuotaMaks     int
+	// BatasTunggu diisi bila setup menunggu harga kembali ke level entry.
+	BatasTunggu string
+	Link        string
+}
+
+// FormatHeldMessage menyusun pesan untuk setup yang MASIH berlaku tetapi
+// eksekusinya ditahan. Judul dan penutup mengikuti alasan penahanannya supaya
+// user tahu apakah masih ada kesempatan atau tidak.
+func FormatHeldMessage(p HeldParams) Message {
+	if p.Alasan == PenahananBatal || p.Alasan == PenahananHarga {
+		return FormatCancelledMessage(p)
+	}
+
+	emoji, keadaan, penutup, label, _ := penahananTeks(p.Alasan)
+
+	var b strings.Builder
+	b.WriteString(judulPesan(emoji, p.Symbol, p.Htf, p.Ltf, keadaan))
+	b.WriteString("\n")
+
+	b.WriteString(makeBox([][2]string{
+		{"Arah", arahTampil(p.Direction)},
+		{"Metode", metodeTampil(p.StrategyVersion)},
+		{"Entry", formatPrice(p.EntryPrice)},
+		{"Stop", formatPrice(p.StopLoss)},
+		{"Target", formatPrice(p.TakeProfit)},
+		{"RR", rrTampil(p.RiskReward)},
+		{"Kuota", kuotaTampil(p.KuotaTerpakai, p.KuotaMaks)},
+		{"Sebab", p.Keterangan},
+	}))
+
+	fmt.Fprintf(&b, "\n%s\n", penutup)
+
+	return Message{Text: b.String(), Buttons: tombolRadar(label, p.Link)}
+}
+
+// FormatCancelledMessage menyusun pesan untuk setup yang sudah tidak berlaku.
+//
+// Dipakai dua keadaan: penahanan karena harga sudah lewat (masih menunggu
+// kembali sampai batas waktu) dan pembatalan penuh.
+func FormatCancelledMessage(p HeldParams) Message {
+	var b strings.Builder
+
+	if p.Alasan == PenahananHarga {
+		b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapSiap+" · Menunggu harga kembali"))
+		b.WriteString("\n")
+		b.WriteString(makeBox([][2]string{
+			{"Arah", arahTampil(p.Direction)},
+			{"Entry", formatPrice(p.EntryPrice)},
+			{"Stop", formatPrice(p.StopLoss)},
+			{"Target", formatPrice(p.TakeProfit)},
+			{"RR", rrTampil(p.RiskReward)},
+			{"Batas tunggu", p.BatasTunggu},
+		}))
+		fmt.Fprintf(&b, "\nHarga sudah melewati level entry %s.\n", formatPrice(p.EntryPrice))
+		if p.BatasTunggu != "" {
+			fmt.Fprintf(&b, "Setup menunggu harga kembali sebelum %s. Setelah itu dibatalkan otomatis.\n", p.BatasTunggu)
+		} else {
+			b.WriteString("Setup menunggu harga kembali ke level entry. Setelah itu dibatalkan otomatis.\n")
+		}
+		return Message{Text: b.String(), Buttons: tombolRadar("📊 Pantau Harga", p.Link)}
+	}
+
+	b.WriteString(judulPesan("⌛", p.Symbol, p.Htf, p.Ltf, "Setup dibatalkan"))
+	b.WriteString("\n")
+	b.WriteString(makeBox([][2]string{
+		{"Arah", arahTampil(p.Direction)},
+		{"Metode", metodeTampil(p.StrategyVersion)},
+		{"Sebab", p.Keterangan},
+	}))
+
+	b.WriteString("\nSetup tidak berlaku lagi. Tidak ada posisi yang dibuka.\n")
+	b.WriteString("Radar menunggu setup baru.\n")
+
+	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar", p.Link)}
+}
+
+// penahananTeks memilih emoji, judul, penutup, dan tombol per alasan.
+//
+// penutup wajib menyebut apakah setup masih berlaku. Kalimat yang sama untuk
+// semua alasan membuat user mengira setup yang sudah mati masih dipantau.
+func penahananTeks(alasan AlasanPenahanan) (emoji, keadaan, penutup, label string, tombol string) {
+	switch alasan {
+	case PenahananKuota:
+		return "🔔", "Tahap " + tahapSiap + " · Ditahan kuota harian",
+			"Batas trade harian tercapai. Kuota pulih besok, dan eksekusi manual masih bisa bila disetujui.",
+			"⚡ Eksekusi Manual", "eksekusi"
+	case PenahananPosisi:
+		return "🔔", "Tahap " + tahapSiap + " · Ditahan posisi berjalan",
+			"Masih ada posisi aktif. Sistem tidak membuka posisi ganda di pasangan ini.",
+			"📊 Lihat Posisi Aktif", "posisi"
+	case PenahananAkun:
+		return "⚠️", "Tahap " + tahapSiap + " · Akun perlu dibereskan",
+			"Setup tetap dipantau setelah urusan akun selesai. Buka pengaturan untuk menindaklanjuti.",
+			"🔧 Buka Pengaturan", "pengaturan"
+	case PenahananPasar:
+		return "🌙", "Tahap " + tahapSiap + " · Pasar tutup",
+			"Pasar sedang tutup. Setup akan diproses otomatis begitu pasar dibuka.",
+			"", ""
+	case PenahananSistem:
+		return "🛠", "Tahap " + tahapSiap + " · Ditahan sistem",
+			"Entry baru ditahan sementara oleh sistem. Setup tetap dipantau.",
+			"", ""
+	default:
+		return "⌛", "Setup dibatalkan",
+			"Setup tidak berlaku lagi.",
+			"", ""
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tahap 5 & 6 — Posisi berjalan dan posisi selesai
+// ---------------------------------------------------------------------------
+
+// PositionOpenedParams adalah masukan untuk notifikasi order yang sudah live di pasar.
 type PositionOpenedParams struct {
 	Symbol       string
 	Direction    string
@@ -313,69 +516,82 @@ type PositionOpenedParams struct {
 	PosisiLink   string
 }
 
-// FormatPositionOpenedMessage menyusun pesan Tahap 4: Posisi Terpasang & Berjalan di Pasar.
+// FormatPositionOpenedMessage menyusun pesan Tahap 5: posisi berjalan di pasar.
 func FormatPositionOpenedMessage(p PositionOpenedParams) Message {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "🚀 POSISI TERPASANG — %s\n", p.Symbol)
-	ticket := p.TicketNumber
-	if ticket == "" {
-		ticket = "PROSES"
-	}
-	broker := p.BrokerType
-	if broker == "" {
-		broker = "Broker"
-	}
-	fmt.Fprintf(&b, "Order: %s #%s  |  Broker: %s\n", strings.ToUpper(p.Direction), ticket, broker)
-	b.WriteString("Status: POSISI AKTIF (OPEN)\n\n")
-
-	b.WriteString("Tahap: 4/4 — Posisi Berjalan di Pasar\n")
-	waktu := p.OpenedAt
-	if waktu.IsZero() {
-		waktu = time.Now()
-	}
-	// Tampilkan waktu WIB (UTC+7)
-	wib := waktu.In(time.FixedZone("WIB", 7*3600))
-	fmt.Fprintf(&b, "Waktu Masuk: %s WIB\n\n", wib.Format("02 Jan 2006, 15:04:05"))
-
-	b.WriteString("📋 Parameter Tiket Aktif:\n")
-	if p.LotSize > 0 {
-		fmt.Fprintf(&b, "• Volume / Lot: %s Lot\n", formatThousands(p.LotSize, 2))
-	}
-	fmt.Fprintf(&b, "• Open Price: %s\n", formatPrice(p.OpenPrice))
-	if p.StopLoss > 0 {
-		fmt.Fprintf(&b, "• Stop Loss Terpasang: %s\n", formatPrice(p.StopLoss))
-	}
-	if p.TakeProfit > 0 {
-		fmt.Fprintf(&b, "• Take Profit Terpasang: %s\n", formatPrice(p.TakeProfit))
-	}
-	if p.OutcomeR > 0 {
-		fmt.Fprintf(&b, "• Potensi Outcome: +%sR\n", formatFrom(p.OutcomeR))
-	}
+	b.WriteString(judulPesan("🚀", p.Symbol, "", "", "Tahap "+tahapPosisi+" · Posisi berjalan"))
 	b.WriteString("\n")
 
-	b.WriteString("Catatan Risiko:\n")
-	b.WriteString("Order dilindungi pengaman trailing / target otomatis. Jangan geser Stop Loss melewati batas risiko terukur.\n\n")
-
-	var buttons [][]InlineButton
-	if p.PosisiLink != "" {
-		buttons = append(buttons, []InlineButton{
-			{Text: "📊 Kelola Posisi di Dashboard", URL: p.PosisiLink},
-		})
+	order := arahTampil(p.Direction)
+	if p.TicketNumber != "" && p.TicketNumber != "PROSES" {
+		order += " #" + p.TicketNumber
 	}
 
-	return Message{Text: b.String(), Buttons: buttons}
+	masuk := ""
+	if !p.OpenedAt.IsZero() {
+		wib := p.OpenedAt.In(time.FixedZone("WIB", 7*3600))
+		masuk = wib.Format("02 Jan 2006, 15:04") + " WIB"
+	}
+
+	b.WriteString(makeBox([][2]string{
+		{"Order", order},
+		{"Broker", p.BrokerType},
+		{"Lot", lotTampil(p.LotSize)},
+		{"Entry", formatPrice(p.OpenPrice)},
+		{"Stop", formatPrice(p.StopLoss)},
+		{"Target", formatPrice(p.TakeProfit)},
+		{"RR", rrTampil(p.OutcomeR)},
+		{"Masuk", masuk},
+	}))
+
+	b.WriteString("\nPosisi aktif. Biarkan berjalan sampai Stop atau Target.\n")
+
+	return Message{Text: b.String(), Buttons: tombolRadar("📊 Lihat Posisi", p.PosisiLink)}
 }
 
-// FormatHeldMessage menyusun pesan untuk sinyal yang tertahan aturan harian.
-// Sinyal tetap dikirim walau tidak dieksekusi (plans/05 §3).
-func FormatHeldMessage(symbol, side, strategy string, rr float64, reason string) Message {
-	text := fmt.Sprintf(
-		"⏸ SETUP TERLIHAT — %s\nArah: %s  |  %s\nRR 1:%s\n\nTidak dieksekusi: %s\nSinyal tetap ditampilkan untuk pemantauan.\n",
-		symbol, side, strategy, formatFrom(rr), reason,
-	)
-	return Message{Text: text}
+// ClosedParams adalah masukan notifikasi posisi yang sudah ditutup.
+type ClosedParams struct {
+	Symbol      string
+	Direction   string
+	Htf         string
+	Ltf         string
+	Result      string
+	EntryPrice  float64
+	ExitPrice   float64
+	ProfitLoss  float64
+	OutcomeR    float64
+	Duration    string
+	DailyNote   string
+	RiwayatLink string
 }
+
+// FormatClosedMessage merangkum posisi yang sudah ditutup.
+func FormatClosedMessage(p ClosedParams) Message {
+	var b strings.Builder
+
+	b.WriteString(judulPesan("🏁", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapSelesai+" · "+p.Result))
+	b.WriteString("\n")
+
+	b.WriteString(makeBox([][2]string{
+		{"Arah", arahTampil(p.Direction)},
+		{"Entry", formatPrice(p.EntryPrice)},
+		{"Exit", formatPrice(p.ExitPrice)},
+		{"Hasil", hasilR(p.OutcomeR)},
+		{"PnL", formatMoney(p.ProfitLoss)},
+		{"Durasi", p.Duration},
+	}))
+
+	if p.DailyNote != "" {
+		fmt.Fprintf(&b, "\n%s\n", p.DailyNote)
+	}
+
+	return Message{Text: b.String(), Buttons: tombolRadar("📊 Riwayat Posisi", p.RiwayatLink)}
+}
+
+// ---------------------------------------------------------------------------
+// Peluang entry & helper tampilan
+// ---------------------------------------------------------------------------
 
 // FormatOpportunityMessage menyusun pesan untuk setup yang TIDAK dieksekusi
 // otomatis karena pasangan timeframe-nya hanya dipantau.
@@ -386,82 +602,46 @@ func FormatHeldMessage(symbol, side, strategy string, rr float64, reason string)
 func FormatOpportunityMessage(symbol, side, strategy, htf, ltf string, entry, sl, tp, rr float64, link string) Message {
 	var b strings.Builder
 
-	b.WriteString("🔔 PELUANG ENTRY — ")
-	b.WriteString(symbol)
+	b.WriteString(judulPesan("🔔", symbol, htf, ltf, "Tahap "+tahapSiap+" · Siap, ditahan pengaturan"))
 	b.WriteString("\n")
 
-	pasangan := htf
-	if ltf != "" {
-		if strategy == "ila-3.0" {
-			mtf := getILA3MTF(htf, ltf)
-			pasangan = fmt.Sprintf("%s ➔ %s ➔ %s", htf, mtf, ltf)
-		} else {
-			pasangan = htf + "-" + ltf
-		}
+	b.WriteString(makeBox([][2]string{
+		{"Arah", arahTampil(side)},
+		{"Metode", metodeTampil(strategy)},
+		{"Entry", formatPrice(entry)},
+		{"Stop", formatPrice(sl)},
+		{"Target", formatPrice(tp)},
+		{"RR", rrTampil(rr)},
+	}))
+
+	b.WriteString("\nEksekusi otomatis tidak aktif untuk pasangan timeframe ini.\n")
+	b.WriteString("Setup masih berlaku dan bisa dieksekusi manual.\n")
+
+	label := "⚡ Eksekusi Manual"
+	if link == "" {
+		label = ""
 	}
-	if pasangan != "" {
-		fmt.Fprintf(&b, "Timeframe: %s\n", pasangan)
-	}
-
-	fmt.Fprintf(&b, "Arah: %s  |  %s\n", side, strategy)
-	fmt.Fprintf(&b, "Entry: %s\n", formatPrice(entry))
-	fmt.Fprintf(&b, "SL: %s  |  TP: %s  (RR 1:%s)\n\n", formatPrice(sl), formatPrice(tp), formatFrom(rr))
-
-	b.WriteString("Eksekusi otomatis tidak aktif untuk pasangan ini pada akun Anda.\n")
-
-	var buttons [][]InlineButton
-	if link != "" {
-		buttons = append(buttons, []InlineButton{
-			{Text: "⚡ Eksekusi Manual di Dashboard", URL: link},
-		})
-	}
-
-	return Message{Text: b.String(), Buttons: buttons}
+	return Message{Text: b.String(), Buttons: tombolRadar(label, link)}
 }
 
 // FormatFinishedMessage memberi tahu bahwa setup berakhir sebelum entry.
 func FormatFinishedMessage(symbol, reason string) Message {
-	return Message{Text: fmt.Sprintf(
-		"⏹ SETUP SELESAI — %s\n%s\nTidak ada aksi yang perlu dilakukan.\n",
-		symbol, reason,
-	)}
+	return FormatCancelledMessage(HeldParams{
+		Symbol:     symbol,
+		Alasan:     PenahananBatal,
+		Keterangan: reason,
+	})
 }
 
 // FormatRadarStepMessage menyusun notifikasi kemajuan radar setup tanpa membocorkan istilah internal.
 func FormatRadarStepMessage(symbol, strategy, htf, ltf, stepName, link string) Message {
 	var b strings.Builder
-	fmt.Fprintf(&b, "⏳ RADAR %s — %s\n", strings.ToUpper(strategy), symbol)
-	if htf != "" && ltf != "" {
-		fmt.Fprintf(&b, "Timeframe: %s ➔ %s\n", htf, ltf)
+	b.WriteString(judulPesan("⏳", symbol, htf, ltf, "Tahap "+tahapStruktur+" · "+stepName))
+	b.WriteString("\nMenunggu konfirmasi penutupan harga.\n")
+	if strategy != "" {
+		fmt.Fprintf(&b, "Metode: %s\n", metodeTampil(strategy))
 	}
-	fmt.Fprintf(&b, "Tahap: %s\n", stepName)
-	b.WriteString("Menunggu konfirmasi penutupan harga.\n\n")
-	var buttons [][]InlineButton
-	if link != "" {
-		buttons = append(buttons, []InlineButton{
-			{Text: "🔍 Buka Radar Dashboard", URL: link},
-		})
-	}
-
-	return Message{Text: b.String(), Buttons: buttons}
-}
-
-// FormatClosedMessage merangkum posisi yang sudah ditutup.
-func FormatClosedMessage(symbol, result string, entry, exit, pnl, outcomeR float64, dailyNote string, link ...string) Message {
-	var b strings.Builder
-	fmt.Fprintf(&b, "🎯 POSISI DITUTUP — %s\nHasil: %s (%sR)\nEntry %s → Exit %s\nPnL: %s\n\n%s\n",
-		symbol, result, formatFrom(outcomeR), formatPrice(entry), formatPrice(exit),
-		formatMoney(pnl), dailyNote,
-	)
-
-	var buttons [][]InlineButton
-	if len(link) > 0 && link[0] != "" {
-		buttons = append(buttons, []InlineButton{
-			{Text: "📊 Riwayat Posisi di Dashboard", URL: link[0]},
-		})
-	}
-
-	return Message{Text: b.String(), Buttons: buttons}
+	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar", link)}
 }
 
 // Sanitize mengganti teks yang membocorkan istilah internal dengan versi aman.
@@ -473,8 +653,73 @@ func Sanitize(text string) string {
 	return "Setup sesuai rencana trading. Detail level tersedia di dashboard."
 }
 
+// metodeTampil menyeragamkan nama metode, kosong bila tidak ada yang dikirim.
+func metodeTampil(strategy string) string {
+	s := strings.TrimSpace(strategy)
+	if s == "" || s == "ILA" {
+		return ""
+	}
+	return s
+}
+
+// formatHargaOpsional mengosongkan harga nol supaya baris box dilewati.
+func formatHargaOpsional(v float64) string {
+	if v <= 0 {
+		return ""
+	}
+	return formatPrice(v)
+}
+
+// rrTampil menyusun rasio risiko-imbalan, kosong bila belum ada.
+func rrTampil(v float64) string {
+	if v <= 0 {
+		return ""
+	}
+	return "1:" + formatFrom(v)
+}
+
+// hasilR menampilkan hasil trade sebagai kelipatan risiko, dengan tanda.
+func hasilR(v float64) string {
+	return fmt.Sprintf("%sR", formatThousands(v, 2))
+}
+
+// lotTampil mengosongkan ukuran lot nol.
+func lotTampil(v float64) string {
+	if v <= 0 {
+		return ""
+	}
+	return formatThousands(v, 2) + " lot"
+}
+
+// kuotaTampil menyusun baris kuota harian, kosong bila datanya tidak ada.
+func kuotaTampil(terpakai, maks int) string {
+	if maks <= 0 {
+		return ""
+	}
+	if terpakai < 0 {
+		terpakai = 0
+	}
+	return fmt.Sprintf("%d dari %d trade terpakai", terpakai, maks)
+}
+
+// ---------------------------------------------------------------------------
+// Format angka gaya Indonesia
+// ---------------------------------------------------------------------------
+
 func formatPrice(v float64) string {
 	return formatThousands(v, decimalsFor(v))
+}
+
+// decimalsFor memilih jumlah desimal: pair harga tinggi cukup dua angka,
+// pair harga rendah butuh lima supaya selisihnya terbaca.
+func decimalsFor(v float64) int {
+	if v < 0 {
+		v = -v
+	}
+	if v >= 10 {
+		return 2
+	}
+	return 5
 }
 
 func formatMoney(v float64) string {
@@ -486,37 +731,10 @@ func formatMoney(v float64) string {
 	return sign + "$" + formatThousands(v, 2)
 }
 
-// getILA3MTF menentukan timeframe medium (MTF) dari ILA 3.0 berdasarkan HTF dan LTF.
-func getILA3MTF(htf, ltf string) string {
-	h := strings.ToUpper(strings.TrimSpace(htf))
-	l := strings.ToUpper(strings.TrimSpace(ltf))
-	if (h == "4H" || h == "H4") && (l == "5M" || l == "M5") {
-		return "1H"
-	}
-	if (h == "D" || h == "D1" || h == "1D") && (l == "15M" || l == "M15") {
-		return "4H"
-	}
-	if (h == "1H" || h == "H1") && (l == "5M" || l == "M5") {
-		return "15M"
-	}
-	if (h == "W" || h == "W1" || h == "1W") && (l == "1H" || l == "H1") {
-		return "4H"
-	}
-	return "MTF"
-}
-
 func formatFrom(v float64) string {
 	return formatThousands(v, 2)
 }
 
-func decimalsFor(v float64) int {
-	if v >= 10 {
-		return 2
-	}
-	return 5
-}
-
-// formatThousands menulis angka dengan titik ribuan dan koma desimal.
 func formatThousands(v float64, decimals int) string {
 	raw := fmt.Sprintf("%.*f", decimals, v)
 	parts := strings.SplitN(raw, ".", 2)
@@ -531,7 +749,8 @@ func formatThousands(v float64, decimals int) string {
 	}
 
 	if len(parts) == 2 {
-		return b.String() + "," + parts[1]
+		b.WriteString(",")
+		b.WriteString(parts[1])
 	}
 	return b.String()
 }

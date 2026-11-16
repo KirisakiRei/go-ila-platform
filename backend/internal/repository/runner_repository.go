@@ -27,7 +27,12 @@ type RunnerRepository interface {
 	// Engine hanya mengirim status terminal lewat SignalUpdate, sehingga tanpa
 	// penyapu ini baris READY_TO_ENTRY lama tertinggal selamanya di database
 	// dan ikut tampil di radar.
-	ExpireStaleSignals(ctx context.Context, now time.Time) (int64, error)
+	// Mengembalikan daftar signal_id yang berubah agar pemanggil bisa
+	// memberi tahu user yang sedang menunggu harga kembali.
+	ExpireStaleSignals(ctx context.Context, now time.Time) ([]string, error)
+	// SlippageWaitingUsers mengembalikan pasangan user dan sinyal yang tertahan
+	// karena harga sudah lewat, untuk sinyal yang masa berlakunya baru habis.
+	SlippageWaitingUsers(ctx context.Context, signalIDs []string) (map[string][]string, error)
 
 	// Status sinyal per user.
 	UpsertUserSignal(ctx context.Context, us *model.UserSignal) error
@@ -210,21 +215,67 @@ func (r *runnerRepository) TouchSignal(ctx context.Context, signalID string, see
 // (HandleSignal melewati status terminal), sehingga radar satu slot mati
 // permanen. Status ACKED/CONSUMED juga tidak disentuh agar jejak eksekusi
 // tidak tersamarkan. Query ini idempotent dan tidak menyentuh tabel posisi.
-func (r *runnerRepository) ExpireStaleSignals(ctx context.Context, now time.Time) (int64, error) {
-	res := r.db.WithContext(ctx).Model(&model.Signal{}).
+func (r *runnerRepository) ExpireStaleSignals(ctx context.Context, now time.Time) ([]string, error) {
+	var kandidat []model.Signal
+	err := r.db.WithContext(ctx).
+		Select("signal_id").
 		Where("expires_at < ?", now).
 		Where("status IN ?", []string{
 			model.SignalStatusReadyToEntry,
 			model.SignalStatusOpportunity,
 		}).
+		Find(&kandidat).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca sinyal kedaluwarsa: %w", err)
+	}
+	if len(kandidat) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]string, 0, len(kandidat))
+	for _, sig := range kandidat {
+		ids = append(ids, sig.SignalID)
+	}
+
+	if err := r.db.WithContext(ctx).Model(&model.Signal{}).
+		Where("signal_id IN ?", ids).
 		Updates(map[string]any{
 			"status":        model.SignalStatusExpired,
 			"cancel_reason": "masa berlaku habis",
-		})
-	if res.Error != nil {
-		return 0, fmt.Errorf("menyapu sinyal kedaluwarsa: %w", res.Error)
+		}).Error; err != nil {
+		return nil, fmt.Errorf("menyapu sinyal kedaluwarsa: %w", err)
 	}
-	return res.RowsAffected, nil
+	return ids, nil
+}
+
+// SlippageWaitingUsers mengelompokkan user yang setupnya tertahan karena harga
+// sudah lewat. Dipakai untuk mengabari pembatalan tanpa mengirim ulang pesan
+// penolakan biasa.
+func (r *runnerRepository) SlippageWaitingUsers(ctx context.Context, signalIDs []string) (map[string][]string, error) {
+	hasil := make(map[string][]string, len(signalIDs))
+	if len(signalIDs) == 0 {
+		return hasil, nil
+	}
+
+	var rows []model.UserSignal
+	err := r.db.WithContext(ctx).
+		Where("signal_id IN ?", signalIDs).
+		Where("status = ?", model.SignalStatusRejected).
+		Where("reject_reason = ?", string(RejectSlippageText())).
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca user tertahan harga: %w", err)
+	}
+	for _, row := range rows {
+		hasil[row.SignalID] = append(hasil[row.SignalID], row.UserID)
+	}
+	return hasil, nil
+}
+
+// RejectSlippageText mengembalikan teks alasan slippage yang tersimpan di kolom
+// reject_reason. Ditulis di sini agar repository tidak mengimpor paket runner.
+func RejectSlippageText() string {
+	return "Harga sudah bergerak terlalu jauh dari level entry."
 }
 
 func (r *runnerRepository) UpsertUserSignal(ctx context.Context, us *model.UserSignal) error {
