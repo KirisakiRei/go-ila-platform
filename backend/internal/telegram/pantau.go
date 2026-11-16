@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"ila/backend/internal/timezone"
 	"strings"
 	"time"
 )
@@ -165,7 +166,7 @@ func kotakMenunggu(m BarisMenunggu) string {
 		baris = append(baris, [2]string{"Trigger", formatPrice(m.TriggerHarga)})
 	}
 	if !m.Sejak.IsZero() {
-		sejak := m.Sejak.In(time.FixedZone("WIB", 7*3600)).Format("15:04") + " WIB"
+		sejak := formatWIBdanNY(m.Sejak)
 		if m.Lama != "" {
 			sejak += " · " + m.Lama
 		}
@@ -193,6 +194,17 @@ func simbolHasil(outcomeR float64) string {
 	default:
 		return "—"
 	}
+}
+
+// formatWIBdanNY menampilkan satu waktu dalam WIB dan NY.
+//
+// Dua zona sengaja ditampilkan berdampingan: sesi pasar dibaca dalam NY,
+// sedangkan hari akuntansi dan kebiasaan trader memakai WIB. Tanpa keduanya,
+// trader harus menghitung sendiri selisihnya setiap kali melihat setup.
+func formatWIBdanNY(t time.Time) string {
+	wib := t.In(time.FixedZone("WIB", 7*3600)).Format("15:04")
+	ny := t.In(timezone.NY).Format("15:04")
+	return wib + " WIB · " + ny + " NY"
 }
 
 // jumlahMenunggu menghitung total setup menunggu dari halaman yang sedang

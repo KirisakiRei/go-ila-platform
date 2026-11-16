@@ -32,7 +32,9 @@ func TestPantauMenampilkanPairTimeframeDanTahap(t *testing.T) {
 		Menunggu:   []BarisMenunggu{barisMenungguUji("EURUSD", "H1", "M5", "3/6", "Cari entry di M5")},
 	})
 
-	for _, ingin := range []string{"EURUSD · H1 ➔ M5", "3/6", "Cari entry di M5", "Sejak", "1 jam 5 menit"} {
+	// 16:00 UTC = 23:00 WIB dan 11:00 NY; kedua zona wajib tampil agar sesi
+	// pasar terbaca tanpa menghitung manual.
+	for _, ingin := range []string{"EURUSD · H1 ➔ M5", "3/6", "Cari entry di M5", "Sejak", "1 jam 5 menit", "23:00 WIB", "11:00 NY"} {
 		if !strings.Contains(pesan.Text, ingin) {
 			t.Fatalf("pesan pantauan tidak memuat %q:\n%s", ingin, pesan.Text)
 		}
