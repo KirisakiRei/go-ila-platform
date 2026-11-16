@@ -170,9 +170,8 @@ func FormatPengaturanMessage(dashboardLink string) Message {
 // FormatMenuMessage menyusun halaman menu utama.
 //
 // Susunannya mengikuti kebiasaan bot yang sudah dikenal trader: identitas
-// singkat di atas, lalu tombol besar satu per baris supaya mudah ditekan
-// dengan jempol.
-func FormatMenuMessage(nama, paket string) Message {
+// singkat di atas, lalu tombol dua kolom supaya mudah ditekan dengan jempol.
+func FormatMenuMessage(nama, paket, dashboardLink string) Message {
 	var b strings.Builder
 
 	b.WriteString("🤖 BOT Trading ILA\n\n")
@@ -188,19 +187,23 @@ func FormatMenuMessage(nama, paket string) Message {
 		b.WriteString(daftar([][2]string{{"Paket", paket}}))
 	}
 
-	return Message{Text: b.String(), Buttons: tombolMenu()}
+	return Message{Text: b.String(), Buttons: tombolMenu(dashboardLink)}
 }
 
-// tombolMenu menyusun tombol halaman menu: dua per baris, panduan di bawah.
+// tombolMenu menyusun tombol halaman menu: dua per baris, dashboard di bawah.
 //
 // Labelnya dipendekkan supaya muat dua kolom di layar ponsel; teks panjang
-// akan terpotong dan sulit dibaca.
-func tombolMenu() [][]InlineButton {
-	return [][]InlineButton{
+// akan terpotong dan sulit dibaca. Tautan dashboard hanya ditampilkan bila
+// alamatnya tersedia, karena tombol URL tanpa alamat akan gagal dikirim.
+func tombolMenu(dashboardLink string) [][]InlineButton {
+	baris := [][]InlineButton{
 		{{Text: "📊 Pantau", CallbackData: CallbackPantau}, {Text: "📋 Riwayat", CallbackData: CallbackRiwayat + "0"}},
 		{{Text: "📈 Hari Ini", CallbackData: CallbackHariIni}, {Text: "⚙️ Pengaturan", CallbackData: CallbackPengaturan}},
-		{{Text: "❓ Panduan Singkat", CallbackData: CallbackBantuan}},
 	}
+	if dashboardLink != "" {
+		baris = append(baris, []InlineButton{{Text: CabangDashboard, URL: dashboardLink}})
+	}
+	return baris
 }
 
 // FormatBantuanMessage menjelaskan cara pakai bot dengan singkat.
@@ -217,7 +220,7 @@ func FormatBantuanMessage() Message {
 		{"Riwayat", "posisi yang sudah tutup beserta hasilnya"},
 		{"Pengaturan", "akun, risiko, dan mode tetap di website"},
 	}))
-	b.WriteString("\nTombol menu di bawah layar bisa disembunyikan lewat tanda panah, dan muncul lagi setiap kali Anda membuka menu.\n")
+	b.WriteString("\nSemua halaman dibuka lewat tombol di bawah pesan. Ketik / untuk melihat daftar perintah.\n")
 
 	return Message{Text: b.String(), Buttons: [][]InlineButton{
 		{{Text: LabelMenu, CallbackData: CallbackMenu}},

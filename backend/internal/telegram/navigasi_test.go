@@ -9,7 +9,7 @@ import (
 // halaman. Tanpa itu, trader terjebak di satu halaman tanpa tombol apa pun.
 func TestSetiapHalamanPunyaJalanKembaliKeMenu(t *testing.T) {
 	halaman := map[string]Message{
-		"menu":   FormatMenuMessage("Ryn", "Plus"),
+		"menu":   FormatMenuMessage("Ryn", "Plus", "https://rekavia.com/app/dashboard"),
 		"pantau": FormatPantauMessage(PantauParams{Diperbarui: time.Now()}),
 		"riwayat": FormatRiwayatMessage(RiwayatParams{
 			Baris:   []BarisRiwayat{{Symbol: "XAUUSD", ClosedAt: time.Now()}},

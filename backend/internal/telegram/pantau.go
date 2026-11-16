@@ -160,7 +160,7 @@ func tombolPantau(dashboardLink string) [][]InlineButton {
 	})
 	if dashboardLink != "" {
 		baris = append(baris, []InlineButton{
-			{Text: "Buka di dashboard", URL: dashboardLink},
+			{Text: CabangDashboard, URL: dashboardLink},
 		})
 	}
 	return baris
@@ -170,7 +170,7 @@ func tombolPantau(dashboardLink string) [][]InlineButton {
 func menuButtons(dashboardLink string) [][]InlineButton {
 	baris := [][]InlineButton{{{Text: LabelSegarkan, CallbackData: CallbackSegarkan}, {Text: LabelMenu, CallbackData: CallbackMenu}}}
 	if dashboardLink != "" {
-		baris = append(baris, []InlineButton{{Text: "Buka di dashboard", URL: dashboardLink}})
+		baris = append(baris, []InlineButton{{Text: CabangDashboard, URL: dashboardLink}})
 	}
 	return baris
 }

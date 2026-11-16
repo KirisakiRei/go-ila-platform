@@ -96,7 +96,7 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 		})
 	case aksi == telegram.CallbackMenu:
 		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
-			return telegram.FormatMenuMessage(namaTampil(user), paketTampil(user)), nil
+			return telegram.FormatMenuMessage(namaTampil(user), paketTampil(user), h.dashboardLink()), nil
 		})
 	case aksi == telegram.CallbackPantau || aksi == telegram.CallbackSegarkan:
 		if !butuhMenu() {
@@ -114,7 +114,7 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 		})
 	case aksi == telegram.CallbackPengaturan:
 		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
-			return telegram.FormatPengaturanMessage(h.dashboardLink()), nil
+			return telegram.FormatPengaturanMessage(h.pengaturanLink()), nil
 		})
 	default:
 		h.edit.AnswerCallback(ctx, cb.ID, "Aksi tidak dikenal")
@@ -203,12 +203,12 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 		h.kirimPesanMenu(ctx, chatID, telegram.FormatBantuanMessage())
 		return
 	case telegram.CallbackPengaturan:
-		h.kirimPesanMenu(ctx, chatID, telegram.FormatPengaturanMessage(h.dashboardLink()))
+		h.kirimPesanMenu(ctx, chatID, telegram.FormatPengaturanMessage(h.pengaturanLink()))
 		return
 	}
 
 	if h.menu == nil {
-		h.kirimPesanMenu(ctx, chatID, telegram.FormatMenuMessage("", ""))
+		h.kirimPesanMenu(ctx, chatID, telegram.FormatMenuMessage("", "", h.dashboardLink()))
 		return
 	}
 
@@ -227,7 +227,7 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 	case strings.HasPrefix(aksi, telegram.CallbackRiwayat):
 		pesan, err = h.menu.Riwayat(ctx, user, 0)
 	default:
-		pesan = telegram.FormatMenuMessage(namaTampil(user), paketTampil(user))
+		pesan = telegram.FormatMenuMessage(namaTampil(user), paketTampil(user), h.dashboardLink())
 	}
 	if err != nil {
 		h.logInfo(ctx, "menyusun halaman menu gagal", err)
@@ -297,8 +297,14 @@ func (h *TelegramHandler) kirimTeks(ctx context.Context, chatID, teks string) {
 }
 
 // dashboardLink menyusun alamat dashboard untuk tombol tautan.
+// dashboardLink menunjuk halaman utama aplikasi web.
 func (h *TelegramHandler) dashboardLink() string {
-	return h.baseURL
+	return telegram.AppURL(h.baseURL, "/dashboard")
+}
+
+// pengaturanLink menunjuk halaman pengaturan akun di web.
+func (h *TelegramHandler) pengaturanLink() string {
+	return telegram.AppURL(h.baseURL, "/pengaturan")
 }
 
 func (h *TelegramHandler) logInfo(ctx context.Context, pesan string, err error) {

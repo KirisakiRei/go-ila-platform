@@ -40,6 +40,8 @@ const (
 	LabelPengaturan = "⚙️ Pengaturan"
 	LabelMenu       = "🏠 Menu"
 	LabelSegarkan   = "🔄 Segarkan"
+	// CabangDashboard adalah label tombol tautan ke dashboard web.
+	CabangDashboard = "🌐 Buka Dashboard"
 )
 
 // PerintahTelegram adalah daftar perintah yang muncul saat pengguna mengetik

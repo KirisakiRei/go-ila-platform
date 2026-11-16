@@ -30,7 +30,7 @@ func TestPesanBertombolTetapMembawaTombol(t *testing.T) {
 }
 
 func TestMenuPunyaTombolUntukSetiapHalaman(t *testing.T) {
-	pesan := FormatMenuMessage("Ryn", "Plus")
+	pesan := FormatMenuMessage("Ryn", "Plus", "https://rekavia.com/app/dashboard")
 
 	// Dua tombol per baris, panduan sendiri di baris terakhir.
 	if len(pesan.Buttons) != 3 {
@@ -43,10 +43,14 @@ func TestMenuPunyaTombolUntukSetiapHalaman(t *testing.T) {
 	for _, baris := range pesan.Buttons {
 		for _, tombol := range baris {
 			total++
-			if tombol.CallbackData == "" {
-				t.Fatalf("tombol %q harus punya callback", tombol.Text)
+			// Tombol dashboard membuka tautan, bukan mengirim callback.
+			if tombol.CallbackData == "" && tombol.URL == "" {
+				t.Fatalf("tombol %q harus punya callback atau URL", tombol.Text)
 			}
 		}
+	}
+	if !strings.HasSuffix(pesan.Buttons[2][0].URL, "/dashboard") {
+		t.Fatalf("tombol terakhir harus menuju dashboard, dapat %q", pesan.Buttons[2][0].URL)
 	}
 	if total != 5 {
 		t.Fatalf("menu harus 5 tombol, dapat %d", total)
