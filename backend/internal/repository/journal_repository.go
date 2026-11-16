@@ -191,12 +191,13 @@ func (r *journalRepository) SaveSignalEval(ctx context.Context, userID, signalID
 		Model(&model.UserSignal{}).
 		Where("user_id = ? AND signal_id = ? AND position_id = ?", userID, signalID, "").
 		Updates(map[string]any{
-			"eval_status":  out.Status,
-			"eval_at":      out.At,
-			"eval_price":   out.Price,
-			"eval_r_lower": out.RLower,
-			"eval_note":    out.Note,
-			"updated_at":   time.Now().UTC(),
+			"eval_status":   out.Status,
+			"eval_entry_at": out.EntryAt,
+			"eval_at":       out.At,
+			"eval_price":    out.Price,
+			"eval_r_lower":  out.RLower,
+			"eval_note":     out.Note,
+			"updated_at":    time.Now().UTC(),
 		}).Error
 	if err != nil {
 		return fmt.Errorf("menyimpan hasil evaluasi sinyal: %w", err)
@@ -233,19 +234,20 @@ var skipStatuses = []string{
 // Tujuannya memberi gambaran peluang yang terlewat, bukan hanya trade yang
 // terjadi. Tanpa ini, jurnal hanya berisi kemenangan dan kekalahan dan
 // menyembunyikan berapa banyak setup yang tidak pernah dieksekusi.
+//
+// Satu setup bisa diterbitkan berkali-kali oleh engine dengan signal_id
+// berbeda. Yang ditampilkan hanya satu baris per setup; lihat skippedQuery.
 func (r *journalRepository) ListSkipped(ctx context.Context, userID string, filter JournalFilter, offset, limit int) ([]model.UserSignal, error) {
 	var rows []model.UserSignal
-
 	query := r.skippedQuery(ctx, userID, filter)
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
-
-	// Kolom user_signal dipilih eksplisit agar join tidak menimpa kolom yang
-	// bernama sama (id, status, created_at) saat hasil dipindai ke struct.
+	// Kolom dipilih eksplisit agar join tidak menimpa kolom yang bernama sama
+	// (id, status, created_at) saat hasil dipindai ke struct.
 	if err := query.
-		Select("user_signal.*").
-		Order("user_signal.created_at DESC").
+		Select(`user_signal.*, signal.published_at AS published_at`).
+		Order("signal.published_at DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("membaca sinyal tidak tereksekusi: %w", err)
@@ -253,18 +255,23 @@ func (r *journalRepository) ListSkipped(ctx context.Context, userID string, filt
 	return rows, nil
 }
 
-// CountSkipped menghitung seluruh peluang terlewat pada filter yang sama.
+// CountSkipped menghitung seluruh setup terlewat pada filter yang sama.
 func (r *journalRepository) CountSkipped(ctx context.Context, userID string, filter JournalFilter) (int, error) {
 	var total int64
-	// Distinct pada kunci primer: query memakai join ke signal, dan hitungan
-	// harus tetap satu baris per user_signal walau join-nya menggandakan.
-	if err := r.skippedQuery(ctx, userID, filter).Distinct("user_signal.id").Count(&total).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Table("(?) AS dedup", r.skippedQuery(ctx, userID, filter).Select("user_signal.id")).
+		Count(&total).Error; err != nil {
 		return 0, fmt.Errorf("menghitung sinyal tidak tereksekusi: %w", err)
 	}
 	return int(total), nil
 }
 
-// skippedQuery menyusun kueri bersama untuk peluang terlewat.
+// skippedQuery menyusun kueri bersama untuk peluang terlewat, sudah terdeduplikasi.
+//
+// Engine menerbitkan ulang setup yang sama dengan signal_id baru, sehingga satu
+// setup bisa punya beberapa baris. Bentuk grouping di sini mengambil satu baris
+// per setup: baris dengan hasil final (TP/SL) didahulukan, lalu penerbitan
+// paling awal karena itulah saat setup benar-benar lahir.
 //
 // Filter metode dan pair ikut diterapkan di sini. Sebelumnya keduanya diabaikan,
 // sehingga memilih "ILA 3.0" atau satu pair tetap menampilkan seluruh peluang
@@ -272,23 +279,15 @@ func (r *journalRepository) CountSkipped(ctx context.Context, userID string, fil
 func (r *journalRepository) skippedQuery(ctx context.Context, userID string, filter JournalFilter) *gorm.DB {
 	query := r.db.WithContext(ctx).
 		Model(&model.UserSignal{}).
+		Joins("JOIN signal ON signal.signal_id = user_signal.signal_id").
 		Where("user_signal.user_id = ?", userID).
 		Where("user_signal.status IN ?", skipStatuses).
 		Where("user_signal.position_id = ?", "")
-
 	if !filter.From.IsZero() {
-		query = query.Where("user_signal.created_at >= ?", filter.From)
+		query = query.Where("signal.published_at >= ?", filter.From)
 	}
 	if !filter.To.IsZero() {
-		query = query.Where("user_signal.created_at < ?", filter.To)
-	}
-
-	// StrategyVersion dan Symbol berada di tabel signal, bukan user_signal:
-	// user_signal hanya mencatat keputusan per akun. Kolomnya harus dirujuk
-	// lewat join, bukan langsung — merujuk kolom yang tidak ada akan gagal
-	// sebagai galat basis data, bukan sekadar filter diabaikan.
-	if filter.StrategyVersion != "" || filter.Symbol != "" {
-		query = query.Joins("JOIN signal ON signal.signal_id = user_signal.signal_id")
+		query = query.Where("signal.published_at < ?", filter.To)
 	}
 	if filter.StrategyVersion != "" {
 		query = query.Where("signal.strategy_version = ?", filter.StrategyVersion)
@@ -296,5 +295,19 @@ func (r *journalRepository) skippedQuery(ctx context.Context, userID string, fil
 	if filter.Symbol != "" {
 		query = query.Where("signal.symbol = ?", filter.Symbol)
 	}
+	// Urutan prioritas dalam satu setup: hasil final lebih dulu, lalu yang
+	// terbit paling awal. DISTINCT ON memakai urutan ini untuk memilih baris.
+	query = query.Where(`user_signal.id IN (
+		SELECT DISTINCT ON (s.symbol, s.htf, s.ltf, s.direction, s.entry_price, s.stop_loss, s.take_profit)
+			us.id
+		FROM user_signal us
+		JOIN signal s ON s.signal_id = us.signal_id
+		WHERE us.user_id = ?
+		  AND us.status IN ?
+		  AND us.position_id = ''
+		ORDER BY s.symbol, s.htf, s.ltf, s.direction, s.entry_price, s.stop_loss, s.take_profit,
+			CASE WHEN us.eval_status IN ('TP','SL') THEN 0 ELSE 1 END,
+			s.published_at ASC
+	)`, userID, skipStatuses)
 	return query
 }

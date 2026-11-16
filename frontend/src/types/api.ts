@@ -539,7 +539,9 @@ export type JournalSkipped = {
    * lebih dulu, SL lebih dulu, atau tidak pernah menyentuh level entry.
    * Kosong berarti belum dinilai.
    */
-  eval_status?: 'PENDING' | 'TP' | 'SL' | 'NO_ENTRY' | 'UNKNOWN'
+  eval_status?: 'PENDING' | 'RUNNING' | 'TP' | 'SL' | 'NO_ENTRY' | 'UNKNOWN'
+  /** Waktu harga menyentuh level entry. */
+  eval_entry_at?: string
   eval_at?: string
   eval_price?: number
   eval_r_lower?: number

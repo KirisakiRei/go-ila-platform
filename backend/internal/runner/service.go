@@ -467,15 +467,83 @@ func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
 		return
 	}
 
+	// Engine menerbitkan ulang setup yang sama dengan signal_id baru setiap
+	// siklus. Penahanan hanya berlaku bila tidak ada posisi terbuka pada setup
+	// itu: saat posisi sudah terbuka, penolakan "posisi masih berjalan" beserta
+	// notifikasinya tetap harus lahir agar user tahu setup sejenis muncul.
+	if asal, ok := s.penerbitanUlang(ctx, signal); ok {
+		s.ackDuplikat(ctx, signal)
+		s.logger.Info("penerbitan ulang setup ditahan",
+			"evt", "signal.duplikat.ditahan",
+			"signal_id", signal.SignalID,
+			"signal_asal", asal.SignalID,
+			"symbol", signal.Symbol,
+			"htf", signal.Htf, "ltf", signal.Ltf,
+			"status_asal", asal.Status)
+		return
+	}
+
 	if err := s.ackSignal(ctx, signal.StrategyVersion, signal.SignalID); err != nil {
 		// ACK gagal bukan alasan membuang sinyal: engine boleh mengulang.
 		s.logger.Warn("ACK sinyal gagal", "evt", "signal.ack.gagal",
 			"signal_id", signal.SignalID, "error", err.Error())
 	}
-
 	s.fanOutReady(ctx, signal)
 }
 
+// penerbitanUlang melaporkan apakah sinyal ini penerbitan ulang setup yang
+// masih hidup, beserta sinyal asalnya.
+//
+// Yang dianggap penerbitan ulang: entry, SL, dan TP sama persis dengan sinyal
+// lain yang statusnya belum final. Bila setup lama sudah berakhir (EXPIRED,
+// CANCELLED, SUPERSEDED), terbitan baru diloloskan karena struktur harganya
+// bisa masih valid setelah jeda.
+//
+// Posisi terbuka pada setup yang sama tidak ikut ditahan: penolakan "posisi
+// masih berjalan" tetap harus lahir sebagai catatan dan notifikasi.
+//
+// Masa berlaku yang lebih panjang dari keduanya dipertahankan agar setup tidak
+// mati lebih cepat hanya karena terbitan pengulang membawa masa berlaku pendek.
+func (s *Service) penerbitanUlang(ctx context.Context, signal *model.Signal) (*model.Signal, bool) {
+	if signal == nil || signal.EntryPrice <= 0 || signal.StopLoss <= 0 || signal.TakeProfit <= 0 {
+		return nil, false
+	}
+	asal, err := s.store.FindLiveDuplicate(ctx, signal)
+	if err != nil {
+		// Termasuk "tidak ada duplikat": sinyal diteruskan seperti biasa.
+		return nil, false
+	}
+	users, err := s.store.ListUsersBySymbol(ctx, signal.Symbol)
+	if err != nil {
+		// Tanpa daftar pemantau, pengecekan posisi terbuka tidak bisa dilakukan;
+		// sinyal diteruskan agar tidak ada pemantau yang kehilangan kabar.
+		return nil, false
+	}
+	for _, user := range users {
+		if _, posErr := s.store.FindOpenPositionBySignal(ctx, user.ID, asal.SignalID); posErr == nil {
+			return nil, false
+		}
+	}
+	if signal.ExpiresAt.After(asal.ExpiresAt) {
+		if err := s.store.PerpanjangMasaBerlaku(ctx, asal.SignalID, signal.ExpiresAt); err != nil {
+			s.logger.Warn("gagal memperpanjang masa berlaku sinyal",
+				"evt", "signal.duplikat.perpanjang.gagal",
+				"signal_id", asal.SignalID, "error", err.Error())
+		}
+	}
+	return asal, true
+}
+
+// ackDuplikat memberi tahu engine bahwa penerbitan ulang sudah diterima, supaya
+// pengiriman berikutnya tidak diulang terus-menerus.
+func (s *Service) ackDuplikat(ctx context.Context, signal *model.Signal) {
+	if err := s.ackSignal(ctx, signal.StrategyVersion, signal.SignalID); err != nil {
+		s.logger.Warn("ACK sinyal duplikat gagal", "evt", "signal.ack.gagal",
+			"signal_id", signal.SignalID, "error", err.Error())
+	}
+}
+
+// fanOutIntermediate menyebarkan status menengah ke pemantau simbol.
 func (s *Service) fanOutIntermediate(ctx context.Context, signal *model.Signal) {
 	users, err := s.store.ListUsersBySymbol(ctx, signal.Symbol)
 	if err != nil {

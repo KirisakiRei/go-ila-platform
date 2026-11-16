@@ -34,10 +34,13 @@ type EvalSink interface {
 // evalOutcome adalah hasil penilaian satu setup.
 type evalOutcome struct {
 	Status string
-	At     *time.Time
-	Price  float64
-	RLower float64
-	Note   string
+	// EntryAt adalah waktu harga pertama menyentuh level entry. Diisi juga untuk
+	// hasil RUNNING sehingga durasi bisa dihitung sejak masuk, bukan sejak terbit.
+	EntryAt *time.Time
+	At      *time.Time
+	Price   float64
+	RLower  float64
+	Note    string
 }
 
 // evaluate menilai satu sinyal. Nilai balik kedua false berarti data harga
@@ -66,6 +69,7 @@ func evaluateCandles(signal *model.Signal, candles []market.Candle, since time.T
 	expiresUnix := signal.ExpiresAt.Unix()
 
 	touched := false
+	var entryAt *time.Time
 	for _, c := range candles {
 		if c.Time < sinceUnix {
 			continue
@@ -86,6 +90,7 @@ func evaluateCandles(signal *model.Signal, candles []market.Candle, since time.T
 				continue
 			}
 			touched = true
+			entryAt = utcPtr(time.Unix(c.Time, 0))
 		}
 
 		hitTP, hitSL := false, false
@@ -100,30 +105,34 @@ func evaluateCandles(signal *model.Signal, candles []market.Candle, since time.T
 		switch {
 		case hitTP && hitSL:
 			return evalOutcome{
-				Status: model.EvalUnknown,
-				At:     utcPtr(time.Unix(c.Time, 0)),
-				Note:   "TP dan SL tersentuh pada lilin yang sama",
+				Status:  model.EvalUnknown,
+				EntryAt: entryAt,
+				At:      utcPtr(time.Unix(c.Time, 0)),
+				Note:    "TP dan SL tersentuh pada lilin yang sama",
 			}, true
 		case hitTP:
 			return evalOutcome{
-				Status: model.EvalTP,
-				At:     utcPtr(time.Unix(c.Time, 0)),
-				Price:  signal.TakeProfit,
-				RLower: signal.RiskReward,
+				Status:  model.EvalTP,
+				EntryAt: entryAt,
+				At:      utcPtr(time.Unix(c.Time, 0)),
+				Price:   signal.TakeProfit,
+				RLower:  signal.RiskReward,
 			}, true
 		case hitSL:
 			return evalOutcome{
-				Status: model.EvalSL,
-				At:     utcPtr(time.Unix(c.Time, 0)),
-				Price:  signal.StopLoss,
-				RLower: -1,
+				Status:  model.EvalSL,
+				EntryAt: entryAt,
+				At:      utcPtr(time.Unix(c.Time, 0)),
+				Price:   signal.StopLoss,
+				RLower:  -1,
 			}, true
 		}
 	}
 
 	if touched {
-		// Setup sudah tersentuh tetapi belum selesai: biarkan baris menunggu.
-		return evalOutcome{}, false
+		// Setup sudah tersentuh tetapi belum selesai: sedang berjalan. Jam entry
+		// tetap dilaporkan agar durasi bisa dihitung sejak masuk.
+		return evalOutcome{Status: model.EvalRunning, EntryAt: entryAt}, true
 	}
 	if len(candles) > 0 && candles[len(candles)-1].Time > expiresUnix {
 		return evalOutcome{

@@ -47,11 +47,14 @@ type JournalSkippedResponse struct {
 	OccurredPair TimePair  `json:"occurred_at_pair"`
 	// Hasil hipotetis setup ini bila tidak dieksekusi. Kosong berarti belum
 	// dinilai; nilainya PENDING, TP, SL, NO_ENTRY, atau UNKNOWN.
-	EvalStatus string     `json:"eval_status,omitempty"`
-	EvalAt     *time.Time `json:"eval_at,omitempty"`
-	EvalPrice  float64    `json:"eval_price,omitempty"`
-	EvalRLower float64    `json:"eval_r_lower,omitempty"`
-	EvalNote   string     `json:"eval_note,omitempty"`
+	EvalStatus string `json:"eval_status,omitempty"`
+	// EvalEntryAt adalah waktu harga menyentuh level entry. Dipakai bersama
+	// EvalAt untuk menghitung durasi setup.
+	EvalEntryAt *time.Time `json:"eval_entry_at,omitempty"`
+	EvalAt      *time.Time `json:"eval_at,omitempty"`
+	EvalPrice   float64    `json:"eval_price,omitempty"`
+	EvalRLower  float64    `json:"eval_r_lower,omitempty"`
+	EvalNote    string     `json:"eval_note,omitempty"`
 }
 
 // JournalResponse adalah isi satu permintaan jurnal.

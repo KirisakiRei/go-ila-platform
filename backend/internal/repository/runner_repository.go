@@ -30,6 +30,14 @@ type RunnerRepository interface {
 	// Mengembalikan daftar signal_id yang berubah agar pemanggil bisa
 	// memberi tahu user yang sedang menunggu harga kembali.
 	ExpireStaleSignals(ctx context.Context, now time.Time) ([]string, error)
+	// FindLiveDuplicate mencari sinyal lain dengan setup identik yang belum
+	// berakhir. Engine menerbitkan ulang setup yang sama dengan signal_id baru
+	// setiap siklus; tanpa pemeriksaan ini penyebaran, notifikasi, dan evaluasi
+	// harga berjalan berkali-kali untuk satu setup.
+	FindLiveDuplicate(ctx context.Context, signal *model.Signal) (*model.Signal, error)
+	// PerpanjangMasaBerlaku memperbarui expires_at satu sinyal tanpa menyentuh
+	// kolom lain. Dipakai saat penerbitan ulang membawa masa berlaku lebih panjang.
+	PerpanjangMasaBerlaku(ctx context.Context, signalID string, expiresAt time.Time) error
 	// SlippageWaitingUsers mengembalikan pasangan user dan sinyal yang tertahan
 	// karena harga sudah lewat, untuk sinyal yang masa berlakunya baru habis.
 	SlippageWaitingUsers(ctx context.Context, signalIDs []string) (map[string][]string, error)
@@ -155,6 +163,65 @@ func (r *runnerRepository) UpsertSignal(ctx context.Context, signal *model.Signa
 		return fmt.Errorf("menyimpan sinyal: %w", err)
 	}
 	return nil
+}
+
+// FindLiveDuplicate mencari sinyal lain dengan setup identik yang belum berakhir.
+//
+// Setup dianggap identik bila simbol, pasangan timeframe, arah, dan ketiga
+// level harganya sama persis. Status yang dianggap masih hidup mengikuti
+// pengecualian IsTerminalSignal: status final boleh terbit lagi karena
+// strukturnya bisa masih valid setelah kedaluwarsa.
+//
+// Sinyal tanpa level harga diabaikan: tanpa entry/SL/TP tidak ada pembanding
+// yang bermakna, dan menganggapnya duplikat akan membuang sinyal sungguhan.
+func (r *runnerRepository) FindLiveDuplicate(ctx context.Context, signal *model.Signal) (*model.Signal, error) {
+	if signal == nil || signal.EntryPrice <= 0 || signal.StopLoss <= 0 || signal.TakeProfit <= 0 {
+		return nil, apperror.ErrNotFound
+	}
+	var lain model.Signal
+	err := r.db.WithContext(ctx).
+		Where("signal_id <> ?", signal.SignalID).
+		Where("symbol = ? AND htf = ? AND ltf = ? AND direction = ?",
+			signal.Symbol, signal.Htf, signal.Ltf, signal.Direction).
+		Where("entry_price = ? AND stop_loss = ? AND take_profit = ?",
+			signal.EntryPrice, signal.StopLoss, signal.TakeProfit).
+		Where("status NOT IN ?", terminalStatuses()).
+		Order("published_at DESC").
+		First(&lain).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, fmt.Errorf("mencari sinyal duplikat: %w", err)
+	}
+	return &lain, nil
+}
+
+// PerpanjangMasaBerlaku memperbarui expires_at satu sinyal tanpa menyentuh
+// kolom lain, agar penerbitan ulang yang membawa masa berlaku lebih panjang
+// tidak memperpendek setup yang sedang berjalan.
+func (r *runnerRepository) PerpanjangMasaBerlaku(ctx context.Context, signalID string, expiresAt time.Time) error {
+	err := r.db.WithContext(ctx).
+		Model(&model.Signal{}).
+		Where("signal_id = ?", signalID).
+		Update("expires_at", expiresAt).Error
+	if err != nil {
+		return fmt.Errorf("memperpanjang masa berlaku sinyal: %w", err)
+	}
+	return nil
+}
+
+// terminalStatuses adalah status yang tidak bisa dieksekusi lagi. Daftarnya
+// sejalan dengan model.IsTerminalSignal agar satu definisi tidak bercabang.
+func terminalStatuses() []string {
+	return []string{
+		model.SignalStatusConsumed,
+		model.SignalStatusExpired,
+		model.SignalStatusCancelled,
+		model.SignalStatusSuperseded,
+		model.SignalStatusRejected,
+		model.SignalStatusSkipped,
+	}
 }
 
 func (r *runnerRepository) FindSignal(ctx context.Context, signalID string) (*model.Signal, error) {

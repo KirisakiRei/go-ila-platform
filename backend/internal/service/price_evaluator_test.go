@@ -85,18 +85,43 @@ func TestEvaluateCandlesNoEntry(t *testing.T) {
 	}
 }
 
-// Entry tersentuh tetapi TP/SL belum, dan sinyal belum kedaluwarsa: belum
-// ada keputusan, jadi baris dibiarkan menunggu.
+// Entry tersentuh tetapi TP/SL belum: setup sedang berjalan, dan jam entry
+// harus dilaporkan agar durasi bisa dihitung sejak masuk.
 func TestEvaluateCandlesMasihBerjalan(t *testing.T) {
 	signal := sinyalUji("BUY")
 	sejak := time.Unix(1_000_000, 0)
 
-	_, ok := evaluateCandles(signal, []market.Candle{
+	hasil, ok := evaluateCandles(signal, []market.Candle{
 		lilin(1_000_000, 4125, 4116),
+		lilin(1_000_300, 4127, 4118),
 	}, sejak)
 
-	if ok {
-		t.Fatal("setup yang masih berjalan tidak boleh dianggap final")
+	if !ok || hasil.Status != model.EvalRunning {
+		t.Fatalf("hasil = %+v ok=%v, ingin RUNNING", hasil, ok)
+	}
+	if hasil.EntryAt == nil || hasil.EntryAt.Unix() != 1_000_000 {
+		t.Fatalf("jam entry = %v, ingin lilin pertama yang menyentuh entry", hasil.EntryAt)
+	}
+	if hasil.At != nil {
+		t.Fatalf("waktu keluar = %v, ingin kosong selama belum TP/SL", hasil.At)
+	}
+}
+
+// Durasi dihitung dari jam masuk ke jam keluar.
+func TestEvaluateCandlesDurasi(t *testing.T) {
+	signal := sinyalUji("BUY")
+	sejak := time.Unix(1_000_000, 0)
+
+	hasil, ok := evaluateCandles(signal, []market.Candle{
+		lilin(1_000_000, 4125, 4118),
+		lilin(1_003_600, 4152, 4124),
+	}, sejak)
+
+	if !ok || hasil.EntryAt == nil || hasil.At == nil {
+		t.Fatalf("hasil = %+v ok=%v, ingin TP dengan jam masuk dan keluar", hasil, ok)
+	}
+	if durasi := hasil.At.Sub(*hasil.EntryAt); durasi != time.Hour {
+		t.Fatalf("durasi = %v, ingin 1 jam", durasi)
 	}
 }
 

@@ -89,6 +89,41 @@ func (s *fakeStore) UpsertSignal(_ context.Context, signal *model.Signal) error 
 	return nil
 }
 
+func (s *fakeStore) FindLiveDuplicate(_ context.Context, signal *model.Signal) (*model.Signal, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, lain := range s.signals {
+		if lain.SignalID == signal.SignalID {
+			continue
+		}
+		if lain.Symbol != signal.Symbol || lain.Htf != signal.Htf || lain.Ltf != signal.Ltf {
+			continue
+		}
+		if lain.Direction != signal.Direction {
+			continue
+		}
+		if lain.EntryPrice != signal.EntryPrice || lain.StopLoss != signal.StopLoss ||
+			lain.TakeProfit != signal.TakeProfit {
+			continue
+		}
+		if model.IsTerminalSignal(lain.Status) {
+			continue
+		}
+		copyLain := *lain
+		return &copyLain, nil
+	}
+	return nil, apperror.ErrNotFound
+}
+
+func (s *fakeStore) PerpanjangMasaBerlaku(_ context.Context, signalID string, expiresAt time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sig, ok := s.signals[signalID]; ok {
+		sig.ExpiresAt = expiresAt
+	}
+	return nil
+}
+
 func (s *fakeStore) FindSignal(_ context.Context, signalID string) (*model.Signal, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

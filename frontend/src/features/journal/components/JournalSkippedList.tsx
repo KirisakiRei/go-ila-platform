@@ -65,6 +65,8 @@ function alasanTerbaca(item: JournalSkipped): string {
  */
 function hasilHipotetis(item: JournalSkipped): { label: string; tone: 'positif' | 'negatif' | 'netral' } | null {
   switch (item.eval_status) {
+    case 'RUNNING':
+      return { label: 'Sedang berjalan', tone: 'netral' }
     case 'TP':
       return {
         label: item.eval_r_lower ? `Tembus TP (+${formatR(item.eval_r_lower)})` : 'Tembus TP',
@@ -79,6 +81,22 @@ function hasilHipotetis(item: JournalSkipped): { label: string; tone: 'positif' 
     default:
       return null
   }
+}
+
+/**
+ * durasiRingkas menghitung selisih dua waktu menjadi teks pendek.
+ *
+ * Durasi sengaja dihitung saat ditampilkan, bukan disimpan: menyimpannya akan
+ * membuat nilainya basi untuk setup yang masih berjalan.
+ */
+function durasiRingkas(mulai: string, akhir: string): string {
+  const ms = new Date(akhir).getTime() - new Date(mulai).getTime()
+  if (!Number.isFinite(ms) || ms <= 0) return ''
+  const menit = Math.floor(ms / 60_000)
+  if (menit < 60) return `${menit} menit`
+  const jam = Math.floor(menit / 60)
+  if (jam < 24) return `${jam} jam ${menit % 60} menit`
+  return `${Math.floor(jam / 24)} hari ${jam % 24} jam`
 }
 
 const TONE_CLASS: Record<'positif' | 'negatif' | 'netral', string> = {
@@ -150,15 +168,24 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
               <p className="text-[11px] text-muted-foreground">{alasanTerbaca(item)}</p>
             )}
 
-            {hasil && item.eval_at && (
-              <p className="text-[10.5px] text-muted-foreground">
-                {/* Harga yang dikenai ditampilkan agar user bisa memeriksa
-                    hasilnya sendiri di chart, bukan hanya percaya label. */}
-                {item.eval_status === 'TP' || item.eval_status === 'SL'
-                  ? `Harga menyentuh ${formatNumber(item.eval_price ?? 0, 5)} · ${formatDateTime(item.eval_at)}`
-                  : `Dinilai ${formatDateTime(item.eval_at)}`}
-                {item.eval_note ? ` · ${item.eval_note}` : ''}
+            {hasil && item.eval_entry_at && (
+              <p className="tabular text-[10.5px] text-muted-foreground">
+                Entry {formatDateTime(item.eval_entry_at)}
+                {item.eval_at && (
+                  <>
+                    {' · Exit '}
+                    {formatDateTime(item.eval_at)}
+                    {durasiRingkas(item.eval_entry_at, item.eval_at)
+                      ? ` · ${durasiRingkas(item.eval_entry_at, item.eval_at)}`
+                      : ''}
+                  </>
+                )}
+                {!item.eval_at && item.eval_status === 'RUNNING' ? ' · belum keluar' : ''}
               </p>
+            )}
+
+            {hasil && item.eval_note && (
+              <p className="text-[10.5px] text-muted-foreground">{item.eval_note}</p>
             )}
 
             <p className="text-[10.5px] text-muted-foreground">{formatDateTime(item.occurred_at)}</p>

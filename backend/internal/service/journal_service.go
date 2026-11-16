@@ -238,12 +238,14 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 					if ev, ok := s.evaluator.evaluate(ctx, signal, since); ok {
 						s.simpanEvaluasi(ctx, us.UserID, us.SignalID, ev)
 						us.EvalStatus, us.EvalAt = ev.Status, ev.At
+						us.EvalEntryAt = ev.EntryAt
 						us.EvalPrice, us.EvalRLower, us.EvalNote = ev.Price, ev.RLower, ev.Note
 					}
 				}
 			}
 		}
 		item.EvalStatus = us.EvalStatus
+		item.EvalEntryAt = us.EvalEntryAt
 		item.EvalAt = us.EvalAt
 		item.EvalPrice = us.EvalPrice
 		item.EvalRLower = us.EvalRLower
@@ -260,11 +262,12 @@ func (s *tradingService) simpanEvaluasi(ctx context.Context, userID, signalID st
 		return
 	}
 	out := &model.UserSignalEval{
-		Status: ev.Status,
-		At:     ev.At,
-		Price:  ev.Price,
-		RLower: ev.RLower,
-		Note:   ev.Note,
+		Status:  ev.Status,
+		EntryAt: ev.EntryAt,
+		At:      ev.At,
+		Price:   ev.Price,
+		RLower:  ev.RLower,
+		Note:    ev.Note,
 	}
 	_ = s.evaluator.sink.SaveSignalEval(ctx, userID, signalID, out)
 }
