@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"ila/backend/internal/model"
@@ -18,7 +19,7 @@ import (
 // akun yang bisa dilakukan lewat Telegram: kredensial, risiko, dan pair tetap
 // dikelola di website.
 type TelegramMenuService interface {
-	Pantau(ctx context.Context, user *model.User, link string) (telegram.Message, error)
+	Pantau(ctx context.Context, user *model.User, link string, halaman int) (telegram.Message, error)
 	Riwayat(ctx context.Context, user *model.User, offset int) (telegram.Message, error)
 	HariIni(ctx context.Context, user *model.User, link string) (telegram.Message, error)
 }
@@ -28,6 +29,14 @@ type telegramMenuService struct {
 	akun      TelegramPositionReader
 	timezone  func() time.Time
 	maksTrade int
+	// radar membaca slot yang sedang berjalan untuk daftar setup menunggu.
+	// Boleh nil: tanpa pembaca ini halaman pantauan tetap tampil tanpa daftar itu.
+	radar RadarReader
+}
+
+// RadarReader membaca slot radar yang sedang berjalan untuk satu user.
+type RadarReader interface {
+	ListRadarForUser(ctx context.Context, userID string, batas int) ([]model.Signal, error)
 }
 
 // TelegramPositionReader membaca posisi berjalan dan ringkasan harian.
@@ -39,7 +48,8 @@ type TelegramPositionReader interface {
 // NewTelegramMenuService merangkai penyusun halaman menu Telegram.
 //
 // maksTrade adalah batas eksekusi otomatis per hari yang berlaku di Runner,
-// dipakai sebagai penyebut kuota pada halaman ringkasan hari.
+// dipakai sebagai penyebut kuota pada halaman ringkasan hari. radar boleh nil:
+// tanpa itu halaman pantauan tetap tampil, hanya tanpa daftar setup menunggu.
 func NewTelegramMenuService(journal JournalRepositoryReader, akun TelegramPositionReader, maksTrade int) TelegramMenuService {
 	if maksTrade <= 0 {
 		maksTrade = defaultMaxDailyTrades
@@ -52,19 +62,30 @@ func NewTelegramMenuService(journal JournalRepositoryReader, akun TelegramPositi
 	}
 }
 
+// NewTelegramMenuServiceWithRadar merangkai menu Telegram sekaligus pembaca
+// slot radar, sehingga halaman pantauan bisa memuat setup yang sedang menunggu
+// beserta tahapnya. Konstruktor publik lama tetap ada agar pemanggil lain tidak
+// ikut berubah.
+func NewTelegramMenuServiceWithRadar(journal JournalRepositoryReader, akun TelegramPositionReader, radar RadarReader, maksTrade int) TelegramMenuService {
+	svc := NewTelegramMenuService(journal, akun, maksTrade).(*telegramMenuService)
+	svc.radar = radar
+	return svc
+}
+
 // Pantau menyusun posisi berjalan, setup yang menunggu, dan yang selesai hari ini.
 //
-// Harga terkini sengaja tidak diambil di sini: menguhubungi broker untuk setiap
+// Harga terkini sengaja tidak diambil di sini: menghubungi broker untuk setiap
 // tekanan tombol akan memperlambat balasan. Kolom "Kini" dikosongkan dan
 // ditandai belum tersedia, bukan diisi angka lama.
-func (s *telegramMenuService) Pantau(ctx context.Context, user *model.User, link string) (telegram.Message, error) {
+//
+// Halaman mulai dari 1 dan hanya membatasi daftar setup menunggu; posisi
+// berjalan serta ringkasan hari tetap utuh di setiap halaman.
+func (s *telegramMenuService) Pantau(ctx context.Context, user *model.User, link string, halaman int) (telegram.Message, error) {
 	sekarang := s.timezone()
-
 	posisi, err := s.akun.ListOpenPositionsByUser(ctx, user.ID)
 	if err != nil {
 		return telegram.Message{}, fmt.Errorf("membaca posisi berjalan: %w", err)
 	}
-
 	barisPosisi := make([]telegram.BarisPantau, 0, len(posisi))
 	for _, pos := range posisi {
 		barisPosisi = append(barisPosisi, telegram.BarisPantau{
@@ -74,6 +95,10 @@ func (s *telegramMenuService) Pantau(ctx context.Context, user *model.User, link
 			Lots:       pos.LotSize,
 			EntryPrice: pos.OpenPrice,
 		})
+	}
+	menunggu, totalHalaman, err := s.setupMenunggu(ctx, user.ID, posisi, halaman)
+	if err != nil {
+		return telegram.Message{}, err
 	}
 
 	// Posisi yang tutup sejak awal hari ikut ditampilkan sebagai penutup
@@ -104,10 +129,117 @@ func (s *telegramMenuService) Pantau(ctx context.Context, user *model.User, link
 	return telegram.FormatPantauMessage(telegram.PantauParams{
 		Diperbarui:    sekarang,
 		Posisi:        barisPosisi,
+		Menunggu:      menunggu,
 		Selesai:       barisSelesai,
 		HargaTersedia: false,
 		DashboardLink: link,
+		Halaman:       halaman,
+		TotalHalaman:  totalHalaman,
 	}), nil
+}
+
+// setupMenunggu menyusun daftar setup yang belum menjadi posisi.
+//
+// Sumbernya baris radar yang masih berjalan. Setup yang sudah membuka posisi
+// dilewati: posisinya sudah tampil di bagian atas halaman, jadi menampilkannya
+// di sini akan membuat trader mengira ada peluang kedua.
+//
+// Nilai balik kedua adalah jumlah halaman daftar tersebut.
+func (s *telegramMenuService) setupMenunggu(ctx context.Context, userID string, posisi []model.Position, halaman int) ([]telegram.BarisMenunggu, int, error) {
+	if s.radar == nil {
+		return nil, 0, nil
+	}
+	radar, err := s.radar.ListRadarForUser(ctx, userID, 100)
+	if err != nil {
+		return nil, 0, fmt.Errorf("membaca setup menunggu: %w", err)
+	}
+	sedangJalan := make(map[string]struct{}, len(posisi))
+	for _, pos := range posisi {
+		if pos.SourceSignalID != "" {
+			sedangJalan[pos.SourceSignalID] = struct{}{}
+		}
+	}
+
+	baris := make([]telegram.BarisMenunggu, 0, len(radar))
+	for i := range radar {
+		sig := &radar[i]
+		if _, sudahJalan := sedangJalan[sig.SignalID]; sudahJalan {
+			continue
+		}
+		tahap, teks := tahapRadar(sig.Status, sig.Htf, sig.Ltf)
+		if tahap == "" {
+			continue
+		}
+		mulai := sig.UpdatedAt
+		if mulai.IsZero() {
+			mulai = sig.PublishedAt
+		}
+		baris = append(baris, telegram.BarisMenunggu{
+			Symbol:       sig.Symbol,
+			Htf:          sig.Htf,
+			Ltf:          sig.Ltf,
+			Direction:    sig.Direction,
+			Tahap:        tahap,
+			TahapTeks:    teks,
+			Target:       sig.TakeProfit,
+			StopLoss:     sig.StopLoss,
+			TriggerHarga: sig.EntryPrice,
+			Sejak:        mulai,
+			Lama:         lamaRingkas(s.timezone().Sub(mulai)),
+		})
+	}
+
+	totalHalaman := (len(baris) + telegram.PantauPerHalaman - 1) / telegram.PantauPerHalaman
+	if halaman < 1 {
+		halaman = 1
+	}
+	awal := (halaman - 1) * telegram.PantauPerHalaman
+	if awal > len(baris) {
+		awal = len(baris)
+	}
+	akhir := awal + telegram.PantauPerHalaman
+	if akhir > len(baris) {
+		akhir = len(baris)
+	}
+	return baris[awal:akhir], totalHalaman, nil
+}
+
+// tahapRadar menerjemahkan status radar menjadi nomor tahap beserta kalimat
+// singkatnya. Nomornya sengaja sama dengan yang dipakai notifikasi sehingga
+// trader mengenali posisinya tanpa harus belajar istilah baru.
+//
+// String kosong berarti status itu bukan tahap menunggu entry.
+func tahapRadar(status, htf, ltf string) (string, string) {
+	switch status {
+	case model.SignalStatusWaitHTFSweep:
+		return "1/6", "Baca arah " + htf
+	case model.SignalStatusWaitHTFCandleClose:
+		return "2/6", "Tunggu close " + htf
+	case model.SignalStatusWaitLTFCISD:
+		return "3/6", "Cari entry di " + ltf
+	case model.SignalStatusReadyToEntry, model.SignalStatusOpportunity:
+		return "4/6", "Siap masuk"
+	}
+	if strings.HasPrefix(status, "WAIT_ILA3_") {
+		return "3/6", "Menunggu trigger ILA 3.0"
+	}
+	return "", ""
+}
+
+// lamaRingkas mengubah selang waktu menjadi teks pendek yang mudah dibaca.
+func lamaRingkas(d time.Duration) string {
+	if d < 0 {
+		return ""
+	}
+	menit := int(d.Minutes())
+	switch {
+	case menit < 60:
+		return fmt.Sprintf("%d menit", menit)
+	case menit < 24*60:
+		return fmt.Sprintf("%d jam %d menit", menit/60, menit%60)
+	default:
+		return fmt.Sprintf("%d hari %d jam", menit/(24*60), (menit/60)%24)
+	}
 }
 
 // Riwayat menyusun satu halaman riwayat posisi.

@@ -21,12 +21,20 @@ type BarisPantau struct {
 
 // BarisMenunggu adalah setup yang masih mencari entry.
 type BarisMenunggu struct {
-	Symbol       string
-	Direction    string
-	Tahap        string
+	Symbol    string
+	Htf       string
+	Ltf       string
+	Direction string
+	// Tahap adalah penanda siklus seperti "3/6".
+	Tahap string
+	// TahapTeks menjelaskan apa yang sedang ditunggu pada tahap itu.
+	TahapTeks    string
 	Target       float64
 	StopLoss     float64
 	TriggerHarga float64
+	// Sejak adalah waktu tahap ini dimulai dan Lama sudah berapa lama berjalan.
+	Sejak time.Time
+	Lama  string
 }
 
 // BarisSelesai adalah posisi yang sudah tutup hari ini.
@@ -45,7 +53,13 @@ type PantauParams struct {
 	Selesai       []BarisSelesai
 	HargaTersedia bool
 	DashboardLink string
+	// Halaman dan TotalHalaman mengatur navigasi daftar setup menunggu.
+	Halaman      int
+	TotalHalaman int
 }
+
+// PantauPerHalaman adalah jumlah setup menunggu pada satu halaman pantauan.
+const PantauPerHalaman = 5
 
 // FormatPantauMessage menyusun halaman "Pantau Saat Ini".
 //
@@ -53,45 +67,50 @@ type PantauParams struct {
 // lebih dulu, lalu setup yang menunggu, terakhir yang sudah selesai hari ini.
 func FormatPantauMessage(p PantauParams) Message {
 	var b strings.Builder
-
 	waktu := ""
 	if !p.Diperbarui.IsZero() {
 		waktu = " · " + p.Diperbarui.In(time.FixedZone("WIB", 7*3600)).Format("15:04") + " WIB"
 	}
 	b.WriteString("📊 Pantauan" + waktu + "\n")
-
 	if len(p.Posisi) == 0 && len(p.Menunggu) == 0 && len(p.Selesai) == 0 {
 		b.WriteString("\nBelum ada posisi berjalan dan belum ada setup yang menunggu.\n")
 		b.WriteString("Bot akan mengabari begitu ada peluang masuk.\n")
 		return Message{Text: b.String(), Buttons: menuButtons(p.DashboardLink)}
 	}
-
 	if len(p.Posisi) > 0 {
 		fmt.Fprintf(&b, "\nPosisi berjalan (%d)\n", len(p.Posisi))
 		for _, pos := range p.Posisi {
 			b.WriteString(kotakPosisi(pos))
 		}
 	}
-
 	if len(p.Menunggu) > 0 {
-		fmt.Fprintf(&b, "\nMenunggu entry (%d)\n", len(p.Menunggu))
+		halaman := p.Halaman
+		if halaman < 1 {
+			halaman = 1
+		}
+		total := p.TotalHalaman
+		if total < 1 {
+			total = 1
+		}
+		if total > 1 {
+			fmt.Fprintf(&b, "\nMenunggu entry (%d · halaman %d/%d)\n", jumlahMenunggu(p, halaman, total), halaman, total)
+		} else {
+			fmt.Fprintf(&b, "\nMenunggu entry (%d)\n", len(p.Menunggu))
+		}
 		for _, m := range p.Menunggu {
 			b.WriteString(kotakMenunggu(m))
 		}
 	}
-
 	if len(p.Selesai) > 0 {
 		fmt.Fprintf(&b, "\nSelesai hari ini (%d)\n", len(p.Selesai))
 		for _, s := range p.Selesai {
 			b.WriteString(kotakSelesai(s))
 		}
 	}
-
 	if !p.HargaTersedia && len(p.Posisi) > 0 {
 		b.WriteString("\nHarga terkini belum bisa diambil dari broker. Coba segarkan lagi sebentar.\n")
 	}
-
-	return Message{Text: b.String(), Buttons: tombolPantau(p.DashboardLink)}
+	return Message{Text: b.String(), Buttons: tombolPantau(p.DashboardLink, p.Halaman, p.TotalHalaman)}
 }
 
 // kotakPosisi merangkum satu posisi berjalan.
@@ -120,15 +139,39 @@ func kotakPosisi(pos BarisPantau) string {
 }
 
 // kotakMenunggu merangkum satu setup yang menunggu entry.
+//
+// Baris harga yang belum tersedia dilewati, bukan diisi tanda hubung: pada
+// tahap awal level target, batas, dan trigger memang belum ditentukan.
 func kotakMenunggu(m BarisMenunggu) string {
-	baris := [][2]string{
-		{"Arah", arahTampil(m.Direction)},
-		{"Tahap", m.Tahap},
-		{"Target", formatHargaOpsional(m.Target)},
-		{"Batas", formatHargaOpsional(m.StopLoss)},
-		{"Trigger", formatHargaOpsional(m.TriggerHarga)},
+	judul := m.Symbol
+	if m.Htf != "" && m.Ltf != "" {
+		judul += " · " + m.Htf + " ➔ " + m.Ltf
 	}
-	return m.Symbol + "\n" + daftar(baris)
+	baris := [][2]string{{"Arah", arahTampil(m.Direction)}}
+	if m.Tahap != "" {
+		tahap := m.Tahap
+		if m.TahapTeks != "" {
+			tahap += " · " + m.TahapTeks
+		}
+		baris = append(baris, [2]string{"Tahap", tahap})
+	}
+	if m.Target != 0 {
+		baris = append(baris, [2]string{"Target", formatPrice(m.Target)})
+	}
+	if m.StopLoss != 0 {
+		baris = append(baris, [2]string{"Batas", formatPrice(m.StopLoss)})
+	}
+	if m.TriggerHarga != 0 {
+		baris = append(baris, [2]string{"Trigger", formatPrice(m.TriggerHarga)})
+	}
+	if !m.Sejak.IsZero() {
+		sejak := m.Sejak.In(time.FixedZone("WIB", 7*3600)).Format("15:04") + " WIB"
+		if m.Lama != "" {
+			sejak += " · " + m.Lama
+		}
+		baris = append(baris, [2]string{"Sejak", sejak})
+	}
+	return "◇ " + judul + "\n" + daftar(baris)
 }
 
 // kotakSelesai merangkum satu posisi yang sudah tutup.
@@ -152,11 +195,45 @@ func simbolHasil(outcomeR float64) string {
 	}
 }
 
+// jumlahMenunggu menghitung total setup menunggu dari halaman yang sedang
+// berlaku. Halaman terakhir menentukan sisanya, sehingga angkanya tidak
+// melebihkan saat jumlahnya tepat kelipatan per halaman.
+func jumlahMenunggu(p PantauParams, halaman, total int) int {
+	if total <= 1 {
+		return len(p.Menunggu)
+	}
+	isiPenuh := PantauPerHalaman * (total - 1)
+	return isiPenuh + len(p.Menunggu)
+}
+
 // tombolPantau menyusun tombol bawah halaman pantauan.
-func tombolPantau(dashboardLink string) [][]InlineButton {
+//
+// Navigasi memakai bentuk ‹ Sebelumnya | 1/2 | Berikutnya › agar posisi tombol
+// tidak bergeser antar halaman. Tombol yang tidak mungkin ditekan dikirim tanpa
+// aksi, bukan dihilangkan.
+func tombolPantau(dashboardLink string, halaman, total int) [][]InlineButton {
 	var baris [][]InlineButton
+	if total > 1 {
+		if halaman < 1 {
+			halaman = 1
+		}
+		sebelum := InlineButton{Text: "‹ Sebelumnya"}
+		if halaman > 1 {
+			sebelum.CallbackData = fmt.Sprintf("%s%d", CallbackPantauHalaman, halaman-1)
+		}
+		berikut := InlineButton{Text: "Berikutnya ›"}
+		if halaman < total {
+			berikut.CallbackData = fmt.Sprintf("%s%d", CallbackPantauHalaman, halaman+1)
+		}
+		baris = append(baris, []InlineButton{
+			sebelum,
+			{Text: fmt.Sprintf("%d/%d", halaman, total), CallbackData: CallbackMenu},
+			berikut,
+		})
+	}
 	baris = append(baris, []InlineButton{
 		{Text: "Segarkan", CallbackData: CallbackSegarkan},
+		{Text: LabelMenu, CallbackData: CallbackMenu},
 	})
 	if dashboardLink != "" {
 		baris = append(baris, []InlineButton{

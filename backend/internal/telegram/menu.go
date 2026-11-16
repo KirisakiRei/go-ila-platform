@@ -8,17 +8,22 @@ import "strings"
 // pendek. Token approve berukuran 32 karakter, menyisakan ruang yang cukup
 // untuk awalan dua karakter.
 const (
-	CallbackEksekusi   = "a:"
-	CallbackLewati     = "s:"
-	CallbackMenu       = "m"
-	CallbackPantau     = "p"
-	CallbackRiwayat    = "r:"
-	CallbackDetail     = "d:"
-	CallbackHariIni    = "h"
-	CallbackPengaturan = "g"
-	CallbackSegarkan   = "px"
-	CallbackHalaman    = "r:"
-	CallbackBantuan    = "help"
+	CallbackEksekusi = "a:"
+	CallbackLewati   = "s:"
+	CallbackMenu     = "m"
+	CallbackPantau   = "p"
+	// CallbackPantauHalaman membuka halaman tertentu daftar setup menunggu.
+	CallbackPantauHalaman = "ph:"
+	// CallbackPantauHalamanAksi adalah bentuk yang dikembalikan aksiCallback,
+	// tanpa titik dua, karena handler membandingkan dengan nilai itu.
+	CallbackPantauHalamanAksi = "ph"
+	CallbackRiwayat           = "r:"
+	CallbackDetail            = "d:"
+	CallbackHariIni           = "h"
+	CallbackPengaturan        = "g"
+	CallbackSegarkan          = "px"
+	CallbackHalaman           = "r:"
+	CallbackBantuan           = "help"
 )
 
 // Perintah yang didaftarkan ke Telegram agar muncul di menu "/".
@@ -85,7 +90,7 @@ func AksiDariPerintah(text string) (string, bool) {
 // aksiCallback memisahkan awalan dari isi callback_data.
 func aksiCallback(data string) (string, string) {
 	data = strings.TrimSpace(data)
-	for _, prefix := range []string{CallbackEksekusi, CallbackLewati, CallbackRiwayat} {
+	for _, prefix := range []string{CallbackEksekusi, CallbackLewati, CallbackRiwayat, CallbackPantauHalaman} {
 		if strings.HasPrefix(data, prefix) {
 			return strings.TrimSuffix(prefix, ":"), strings.TrimPrefix(data, prefix)
 		}

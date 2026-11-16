@@ -103,7 +103,15 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 			return
 		}
 		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
-			return h.menu.Pantau(ctx, user, h.dashboardLink())
+			return h.menu.Pantau(ctx, user, h.dashboardLink(), 1)
+		})
+	case aksi == telegram.CallbackPantauHalamanAksi:
+		if !butuhMenu() {
+			return
+		}
+		halaman, _ := strconv.Atoi(strings.TrimPrefix(cb.Data, telegram.CallbackPantauHalaman))
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
+			return h.menu.Pantau(ctx, user, h.dashboardLink(), halaman)
 		})
 	case aksi == telegram.CallbackHariIni:
 		if !butuhMenu() {
@@ -221,7 +229,7 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 	var pesan telegram.Message
 	switch {
 	case aksi == telegram.CallbackPantau:
-		pesan, err = h.menu.Pantau(ctx, user, h.dashboardLink())
+		pesan, err = h.menu.Pantau(ctx, user, h.dashboardLink(), 1)
 	case aksi == telegram.CallbackHariIni:
 		pesan, err = h.menu.HariIni(ctx, user, h.dashboardLink())
 	case strings.HasPrefix(aksi, telegram.CallbackRiwayat):
