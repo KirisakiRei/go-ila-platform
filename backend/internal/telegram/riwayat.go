@@ -191,13 +191,14 @@ func FormatMenuMessage(nama, paket string) Message {
 	return Message{Text: b.String(), Buttons: tombolMenu()}
 }
 
-// tombolMenu menyusun tombol halaman menu, satu per baris.
+// tombolMenu menyusun tombol halaman menu: dua per baris, panduan di bawah.
+//
+// Labelnya dipendekkan supaya muat dua kolom di layar ponsel; teks panjang
+// akan terpotong dan sulit dibaca.
 func tombolMenu() [][]InlineButton {
 	return [][]InlineButton{
-		{{Text: LabelPantau, CallbackData: CallbackPantau}},
-		{{Text: LabelRiwayat, CallbackData: CallbackRiwayat + "0"}},
-		{{Text: LabelHariIni, CallbackData: CallbackHariIni}},
-		{{Text: LabelPengaturan, CallbackData: CallbackPengaturan}},
+		{{Text: "📊 Pantau", CallbackData: CallbackPantau}, {Text: "📋 Riwayat", CallbackData: CallbackRiwayat + "0"}},
+		{{Text: "📈 Hari Ini", CallbackData: CallbackHariIni}, {Text: "⚙️ Pengaturan", CallbackData: CallbackPengaturan}},
 		{{Text: "❓ Panduan Singkat", CallbackData: CallbackBantuan}},
 	}
 }

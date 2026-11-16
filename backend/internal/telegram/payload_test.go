@@ -32,13 +32,24 @@ func TestPesanBertombolTetapMembawaTombol(t *testing.T) {
 func TestMenuPunyaTombolUntukSetiapHalaman(t *testing.T) {
 	pesan := FormatMenuMessage("Ryn", "Plus")
 
-	if len(pesan.Buttons) != 5 {
-		t.Fatalf("menu harus punya 5 tombol, dapat %d", len(pesan.Buttons))
+	// Dua tombol per baris, panduan sendiri di baris terakhir.
+	if len(pesan.Buttons) != 3 {
+		t.Fatalf("menu harus 3 baris tombol, dapat %d", len(pesan.Buttons))
 	}
+	if len(pesan.Buttons[0]) != 2 || len(pesan.Buttons[1]) != 2 || len(pesan.Buttons[2]) != 1 {
+		t.Fatalf("susunan tombol harus 2-2-1, dapat %+v", pesan.Buttons)
+	}
+	total := 0
 	for _, baris := range pesan.Buttons {
-		if len(baris) != 1 || baris[0].CallbackData == "" {
-			t.Fatalf("setiap tombol menu harus satu baris dengan callback: %+v", baris)
+		for _, tombol := range baris {
+			total++
+			if tombol.CallbackData == "" {
+				t.Fatalf("tombol %q harus punya callback", tombol.Text)
+			}
 		}
+	}
+	if total != 5 {
+		t.Fatalf("menu harus 5 tombol, dapat %d", total)
 	}
 	if !strings.Contains(pesan.Text, "Halo, Ryn") {
 		t.Fatalf("menu harus menyapa nama depan: %q", pesan.Text)
