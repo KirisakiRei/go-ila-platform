@@ -43,11 +43,6 @@ func (f *fakeTelegramEditor) SendMessageReturningID(_ context.Context, _ string,
 	return 1, nil
 }
 
-func (f *fakeTelegramEditor) SendKeyboard(_ context.Context, _ string, text string, _ telegram.ReplyKeyboardMarkup) error {
-	f.sent = append(f.sent, text)
-	return nil
-}
-
 // fakeApprove hanya mencatat token yang dipakai.
 type fakeApprove struct {
 	sudahDipanggil bool

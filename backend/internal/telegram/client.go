@@ -77,6 +77,8 @@ type ReplyKeyboardMarkup struct {
 	Keyboard       [][]KeyboardButton `json:"keyboard"`
 	ResizeKeyboard bool               `json:"resize_keyboard"`
 	IsPersistent   bool               `json:"is_persistent"`
+	// InputFieldPlaceholder adalah teks petunjuk pada kolom ketik.
+	InputFieldPlaceholder string `json:"input_field_placeholder,omitempty"`
 }
 
 // InlineKeyboardMarkup menyusun tombol-tombol pada inline keyboard.
@@ -126,22 +128,6 @@ func (c *Client) SendMessageReturningID(ctx context.Context, chatID string, msg 
 	return c.post(ctx, "sendMessage", c.pesanPayload(chatID, msg))
 }
 
-// SendKeyboard mengirim teks disertai keyboard tetap di bawah layar.
-func (c *Client) SendKeyboard(ctx context.Context, chatID, text string, kb ReplyKeyboardMarkup) error {
-	if !c.cfg.Enabled() || chatID == "" {
-		return nil
-	}
-	c.throttle(ctx, chatID)
-	_, err := c.post(ctx, "sendMessage", map[string]any{
-		"chat_id":                  chatID,
-		"text":                     text,
-		"parse_mode":               "HTML",
-		"reply_markup":             kb,
-		"disable_web_page_preview": true,
-	})
-	return err
-}
-
 // EditMessageText mengganti isi pesan yang sudah terkirim.
 //
 // Tanpa tombol, Telegram mempertahankan tombol lama. Karena itu keyboard kosong
@@ -188,7 +174,11 @@ func (c *Client) pesanPayload(chatID string, msg Message) any {
 		// menampilkan tag sebagai teks mentah.
 		ParseMode: "HTML",
 	}
-	if len(msg.Buttons) > 0 {
+	// Keyboard tetap didahulukan: pesan interaktif butuh menu, sedangkan
+	// pesan bertombol inline sudah membawa aksinya sendiri.
+	if msg.Keyboard != nil {
+		payload.ReplyMarkup = *msg.Keyboard
+	} else if len(msg.Buttons) > 0 {
 		payload.ReplyMarkup = InlineKeyboardMarkup{InlineKeyboard: msg.Buttons}
 	}
 	return payload

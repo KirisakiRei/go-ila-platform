@@ -221,19 +221,30 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 		pesan = telegram.Message{Text: "Halaman belum bisa dimuat. Coba lagi sebentar lagi."}
 	}
 	if h.edit != nil {
+		kb := telegram.KeyboardUtama()
+		pesan.Keyboard = &kb
 		if _, err := h.edit.SendMessageReturningID(ctx, chatID, pesan); err != nil {
 			h.logInfo(ctx, "mengirim halaman menu gagal", err)
 		}
 	}
 }
 
-// pasangKeyboard memasang menu tetap di bawah layar chat.
-func (h *TelegramHandler) pasangKeyboard(ctx context.Context, chatID string) {
-	if h.edit == nil {
+// pasangKeyboard mengirim pesan pembuka sekaligus memasang menu tetap.
+//
+// Telegram menempelkan keyboard pada pesan, sehingga menu hilang bila pesan
+// terakhir bot tidak membawanya. Semua balasan menu memakai helper ini.
+// Kanal yang tidak mendukung keyboard tetap menerima teksnya saja.
+func (h *TelegramHandler) pasangKeyboard(ctx context.Context, chatID, teks string) {
+	if h.edit != nil {
+		kb := telegram.KeyboardUtama()
+		pesan := telegram.Message{Text: teks, Keyboard: &kb}
+		if _, err := h.edit.SendMessageReturningID(ctx, chatID, pesan); err != nil {
+			h.logInfo(ctx, "memasang keyboard menu gagal", err)
+		}
 		return
 	}
-	if err := h.edit.SendKeyboard(ctx, chatID, "Menu ada di bawah. Pilih yang ingin Anda lihat.", telegram.KeyboardUtama()); err != nil {
-		h.logInfo(ctx, "memasang keyboard menu gagal", err)
+	if h.sender != nil {
+		_ = h.sender.Send(ctx, chatID, teks)
 	}
 }
 

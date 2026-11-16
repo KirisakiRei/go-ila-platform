@@ -47,6 +47,9 @@ type Message struct {
 	Key string
 	// Buttons memuat tombol tautan inline keyboard di bawah pesan.
 	Buttons [][]InlineButton
+	// Keyboard memasang menu tetap di bawah layar. Hanya dipakai balasan
+	// interaktif; notifikasi trading cukup membawa tombol inline.
+	Keyboard *ReplyKeyboardMarkup
 }
 
 // ---------------------------------------------------------------------------

@@ -27,7 +27,6 @@ type telegramEditor interface {
 	AnswerCallback(ctx context.Context, callbackID, text string) error
 	EditMessageText(ctx context.Context, chatID string, messageID int64, text string, buttons [][]telegram.InlineButton) error
 	SendMessageReturningID(ctx context.Context, chatID string, msg telegram.Message) (int64, error)
-	SendKeyboard(ctx context.Context, chatID, text string, kb telegram.ReplyKeyboardMarkup) error
 }
 
 // TelegramHandler melayani penghubungan chat dan webhook dari Telegram.
@@ -126,26 +125,18 @@ func (h *TelegramHandler) Webhook(c *gin.Context) {
 			// disusun kanal Telegram, bukan dibocorkan lewat status HTTP.
 			_, err := h.telegram.HandleStart(c.Request.Context(), token, chatID)
 			if err != nil {
-				if h.sender != nil {
-					_ = h.sender.Send(c.Request.Context(), chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan ILA Platform Anda.")
-				}
+				h.pasangKeyboard(c.Request.Context(), chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan ILA Platform Anda.")
 			} else {
-				if h.sender != nil {
-					_ = h.sender.Send(c.Request.Context(), chatID, "✅ Akun ILA Platform Anda berhasil terhubung!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini.")
-				}
-				// Keyboard menu dipasang setelah akun terhubung, karena sebelum
-				// itu tombolnya hanya akan berakhir "akun belum terhubung".
-				h.pasangKeyboard(c.Request.Context(), chatID)
+				h.pasangKeyboard(c.Request.Context(), chatID, "✅ Akun ILA Platform Anda berhasil terhubung!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Menu ada di bawah.")
 			}
 		} else {
-			if h.sender != nil {
-				_ = h.sender.Send(c.Request.Context(), chatID, "👋 Halo! Saya bot resmi ILA Platform.\n\nUntuk menghubungkan akun Anda, silakan buka Pengaturan di dashboard ILA Platform (rekavia.com) dan klik 'Hubungkan Telegram'.")
-			}
+			h.pasangKeyboard(c.Request.Context(), chatID, "👋 Halo! Saya bot resmi ILA Platform.\n\nPilih menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari.\n\nKalau akun Anda belum terhubung, buka Pengaturan di dashboard ILA Platform (rekavia.com) lalu klik 'Hubungkan Telegram'.")
 		}
 	} else if strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/") {
-		if h.sender != nil {
-			_ = h.sender.Send(c.Request.Context(), chatID, "👋 Bot ILA Platform siap mengirimkan notifikasi sinyal trading dan alert ke akun Anda.\n\nUntuk menghubungkan atau mengelola akun, kunjungi menu Pengaturan di web ILA Platform (rekavia.com).")
-		}
+		h.pasangKeyboard(c.Request.Context(), chatID, "👋 Bot ILA Platform siap mengirimkan notifikasi sinyal trading dan alert ke akun Anda.\n\nGunakan menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari. Pengaturan akun tetap di website ILA Platform (rekavia.com).")
+	} else {
+		// Pesan bebas selain menu: balas dengan menu supaya keyboardnya tetap ada.
+		h.pasangKeyboard(c.Request.Context(), chatID, "Pilih menu di bawah untuk melanjutkan.")
 	}
 
 	c.Status(http.StatusOK)

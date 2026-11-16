@@ -30,9 +30,11 @@ const (
 	LabelMenu       = "🏠 Menu"
 )
 
-// KeyboardUtama menyusun keyboard tetap yang selalu terlihat di bawah layar.
+// ReplyKeyboard adalah keyboard tetap di bawah layar chat.
 //
-// Dua tombol per baris supaya teksnya tidak terpotong di layar sempit.
+// Keyboard menempel pada pesan, bukan pada chat: setiap balasan bot perlu
+// membawanya ulang supaya tombolnya tetap terlihat. Pengguna tetap bisa
+// menyembunyikannya lewat tombol tutup bawaan Telegram.
 func KeyboardUtama() ReplyKeyboardMarkup {
 	return ReplyKeyboardMarkup{
 		Keyboard: [][]KeyboardButton{
@@ -41,6 +43,8 @@ func KeyboardUtama() ReplyKeyboardMarkup {
 		},
 		ResizeKeyboard: true,
 		IsPersistent:   true,
+		// Tanpa placeholder, kolom ketik tetap muncul di atas keyboard.
+		InputFieldPlaceholder: "Tulis pesan, atau pilih menu di bawah",
 	}
 }
 
