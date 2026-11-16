@@ -1,7 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { ApiError } from '@/lib/api-error'
 
-const heartbeat = vi.fn(() => Promise.resolve({ expires_at: '', idle_minutes: 10 }))
+const { heartbeat } = vi.hoisted(() => ({
+  heartbeat: vi.fn(() => Promise.resolve({ expires_at: '', idle_minutes: 10 })),
+}))
 
 vi.mock('@/lib/admin-api', () => ({
   adminAuthApi: {
@@ -23,7 +26,10 @@ function renderIdle(overrides: Partial<Options> = {}) {
 
 describe('useAdminIdleTimer', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    // Batas interval heartbeat memakai Date.now(), jadi jam palsu harus ikut
+    // maju bersama timer.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     heartbeat.mockClear()
   })
 
@@ -57,7 +63,7 @@ describe('useAdminIdleTimer', () => {
     expect(onTimeout).toHaveBeenCalledTimes(1)
   })
 
-  it('tombol masih di sini mengulang timer dan memperpanjang sesi', () => {
+  it('tombol masih di sini mengulang timer tanpa mengirim heartbeat beruntun', () => {
     const { hook, onTimeout } = renderIdle()
 
     act(() => {
@@ -65,12 +71,14 @@ describe('useAdminIdleTimer', () => {
     })
     heartbeat.mockClear()
 
+    // Heartbeat pertama sudah terkirim saat hook dipasang, jadi klik dalam
+    // jendela interval minimum tidak boleh menambah permintaan.
     act(() => {
       hook.result.current.stay()
     })
 
     expect(hook.result.current.warningVisible).toBe(false)
-    expect(heartbeat).toHaveBeenCalledTimes(1)
+    expect(heartbeat).not.toHaveBeenCalled()
 
     // Hitung mundur lama tidak boleh lagi memicu keluar.
     act(() => {
@@ -88,5 +96,77 @@ describe('useAdminIdleTimer', () => {
 
     expect(hook.result.current.warningVisible).toBe(false)
     expect(onTimeout).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Pembatasan laju heartbeat diuji dengan jam sungguhan yang bisa dimajukan,
+ * karena batas interval memakai Date.now() dan tidak bergantung pada timer.
+ */
+describe('useAdminIdleTimer heartbeat', () => {
+  const realNow = Date.now.bind(Date)
+  let offsetMs = 0
+
+  beforeEach(() => {
+    offsetMs = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offsetMs)
+    heartbeat.mockClear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('mengirim heartbeat saat interaksi pertama lalu menahan yang berikutnya', () => {
+    renderIdle()
+
+    expect(heartbeat).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      window.dispatchEvent(new Event('pointerdown'))
+    })
+
+    expect(heartbeat).toHaveBeenCalledTimes(1)
+  })
+
+  it('mengirim heartbeat lagi setelah jarak minimum terlampaui', async () => {
+    renderIdle()
+
+    // Tunggu permintaan pertama selesai supaya penanda "sedang berjalan" lepas.
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    offsetMs += 4 * 60_000
+    act(() => {
+      window.dispatchEvent(new Event('pointerdown'))
+    })
+
+    expect(heartbeat).toHaveBeenCalledTimes(2)
+  })
+
+  it('menahan pengiriman selama masa jeda setelah ditolak 429', async () => {
+    heartbeat.mockRejectedValueOnce(new ApiError('rate limited', 429))
+    renderIdle()
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(heartbeat).toHaveBeenCalledTimes(1)
+
+    // Jendela jeda 60 detik belum lewat, jadi interaksi tidak memicu kirim.
+    offsetMs += 30_000
+    act(() => {
+      window.dispatchEvent(new Event('pointerdown'))
+    })
+    expect(heartbeat).toHaveBeenCalledTimes(1)
+
+    // Lewati sisa masa jeda sekaligus jarak minimum heartbeat.
+    offsetMs += 4 * 60_000
+    act(() => {
+      window.dispatchEvent(new Event('pointerdown'))
+    })
+    expect(heartbeat).toHaveBeenCalledTimes(2)
   })
 })

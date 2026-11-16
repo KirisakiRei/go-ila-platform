@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
 import { IdleWarningDialog } from '@/features/auth/components/IdleWarningDialog'
@@ -14,26 +14,28 @@ export function AdminIdleGuard() {
   const { signOut } = useAdminAuth()
   const navigate = useNavigate()
 
-  const idle = useAdminIdleTimer({
-    enabled: true,
-    onTimeout: () => {
-      signOut()
-      navigate('/admin/login', { replace: true })
-    },
-  })
+  // Callback dijaga stabil: identitas baru pada setiap render akan memicu
+  // pemasangan ulang listener di hook idle.
+  const handleTimeout = useCallback(() => {
+    signOut()
+    navigate('/admin/login', { replace: true })
+  }, [signOut, navigate])
+
+  const idle = useAdminIdleTimer({ enabled: true, onTimeout: handleTimeout })
+  const { warningVisible, leaveNow } = idle
 
   // Sesi admin bisa habis lebih dulu di server; jangan biarkan modal
   // peringatan menutupi halaman yang sudah tidak sah.
   useEffect(() => {
-    if (!idle.warningVisible) return
+    if (!warningVisible) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') idle.leaveNow()
+      if (event.key === 'Escape') leaveNow()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [idle])
+  }, [warningVisible, leaveNow])
 
-  if (!idle.warningVisible) return null
+  if (!warningVisible) return null
 
   return (
     <IdleWarningDialog
