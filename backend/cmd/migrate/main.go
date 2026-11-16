@@ -49,6 +49,7 @@ func main() {
 		&model.ApprovalToken{},
 		&model.OnboardingToken{},
 		&model.NotificationLog{},
+		&model.TelegramMessage{},
 		&model.UserSignal{},
 		&model.SignalEvent{},
 		&model.ExecutionRecord{},

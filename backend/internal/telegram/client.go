@@ -58,10 +58,25 @@ func NewClient(cfg Config, logger *slog.Logger) *Client {
 	}
 }
 
-// InlineButton adalah tombol tautan URL pada inline keyboard Telegram.
+// InlineButton adalah tombol pada inline keyboard Telegram.
+//
+// URL membuka tautan; CallbackData mengirim tekanan kembali ke webhook.
 type InlineButton struct {
+	Text         string `json:"text"`
+	URL          string `json:"url,omitempty"`
+	CallbackData string `json:"callback_data,omitempty"`
+}
+
+// KeyboardButton adalah satu tombol pada keyboard tetap di bawah layar.
+type KeyboardButton struct {
 	Text string `json:"text"`
-	URL  string `json:"url,omitempty"`
+}
+
+// ReplyKeyboardMarkup menyusun keyboard tetap yang selalu terlihat.
+type ReplyKeyboardMarkup struct {
+	Keyboard       [][]KeyboardButton `json:"keyboard"`
+	ResizeKeyboard bool               `json:"resize_keyboard"`
+	IsPersistent   bool               `json:"is_persistent"`
 }
 
 // InlineKeyboardMarkup menyusun tombol-tombol pada inline keyboard.
@@ -70,16 +85,19 @@ type InlineKeyboardMarkup struct {
 }
 
 type sendMessageRequest struct {
-	ChatID         string                `json:"chat_id"`
-	Text           string                `json:"text"`
-	DisablePreview bool                  `json:"disable_web_page_preview"`
-	ParseMode      string                `json:"parse_mode,omitempty"`
-	ReplyMarkup    *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	ChatID         string `json:"chat_id"`
+	Text           string `json:"text"`
+	DisablePreview bool   `json:"disable_web_page_preview"`
+	ParseMode      string `json:"parse_mode,omitempty"`
+	ReplyMarkup    any    `json:"reply_markup,omitempty"`
 }
 
 type apiResponse struct {
 	OK          bool   `json:"ok"`
 	Description string `json:"description"`
+	Result      struct {
+		MessageID int64 `json:"message_id"`
+	} `json:"result"`
 }
 
 // Send mengirim satu pesan teks sederhana ke chat (kompatibilitas mundur).
@@ -89,19 +107,80 @@ func (c *Client) Send(ctx context.Context, chatID, text string) error {
 
 // SendMessage mengirim pesan Telegram lengkap dengan teks dan tombol inline keyboard.
 func (c *Client) SendMessage(ctx context.Context, chatID string, msg Message) error {
-	if !c.cfg.Enabled() {
-		return nil
-	}
-	if chatID == "" {
-		return nil
-	}
+	_, err := c.SendMessageReturningID(ctx, chatID, msg)
+	return err
+}
 
+// SendMessageReturningID mengirim pesan dan mengembalikan message_id.
+//
+// Dipakai Runner untuk menyimpan jejak pesan bertombol, agar tombolnya bisa
+// dibersihkan sendiri saat setup tidak berlaku lagi.
+func (c *Client) SendMessageReturningID(ctx context.Context, chatID string, msg Message) (int64, error) {
+	if !c.cfg.Enabled() || chatID == "" {
+		return 0, nil
+	}
 	c.throttle(ctx, chatID)
 	if err := ctx.Err(); err != nil {
-		return err
+		return 0, err
 	}
+	return c.post(ctx, "sendMessage", c.pesanPayload(chatID, msg))
+}
 
-	reqPayload := sendMessageRequest{
+// SendKeyboard mengirim teks disertai keyboard tetap di bawah layar.
+func (c *Client) SendKeyboard(ctx context.Context, chatID, text string, kb ReplyKeyboardMarkup) error {
+	if !c.cfg.Enabled() || chatID == "" {
+		return nil
+	}
+	c.throttle(ctx, chatID)
+	_, err := c.post(ctx, "sendMessage", map[string]any{
+		"chat_id":                  chatID,
+		"text":                     text,
+		"parse_mode":               "HTML",
+		"reply_markup":             kb,
+		"disable_web_page_preview": true,
+	})
+	return err
+}
+
+// EditMessageText mengganti isi pesan yang sudah terkirim.
+//
+// Tanpa tombol, Telegram mempertahankan tombol lama. Karena itu keyboard kosong
+// selalu dikirim eksplisit saat pesan harus kehilangan tombolnya.
+func (c *Client) EditMessageText(ctx context.Context, chatID string, messageID int64, text string, buttons [][]InlineButton) error {
+	if !c.cfg.Enabled() || chatID == "" {
+		return nil
+	}
+	if buttons == nil {
+		buttons = [][]InlineButton{}
+	}
+	_, err := c.post(ctx, "editMessageText", map[string]any{
+		"chat_id":      chatID,
+		"message_id":   messageID,
+		"text":         text,
+		"parse_mode":   "HTML",
+		"reply_markup": InlineKeyboardMarkup{InlineKeyboard: buttons},
+	})
+	return err
+}
+
+// AnswerCallback menutup indikator memuat pada tombol yang ditekan.
+//
+// Telegram menampilkan spinner sampai ini dipanggil, jadi jawaban harus tetap
+// dikirim walau pemrosesan gagal.
+func (c *Client) AnswerCallback(ctx context.Context, callbackID, text string) error {
+	if !c.cfg.Enabled() || callbackID == "" {
+		return nil
+	}
+	_, err := c.post(ctx, "answerCallbackQuery", map[string]any{
+		"callback_query_id": callbackID,
+		"text":              text,
+	})
+	return err
+}
+
+// pesanPayload menyusun isi permintaan kirim pesan.
+func (c *Client) pesanPayload(chatID string, msg Message) any {
+	payload := sendMessageRequest{
 		ChatID:         chatID,
 		Text:           msg.Text,
 		DisablePreview: true,
@@ -109,41 +188,38 @@ func (c *Client) SendMessage(ctx context.Context, chatID string, msg Message) er
 		// menampilkan tag sebagai teks mentah.
 		ParseMode: "HTML",
 	}
-
 	if len(msg.Buttons) > 0 {
-		reqPayload.ReplyMarkup = &InlineKeyboardMarkup{
-			InlineKeyboard: msg.Buttons,
-		}
+		payload.ReplyMarkup = InlineKeyboardMarkup{InlineKeyboard: msg.Buttons}
 	}
+	return payload
+}
 
-	body, err := json.Marshal(reqPayload)
+// post mengirim satu permintaan ke Telegram dan membaca message_id bila ada.
+func (c *Client) post(ctx context.Context, method string, payload any) (int64, error) {
+	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("menyusun pesan: %w", err)
+		return 0, fmt.Errorf("menyusun pesan: %w", err)
 	}
-
-	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.cfg.BotToken)
+	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/%s", c.cfg.BotToken, method)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("membuat permintaan telegram: %w", err)
+		return 0, fmt.Errorf("membuat permintaan telegram: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("mengirim pesan telegram: %w", sanitizeTransportError(err, c.cfg.BotToken))
+		return 0, fmt.Errorf("mengirim pesan telegram: %w", sanitizeTransportError(err, c.cfg.BotToken))
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
-
+	var hasil apiResponse
+	_ = json.NewDecoder(resp.Body).Decode(&hasil)
 	if resp.StatusCode != http.StatusOK {
-		var apiErr apiResponse
-		_ = json.NewDecoder(resp.Body).Decode(&apiErr)
-		return fmt.Errorf("telegram menolak pesan: %s", apiErr.Description)
+		return 0, fmt.Errorf("telegram menolak permintaan: %s", hasil.Description)
 	}
-
-	return nil
+	return hasil.Result.MessageID, nil
 }
 
 // throttle menjaga jarak antar pesan ke chat yang sama.

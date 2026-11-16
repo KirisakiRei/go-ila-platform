@@ -383,7 +383,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 			Timeout:  cfg.TelegramTimeout,
 		}, logger)
 	}
-	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret, tgClient)
+	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret, tgClient).
+		WithMenu(service.NewTelegramMenuService(journalRepo, runnerRepo, cfg.MaxDailyTrades), approveService, telegram.AppURL(cfg.PublicURL, "/pengaturan"), logger)
 	trialHandler := handler.NewTrialHandler(trialService)
 	adminAuthHandler := handler.NewAdminAuthHandler(
 		adminAuthService,

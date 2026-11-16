@@ -28,10 +28,17 @@ type runnerPublisher struct {
 	// flags memberi angka kuota harian yang berlaku saat ini. Tanpa ini
 	// notifikasi memakai nilai bawaan yang bisa berbeda dari pengaturan admin.
 	flags runner.Flags
+	// jejak menyimpan pesan bot yang masih bertombol, agar tombol lama bisa
+	// dilepas saat setup tidak berlaku lagi.
+	jejak repository.TelegramMessageRepository
+	tg    *telegram.Client
 }
 
 // PublishSignal mengirim notifikasi untuk satu perubahan status sinyal user.
 func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, status, reason string) {
+	if statusTerminal(status) {
+		p.lepasTombol(ctx, userID, signalID, status, reason)
+	}
 	signal, err := p.store.FindSignal(ctx, signalID)
 	if err != nil {
 		p.logger.Warn("notifikasi dilewati: sinyal tidak ditemukan", "signal_id", signalID)
@@ -55,7 +62,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 
 	messageKey := "sig:" + signalID + ":" + userID + ":" + status
 
-	p.notifier.Enqueue(userID, messageKey, func(chatID string) telegram.Message {
+	p.notifier.EnqueueSignal(userID, messageKey, signalID, func(chatID string) telegram.Message {
 		_ = chatID
 
 		switch status {
@@ -105,7 +112,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			})
 
 		case model.SignalStatusReadyToEntry:
-			link := p.approveLink(ctx, userID, signalID)
+			token, link := p.approveLink(ctx, userID, signalID)
 			return telegram.FormatSetupDetailedMessage(telegram.SetupMessageParams{
 				Symbol:          signal.Symbol,
 				Direction:       signal.Direction,
@@ -119,6 +126,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 				RiskPercent:     defaultRiskPercent,
 				RiskAmount:      0,
 				ApprovalLink:    link,
+				ApproveToken:    token,
 			})
 
 		case model.SignalStatusConsumed:
@@ -182,7 +190,7 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 
 		case model.SignalStatusOpportunity:
 			// Peluang bukan penolakan: pesannya menawarkan langkah berikutnya.
-			dashboardLink := p.approveLink(ctx, userID, signalID)
+			_, dashboardLink := p.approveLink(ctx, userID, signalID)
 			if dashboardLink == "" {
 				dashboardLink = telegram.AppURL(p.baseURL, "/sinyal?pair="+signal.Symbol)
 			}
@@ -285,7 +293,7 @@ func batasTunggu(expiresAt time.Time) string {
 // tautanTindakan memilih tombol: approve bila masih boleh dieksekusi manual,
 // dashboard bila tidak.
 func (p *runnerPublisher) tautanTindakan(ctx context.Context, userID, signalID, symbol string) string {
-	if link := p.approveLink(ctx, userID, signalID); link != "" {
+	if _, link := p.approveLink(ctx, userID, signalID); link != "" {
 		return link
 	}
 	return telegram.AppURL(p.baseURL, "/sinyal?pair="+symbol)
@@ -444,13 +452,15 @@ func (p *runnerPublisher) dailyNote(daily *runner.DailyOutcome) string {
 
 // approveLink membuat token sekali pakai lalu menyusun deep-link.
 // Token disimpan sebagai hash; plaintext hanya dikirim ke user.
-func (p *runnerPublisher) approveLink(ctx context.Context, userID, signalID string) string {
-	token, hash, err := newApprovalToken()
+//
+// Token mentah ikut dikembalikan karena tombol inline di Telegram mengirim
+// callback berisi token, bukan tautan.
+func (p *runnerPublisher) approveLink(ctx context.Context, userID, signalID string) (token string, link string) {
+	raw, hash, err := newApprovalToken()
 	if err != nil {
 		p.logger.Error("gagal membuat token konfirmasi", "error", err.Error())
-		return ""
+		return "", ""
 	}
-
 	record := &model.ApprovalToken{
 		TokenHash: hash,
 		UserID:    userID,
@@ -458,13 +468,11 @@ func (p *runnerPublisher) approveLink(ctx context.Context, userID, signalID stri
 		Action:    "ENTRY",
 		ExpiresAt: time.Now().UTC().Add(5 * time.Minute),
 	}
-
 	if err := p.store.CreateApprovalToken(ctx, record); err != nil {
 		p.logger.Error("gagal menyimpan token konfirmasi", "error", err.Error())
-		return ""
+		return "", ""
 	}
-
-	return telegram.DeepLink(p.baseURL, token)
+	return raw, telegram.DeepLink(p.baseURL, raw)
 }
 
 // defaultRiskPercent adalah risiko acuan yang ditampilkan di pesan.

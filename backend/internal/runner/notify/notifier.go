@@ -28,34 +28,48 @@ type ClaimCheck interface {
 	MarkMessageFailed(ctx context.Context, messageKey, reason string) error
 }
 
+// MessageRecorder menyimpan jejak pesan bot yang masih bertombol.
+//
+// Jejak ini dipakai untuk membersihkan tombol saat setup tidak berlaku lagi.
+type MessageRecorder interface {
+	Simpan(ctx context.Context, pesan *model.TelegramMessage) error
+}
+
 // Notifier mengirim notifikasi lewat antrean.
 type Notifier struct {
-	users  UserLookup
-	claims ClaimCheck
-	tg     *telegram.Client
-	logger *slog.Logger
-	queue  chan job
-	wg     sync.WaitGroup
+	users    UserLookup
+	claims   ClaimCheck
+	tg       *telegram.Client
+	logger   *slog.Logger
+	queue    chan job
+	recorder MessageRecorder
+	wg       sync.WaitGroup
 }
 
 type job struct {
 	userID     string
 	messageKey string
-	build      func(chatID string) telegram.Message
+	// signalID diisi bila pesan memuat tombol yang terikat ke satu sinyal.
+	signalID string
+	build    func(chatID string) telegram.Message
 }
 
 // New membuat notifier dengan sejumlah pekerja tetap.
-func New(users UserLookup, claims ClaimCheck, tg *telegram.Client, logger *slog.Logger, workers int) *Notifier {
+//
+// recorder boleh nil: tanpa pencatat, pesan tetap terkirim tetapi tombolnya
+// tidak bisa dibersihkan otomatis.
+func New(users UserLookup, claims ClaimCheck, tg *telegram.Client, recorder MessageRecorder, logger *slog.Logger, workers int) *Notifier {
 	if workers < 1 {
 		workers = 1
 	}
 
 	n := &Notifier{
-		users:  users,
-		claims: claims,
-		tg:     tg,
-		logger: logger,
-		queue:  make(chan job, 256),
+		users:    users,
+		claims:   claims,
+		tg:       tg,
+		logger:   logger,
+		queue:    make(chan job, 256),
+		recorder: recorder,
 	}
 
 	for i := 0; i < workers; i++ {
@@ -74,12 +88,17 @@ func (n *Notifier) Close() {
 // Enqueue memasukkan pesan ke antrean tanpa memblokir pemanggil.
 // Antrean penuh berarti pesan dibuang dan dicatat, bukan membuat Runner macet.
 func (n *Notifier) Enqueue(userID, messageKey string, build func(chatID string) telegram.Message) {
+	n.EnqueueSignal(userID, messageKey, "", build)
+}
+
+// EnqueueSignal sama dengan Enqueue, tetapi menandai pesan sebagai milik satu
+// sinyal agar tombolnya bisa dibersihkan belakangan.
+func (n *Notifier) EnqueueSignal(userID, messageKey, signalID string, build func(chatID string) telegram.Message) {
 	if n == nil || n.tg == nil {
 		return
 	}
-
 	select {
-	case n.queue <- job{userID: userID, messageKey: messageKey, build: build}:
+	case n.queue <- job{userID: userID, messageKey: messageKey, signalID: signalID, build: build}:
 	default:
 		n.logger.Warn("antrean notifikasi penuh, pesan dilewati",
 			"user_id", userID, "message_key", messageKey)
@@ -128,7 +147,8 @@ func (n *Notifier) deliver(j job) {
 		message.Text = telegram.Sanitize(message.Text)
 	}
 
-	if err := n.tg.SendMessage(ctx, *user.TelegramChatID, message); err != nil {
+	messageID, err := n.tg.SendMessageReturningID(ctx, *user.TelegramChatID, message)
+	if err != nil {
 		// Teks error disaring dahulu: kegagalan jaringan bisa memuat URL yang
 		// berisi token bot, dan nilainya ikut tercatat di log serta database.
 		safeError := redact.Error(err)
@@ -139,8 +159,22 @@ func (n *Notifier) deliver(j job) {
 		}
 		return
 	}
-
 	if n.claims != nil {
 		_ = n.claims.MarkMessageSent(ctx, j.messageKey)
+	}
+	// Hanya pesan bertombol yang perlu diingat: tombol itulah yang harus
+	// dilepas saat setup batal atau kedaluwarsa.
+	if n.recorder != nil && len(message.Buttons) > 0 && messageID != 0 {
+		jejak := &model.TelegramMessage{
+			UserID:    j.userID,
+			ChatID:    *user.TelegramChatID,
+			MessageID: messageID,
+			SignalID:  j.signalID,
+			Kind:      model.TelegramPesanSetup,
+		}
+		if err := n.recorder.Simpan(ctx, jejak); err != nil {
+			n.logger.Warn("gagal mencatat jejak pesan bertombol",
+				"user_id", j.userID, "message_key", j.messageKey, "error", redact.Error(err))
+		}
 	}
 }

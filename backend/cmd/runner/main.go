@@ -102,7 +102,8 @@ func main() {
 		Timeout:  cfg.TelegramTimeout,
 	}, logger)
 
-	notifier := notify.New(store, repository.NewNotificationRepository(db), tgClient, logger, 2)
+	notifier := notify.New(store, repository.NewNotificationRepository(db), tgClient,
+		repository.NewTelegramMessageRepository(db), logger, 2)
 	defer notifier.Close()
 
 	// Peringatan gangguan platform ke admin; anti-banjir 15 menit per pemicu.
@@ -114,6 +115,8 @@ func main() {
 		baseURL:  cfg.PublicURL,
 		logger:   logger,
 		flags:    flags,
+		jejak:    repository.NewTelegramMessageRepository(db),
+		tg:       tgClient,
 	}
 
 	// --- Broker ---------------------------------------------------------------
@@ -229,6 +232,13 @@ func main() {
 	go func() {
 		defer wg.Done()
 		runTelemetry(ctx, svc, logger)
+	}()
+	// Pembersih jejak pesan bertombol: catatan lebih dari tiga hari tidak
+	// mungkin diedit lagi oleh Telegram, jadi tidak perlu disimpan.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pruneLoop(ctx, repository.NewTelegramMessageRepository(db), logger)
 	}()
 
 	// Koneksi engine: setiap strategi punya proses sendiri (plans/15 par.1.1).

@@ -177,6 +177,8 @@ type SetupMessageParams struct {
 	RiskAmount      float64
 	LotSize         float64
 	ApprovalLink    string
+	// ApproveToken mengubah tombol menjadi aksi langsung di Telegram.
+	ApproveToken string
 }
 
 // FormatSetupDetailedMessage menyusun pesan Tahap 4: setup lengkap dan siap masuk.
@@ -201,6 +203,16 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 	}))
 
 	b.WriteString("\nJendela entry cuma sebentar. Masuk sekarang atau lewati.\n")
+
+	// Tombol aksi memakai callback agar keputusan selesai di Telegram, tanpa
+	// membuka browser saat harga bergerak. Bila token gagal dibuat, tombol
+	// kembali menjadi tautan dashboard supaya user masih punya jalan.
+	if p.ApproveToken != "" {
+		return Message{Text: b.String(), Buttons: [][]InlineButton{{
+			{Text: "⚡ Eksekusi", CallbackData: CallbackEksekusi + p.ApproveToken},
+			{Text: "🚫 Lewati", CallbackData: CallbackLewati + p.ApproveToken},
+		}}}
+	}
 
 	label := "🔍 Detail Setup"
 	if p.ApprovalLink != "" {
@@ -794,6 +806,15 @@ func formatFrom(v float64) string {
 	return formatThousands(v, 2)
 }
 
+// formatProfitHarian mengosongkan nominal nol karena tabel ringkasan harian
+// tidak menyimpan nilai uang: nol berarti belum tercatat, bukan impas.
+func formatProfitHarian(v float64) string {
+	if v == 0 {
+		return "—"
+	}
+	return formatMoney(v)
+}
+
 func formatThousands(v float64, decimals int) string {
 	raw := fmt.Sprintf("%.*f", decimals, v)
 	parts := strings.SplitN(raw, ".", 2)
@@ -812,4 +833,104 @@ func formatThousands(v float64, decimals int) string {
 		b.WriteString(parts[1])
 	}
 	return b.String()
+}
+
+// ---------------------------------------------------------------------------
+// Hasil tekanan tombol
+// ---------------------------------------------------------------------------
+
+// FormatEksekusiBerhasil menyusun pesan pengganti setelah entry dikonfirmasi.
+//
+// Pesannya menggantikan pesan setup yang lama, jadi tombolnya otomatis hilang
+// dan tidak ada lagi tekanan yang bisa mengulang order.
+func FormatEksekusiBerhasil(p EksekusiParams) Message {
+	var b strings.Builder
+
+	b.WriteString(judulPesan("✅", p.Symbol, p.Htf, p.Ltf, "Posisi terpasang"))
+	b.WriteString("\n")
+	b.WriteString(makeBox([][2]string{
+		{"Arah", arahTampil(p.Direction)},
+		{"Order", nomorOrder(p.Ticket)},
+		{"Entry", formatPrice(p.EntryPrice)},
+		{"Stop", formatPrice(p.StopLoss)},
+		{"Target", formatPrice(p.TakeProfit)},
+		{"Lot", lotTampil(p.LotSize)},
+	}))
+	b.WriteString("\nOrder sudah masuk ke broker. Bot akan mengabari saat posisi ditutup.\n")
+
+	return Message{Text: b.String()}
+}
+
+// EksekusiParams memuat rincian posisi yang baru dibuka.
+type EksekusiParams struct {
+	Symbol     string
+	Direction  string
+	Htf        string
+	Ltf        string
+	Ticket     string
+	EntryPrice float64
+	StopLoss   float64
+	TakeProfit float64
+	LotSize    float64
+}
+
+// FormatEksekusiGagal menyusun pesan pengganti saat entry tidak jadi dijalankan.
+//
+// Alasan ditulis apa adanya dari Runner, karena trader perlu tahu apakah setup
+// masih berlaku atau sudah lewat.
+func FormatEksekusiGagal(symbol, htf, ltf, alasan string) Message {
+	var b strings.Builder
+
+	b.WriteString(judulPesan("⛔", symbol, htf, ltf, "Entry tidak dijalankan"))
+	b.WriteString("\n")
+	if alasan != "" {
+		b.WriteString(Sanitize(alasan))
+		b.WriteString("\n")
+	}
+	b.WriteString("\nTidak ada order yang terkirim.\n")
+
+	return Message{Text: b.String()}
+}
+
+// FormatDilewatiMessage menyusun pesan pengganti setelah setup dilewati.
+func FormatDilewatiMessage(symbol, htf, ltf string) Message {
+	var b strings.Builder
+
+	b.WriteString(judulPesan("🚫", symbol, htf, ltf, "Setup dilewati"))
+	b.WriteString("\nSetup ini tidak akan dieksekusi. Kuota trading Anda tidak terpakai.\n")
+
+	return Message{Text: b.String()}
+}
+
+// FormatSudahTidakBerlaku menandai pesan lama yang tombolnya harus dibuang.
+//
+// Dipakai saat setup berakhir sebelum sempat dieksekusi, supaya pesan lamanya
+// tidak lagi menawarkan tombol yang tidak ada gunanya.
+func FormatSudahTidakBerlaku(symbol, htf, ltf, sebab string) Message {
+	var b strings.Builder
+
+	b.WriteString(judulPesan("⌛", symbol, htf, ltf, "Sudah tidak berlaku"))
+	b.WriteString("\n")
+	if sebab != "" {
+		b.WriteString(Sanitize(sebab))
+		b.WriteString("\n")
+	}
+
+	return Message{Text: b.String()}
+}
+
+// FormatKedaluwarsaTautan dipakai saat tombol ditekan tetapi tautannya sudah mati.
+func FormatKedaluwarsaTautan(symbol string) Message {
+	return Message{Text: fmt.Sprintf(
+		"⌛ %s\n\nTautan ini sudah tidak berlaku. Setup mungkin sudah lewat, sudah dieksekusi, atau sudah dibatalkan.\n",
+		symbol,
+	)}
+}
+
+// nomorOrder menampilkan nomor tiket, atau keterangan bila belum ada.
+func nomorOrder(ticket string) string {
+	if ticket == "" {
+		return "menunggu broker"
+	}
+	return "#" + ticket
 }

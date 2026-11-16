@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"crypto/subtle"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"ila/backend/internal/middleware"
 	"ila/backend/internal/service"
+	"ila/backend/internal/telegram"
 	"ila/backend/pkg/httpx"
 )
 
@@ -19,22 +21,43 @@ type telegramSender interface {
 	Send(ctx context.Context, chatID, text string) error
 }
 
+// telegramEditor adalah kemampuan tambahan yang dipakai tombol inline dan
+// menu. Kanal tanpa dukungan ini tetap bisa mengirim notifikasi biasa.
+type telegramEditor interface {
+	AnswerCallback(ctx context.Context, callbackID, text string) error
+	EditMessageText(ctx context.Context, chatID string, messageID int64, text string, buttons [][]telegram.InlineButton) error
+	SendMessageReturningID(ctx context.Context, chatID string, msg telegram.Message) (int64, error)
+	SendKeyboard(ctx context.Context, chatID, text string, kb telegram.ReplyKeyboardMarkup) error
+}
+
 // TelegramHandler melayani penghubungan chat dan webhook dari Telegram.
 type TelegramHandler struct {
 	telegram service.TelegramService
 	botName  string
 	secret   string
 	sender   telegramSender
+	menu     service.TelegramMenuService
+	approve  service.ApproveService
+	baseURL  string
+	logger   *slog.Logger
+	edit     telegramEditor
 }
 
 // NewTelegramHandler merangkai handler Telegram.
+//
+// sender dipakai untuk notifikasi teks biasa. Bila klien yang diberikan juga
+// mendukung tombol inline, menu dan konfirmasi entry ikut aktif.
 func NewTelegramHandler(telegram service.TelegramService, botUsername, webhookSecret string, sender telegramSender) *TelegramHandler {
-	return &TelegramHandler{
+	h := &TelegramHandler{
 		telegram: telegram,
 		botName:  strings.TrimSpace(botUsername),
 		secret:   webhookSecret,
 		sender:   sender,
 	}
+	if editor, ok := sender.(telegramEditor); ok {
+		h.edit = editor
+	}
+	return h
 }
 
 // CreateLink menangani POST /api/v1/telegram/link.
@@ -64,6 +87,7 @@ type webhookUpdate struct {
 			ID int64 `json:"id"`
 		} `json:"chat"`
 	} `json:"message"`
+	CallbackQuery *callbackUpdate `json:"callback_query"`
 }
 
 // Webhook menangani POST /api/v1/telegram/webhook.
@@ -77,15 +101,25 @@ func (h *TelegramHandler) Webhook(c *gin.Context) {
 	}
 
 	var update webhookUpdate
-	if err := c.ShouldBindJSON(&update); err != nil || update.Message == nil {
+	if err := c.ShouldBindJSON(&update); err != nil {
+		c.Status(http.StatusOK)
+		return
+	}
+	if update.CallbackQuery != nil {
+		h.handleCallback(c.Request.Context(), update.CallbackQuery)
+		c.Status(http.StatusOK)
+		return
+	}
+	if update.Message == nil {
 		c.Status(http.StatusOK)
 		return
 	}
 
 	chatID := strconv.FormatInt(update.Message.Chat.ID, 10)
 	text := strings.TrimSpace(update.Message.Text)
-
-	if strings.HasPrefix(text, "/start") {
+	if aksi, kenal := telegram.AksiDariTeks(text); kenal {
+		h.handleMenuTeks(c.Request.Context(), chatID, aksi)
+	} else if strings.HasPrefix(text, "/start") {
 		token := strings.TrimSpace(strings.TrimPrefix(text, "/start"))
 		if token != "" {
 			// Kegagalan token dibalas sebagai 200: pesan balasan ke user
@@ -99,6 +133,9 @@ func (h *TelegramHandler) Webhook(c *gin.Context) {
 				if h.sender != nil {
 					_ = h.sender.Send(c.Request.Context(), chatID, "✅ Akun ILA Platform Anda berhasil terhubung!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini.")
 				}
+				// Keyboard menu dipasang setelah akun terhubung, karena sebelum
+				// itu tombolnya hanya akan berakhir "akun belum terhubung".
+				h.pasangKeyboard(c.Request.Context(), chatID)
 			}
 		} else {
 			if h.sender != nil {
