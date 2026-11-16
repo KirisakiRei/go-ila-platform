@@ -12,6 +12,7 @@ import (
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
 	"ila/backend/internal/runner/notify"
+	"ila/backend/internal/settings"
 	"ila/backend/internal/telegram"
 )
 
@@ -24,6 +25,9 @@ type runnerPublisher struct {
 	notifier *notify.Notifier
 	baseURL  string
 	logger   *slog.Logger
+	// flags memberi angka kuota harian yang berlaku saat ini. Tanpa ini
+	// notifikasi memakai nilai bawaan yang bisa berbeda dari pengaturan admin.
+	flags runner.Flags
 }
 
 // PublishSignal mengirim notifikasi untuk satu perubahan status sinyal user.
@@ -293,14 +297,20 @@ func (p *runnerPublisher) kuotaAngka(ctx context.Context, userID string, alasan 
 		return 0
 	}
 
+	if mauMaks {
+		// Batas dibaca dari pengaturan aktif, bukan nilai bawaan, agar pesan
+		// menyebut angka yang benar-benar dipakai Runner saat menahan setup.
+		maks := runner.DefaultDailyPolicy().MaxTrades
+		if p.flags != nil {
+			maks = p.flags.Int(ctx, settings.KeyMaxDailyTrades, maks)
+		}
+		return runner.DailyPolicy{MaxTrades: maks}.Clamp().MaxTrades
+	}
+
 	summary, err := p.store.FindDailySummary(ctx, userID, runner.DayKey(time.Now()))
 	if err != nil {
 		p.logger.Warn("kuota harian tidak terbaca untuk notifikasi", "user_id", userID, "error", err.Error())
 		return 0
-	}
-
-	if mauMaks {
-		return runner.DefaultDailyPolicy().Clamp().MaxTrades
 	}
 	return summary.TotalTrades
 }
@@ -325,9 +335,14 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 	p.notifier.Enqueue(pos.UserID, messageKey, func(chatID string) telegram.Message {
 		_ = chatID
 		posisiLink := telegram.AppURL(p.baseURL, "/posisi")
+		// Timeframe diambil dari sinyal asal agar user tahu setup mana yang
+		// menghasilkan posisi ini. Gagal membaca bukan alasan menahan kabar.
+		htf, ltf := p.timeframePosisi(ctx, pos)
 		return telegram.FormatClosedMessage(telegram.ClosedParams{
 			Symbol:      pos.Symbol,
 			Direction:   pos.Direction,
+			Htf:         htf,
+			Ltf:         ltf,
 			Result:      positionResultLabel(pos.Status),
 			EntryPrice:  pos.OpenPrice,
 			ExitPrice:   pos.ExitPrice,
@@ -338,6 +353,19 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 			RiwayatLink: posisiLink,
 		})
 	})
+}
+
+// timeframePosisi membaca pasangan timeframe dari sinyal yang membuka posisi.
+// Kosong bila sinyal asalnya tidak ditemukan; kolomnya lalu dilewati saja.
+func (p *runnerPublisher) timeframePosisi(ctx context.Context, pos *model.Position) (string, string) {
+	if pos.SourceSignalID == "" {
+		return "", ""
+	}
+	signal, err := p.store.FindSignal(ctx, pos.SourceSignalID)
+	if err != nil || signal == nil {
+		return "", ""
+	}
+	return signal.Htf, signal.Ltf
 }
 
 // durasiPosisi menghitung lama posisi terbuka dalam bahasa yang ringkas.

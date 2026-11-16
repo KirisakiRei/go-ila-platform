@@ -113,6 +113,7 @@ func main() {
 		notifier: notifier,
 		baseURL:  cfg.PublicURL,
 		logger:   logger,
+		flags:    flags,
 	}
 
 	// --- Broker ---------------------------------------------------------------
