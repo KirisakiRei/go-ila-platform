@@ -482,9 +482,22 @@ func (s *Service) fanOutIntermediate(ctx context.Context, signal *model.Signal) 
 		s.logger.Error("gagal membaca pemantau simbol", "error", err.Error())
 		return
 	}
-
 	for _, user := range users {
 		if !s.userWantsSignal(ctx, user.ID, signal) {
+			continue
+		}
+		// Kemajuan radar datang berkali-kali untuk slot yang sama. Baris user yang
+		// sudah punya posisi atau sudah berstatus final tidak boleh disentuh lagi:
+		// menimpanya akan mengembalikan sinyal yang sudah dieksekusi ke keadaan
+		// menunggu, sehingga radar meminta entry ulang padahal posisinya terbuka.
+		if _, posErr := s.store.FindOpenPositionBySignal(ctx, user.ID, signal.SignalID); posErr == nil {
+			continue
+		}
+		existing, findErr := s.store.FindUserSignal(ctx, user.ID, signal.SignalID)
+		if findErr != nil && !errors.Is(findErr, apperror.ErrNotFound) {
+			continue
+		}
+		if existing != nil && IsTerminal(existing.Status) {
 			continue
 		}
 		s.recordUserSignal(ctx, user.ID, signal.SignalID, signal.Status, "", nil)
@@ -1749,12 +1762,7 @@ func (s *Service) recordUserSignal(ctx context.Context, userID, signalID, status
 }
 
 func (s *Service) updateUserSignalPosition(ctx context.Context, userID, signalID, positionID string) error {
-	us, err := s.store.FindUserSignal(ctx, userID, signalID)
-	if err != nil {
-		return err
-	}
-	us.PositionID = positionID
-	return s.store.UpsertUserSignal(ctx, us)
+	return s.store.SetUserSignalPosition(ctx, userID, signalID, positionID)
 }
 
 // reject menahan eksekusi.

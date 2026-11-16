@@ -172,7 +172,22 @@ func (s *fakeStore) UpsertUserSignal(_ context.Context, us *model.UserSignal) er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	copyUs := *us
+	// Samakan dengan repository: kolom position_id tidak ikut ditimpa.
+	if lama, ok := s.userSignals[userSignalKey(us.UserID, us.SignalID)]; ok {
+		copyUs.PositionID = lama.PositionID
+	}
 	s.userSignals[userSignalKey(us.UserID, us.SignalID)] = &copyUs
+	return nil
+}
+
+func (s *fakeStore) SetUserSignalPosition(_ context.Context, userID, signalID, positionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	us, ok := s.userSignals[userSignalKey(userID, signalID)]
+	if !ok {
+		return apperror.ErrNotFound
+	}
+	us.PositionID = positionID
 	return nil
 }
 

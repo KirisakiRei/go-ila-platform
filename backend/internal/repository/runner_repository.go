@@ -36,6 +36,8 @@ type RunnerRepository interface {
 
 	// Status sinyal per user.
 	UpsertUserSignal(ctx context.Context, us *model.UserSignal) error
+	// SetUserSignalPosition menautkan status sinyal user ke posisi hasil eksekusi.
+	SetUserSignalPosition(ctx context.Context, userID, signalID, positionID string) error
 	FindUserSignal(ctx context.Context, userID, signalID string) (*model.UserSignal, error)
 	FindUserSignalByPosition(ctx context.Context, positionID string) (*model.UserSignal, error)
 	RecordSignalEvent(ctx context.Context, event *model.SignalEvent) error
@@ -279,17 +281,32 @@ func RejectSlippageText() string {
 }
 
 func (r *runnerRepository) UpsertUserSignal(ctx context.Context, us *model.UserSignal) error {
+	// position_id tidak ikut ditimpa. Baris lama yang sudah terhubung ke posisi
+	// tetap memegang posisinya saat status diperbarui tanpa membawa posisi
+	// (mis. kemajuan radar atau penolakan akun lain). Pengosongan kolom ini akan
+	// memutus jejak sinyal ke posisi yang sudah terbuka.
 	err := r.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "user_id"}, {Name: "signal_id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"status", "reject_reason", "not_before",
-				"decided_at", "position_id", "updated_at",
+				"decided_at", "updated_at",
 			}),
 		}).
 		Create(us).Error
 	if err != nil {
 		return fmt.Errorf("menyimpan status sinyal user: %w", err)
+	}
+	return nil
+}
+
+func (r *runnerRepository) SetUserSignalPosition(ctx context.Context, userID, signalID, positionID string) error {
+	err := r.db.WithContext(ctx).
+		Model(&model.UserSignal{}).
+		Where("user_id = ? AND signal_id = ?", userID, signalID).
+		Updates(map[string]any{"position_id": positionID, "updated_at": time.Now().UTC()}).Error
+	if err != nil {
+		return fmt.Errorf("menautkan posisi ke status sinyal user: %w", err)
 	}
 	return nil
 }
