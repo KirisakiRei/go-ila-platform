@@ -196,7 +196,7 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 	// walau chat belum terhubung. Hanya halaman berisi data yang ditolak.
 	switch aksi {
 	case telegram.CallbackBantuan:
-		h.pasangKeyboard(ctx, chatID, telegram.FormatBantuanMessage().Text)
+		h.kirimPesanMenu(ctx, chatID, telegram.FormatBantuanMessage())
 		return
 	case telegram.CallbackPengaturan:
 		h.kirimPesanMenu(ctx, chatID, telegram.FormatPengaturanMessage(h.dashboardLink()))
@@ -204,13 +204,13 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 	}
 
 	if h.menu == nil {
-		h.pasangKeyboard(ctx, chatID, telegram.FormatMenuMessage("", "").Text)
+		h.kirimPesanMenu(ctx, chatID, telegram.FormatMenuMessage("", ""))
 		return
 	}
 
 	user, err := h.telegram.ResolveChat(ctx, chatID)
 	if err != nil {
-		h.pasangKeyboard(ctx, chatID, "Chat ini belum terhubung ke akun BOT Trading ILA. Hubungkan lewat menu Pengaturan di dashboard, lalu buka /start dari tautan yang tersedia.")
+		h.kirimTeks(ctx, chatID, "Chat ini belum terhubung ke akun BOT Trading ILA. Hubungkan lewat menu Pengaturan di dashboard, lalu buka /start dari tautan yang tersedia.")
 		return
 	}
 
@@ -232,8 +232,10 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 	h.kirimPesanMenu(ctx, chatID, pesan)
 }
 
-// kirimPesanMenu mengirim halaman menu sebagai pesan baru bertombol inline,
-// dengan keyboard tetap ikut terpasang.
+// kirimPesanMenu mengirim halaman menu sebagai pesan baru.
+//
+// Tombol inline dibiarkan menempel di balon chat. Keyboard bawah layar tidak
+// ikut dikirim karena Telegram hanya menerima satu reply_markup per pesan.
 func (h *TelegramHandler) kirimPesanMenu(ctx context.Context, chatID string, pesan telegram.Message) {
 	if h.edit == nil {
 		if h.sender != nil {
@@ -241,8 +243,6 @@ func (h *TelegramHandler) kirimPesanMenu(ctx context.Context, chatID string, pes
 		}
 		return
 	}
-	kb := telegram.KeyboardUtama()
-	pesan.Keyboard = &kb
 	if _, err := h.edit.SendMessageReturningID(ctx, chatID, pesan); err != nil {
 		h.logInfo(ctx, "mengirim halaman menu gagal", err)
 	}
@@ -281,12 +281,15 @@ func paketTampil(user *model.User) string {
 	return strings.ToUpper(tier[:1]) + tier[1:]
 }
 
-// pasangKeyboard mengirim balasan teks biasa sekaligus memasang menu tetap.
+// kirimTeks mengirim balasan singkat dengan tombol menu utama.
 //
-// Telegram menempelkan keyboard pada pesan, sehingga menu hilang bila pesan
-// terakhir bot tidak membawanya.
-func (h *TelegramHandler) pasangKeyboard(ctx context.Context, chatID, teks string) {
-	h.kirimPesanMenu(ctx, chatID, telegram.Message{Text: teks})
+// Tombol ditempel di balon chat agar trader selalu punya jalan kembali ke
+// menu tanpa mengetik perintah.
+func (h *TelegramHandler) kirimTeks(ctx context.Context, chatID, teks string) {
+	h.kirimPesanMenu(ctx, chatID, telegram.Message{
+		Text:    teks,
+		Buttons: [][]telegram.InlineButton{{{Text: telegram.LabelMenu, CallbackData: telegram.CallbackMenu}}},
+	})
 }
 
 // dashboardLink menyusun alamat dashboard untuk tombol tautan.

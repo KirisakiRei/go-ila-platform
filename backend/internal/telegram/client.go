@@ -67,20 +67,6 @@ type InlineButton struct {
 	CallbackData string `json:"callback_data,omitempty"`
 }
 
-// KeyboardButton adalah satu tombol pada keyboard tetap di bawah layar.
-type KeyboardButton struct {
-	Text string `json:"text"`
-}
-
-// ReplyKeyboardMarkup menyusun keyboard tetap yang selalu terlihat.
-type ReplyKeyboardMarkup struct {
-	Keyboard       [][]KeyboardButton `json:"keyboard"`
-	ResizeKeyboard bool               `json:"resize_keyboard"`
-	IsPersistent   bool               `json:"is_persistent"`
-	// InputFieldPlaceholder adalah teks petunjuk pada kolom ketik.
-	InputFieldPlaceholder string `json:"input_field_placeholder,omitempty"`
-}
-
 // InlineKeyboardMarkup menyusun tombol-tombol pada inline keyboard.
 type InlineKeyboardMarkup struct {
 	InlineKeyboard [][]InlineButton `json:"inline_keyboard"`
@@ -208,11 +194,10 @@ func (c *Client) pesanPayload(chatID string, msg Message) any {
 		// menampilkan tag sebagai teks mentah.
 		ParseMode: "HTML",
 	}
-	// Keyboard tetap didahulukan: pesan interaktif butuh menu, sedangkan
-	// pesan bertombol inline sudah membawa aksinya sendiri.
-	if msg.Keyboard != nil {
-		payload.ReplyMarkup = *msg.Keyboard
-	} else if len(msg.Buttons) > 0 {
+	// Telegram hanya menerima satu reply_markup per pesan, dan tombol inline
+	// yang menempel di balon chat lebih penting bagi trader daripada keyboard
+	// bawah layar. Keyboard tetap dipasang lewat tombol menu chat, bukan di sini.
+	if len(msg.Buttons) > 0 {
 		payload.ReplyMarkup = InlineKeyboardMarkup{InlineKeyboard: msg.Buttons}
 	}
 	return payload

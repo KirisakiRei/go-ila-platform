@@ -118,14 +118,3 @@ func TestDaftarTanpaBlokKode(t *testing.T) {
 		t.Fatalf("format daftar tidak sesuai: %q", hasil)
 	}
 }
-
-func TestAksiDariTeks(t *testing.T) {
-	aksi, kenal := AksiDariTeks(LabelPantau)
-	if !kenal || aksi != CallbackPantau {
-		t.Fatalf("label pantau harus memetakan ke %q, dapat %q", CallbackPantau, aksi)
-	}
-	aksi, kenal = AksiDariTeks(LabelRiwayat)
-	if !kenal || aksi != CallbackRiwayat+"0" {
-		t.Fatalf("label riwayat harus membuka halaman pertama, dapat %q", aksi)
-	}
-}

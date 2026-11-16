@@ -163,14 +163,3 @@ func TestCallbackEksekusiDitolakMenampilkanAlasan(t *testing.T) {
 		t.Fatalf("alasan penolakan hilang dari pesan: %q", sender.edits[0])
 	}
 }
-
-func TestTeksKeyboardDikenali(t *testing.T) {
-	for _, label := range []string{telegram.LabelPantau, telegram.LabelRiwayat, telegram.LabelHariIni, telegram.LabelPengaturan} {
-		if _, kenal := telegram.AksiDariTeks(label); !kenal {
-			t.Fatalf("label %q harus dikenali sebagai menu", label)
-		}
-	}
-	if _, kenal := telegram.AksiDariTeks("halo apa kabar"); kenal {
-		t.Fatal("teks biasa tidak boleh dianggap perintah menu")
-	}
-}

@@ -124,9 +124,7 @@ func (h *TelegramHandler) Webhook(c *gin.Context) {
 		_ = h.edit.SendChatAction(c.Request.Context(), chatID, telegram.ChatActionTyping)
 	}
 
-	if aksi, kenal := telegram.AksiDariTeks(text); kenal {
-		h.handleMenuTeks(c.Request.Context(), chatID, aksi)
-	} else if strings.HasPrefix(text, "/") {
+	if strings.HasPrefix(text, "/") {
 		h.handlePerintah(c.Request.Context(), chatID, text)
 	} else {
 		// Pesan bebas: tampilkan menu alih-alih balasan kosong.
@@ -145,9 +143,9 @@ func (h *TelegramHandler) handlePerintah(ctx context.Context, chatID, text strin
 			// Kegagalan token dibalas sebagai 200: balasan ke user disusun kanal
 			// Telegram, bukan dibocorkan lewat status HTTP.
 			if _, err := h.telegram.HandleStart(ctx, token, chatID); err != nil {
-				h.pasangKeyboard(ctx, chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan BOT Trading ILA Anda.")
+				h.kirimTeks(ctx, chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan BOT Trading ILA Anda.")
 			} else {
-				h.pasangKeyboard(ctx, chatID, "✅ Akun Anda berhasil terhubung ke BOT Trading ILA!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Menu ada di bawah.")
+				h.kirimTeks(ctx, chatID, "✅ Akun Anda berhasil terhubung ke BOT Trading ILA!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Gunakan tombol di bawah pesan ini.")
 			}
 			return
 		}
