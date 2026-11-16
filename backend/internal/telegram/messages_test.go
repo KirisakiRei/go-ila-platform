@@ -31,8 +31,9 @@ func TestSanitizeReplacesLeakingText(t *testing.T) {
 	if ContainsForbiddenTerms(got) {
 		t.Fatalf("hasil sanitasi masih memuat istilah terlarang: %q", got)
 	}
-	if !strings.Contains(got, "dashboard") {
-		t.Fatalf("hasil sanitasi harus mengarahkan ke dashboard: %q", got)
+	// Kalimat dipertahankan; hanya istilahnya yang diterjemahkan.
+	if !strings.Contains(got, "M15") || !strings.Contains(got, "Bullish") {
+		t.Fatalf("isi kalimat tidak boleh hilang: %q", got)
 	}
 
 	bersih := "Setup sesuai rencana."
@@ -352,5 +353,40 @@ func TestBoxMengamankanKarakterHTML(t *testing.T) {
 	}
 	if !strings.Contains(msg.Text, "&lt; minimum &amp; akun") {
 		t.Errorf("escape HTML tidak sesuai:\n%s", msg.Text)
+	}
+}
+
+// TestSanitizeMempertahankanAngka memastikan istilah internal diganti per kata,
+// bukan seluruh kalimat. Sebelumnya satu istilah terlarang membuang seluruh
+// isi pesan sehingga user kehilangan level dan arahnya.
+func TestSanitizeMempertahankanAngka(t *testing.T) {
+	masukan := "HTF H4 sweep valid. Menunggu CISD M15 di level 3880.24 (SL: 3895.33)."
+	hasil := Sanitize(masukan)
+
+	if ContainsForbiddenTerms(hasil) {
+		t.Fatalf("hasil masih memuat istilah terlarang: %q", hasil)
+	}
+	for _, ingin := range []string{"3880.24", "3895.33", "H4", "M15"} {
+		if !strings.Contains(hasil, ingin) {
+			t.Errorf("hasil kehilangan %q: %q", ingin, hasil)
+		}
+	}
+	if strings.Contains(hasil, "Detail level tersedia di dashboard") {
+		t.Errorf("kalimat tidak boleh diganti utuh: %q", hasil)
+	}
+}
+
+// TestRadarLTFTanpaLevelTetapInformatif memastikan tahap 3 tidak menjadi
+// pesan kosong saat tingkat acuan belum terbentuk.
+func TestRadarLTFTanpaLevelTetapInformatif(t *testing.T) {
+	msg := FormatRadarLTFMessage(RadarLTFParams{
+		Symbol: "XAUUSD", Direction: "BUY", Htf: "H1", Ltf: "M5",
+		StopLoss: 3875.10, TakeProfit: 3910.20, Siklus: "Candle H1 · 09:00 NY",
+	})
+
+	for _, ingin := range []string{"XAUUSD · H1 ➔ M5", "Tahap 3/6", "3.875,10", "3.910,20", "belum kebentuk"} {
+		if !strings.Contains(msg.Text, ingin) {
+			t.Errorf("pesan tidak memuat %q:\n%s", ingin, msg.Text)
+		}
 	}
 }

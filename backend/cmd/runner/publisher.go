@@ -71,10 +71,23 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			if signal.CisdJSON != "" {
 				_ = json.Unmarshal([]byte(signal.CisdJSON), &cisd)
 			}
-			details := cisd.Details
-			if details == "" {
-				details = signal.Summary
+
+			// Target dan batas sudah diketahui sejak struktur besar terbentuk,
+			// walau konfirmasi di timeframe kecil belum muncul. Mengosongkannya
+			// membuat user kehilangan gambaran setup di tahap paling penting.
+			var htfSweep dto.SignalHtfSweep
+			if signal.HtfSweepJSON != "" {
+				_ = json.Unmarshal([]byte(signal.HtfSweepJSON), &htfSweep)
 			}
+			batas := signal.StopLoss
+			if batas == 0 {
+				batas = htfSweep.StopLoss
+			}
+			target := signal.TakeProfit
+			if target == 0 {
+				target = htfSweep.TargetDOL
+			}
+
 			return telegram.FormatRadarLTFMessage(telegram.RadarLTFParams{
 				Symbol:          signal.Symbol,
 				Direction:       signal.Direction,
@@ -82,11 +95,12 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 				Htf:             signal.Htf,
 				Ltf:             signal.Ltf,
 				EntryPrice:      signal.EntryPrice,
-				StopLoss:        signal.StopLoss,
-				TakeProfit:      signal.TakeProfit,
+				StopLoss:        batas,
+				TakeProfit:      target,
 				RiskReward:      signal.RiskReward,
 				CISDLevel:       cisd.CISDLevel,
-				Details:         details,
+				Details:         signal.Summary,
+				Siklus:          siklusCandle(signal.Htf, signal.PublishedAt),
 				DashboardLink:   dashboardLink,
 			})
 

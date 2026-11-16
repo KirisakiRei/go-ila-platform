@@ -351,10 +351,14 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 	if p.CISDLevel > 0 {
 		fmt.Fprintf(&b, "\nTunggu candle %s close nembus %s, itu tanda arah sudah mantap.\n",
 			ltf, formatPrice(p.CISDLevel))
-	} else if detail := Sanitize(p.Details); detail != "" {
-		fmt.Fprintf(&b, "\n%s\n", detail)
 	} else {
-		fmt.Fprintf(&b, "\nLagi nunggu sinyal mantap di %s.\n", ltf)
+		// Tingkat acuan belum terbentuk. User tetap diberi tahu apa yang
+		// ditunggu dan di harga mana batasnya, bukan kalimat kosong.
+		fmt.Fprintf(&b, "\nTingkat acuan di %s belum kebentuk.\n", ltf)
+		fmt.Fprintf(&b, "Tunggu candle %s close yang jelas buat nentuin titik entry.\n", ltf)
+		if p.StopLoss > 0 {
+			fmt.Fprintf(&b, "Kalau arah sudah mantap, batas risiko di %s.\n", formatPrice(p.StopLoss))
+		}
 	}
 
 	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Pantau "+ltf, p.DashboardLink)}
@@ -657,11 +661,55 @@ func FormatRadarStepMessage(symbol, strategy, htf, ltf, stepName, link string) M
 
 // Sanitize mengganti teks yang membocorkan istilah internal dengan versi aman.
 // Ringkasan tetap disampaikan; hanya istilahnya yang disederhanakan.
+// penggantiIstilah menerjemahkan istilah internal ke bahasa yang boleh dibaca
+// user. Kalimatnya dipertahankan supaya informasi level dan arah tidak hilang;
+// sebelumnya seluruh kalimat diganti sehingga pesan jadi tanpa isi.
+var penggantiIstilah = map[string]string{
+	"fvg":                         "area",
+	"fair value gap":              "area",
+	"htf fvg":                     "area besar",
+	"internal liquidity":          "area internal",
+	"external range liquidity":    "area terluar",
+	"erl":                         "area terluar",
+	"irl":                         "area internal",
+	"imaginary liquidity":         "area likuiditas",
+	"draw on liquidity":           "target",
+	"dol":                         "target",
+	"cisd":                        "konfirmasi arah",
+	"change in state of delivery": "konfirmasi arah",
+	"sweep":                       "sentuh",
+	"sweept":                      "disentuh",
+	"body break body":             "penembusan harga",
+	"candle 4":                    "candle acuan",
+	"candle 5":                    "candle entry",
+	"displacement":                "dorongan harga",
+	"mitigation":                  "uji area",
+}
+
+// Sanitize mengganti istilah internal dengan padanan yang boleh dibaca user.
+// Kalimat dan angkanya tetap utuh; hanya istilahnya yang disederhanakan.
 func Sanitize(text string) string {
 	if !ContainsForbiddenTerms(text) {
 		return text
 	}
-	return "Setup sesuai rencana trading. Detail level tersedia di dashboard."
+
+	hasil := text
+	for istilah, ganti := range penggantiIstilah {
+		hasil = forbiddenTermPattern(istilah).ReplaceAllString(hasil, ganti)
+	}
+
+	// Penggantian bisa memunculkan istilah terlarang lain lewat kata pengganti
+	// yang kebetulan cocok. Bila masih bocor, kalimatnya diganti utuh.
+	if ContainsForbiddenTerms(hasil) {
+		return "Setup sesuai rencana trading. Detail level tersedia di dashboard."
+	}
+	return hasil
+}
+
+// forbiddenTermPattern menyusun pola satu istilah dengan batas kata, supaya
+// "erl" tidak cocok di dalam kata lain.
+func forbiddenTermPattern(term string) *regexp.Regexp {
+	return regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(term) + `\b`)
 }
 
 // metodeTampil menyeragamkan nama metode, kosong bila tidak ada yang dikirim.

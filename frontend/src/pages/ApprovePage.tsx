@@ -1,11 +1,47 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
 import { approvalApi } from '@/lib/api'
 import { queryKeys } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime, formatNumber } from '@/lib/format'
+
+/**
+ * pesanTautanGagal menerjemahkan kegagalan token menjadi kalimat yang bisa
+ * ditindaklanjuti. Tanpa ini user hanya melihat pesan teknis dan buntu.
+ */
+function pesanTautanGagal(err: unknown): { judul: string; isi: string } {
+  if (err instanceof ApiError) {
+    if (err.isUnauthorized) {
+      return {
+        judul: 'Perlu masuk dulu',
+        isi: 'Tautan konfirmasi hanya bisa dibuka dari akun pemilik sinyal. Masuk dulu, lalu buka tautannya lagi.',
+      }
+    }
+    if (err.isNetworkProblem) {
+      return {
+        judul: 'Koneksi terputus',
+        isi: 'Server tidak bisa dihubungi saat ini. Coba buka tautannya sekali lagi beberapa saat lagi.',
+      }
+    }
+    		if (err.status === 410 || err.status === 404) {
+    			return {
+    				judul: 'Tautan sudah tidak berlaku',
+    				isi: 'Tautan konfirmasi hanya berlaku sekali dan dalam waktu singkat. Setup ini mungkin sudah kedaluwarsa, sudah dieksekusi, atau sudah dibatalkan.',
+    			}
+    		}
+    		if (err.status === 409 && err.message) {
+    			// Backend sudah menuliskan sebabnya (tautan dipakai atau kedaluwarsa).
+    			return { judul: 'Tautan sudah tidak berlaku', isi: err.message }
+    		}
+    if (err.message) return { judul: 'Tautan tidak bisa dipakai', isi: err.message }
+  }
+  return {
+    judul: 'Tautan tidak berlaku',
+    isi: 'Tautan sudah kedaluwarsa atau pernah dipakai.',
+  }
+}
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -56,18 +92,44 @@ export default function ApprovePage() {
     return (
       <>
         <PageHeader title="Selesai" description={hasil} />
-        <Alert variant="success">{hasil}</Alert>
+        <div className="flex flex-col gap-4">
+          <Alert variant="success">{hasil}</Alert>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild className="flex-1">
+              <Link to="/posisi">Lihat posisi saya</Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1">
+              <Link to="/sinyal">Sinyal terbaru</Link>
+            </Button>
+          </div>
+        </div>
       </>
     )
   }
 
   if (isError) {
+    const gagal = pesanTautanGagal(error)
     return (
       <>
-        <PageHeader title="Tautan tidak berlaku" />
-        <Alert variant="destructive">
-          {(error as Error).message || 'Tautan sudah kedaluwarsa atau pernah dipakai.'}
-        </Alert>
+        <PageHeader
+          title={gagal.judul}
+          description="Tidak ada order yang terkirim dari tautan ini."
+        />
+        <div className="flex flex-col gap-4">
+          <Alert variant="destructive">{gagal.isi}</Alert>
+          <p className="text-[13px] text-muted-foreground">
+            Setup terbaru selalu bisa dilihat di halaman sinyal. Kalau sinyalnya masih hidup, tombol
+            eksekusi tersedia di sana.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild className="flex-1">
+              <Link to="/sinyal">Lihat sinyal terbaru</Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1">
+              <Link to="/posisi">Buka posisi saya</Link>
+            </Button>
+          </div>
+        </div>
       </>
     )
   }
