@@ -128,6 +128,8 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			return telegram.FormatPositionOpenedMessage(telegram.PositionOpenedParams{
 				Symbol:       signal.Symbol,
 				Direction:    signal.Direction,
+				Htf:          signal.Htf,
+				Ltf:          signal.Ltf,
 				TicketNumber: "",
 				BrokerType:   "",
 				LotSize:      0,
@@ -228,13 +230,13 @@ func (p *runnerPublisher) radarHTFParams(ctx context.Context, signal *model.Sign
 	}
 }
 
-// siklusCandle menyebut lilin yang sedang berjalan beserta sesi New York-nya.
+// siklusCandle menyebut candle yang sedang berjalan dan jam New York-nya.
 func siklusCandle(htf string, terbit time.Time) string {
 	if htf == "" || terbit.IsZero() {
 		return ""
 	}
 	ny := terbit.UTC().Add(-5 * time.Hour)
-	return fmt.Sprintf("Candle %s (%s NY)", htf, ny.Format("15:04"))
+	return fmt.Sprintf("Candle %s · %s NY", htf, ny.Format("15:04"))
 }
 
 // alasanPenahanan menerjemahkan grup alasan Runner ke kelompok tampilan.

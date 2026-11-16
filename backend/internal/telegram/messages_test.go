@@ -125,7 +125,7 @@ func TestCancelledTidakMenjanjikanPemantauan(t *testing.T) {
 	if strings.Contains(msg.Text, "tetap dipantau") {
 		t.Errorf("setup batal tidak boleh dijanjikan dipantau:\n%s", msg.Text)
 	}
-	if !strings.Contains(msg.Text, "Setup tidak berlaku lagi") {
+	if !strings.Contains(msg.Text, "sudah gak berlaku") {
 		t.Errorf("pesan batal harus tegas:\n%s", msg.Text)
 	}
 }
@@ -319,5 +319,38 @@ func TestFormatOpportunityTanpaTimeframe(t *testing.T) {
 	}
 	if len(msg.Buttons) != 0 {
 		t.Errorf("tanpa link tidak boleh ada tombol, dapat: %v", msg.Buttons)
+	}
+}
+
+// TestBoxMemakaiPreBukanBacktick memastikan kotak memakai <pre>, bukan
+// backtick. Client mengirim dengan parse_mode HTML; backtick akan tampil
+// mentah sebagai tiga karakter di Telegram.
+func TestBoxMemakaiPreBukanBacktick(t *testing.T) {
+	msg := FormatRadarHTFMessage(RadarHTFParams{
+		Symbol: "EURUSD", Htf: "H4", Ltf: "M15", Siklus: "Candle H4 · 08:00 NY",
+	})
+
+	if strings.Contains(msg.Text, "```") {
+		t.Errorf("pesan tidak boleh memuat backtick:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "<pre>") || !strings.Contains(msg.Text, "</pre>") {
+		t.Errorf("kotak harus memakai <pre>:\n%s", msg.Text)
+	}
+}
+
+// TestBoxMengamankanKarakterHTML memastikan teks dari engine tidak merusak
+// pesan. Keterangan alasan berasal dari luar dan bisa memuat < atau &.
+func TestBoxMengamankanKarakterHTML(t *testing.T) {
+	msg := FormatHeldMessage(HeldParams{
+		Symbol: "EURUSD", Direction: "SELL", Htf: "H4", Ltf: "M15",
+		Alasan:     PenahananAkun,
+		Keterangan: "Saldo < minimum & akun ditahan",
+	})
+
+	if strings.Contains(msg.Text, "< minimum") {
+		t.Errorf("karakter khusus tidak di-escape:\n%s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "&lt; minimum &amp; akun") {
+		t.Errorf("escape HTML tidak sesuai:\n%s", msg.Text)
 	}
 }

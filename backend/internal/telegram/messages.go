@@ -84,10 +84,13 @@ func judulPesan(emoji, symbol, htf, ltf, keadaan string) string {
 	return fmt.Sprintf("%s %s · %s\n%s\n", emoji, symbol, pasangan, keadaan)
 }
 
-// makeBox merender baris label-nilai sebagai satu blok.
+// makeBox merender baris label-nilai sebagai kotak monospace.
 //
-// Baris yang nilainya kosong dilewati supaya tidak muncul "│ Target │ │" saat
-// engine belum mengirim angka. Lebar label disamakan agar kolom kanan rata.
+// Tag <pre> dipakai, bukan backtick: client mengirim tanpa parse_mode
+// sehingga backtick tampil mentah di Telegram.
+//
+// Isi nilai di-escape karena sebagian berasal dari engine (mis. keterangan
+// alasan) dan bisa memuat karakter khusus HTML yang merusak pesan.
 func makeBox(rows [][2]string) string {
 	lebar := 0
 	for _, row := range rows {
@@ -103,15 +106,21 @@ func makeBox(rows [][2]string) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("```\n")
+	b.WriteString("<pre>")
 	for _, row := range rows {
 		if row[1] == "" {
 			continue
 		}
-		fmt.Fprintf(&b, "│ %-*s │ %s\n", lebar, row[0], row[1])
+		fmt.Fprintf(&b, "│ %-*s │ %s\n", lebar, row[0], escapeHTML(row[1]))
 	}
-	b.WriteString("```\n")
+	b.WriteString("</pre>")
 	return b.String()
+}
+
+// escapeHTML mengamankan teks bebas sebelum dikirim dengan parse_mode HTML.
+func escapeHTML(text string) string {
+	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	return replacer.Replace(text)
 }
 
 // arahTampil menyeragamkan arah posisi untuk ditampilkan.
@@ -178,7 +187,7 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 	if strategi == "" {
 		strategi = "ILA"
 	}
-	b.WriteString(judulPesan("🟢", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapSiap+" · Siap dieksekusi"))
+	b.WriteString(judulPesan("🟢", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapSiap+" · Siap masuk"))
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
@@ -191,7 +200,7 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 		{"Risiko", risikoTampil(p.RiskPercent, p.RiskAmount, p.LotSize)},
 	}))
 
-	b.WriteString("\nPintu konfirmasi terbuka singkat. Eksekusi sekarang atau lewati.\n")
+	b.WriteString("\nJendela entry cuma sebentar. Masuk sekarang atau lewati.\n")
 
 	label := "🔍 Detail Setup"
 	if p.ApprovalLink != "" {
@@ -231,7 +240,7 @@ type RadarHTFParams struct {
 	TargetDOL       float64
 	StopLoss        float64
 	Details         string
-	Siklus          string // e.g. "Candle H4 (20:00 NY)"
+	Siklus          string // e.g. "Candle H4 · 20:00 NY"
 	DashboardLink   string
 }
 
@@ -248,19 +257,19 @@ func FormatRadarHTFMessage(p RadarHTFParams) Message {
 	}
 
 	var b strings.Builder
-	b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapStruktur+" · Menunggu struktur "+htf))
+	b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapStruktur+" · Baca arah "+htf))
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
-		{"Tahap", tahapStruktur + " · Struktur " + htf},
-		{"Siklus", p.Siklus},
+		{"Tahap", tahapStruktur + " · Baca " + htf},
+		{"Waktu", p.Siklus},
 		{"Bias", bias},
 		{"Target", formatHargaOpsional(p.TargetDOL)},
 		{"Batas", formatHargaOpsional(p.StopLoss)},
 	}))
 
-	b.WriteString("\nMemantau reaksi harga di area likuiditas " + htf + ".\n")
-	fmt.Fprintf(&b, "Candle %s harus tutup dulu sebelum arah ditetapkan.\n", htf)
+	b.WriteString("\nLagi mantau " + htf + " dulu. Arah belum bisa dipastikan.\n")
+	fmt.Fprintf(&b, "Tunggu candle %s tutup dulu, baru arahnya jelas.\n", htf)
 
 	if detail := Sanitize(p.Details); detail != "" {
 		fmt.Fprintf(&b, "\n%s\n", detail)
@@ -269,7 +278,7 @@ func FormatRadarHTFMessage(p RadarHTFParams) Message {
 	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar "+htf, p.DashboardLink)}
 }
 
-// FormatRadarSweepMessage menyusun pesan Tahap 2: likuiditas HTF sudah tersentuh.
+// FormatRadarSweepMessage menyusun pesan Tahap 2: area HTF sudah tersentuh harga.
 //
 // Dipisah dari Tahap 1 karena keadaannya berbeda: arah sudah mengarah, tinggal
 // menunggu candle HTF tutup. Menyatukannya membuat user tidak bisa membedakan
@@ -281,19 +290,19 @@ func FormatRadarSweepMessage(p RadarHTFParams) Message {
 	}
 
 	var b strings.Builder
-	b.WriteString(judulPesan("👀", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapKonfirmasi+" · Likuiditas "+htf+" tersentuh"))
+	b.WriteString(judulPesan("👀", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapKonfirmasi+" · Area "+htf+" kena"))
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
-		{"Tahap", tahapKonfirmasi + " · Tunggu candle " + htf},
-		{"Siklus", p.Siklus},
+		{"Tahap", tahapKonfirmasi + " · Tunggu close " + htf},
+		{"Waktu", p.Siklus},
 		{"Bias", arahTampil(p.Direction)},
 		{"Target", formatHargaOpsional(p.TargetDOL)},
 		{"Batas", formatHargaOpsional(p.StopLoss)},
 	}))
 
-	fmt.Fprintf(&b, "\nArea likuiditas %s sudah tersentuh.\n", htf)
-	fmt.Fprintf(&b, "Menunggu candle %s tutup untuk mengonfirmasi arah %s.\n", htf, arahTampil(p.Direction))
+	fmt.Fprintf(&b, "\nHarga sudah nyentuh area %s.\n", htf)
+	fmt.Fprintf(&b, "Tunggu candle %s close dulu buat konfirmasi arah %s.\n", htf, arahTampil(p.Direction))
 
 	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar "+htf, p.DashboardLink)}
 }
@@ -327,12 +336,12 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 	}
 
 	var b strings.Builder
-	b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapTrigger+" · Menunggu trigger "+ltf))
+	b.WriteString(judulPesan("⏳", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapTrigger+" · Cari entry "+ltf))
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
-		{"Tahap", tahapTrigger + " · Trigger " + ltf},
-		{"Siklus", p.Siklus},
+		{"Tahap", tahapTrigger + " · Entry " + ltf},
+		{"Waktu", p.Siklus},
 		{"Bias", arahTampil(p.Direction)},
 		{"Target", formatHargaOpsional(p.TakeProfit)},
 		{"Batas", formatHargaOpsional(p.StopLoss)},
@@ -340,12 +349,12 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 	}))
 
 	if p.CISDLevel > 0 {
-		fmt.Fprintf(&b, "\nMenunggu candle %s tutup menembus %s untuk konfirmasi perubahan arah.\n",
+		fmt.Fprintf(&b, "\nTunggu candle %s close nembus %s, itu tanda arah sudah mantap.\n",
 			ltf, formatPrice(p.CISDLevel))
 	} else if detail := Sanitize(p.Details); detail != "" {
 		fmt.Fprintf(&b, "\n%s\n", detail)
 	} else {
-		fmt.Fprintf(&b, "\nMemantau konfirmasi perubahan arah di %s.\n", ltf)
+		fmt.Fprintf(&b, "\nLagi nunggu sinyal mantap di %s.\n", ltf)
 	}
 
 	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Pantau "+ltf, p.DashboardLink)}
@@ -441,16 +450,16 @@ func FormatCancelledMessage(p HeldParams) Message {
 			{"RR", rrTampil(p.RiskReward)},
 			{"Batas tunggu", p.BatasTunggu},
 		}))
-		fmt.Fprintf(&b, "\nHarga sudah melewati level entry %s.\n", formatPrice(p.EntryPrice))
+		fmt.Fprintf(&b, "\nHarga udah lewat dari entry %s.\n", formatPrice(p.EntryPrice))
 		if p.BatasTunggu != "" {
-			fmt.Fprintf(&b, "Setup menunggu harga kembali sebelum %s. Setelah itu dibatalkan otomatis.\n", p.BatasTunggu)
+			fmt.Fprintf(&b, "Nunggu harga balik sebelum %s. Kalau gak balik, setup batal otomatis.\n", p.BatasTunggu)
 		} else {
-			b.WriteString("Setup menunggu harga kembali ke level entry. Setelah itu dibatalkan otomatis.\n")
+			b.WriteString("Nunggu harga balik ke entry. Kalau gak balik, setup batal otomatis.\n")
 		}
 		return Message{Text: b.String(), Buttons: tombolRadar("📊 Pantau Harga", p.Link)}
 	}
 
-	b.WriteString(judulPesan("⌛", p.Symbol, p.Htf, p.Ltf, "Setup dibatalkan"))
+	b.WriteString(judulPesan("⌛", p.Symbol, p.Htf, p.Ltf, "Setup batal"))
 	b.WriteString("\n")
 	b.WriteString(makeBox([][2]string{
 		{"Arah", arahTampil(p.Direction)},
@@ -458,8 +467,8 @@ func FormatCancelledMessage(p HeldParams) Message {
 		{"Sebab", p.Keterangan},
 	}))
 
-	b.WriteString("\nSetup tidak berlaku lagi. Tidak ada posisi yang dibuka.\n")
-	b.WriteString("Radar menunggu setup baru.\n")
+	b.WriteString("\nSetup ini sudah gak berlaku. Gak ada posisi yang dibuka.\n")
+	b.WriteString("Sekarang nunggu setup berikutnya.\n")
 
 	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar", p.Link)}
 }
@@ -472,27 +481,27 @@ func penahananTeks(alasan AlasanPenahanan) (emoji, keadaan, penutup, label strin
 	switch alasan {
 	case PenahananKuota:
 		return "🔔", "Tahap " + tahapSiap + " · Ditahan kuota harian",
-			"Batas trade harian tercapai. Kuota pulih besok, dan eksekusi manual masih bisa bila disetujui.",
+			"Kuota trade hari ini udah habis. Pulih besok, atau eksekusi manual kalau disetujui.",
 			"⚡ Eksekusi Manual", "eksekusi"
 	case PenahananPosisi:
-		return "🔔", "Tahap " + tahapSiap + " · Ditahan posisi berjalan",
-			"Masih ada posisi aktif. Sistem tidak membuka posisi ganda di pasangan ini.",
+		return "🔔", "Tahap " + tahapSiap + " · Ditahan posisi jalan",
+			"Masih ada posisi jalan di pair ini. Sistem gak buka dua posisi sekaligus.",
 			"📊 Lihat Posisi Aktif", "posisi"
 	case PenahananAkun:
-		return "⚠️", "Tahap " + tahapSiap + " · Akun perlu dibereskan",
-			"Setup tetap dipantau setelah urusan akun selesai. Buka pengaturan untuk menindaklanjuti.",
+		return "⚠️", "Tahap " + tahapSiap + " · Akun ada masalah",
+			"Setup tetap dipantau setelah urusan akun selesai. Buka pengaturan buat beresin.",
 			"🔧 Buka Pengaturan", "pengaturan"
 	case PenahananPasar:
 		return "🌙", "Tahap " + tahapSiap + " · Pasar tutup",
-			"Pasar sedang tutup. Setup akan diproses otomatis begitu pasar dibuka.",
+			"Pasar lagi tutup. Setup diproses otomatis begitu pasar buka.",
 			"", ""
 	case PenahananSistem:
 		return "🛠", "Tahap " + tahapSiap + " · Ditahan sistem",
-			"Entry baru ditahan sementara oleh sistem. Setup tetap dipantau.",
+			"Entry baru ditahan sementara sama sistem. Setup tetap dipantau.",
 			"", ""
 	default:
-		return "⌛", "Setup dibatalkan",
-			"Setup tidak berlaku lagi.",
+		return "⌛", "Setup batal",
+			"Setup sudah gak berlaku.",
 			"", ""
 	}
 }
@@ -505,6 +514,8 @@ func penahananTeks(alasan AlasanPenahanan) (emoji, keadaan, penutup, label strin
 type PositionOpenedParams struct {
 	Symbol       string
 	Direction    string
+	Htf          string
+	Ltf          string
 	TicketNumber string
 	BrokerType   string
 	LotSize      float64
@@ -520,7 +531,7 @@ type PositionOpenedParams struct {
 func FormatPositionOpenedMessage(p PositionOpenedParams) Message {
 	var b strings.Builder
 
-	b.WriteString(judulPesan("🚀", p.Symbol, "", "", "Tahap "+tahapPosisi+" · Posisi berjalan"))
+	b.WriteString(judulPesan("🚀", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapPosisi+" · Posisi jalan"))
 	b.WriteString("\n")
 
 	order := arahTampil(p.Direction)
@@ -545,7 +556,7 @@ func FormatPositionOpenedMessage(p PositionOpenedParams) Message {
 		{"Masuk", masuk},
 	}))
 
-	b.WriteString("\nPosisi aktif. Biarkan berjalan sampai Stop atau Target.\n")
+	b.WriteString("\nPosisi jalan. Biarin sampai kena Stop atau Target.\n")
 
 	return Message{Text: b.String(), Buttons: tombolRadar("📊 Lihat Posisi", p.PosisiLink)}
 }

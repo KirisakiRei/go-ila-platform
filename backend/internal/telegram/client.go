@@ -105,6 +105,9 @@ func (c *Client) SendMessage(ctx context.Context, chatID string, msg Message) er
 		ChatID:         chatID,
 		Text:           msg.Text,
 		DisablePreview: true,
+		// Pesan memakai <pre> untuk kotak tabel. Tanpa parse_mode, Telegram
+		// menampilkan tag sebagai teks mentah.
+		ParseMode: "HTML",
 	}
 
 	if len(msg.Buttons) > 0 {
