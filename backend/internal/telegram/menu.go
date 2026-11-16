@@ -39,6 +39,7 @@ const (
 	LabelHariIni    = "📈 Ringkasan Hari Ini"
 	LabelPengaturan = "⚙️ Pengaturan"
 	LabelMenu       = "🏠 Menu"
+	LabelSegarkan   = "🔄 Segarkan"
 )
 
 // PerintahTelegram adalah daftar perintah yang muncul saat pengguna mengetik

@@ -95,7 +95,9 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 			return h.menu.Riwayat(ctx, user, offset)
 		})
 	case aksi == telegram.CallbackMenu:
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatMenuMessage("", ""), nil)
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
+			return telegram.FormatMenuMessage(namaTampil(user), paketTampil(user)), nil
+		})
 	case aksi == telegram.CallbackPantau || aksi == telegram.CallbackSegarkan:
 		if !butuhMenu() {
 			return
@@ -111,7 +113,9 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 			return h.menu.HariIni(ctx, user, h.dashboardLink())
 		})
 	case aksi == telegram.CallbackPengaturan:
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatPengaturanMessage(h.dashboardLink()), nil)
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
+			return telegram.FormatPengaturanMessage(h.dashboardLink()), nil
+		})
 	default:
 		h.edit.AnswerCallback(ctx, cb.ID, "Aksi tidak dikenal")
 	}

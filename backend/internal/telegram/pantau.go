@@ -168,8 +168,9 @@ func tombolPantau(dashboardLink string) [][]InlineButton {
 
 // menuButtons menyusun tombol sederhana menuju dashboard.
 func menuButtons(dashboardLink string) [][]InlineButton {
-	if dashboardLink == "" {
-		return nil
+	baris := [][]InlineButton{{{Text: LabelSegarkan, CallbackData: CallbackSegarkan}, {Text: LabelMenu, CallbackData: CallbackMenu}}}
+	if dashboardLink != "" {
+		baris = append(baris, []InlineButton{{Text: "Buka di dashboard", URL: dashboardLink}})
 	}
-	return [][]InlineButton{{{Text: "Buka di dashboard", URL: dashboardLink}}}
+	return baris
 }
