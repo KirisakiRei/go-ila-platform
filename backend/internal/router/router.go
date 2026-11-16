@@ -240,6 +240,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	journalRepo := repository.NewJournalRepository(db)
 	tradingService := service.NewTradingService(userRepo, signalRepo, positionRepo, runnerRepo).
 		WithJournal(journalRepo, signalReader{repo: signalRepo}).
+		// Feed yang sama dengan chart dipakai untuk menilai nasib setup yang
+		// tidak dieksekusi, sehingga hasil hipotetis dan tampilan chart tidak
+		// berbicara tentang lilin yang berbeda.
+		WithSignalEvaluator(market.NewTradingViewProvider(), nil).
 		Build()
 	systemService := service.NewSystemService(service.SystemServiceDeps{
 		Accounts:  accountRepo,

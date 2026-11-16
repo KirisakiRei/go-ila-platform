@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"ila/backend/internal/dto"
@@ -42,6 +43,11 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	signal, err := p.store.FindSignal(ctx, signalID)
 	if err != nil {
 		p.logger.Warn("notifikasi dilewati: sinyal tidak ditemukan", "signal_id", signalID)
+		return
+	}
+	if p.sudahPunyaPosisiSejenis(ctx, userID, signal) {
+		// Posisi pada pair dan arah yang sama sudah terbuka: kemajuan radar untuk
+		// slot itu hanya mengulang setup yang sudah dijalankan.
 		return
 	}
 
@@ -377,6 +383,35 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 			RiwayatLink: posisiLink,
 		})
 	})
+}
+
+// sudahPunyaPosisiSejenis melaporkan apakah user sudah memegang posisi terbuka
+// pada pair, pasangan timeframe, dan arah yang sama dengan sinyal ini.
+//
+// Kemajuan radar untuk slot yang sama datang berkali-kali; setelah posisinya
+// terbuka, kiriman berikutnya hanya mengulang setup yang sudah dijalankan.
+func (p *runnerPublisher) sudahPunyaPosisiSejenis(ctx context.Context, userID string, signal *model.Signal) bool {
+	posisi, err := p.store.ListOpenPositionsByUser(ctx, userID)
+	if err != nil {
+		// Gagal membaca posisi tidak boleh menelan notifikasi.
+		return false
+	}
+	for i := range posisi {
+		pos := &posisi[i]
+		if pos.SourceSignalID == signal.SignalID {
+			// Status untuk sinyal yang membuka posisi itu sendiri tetap harus
+			// dikirim: itulah kabar eksekusinya.
+			return false
+		}
+		if !strings.EqualFold(pos.Symbol, signal.Symbol) || pos.Direction != signal.Direction {
+			continue
+		}
+		htf, ltf := p.timeframePosisi(ctx, pos)
+		if htf == signal.Htf && ltf == signal.Ltf {
+			return true
+		}
+	}
+	return false
 }
 
 // timeframePosisi membaca pasangan timeframe dari sinyal yang membuka posisi.

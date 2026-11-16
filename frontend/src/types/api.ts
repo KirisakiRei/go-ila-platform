@@ -534,6 +534,16 @@ export type JournalSkipped = {
   reason?: string
   occurred_at: string
   occurred_at_pair: TimePair
+  /**
+   * Hasil hipotetis bila setup ini tidak dieksekusi: apakah harga menyentuh TP
+   * lebih dulu, SL lebih dulu, atau tidak pernah menyentuh level entry.
+   * Kosong berarti belum dinilai.
+   */
+  eval_status?: 'PENDING' | 'TP' | 'SL' | 'NO_ENTRY' | 'UNKNOWN'
+  eval_at?: string
+  eval_price?: number
+  eval_r_lower?: number
+  eval_note?: string
 }
 
 /** Balasan satu permintaan jurnal. */

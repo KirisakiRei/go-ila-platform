@@ -68,6 +68,9 @@ type JournalRepository interface {
 	// CountSkipped menghitung seluruh baris yang cocok, tanpa batas halaman.
 	// Diperlukan agar antarmuka tahu berapa halaman yang ada.
 	CountSkipped(ctx context.Context, userID string, filter JournalFilter) (int, error)
+	// SaveSignalEval menyimpan hasil hipotetis untuk setup yang tidak menjadi
+	// posisi. Baris yang sudah bertaut posisi sengaja tidak disentuh.
+	SaveSignalEval(ctx context.Context, userID, signalID string, out *model.UserSignalEval) error
 }
 
 type journalRepository struct {
@@ -181,6 +184,24 @@ func (r *journalRepository) Stats(ctx context.Context, userID string, filter Jou
 	stats.DryRunPositions = int(dryRun)
 
 	return stats, nil
+}
+
+func (r *journalRepository) SaveSignalEval(ctx context.Context, userID, signalID string, out *model.UserSignalEval) error {
+	err := r.db.WithContext(ctx).
+		Model(&model.UserSignal{}).
+		Where("user_id = ? AND signal_id = ? AND position_id = ?", userID, signalID, "").
+		Updates(map[string]any{
+			"eval_status":  out.Status,
+			"eval_at":      out.At,
+			"eval_price":   out.Price,
+			"eval_r_lower": out.RLower,
+			"eval_note":    out.Note,
+			"updated_at":   time.Now().UTC(),
+		}).Error
+	if err != nil {
+		return fmt.Errorf("menyimpan hasil evaluasi sinyal: %w", err)
+	}
+	return nil
 }
 
 // skipStatuses adalah status user_signal yang bukan posisi.

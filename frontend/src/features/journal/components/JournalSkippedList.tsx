@@ -48,6 +48,34 @@ function alasanTerbaca(item: JournalSkipped): string {
 }
 
 /**
+ * hasilHipotetis menerjemahkan hasil evaluasi harga menjadi label singkat.
+ *
+ * Setup yang tidak dieksekusi tetap punya nasib: jika harganya benar-benar
+ * mencapai TP, peluangnya nyata; jika hanya menyentuh SL, melewatinya adalah
+ * keputusan yang tepat. Tanpa label ini pengguna tidak bisa menilai itu.
+ */
+function hasilHipotetis(item: JournalSkipped): { label: string; tone: 'positif' | 'negatif' | 'netral' } | null {
+  switch (item.eval_status) {
+    case 'TP':
+      return { label: 'Akan TP', tone: 'positif' }
+    case 'SL':
+      return { label: 'Akan SL', tone: 'negatif' }
+    case 'NO_ENTRY':
+      return { label: 'Tanpa entry', tone: 'netral' }
+    case 'UNKNOWN':
+      return { label: 'Hasil ambigu', tone: 'netral' }
+    default:
+      return null
+  }
+}
+
+const TONE_CLASS: Record<'positif' | 'negatif' | 'netral', string> = {
+  positif: 'border-foreground bg-foreground text-background',
+  negatif: 'border-foreground text-foreground',
+  netral: 'border-border text-muted-foreground',
+}
+
+/**
  * JournalSkippedList menampilkan peluang yang tidak berakhir sebagai posisi.
  *
  * Bagian ini penting untuk kejujuran jurnal: tanpa daftar ini, pengguna hanya
@@ -67,6 +95,7 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
     <ul className="divide-y divide-border rounded-xl border border-border bg-card">
       {items.map((item) => {
         const pasangan = item.htf && item.ltf ? `${item.htf} → ${item.ltf}` : ''
+        const hasil = hasilHipotetis(item)
 
         return (
           <li key={`${item.signal_id}-${item.occurred_at}`} className="flex flex-col gap-1.5 p-3">
@@ -85,7 +114,16 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
                   <span className="text-[11px] text-muted-foreground">{item.strategy_version}</span>
                 )}
               </div>
-              <span className="text-[11px] font-medium">{labelStatus(item.status)}</span>
+              <div className="flex items-center gap-2">
+                {hasil && (
+                  <span
+                    className={`rounded border px-1.5 py-0.5 text-[10.5px] font-medium ${TONE_CLASS[hasil.tone]}`}
+                  >
+                    {hasil.label}
+                  </span>
+                )}
+                <span className="text-[11px] font-medium">{labelStatus(item.status)}</span>
+              </div>
             </div>
 
             {item.entry_price > 0 && (
@@ -98,6 +136,13 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
 
             {alasanTerbaca(item) && (
               <p className="text-[11px] text-muted-foreground">{alasanTerbaca(item)}</p>
+            )}
+
+            {hasil && item.eval_at && (
+              <p className="text-[10.5px] text-muted-foreground">
+                Dinilai {formatDateTime(item.eval_at)}
+                {item.eval_note ? ` · ${item.eval_note}` : ''}
+              </p>
             )}
 
             <p className="text-[10.5px] text-muted-foreground">{formatDateTime(item.occurred_at)}</p>

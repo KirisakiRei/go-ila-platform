@@ -35,6 +35,50 @@ type UserSignal struct {
 	NotBefore       *time.Time `gorm:"index" json:"not_before"`
 	DecidedAt       *time.Time `json:"decided_at"`
 	PositionID      string     `gorm:"type:varchar(36)" json:"position_id"`
+	// Hasil hipotetis untuk setup yang tidak dieksekusi. Tanpa kolom ini, setup
+	// yang terlewat hilang tanpa jejak sehingga strategi tidak bisa dinilai.
+	// Posisi nyata tidak memakai kolom ini; hasilnya ada di tabel position.
+	EvalStatus string     `gorm:"type:varchar(16);index" json:"eval_status"`
+	EvalAt     *time.Time `json:"eval_at"`
+	EvalPrice  float64    `json:"eval_price"`
+	EvalRLower float64    `json:"eval_r_lower"`
+	EvalNote   string     `gorm:"type:varchar(255)" json:"eval_note"`
+}
+
+// Status hasil hipotetis untuk setup yang tidak dieksekusi.
+const (
+	// EvalPending menandai setup yang belum punya cukup candle untuk dinilai.
+	EvalPending = "PENDING"
+	// EvalTP berarti harga menyentuh take profit lebih dulu.
+	EvalTP = "TP"
+	// EvalSL berarti harga menyentuh stop loss lebih dulu.
+	EvalSL = "SL"
+	// EvalNoEntry berarti harga tidak pernah menyentuh level entry sebelum
+	// sinyal kedaluwarsa.
+	EvalNoEntry = "NO_ENTRY"
+	// EvalUnknown berarti candle tidak tersedia sehingga hasil tidak bisa
+	// ditentukan. Sengaja tidak ditebak menjadi NO_ENTRY.
+	EvalUnknown = "UNKNOWN"
+)
+
+// UserSignalEval adalah hasil hipotetis untuk setup yang tidak dieksekusi.
+// Dipisahkan dari UserSignal agar penyimpanan hanya menyentuh kolom evaluasi.
+type UserSignalEval struct {
+	Status string
+	At     *time.Time
+	Price  float64
+	RLower float64
+	Note   string
+}
+
+// IsEvaluated menandai hasil hipotetis yang sudah final sehingga tidak dihitung
+// ulang pada setiap pembacaan jurnal.
+func IsEvaluated(status string) bool {
+	switch status {
+	case EvalTP, EvalSL, EvalNoEntry:
+		return true
+	}
+	return false
 }
 
 // TableName menetapkan nama tabel.

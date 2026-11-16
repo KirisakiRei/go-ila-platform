@@ -117,6 +117,7 @@ export default function PositionsPage() {
   // menghasilkan array baru dan seluruh useMemo di bawahnya dihitung ulang.
   const positions = useMemo(() => data?.positions ?? [], [data?.positions])
   const skipped = useMemo(() => data?.skipped ?? [], [data?.skipped])
+  const skipped_meta = data?.skipped_meta
   const aktif = useMemo(() => positions.filter((pos) => pos.status === 'OPEN'), [positions])
   const riwayat = useMemo(() => positions.filter((pos) => pos.status !== 'OPEN'), [positions])
 
@@ -319,7 +320,9 @@ export default function PositionsPage() {
               ? aktif.length
               : item.id === 'riwayat'
                 ? riwayat.length
-                : skipped.length
+                : // Daftar terlewat dipotong per halaman, jadi angkanya diambil dari
+                  // total server agar tab tidak menampilkan jumlah satu halaman saja.
+                  (skipped_meta?.total ?? skipped.length)
 
           return (
             <button

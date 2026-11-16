@@ -200,9 +200,12 @@ func jurnalPositionsResponse(rows []model.Position) []dto.PositionResponse {
 //
 // Kegagalan membaca satu sinyal tidak menggugurkan barisnya: pengguna tetap
 // perlu tahu bahwa peluang itu ada, walau rincian harganya tidak tersedia.
+//
+// Baris yang belum punya hasil hipotetis dinilai di sini, sekali, lalu hasil
+// finalnya disimpan. Penilaian sengaja tidak menahan halaman: bila feed gagal,
+// baris tetap tampil dengan status menunggu.
 func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model.UserSignal) []dto.JournalSkippedResponse {
 	out := make([]dto.JournalSkippedResponse, 0, len(rows))
-
 	for i := range rows {
 		us := &rows[i]
 		item := dto.JournalSkippedResponse{
@@ -212,7 +215,6 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 			OccurredAt:   us.CreatedAt,
 			OccurredPair: dto.NewTimePair(us.CreatedAt),
 		}
-
 		if s.signalDetail != nil {
 			if signal, err := s.signalDetail.FindSignal(ctx, us.SignalID); err == nil && signal != nil {
 				item.Symbol = signal.Symbol
@@ -224,13 +226,39 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 				item.StopLoss = signal.StopLoss
 				item.TakeProfit = signal.TakeProfit
 				item.RiskReward = signal.RiskReward
+				if !model.IsEvaluated(us.EvalStatus) && s.evaluator != nil {
+					if ev, ok := s.evaluator.evaluate(ctx, signal, us.CreatedAt); ok {
+						s.simpanEvaluasi(ctx, us.UserID, us.SignalID, ev)
+						us.EvalStatus, us.EvalAt = ev.Status, ev.At
+						us.EvalPrice, us.EvalRLower, us.EvalNote = ev.Price, ev.RLower, ev.Note
+					}
+				}
 			}
 		}
-
+		item.EvalStatus = us.EvalStatus
+		item.EvalAt = us.EvalAt
+		item.EvalPrice = us.EvalPrice
+		item.EvalRLower = us.EvalRLower
+		item.EvalNote = us.EvalNote
 		out = append(out, item)
 	}
-
 	return out
+}
+
+// simpanEvaluasi menulis hasil hipotetis ke penyimpanan. Kegagalan disimpan
+// sebagai peringatan saja: jurnal tetap harus tampil.
+func (s *tradingService) simpanEvaluasi(ctx context.Context, userID, signalID string, ev evalOutcome) {
+	if s.evaluator == nil || s.evaluator.sink == nil {
+		return
+	}
+	out := &model.UserSignalEval{
+		Status: ev.Status,
+		At:     ev.At,
+		Price:  ev.Price,
+		RLower: ev.RLower,
+		Note:   ev.Note,
+	}
+	_ = s.evaluator.sink.SaveSignalEval(ctx, userID, signalID, out)
 }
 
 // jurnalMetaResponse menyusun ringkasan halaman untuk daftar peluang terlewat.
