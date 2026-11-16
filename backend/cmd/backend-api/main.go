@@ -86,6 +86,13 @@ func main() {
 		BotToken: cfg.TelegramBotToken, Timeout: cfg.TelegramTimeout,
 	}, logger)
 	notifier := alert.New(tgClient, cfg.TelegramAdminChatID, logger)
+	// Daftar perintah untuk menu "/". Tanpa ini tombol tersebut kosong walau
+	// bot sudah bisa menangani perintahnya.
+	if cfg.TelegramBotToken != "" {
+		if err := tgClient.SetMyCommands(ctx, telegram.PerintahTelegram()); err != nil {
+			logger.Warn("gagal mendaftarkan perintah bot", "error", err.Error())
+		}
+	}
 	// Penyapu langganan: menurunkan tier yang masa tenggangnya habis. Tanpa
 	// ini user kedaluwarsa tetap mendapat akses Plus selamanya.
 	sweeper := service.NewBillingSweeper(router.Billing(cfg, db, logger), logger)

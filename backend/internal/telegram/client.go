@@ -128,6 +128,40 @@ func (c *Client) SendMessageReturningID(ctx context.Context, chatID string, msg 
 	return c.post(ctx, "sendMessage", c.pesanPayload(chatID, msg))
 }
 
+// ChatActionTyping menandai bot sedang menyiapkan balasan, sehingga klien
+// menampilkan indikator "sedang menulis" selama proses berjalan.
+const ChatActionTyping = "typing"
+
+// BotCommand adalah satu entri pada daftar perintah di menu "/".
+type BotCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
+// SetMyCommands mendaftarkan daftar perintah ke Telegram.
+//
+// Tanpa ini, tombol "/" hanya menampilkan perintah bawaan kosong walau bot
+// sudah bisa menanganinya.
+func (c *Client) SetMyCommands(ctx context.Context, commands []BotCommand) error {
+	if !c.cfg.Enabled() {
+		return nil
+	}
+	_, err := c.post(ctx, "setMyCommands", map[string]any{"commands": commands})
+	return err
+}
+
+// SendChatAction menampilkan indikator aktivitas pada chat.
+func (c *Client) SendChatAction(ctx context.Context, chatID, action string) error {
+	if !c.cfg.Enabled() || chatID == "" {
+		return nil
+	}
+	_, err := c.post(ctx, "sendChatAction", map[string]any{
+		"chat_id": chatID,
+		"action":  action,
+	})
+	return err
+}
+
 // EditMessageText mengganti isi pesan yang sudah terkirim.
 //
 // Tanpa tombol, Telegram mempertahankan tombol lama. Karena itu keyboard kosong

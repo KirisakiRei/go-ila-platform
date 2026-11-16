@@ -18,6 +18,18 @@ const (
 	CallbackPengaturan = "g"
 	CallbackSegarkan   = "px"
 	CallbackHalaman    = "r:"
+	CallbackBantuan    = "help"
+)
+
+// Perintah yang didaftarkan ke Telegram agar muncul di menu "/".
+const (
+	CommandMulai      = "start"
+	CommandMenu       = "menu"
+	CommandPantau     = "pantau"
+	CommandRiwayat    = "riwayat"
+	CommandHari       = "hari"
+	CommandPengaturan = "pengaturan"
+	CommandBantuan    = "bantuan"
 )
 
 // Label tombol keyboard tetap. Nilainya juga dipakai webhook untuk mengenali
@@ -46,6 +58,44 @@ func KeyboardUtama() ReplyKeyboardMarkup {
 		// Tanpa placeholder, kolom ketik tetap muncul di atas keyboard.
 		InputFieldPlaceholder: "Tulis pesan, atau pilih menu di bawah",
 	}
+}
+
+// PerintahTelegram adalah daftar perintah yang muncul saat pengguna mengetik
+// "/" di kolom pesan.
+//
+// Deskripsinya pendek karena Telegram memotong teks panjang di daftar.
+func PerintahTelegram() []BotCommand {
+	return []BotCommand{
+		{Command: CommandMenu, Description: "Buka menu utama"},
+		{Command: CommandPantau, Description: "Posisi berjalan dan setup menunggu"},
+		{Command: CommandRiwayat, Description: "Riwayat posisi yang sudah tutup"},
+		{Command: CommandHari, Description: "Ringkasan hari ini"},
+		{Command: CommandPengaturan, Description: "Apa saja yang diatur lewat website"},
+		{Command: CommandBantuan, Description: "Panduan singkat pemakaian"},
+	}
+}
+
+// AksiDariPerintah mengubah perintah chat menjadi aksi menu yang sama.
+func AksiDariPerintah(text string) (string, bool) {
+	perintah, _, _ := strings.Cut(strings.TrimSpace(text), " ")
+	perintah = strings.TrimPrefix(perintah, "/")
+	// Telegram mengirim "/pantau@NamaBot" di grup.
+	perintah, _, _ = strings.Cut(perintah, "@")
+	switch strings.ToLower(perintah) {
+	case CommandMenu:
+		return CallbackMenu, true
+	case CommandPantau:
+		return CallbackPantau, true
+	case CommandRiwayat:
+		return CallbackRiwayat + "0", true
+	case CommandHari:
+		return CallbackHariIni, true
+	case CommandPengaturan:
+		return CallbackPengaturan, true
+	case CommandBantuan:
+		return CallbackBantuan, true
+	}
+	return "", false
 }
 
 // AksiDariTeks mengenali teks tombol keyboard tetap dan mengubahnya menjadi

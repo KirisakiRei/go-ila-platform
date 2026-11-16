@@ -200,7 +200,7 @@ func TestTelegramWebhookStartReplies(t *testing.T) {
 		if len(sender.messages) != 1 {
 			t.Fatalf("expected 1 message, got %d", len(sender.messages))
 		}
-		if !strings.Contains(sender.messages[0].text, "Halo! Saya bot resmi BOT Trading ILA") {
+		if !strings.Contains(sender.messages[0].text, "BOT Trading ILA") {
 			t.Fatalf("pesan tidak memuat sapaan: %s", sender.messages[0].text)
 		}
 	})
@@ -215,7 +215,7 @@ func TestTelegramWebhookStartReplies(t *testing.T) {
 
 		payload, _ := json.Marshal(map[string]any{
 			"message": map[string]any{
-				"text": "/help",
+				"text": "/bantuan",
 				"chat": map[string]any{"id": 9999},
 			},
 		})
@@ -230,7 +230,7 @@ func TestTelegramWebhookStartReplies(t *testing.T) {
 		if len(sender.messages) != 1 {
 			t.Fatalf("expected 1 message, got %d", len(sender.messages))
 		}
-		if !strings.Contains(sender.messages[0].text, "BOT Trading ILA siap mengirimkan") {
+		if !strings.Contains(sender.messages[0].text, "PANDUAN") {
 			t.Fatalf("pesan tidak memuat panduan: %s", sender.messages[0].text)
 		}
 	})

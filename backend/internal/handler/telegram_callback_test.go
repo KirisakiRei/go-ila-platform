@@ -38,6 +38,10 @@ func (f *fakeTelegramEditor) EditMessageText(_ context.Context, _ string, _ int6
 	return nil
 }
 
+func (f *fakeTelegramEditor) SendChatAction(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func (f *fakeTelegramEditor) SendMessageReturningID(_ context.Context, _ string, msg telegram.Message) (int64, error) {
 	f.sent = append(f.sent, msg.Text)
 	return 1, nil

@@ -27,6 +27,7 @@ type telegramEditor interface {
 	AnswerCallback(ctx context.Context, callbackID, text string) error
 	EditMessageText(ctx context.Context, chatID string, messageID int64, text string, buttons [][]telegram.InlineButton) error
 	SendMessageReturningID(ctx context.Context, chatID string, msg telegram.Message) (int64, error)
+	SendChatAction(ctx context.Context, chatID, action string) error
 }
 
 // TelegramHandler melayani penghubungan chat dan webhook dari Telegram.
@@ -116,30 +117,50 @@ func (h *TelegramHandler) Webhook(c *gin.Context) {
 
 	chatID := strconv.FormatInt(update.Message.Chat.ID, 10)
 	text := strings.TrimSpace(update.Message.Text)
+
+	// Indikator "sedang menulis" dipasang sebelum pekerjaan dimulai, karena
+	// menyusun halaman butuh beberapa query database.
+	if h.edit != nil {
+		_ = h.edit.SendChatAction(c.Request.Context(), chatID, telegram.ChatActionTyping)
+	}
+
 	if aksi, kenal := telegram.AksiDariTeks(text); kenal {
 		h.handleMenuTeks(c.Request.Context(), chatID, aksi)
-	} else if strings.HasPrefix(text, "/start") {
-		token := strings.TrimSpace(strings.TrimPrefix(text, "/start"))
-		if token != "" {
-			// Kegagalan token dibalas sebagai 200: pesan balasan ke user
-			// disusun kanal Telegram, bukan dibocorkan lewat status HTTP.
-			_, err := h.telegram.HandleStart(c.Request.Context(), token, chatID)
-			if err != nil {
-				h.pasangKeyboard(c.Request.Context(), chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan BOT Trading ILA Anda.")
-			} else {
-				h.pasangKeyboard(c.Request.Context(), chatID, "✅ Akun Anda berhasil terhubung ke BOT Trading ILA!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Menu ada di bawah.")
-			}
-		} else {
-			h.pasangKeyboard(c.Request.Context(), chatID, "👋 Halo! Saya bot resmi BOT Trading ILA.\n\nPilih menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari.\n\nKalau akun Anda belum terhubung, buka Pengaturan di dashboard BOT Trading ILA (rekavia.com) lalu klik 'Hubungkan Telegram'.")
-		}
-	} else if strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/") {
-		h.pasangKeyboard(c.Request.Context(), chatID, "👋 BOT Trading ILA siap mengirimkan notifikasi sinyal trading dan alert ke akun Anda.\n\nGunakan menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari. Pengaturan akun tetap di website BOT Trading ILA (rekavia.com).")
+	} else if strings.HasPrefix(text, "/") {
+		h.handlePerintah(c.Request.Context(), chatID, text)
 	} else {
-		// Pesan bebas selain menu: balas dengan menu supaya keyboardnya tetap ada.
-		h.pasangKeyboard(c.Request.Context(), chatID, "Pilih menu di bawah untuk melanjutkan.")
+		// Pesan bebas: tampilkan menu alih-alih balasan kosong.
+		h.handleMenuTeks(c.Request.Context(), chatID, telegram.CallbackMenu)
 	}
 
 	c.Status(http.StatusOK)
+}
+
+// handlePerintah melayani perintah chat seperti /pantau dan /riwayat.
+func (h *TelegramHandler) handlePerintah(ctx context.Context, chatID, text string) {
+	perintah, _, _ := strings.Cut(text, " ")
+	if strings.EqualFold(strings.TrimPrefix(perintah, "/"), telegram.CommandMulai) {
+		token := strings.TrimSpace(strings.TrimPrefix(text, "/start"))
+		if token != "" {
+			// Kegagalan token dibalas sebagai 200: balasan ke user disusun kanal
+			// Telegram, bukan dibocorkan lewat status HTTP.
+			if _, err := h.telegram.HandleStart(ctx, token, chatID); err != nil {
+				h.pasangKeyboard(ctx, chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan BOT Trading ILA Anda.")
+			} else {
+				h.pasangKeyboard(ctx, chatID, "✅ Akun Anda berhasil terhubung ke BOT Trading ILA!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Menu ada di bawah.")
+			}
+			return
+		}
+		h.handleMenuTeks(ctx, chatID, telegram.CallbackMenu)
+		return
+	}
+
+	aksi, kenal := telegram.AksiDariPerintah(text)
+	if !kenal {
+		h.handleMenuTeks(ctx, chatID, telegram.CallbackMenu)
+		return
+	}
+	h.handleMenuTeks(ctx, chatID, aksi)
 }
 
 // authorized memeriksa header rahasia webhook dari Telegram.

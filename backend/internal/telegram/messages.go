@@ -122,31 +122,17 @@ func makeBox(rows [][2]string) string {
 
 // daftar merender baris label-nilai dengan gaya daftar pohon.
 //
-// Dipakai halaman menu: satu baris per fakta, diawali "└ Label:" agar mata
-// trader bisa memindai nilai tanpa membaca kotak. <pre> menjaga kolom nilai
-// tetap sejajar walau panjang label berbeda.
+// Sengaja tanpa <pre>: blok monospace membuat Telegram menampilkan tombol
+// salin, yang tidak berguna untuk angka posisi. Kolom nilai jadi tidak sejajar,
+// dan itu memang disengaja.
 func daftar(rows [][2]string) string {
-	lebar := 0
-	for _, row := range rows {
-		if row[1] == "" {
-			continue
-		}
-		if len(row[0]) > lebar {
-			lebar = len(row[0])
-		}
-	}
-	if lebar == 0 {
-		return ""
-	}
 	var b strings.Builder
-	b.WriteString("<pre>")
 	for _, row := range rows {
 		if row[1] == "" {
 			continue
 		}
-		fmt.Fprintf(&b, "└ %-*s : %s\n", lebar, row[0], escapeHTML(row[1]))
+		fmt.Fprintf(&b, "└ %s: %s\n", row[0], escapeHTML(row[1]))
 	}
-	b.WriteString("</pre>")
 	return b.String()
 }
 

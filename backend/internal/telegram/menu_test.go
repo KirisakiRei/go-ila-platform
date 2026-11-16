@@ -85,6 +85,40 @@ func navHalaman(t *testing.T, pesan Message) []InlineButton {
 	return pesan.Buttons[0]
 }
 
+func TestAksiDariPerintah(t *testing.T) {
+	kasus := map[string]string{
+		"/menu":       CallbackMenu,
+		"/pantau":     CallbackPantau,
+		"/riwayat":    CallbackRiwayat + "0",
+		"/hari":       CallbackHariIni,
+		"/pengaturan": CallbackPengaturan,
+		"/bantuan":    CallbackBantuan,
+		"/pantau@BOT": CallbackPantau,
+		"/PANTAU":     CallbackPantau,
+	}
+	for masukan, ingin := range kasus {
+		aksi, kenal := AksiDariPerintah(masukan)
+		if !kenal || aksi != ingin {
+			t.Fatalf("%s harus menghasilkan %q, dapat %q (kenal=%v)", masukan, ingin, aksi, kenal)
+		}
+	}
+	if _, kenal := AksiDariPerintah("/tidakada"); kenal {
+		t.Fatal("perintah tak dikenal tidak boleh dianggap menu")
+	}
+}
+
+func TestDaftarTanpaBlokKode(t *testing.T) {
+	hasil := daftar([][2]string{{"Arah", "SELL"}, {"Lot", "0,10 lot"}})
+
+	// <pre> memunculkan tombol salin di Telegram, yang tidak berguna di sini.
+	if strings.Contains(hasil, "<pre>") {
+		t.Fatalf("daftar tidak boleh memakai blok kode: %q", hasil)
+	}
+	if !strings.Contains(hasil, "└ Arah: SELL") || !strings.Contains(hasil, "└ Lot: 0,10 lot") {
+		t.Fatalf("format daftar tidak sesuai: %q", hasil)
+	}
+}
+
 func TestAksiDariTeks(t *testing.T) {
 	aksi, kenal := AksiDariTeks(LabelPantau)
 	if !kenal || aksi != CallbackPantau {

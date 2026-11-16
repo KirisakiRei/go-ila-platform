@@ -168,21 +168,58 @@ func FormatPengaturanMessage(dashboardLink string) Message {
 }
 
 // FormatMenuMessage menyusun halaman menu utama.
+//
+// Susunannya mengikuti kebiasaan bot yang sudah dikenal trader: identitas
+// singkat di atas, lalu tombol besar satu per baris supaya mudah ditekan
+// dengan jempol.
 func FormatMenuMessage(nama, paket string) Message {
 	var b strings.Builder
 
-	b.WriteString("🤖 BOT Trading ILA\n")
+	b.WriteString("🤖 BOT Trading ILA\n\n")
 	if nama != "" {
-		b.WriteString(nama)
-		if paket != "" {
-			b.WriteString(" · " + paket)
-		}
-		b.WriteString("\n")
+		b.WriteString("Halo, " + escapeHTML(nama) + " 👋\n")
+	} else {
+		b.WriteString("Halo 👋\n")
 	}
-	b.WriteString("\nPilih yang ingin Anda lihat.\n")
+	b.WriteString("Mau lihat apa hari ini?\n")
+
+	if paket != "" {
+		b.WriteString("\n")
+		b.WriteString(daftar([][2]string{{"Paket", paket}}))
+	}
+
+	return Message{Text: b.String(), Buttons: tombolMenu()}
+}
+
+// tombolMenu menyusun tombol halaman menu, satu per baris.
+func tombolMenu() [][]InlineButton {
+	return [][]InlineButton{
+		{{Text: LabelPantau, CallbackData: CallbackPantau}},
+		{{Text: LabelRiwayat, CallbackData: CallbackRiwayat + "0"}},
+		{{Text: LabelHariIni, CallbackData: CallbackHariIni}},
+		{{Text: LabelPengaturan, CallbackData: CallbackPengaturan}},
+		{{Text: "❓ Panduan Singkat", CallbackData: CallbackBantuan}},
+	}
+}
+
+// FormatBantuanMessage menjelaskan cara pakai bot dengan singkat.
+func FormatBantuanMessage() Message {
+	var b strings.Builder
+
+	b.WriteString("❓ PANDUAN SINGKAT\n\n")
+	b.WriteString("Bot ini mengabari setup ILA dan menjalankan entry tanpa Anda harus membuka website.\n\n")
+	b.WriteString("Cara pakai\n")
+	b.WriteString(daftar([][2]string{
+		{"Notifikasi", "pesan masuk saat setup siap dieksekusi"},
+		{"Eksekusi", "tekan tombol di pesan untuk entry atau lewati"},
+		{"Pantau", "posisi berjalan dan setup yang menunggu"},
+		{"Riwayat", "posisi yang sudah tutup beserta hasilnya"},
+		{"Pengaturan", "akun, risiko, dan mode tetap di website"},
+	}))
+	b.WriteString("\nTombol menu di bawah layar bisa disembunyikan lewat tanda panah, dan muncul lagi setiap kali Anda membuka menu.\n")
+
 	return Message{Text: b.String(), Buttons: [][]InlineButton{
-		{{Text: LabelPantau, CallbackData: CallbackPantau}, {Text: LabelRiwayat, CallbackData: CallbackRiwayat + "0"}},
-		{{Text: LabelHariIni, CallbackData: CallbackHariIni}, {Text: LabelPengaturan, CallbackData: CallbackPengaturan}},
+		{{Text: LabelMenu, CallbackData: CallbackMenu}},
 	}}
 }
 
