@@ -120,6 +120,36 @@ func makeBox(rows [][2]string) string {
 	return b.String()
 }
 
+// daftar merender baris label-nilai dengan gaya daftar pohon.
+//
+// Dipakai halaman menu: satu baris per fakta, diawali "└ Label:" agar mata
+// trader bisa memindai nilai tanpa membaca kotak. <pre> menjaga kolom nilai
+// tetap sejajar walau panjang label berbeda.
+func daftar(rows [][2]string) string {
+	lebar := 0
+	for _, row := range rows {
+		if row[1] == "" {
+			continue
+		}
+		if len(row[0]) > lebar {
+			lebar = len(row[0])
+		}
+	}
+	if lebar == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("<pre>")
+	for _, row := range rows {
+		if row[1] == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "└ %-*s : %s\n", lebar, row[0], escapeHTML(row[1]))
+	}
+	b.WriteString("</pre>")
+	return b.String()
+}
+
 // escapeHTML mengamankan teks bebas sebelum dikirim dengan parse_mode HTML.
 func escapeHTML(text string) string {
 	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")

@@ -125,15 +125,15 @@ func (h *TelegramHandler) Webhook(c *gin.Context) {
 			// disusun kanal Telegram, bukan dibocorkan lewat status HTTP.
 			_, err := h.telegram.HandleStart(c.Request.Context(), token, chatID)
 			if err != nil {
-				h.pasangKeyboard(c.Request.Context(), chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan ILA Platform Anda.")
+				h.pasangKeyboard(c.Request.Context(), chatID, "⚠️ Gagal menghubungkan akun: tautan sudah kedaluwarsa atau tidak valid.\n\nSilakan klik 'Hubungkan Telegram' kembali dari dashboard atau pengaturan BOT Trading ILA Anda.")
 			} else {
-				h.pasangKeyboard(c.Request.Context(), chatID, "✅ Akun ILA Platform Anda berhasil terhubung!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Menu ada di bawah.")
+				h.pasangKeyboard(c.Request.Context(), chatID, "✅ Akun Anda berhasil terhubung ke BOT Trading ILA!\n\nNotifikasi sinyal trading dan konfirmasi entry akan dikirimkan langsung ke chat ini. Menu ada di bawah.")
 			}
 		} else {
-			h.pasangKeyboard(c.Request.Context(), chatID, "👋 Halo! Saya bot resmi ILA Platform.\n\nPilih menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari.\n\nKalau akun Anda belum terhubung, buka Pengaturan di dashboard ILA Platform (rekavia.com) lalu klik 'Hubungkan Telegram'.")
+			h.pasangKeyboard(c.Request.Context(), chatID, "👋 Halo! Saya bot resmi BOT Trading ILA.\n\nPilih menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari.\n\nKalau akun Anda belum terhubung, buka Pengaturan di dashboard BOT Trading ILA (rekavia.com) lalu klik 'Hubungkan Telegram'.")
 		}
 	} else if strings.HasPrefix(text, "/help") || strings.HasPrefix(text, "/") {
-		h.pasangKeyboard(c.Request.Context(), chatID, "👋 Bot ILA Platform siap mengirimkan notifikasi sinyal trading dan alert ke akun Anda.\n\nGunakan menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari. Pengaturan akun tetap di website ILA Platform (rekavia.com).")
+		h.pasangKeyboard(c.Request.Context(), chatID, "👋 BOT Trading ILA siap mengirimkan notifikasi sinyal trading dan alert ke akun Anda.\n\nGunakan menu di bawah untuk memantau posisi, membuka riwayat, dan melihat ringkasan hari. Pengaturan akun tetap di website BOT Trading ILA (rekavia.com).")
 	} else {
 		// Pesan bebas selain menu: balas dengan menu supaya keyboardnya tetap ada.
 		h.pasangKeyboard(c.Request.Context(), chatID, "Pilih menu di bawah untuk melanjutkan.")

@@ -184,7 +184,7 @@ func (h *TelegramHandler) tolakCallback(ctx context.Context, cb *callbackUpdate,
 	if h.sender == nil {
 		return
 	}
-	_ = h.sender.Send(ctx, chatID, "Chat ini belum terhubung ke akun ILA Platform. Hubungkan lewat menu Pengaturan di dashboard.")
+	_ = h.sender.Send(ctx, chatID, "Chat ini belum terhubung ke akun BOT Trading ILA. Hubungkan lewat menu Pengaturan di dashboard.")
 }
 
 // handleMenuTeks membalas tekanan tombol keyboard tetap.
@@ -198,7 +198,7 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 	user, err := h.telegram.ResolveChat(ctx, chatID)
 	if err != nil {
 		if h.sender != nil {
-			_ = h.sender.Send(ctx, chatID, "Chat ini belum terhubung ke akun ILA Platform. Hubungkan lewat menu Pengaturan di dashboard.")
+			_ = h.sender.Send(ctx, chatID, "Chat ini belum terhubung ke akun BOT Trading ILA. Hubungkan lewat menu Pengaturan di dashboard.")
 		}
 		return
 	}

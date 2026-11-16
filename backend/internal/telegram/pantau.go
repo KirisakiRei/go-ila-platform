@@ -116,7 +116,7 @@ func kotakPosisi(pos BarisPantau) string {
 			[2]string{"Untung/Rugi", formatMoney(pos.ProfitLoss)},
 		)
 	}
-	return "◆ " + pos.Symbol + "\n" + makeBox(baris)
+	return "◆ " + pos.Symbol + "\n" + daftar(baris)
 }
 
 // kotakMenunggu merangkum satu setup yang menunggu entry.
@@ -128,7 +128,7 @@ func kotakMenunggu(m BarisMenunggu) string {
 		{"Batas", formatHargaOpsional(m.StopLoss)},
 		{"Trigger", formatHargaOpsional(m.TriggerHarga)},
 	}
-	return m.Symbol + "\n" + makeBox(baris)
+	return m.Symbol + "\n" + daftar(baris)
 }
 
 // kotakSelesai merangkum satu posisi yang sudah tutup.

@@ -111,18 +111,16 @@ func FormatHariMessage(p HariParams) Message {
 		b.WriteString(" · " + p.Hari)
 	}
 	b.WriteString("\n\n")
-
-	b.WriteString(makeBox([][2]string{
+	b.WriteString(daftar([][2]string{
 		{"Trade", kuotaTampil(p.TradeTerpakai, p.TradeMaks)},
 		{"Menang", itoaOpsional(p.Win)},
 		{"Kalah", itoaOpsional(p.Loss)},
 		{"Untung/Rugi", formatProfitHarian(p.ProfitLoss)},
 		{"Posisi jalan", itoaOpsional(p.PosisiJalan)},
 	}))
-
 	if p.BulanTotal > 0 {
 		b.WriteString("\nBulan ini\n")
-		b.WriteString(makeBox([][2]string{
+		b.WriteString(daftar([][2]string{
 			{"Total posisi", fmt.Sprintf("%d", p.BulanTotal)},
 			{"Rasio menang", fmt.Sprintf("%s%%", formatFrom(p.BulanWinRate))},
 			{"Untung/Rugi", formatMoney(p.BulanNet)},
@@ -149,22 +147,23 @@ func FormatHariMessage(p HariParams) Message {
 func FormatPengaturanMessage(dashboardLink string) Message {
 	var b strings.Builder
 
-	b.WriteString("⚙️ Pengaturan\n\n")
+	b.WriteString("⚙️ PENGATURAN\n\n")
 	b.WriteString("Sebagian besar pengaturan tetap dikelola di website, karena menyangkut akun dan uang Anda.\n\n")
-	b.WriteString("Di website Anda bisa mengatur:\n")
-	b.WriteString("• akun broker dan kredensialnya\n")
-	b.WriteString("• risiko per transaksi dan ukuran lot\n")
-	b.WriteString("• pair serta timeframe yang dipantau\n")
-	b.WriteString("• mode otomatis atau manual\n")
-	b.WriteString("• notifikasi dan paket langganan\n\n")
-	b.WriteString("Lewat Telegram Anda cukup memantau dan memutuskan entry.\n")
+	b.WriteString("Yang bisa Anda atur di website\n")
+	b.WriteString(daftar([][2]string{
+		{"Akun broker", "kredensial dan koneksi"},
+		{"Risiko", "per transaksi dan ukuran lot"},
+		{"Pantauan", "pair dan timeframe"},
+		{"Mode", "otomatis atau manual"},
+		{"Langganan", "notifikasi dan paket"},
+	}))
+	b.WriteString("\nLewat Telegram Anda cukup memantau dan memutuskan entry.\n")
 
 	var tombol [][]InlineButton
 	if dashboardLink != "" {
 		tombol = append(tombol, []InlineButton{{Text: "Buka Pengaturan", URL: dashboardLink}})
 	}
 	tombol = append(tombol, []InlineButton{{Text: LabelMenu, CallbackData: CallbackMenu}})
-
 	return Message{Text: b.String(), Buttons: tombol}
 }
 
@@ -172,7 +171,7 @@ func FormatPengaturanMessage(dashboardLink string) Message {
 func FormatMenuMessage(nama, paket string) Message {
 	var b strings.Builder
 
-	b.WriteString("🤖 ILA Platform\n")
+	b.WriteString("🤖 BOT Trading ILA\n")
 	if nama != "" {
 		b.WriteString(nama)
 		if paket != "" {
@@ -181,7 +180,6 @@ func FormatMenuMessage(nama, paket string) Message {
 		b.WriteString("\n")
 	}
 	b.WriteString("\nPilih yang ingin Anda lihat.\n")
-
 	return Message{Text: b.String(), Buttons: [][]InlineButton{
 		{{Text: LabelPantau, CallbackData: CallbackPantau}, {Text: LabelRiwayat, CallbackData: CallbackRiwayat + "0"}},
 		{{Text: LabelHariIni, CallbackData: CallbackHariIni}, {Text: LabelPengaturan, CallbackData: CallbackPengaturan}},
