@@ -495,6 +495,24 @@ const (
 	GroupSistem RejectGroup = "sistem"
 )
 
+// OverrideKuotaManual menandai alasan harian yang boleh dilewati lewat
+// eksekusi manual.
+//
+// Batas harian adalah pagar otomatis: setelah 1 win atau 2 trade, sistem
+// berhenti membuka posisi sendiri. User tetap boleh memutuskan masuk lewat
+// tombol konfirmasi, karena keputusan akhir ada di tangan pemilik akun.
+//
+// Pagar lain sengaja tidak bisa dilewati: ban, akun dibekukan, dokumen belum
+// disetujui, harga sudah lewat, dan posisi ganda tetap menolak walau manual.
+func OverrideKuotaManual(reason RejectReason) bool {
+	switch reason {
+	case RejectDailyQuota, RejectDailyWin, RejectTwoStrike:
+		return true
+	default:
+		return false
+	}
+}
+
 // RejectGroupOf memetakan alasan penolakan ke grupnya.
 //
 // Alasan yang belum dikenal jatuh ke GroupBatal: lebih aman menyatakan setup

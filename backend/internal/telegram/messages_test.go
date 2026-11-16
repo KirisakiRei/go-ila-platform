@@ -105,7 +105,7 @@ func TestHeldKuotaMenampilkanAngka(t *testing.T) {
 	if ContainsForbiddenTerms(msg.Text) {
 		t.Fatalf("pesan memuat istilah internal:\n%s", msg.Text)
 	}
-	if !strings.Contains(msg.Text, "2 dari 2 trade terpakai") {
+	if !strings.Contains(msg.Text, "2 dari 2 trade otomatis") {
 		t.Errorf("angka kuota tidak tampil:\n%s", msg.Text)
 	}
 	if strings.Contains(msg.Text, "Tidak dieksekusi:") {

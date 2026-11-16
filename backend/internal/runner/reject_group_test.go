@@ -1,8 +1,11 @@
 package runner_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"ila/backend/internal/model"
 	"ila/backend/internal/runner"
 )
 
@@ -63,5 +66,100 @@ func TestRejectTerkunciTidakDikirim(t *testing.T) {
 		if !runner.RejectTerkirimKeTelegram(reason) {
 			t.Errorf("%q seharusnya tetap dikirim ke Telegram", reason)
 		}
+	}
+}
+
+// TestOverrideKuotaHanyaUntukPagarHarian memastikan jalur manual hanya boleh
+// menembus batas harian. Pagar lain harus tetap menolak, karena melewatinya
+// membahayakan akun atau melanggar aturan platform.
+func TestOverrideKuotaHanyaUntukPagarHarian(t *testing.T) {
+	boleh := []runner.RejectReason{
+		runner.RejectDailyQuota,
+		runner.RejectDailyWin,
+		runner.RejectTwoStrike,
+	}
+	for _, reason := range boleh {
+		if !runner.OverrideKuotaManual(reason) {
+			t.Errorf("%q seharusnya boleh dilewati manual", reason)
+		}
+	}
+
+	tetapTolak := []runner.RejectReason{
+		runner.RejectAccountBanned,
+		runner.RejectAccountFrozen,
+		runner.RejectSuspended,
+		runner.RejectLegalPending,
+		runner.RejectSlippage,
+		runner.RejectOpenPosition,
+		runner.RejectExpired,
+		runner.RejectMarketClosed,
+		runner.RejectEntitlement,
+	}
+	for _, reason := range tetapTolak {
+		if runner.OverrideKuotaManual(reason) {
+			t.Errorf("%q tidak boleh dilewati manual", reason)
+		}
+	}
+}
+
+// TestApproveMenembusKuotaHarian memastikan user tetap bisa eksekusi manual
+// setelah kuota otomatis habis. Batas harian hanya menghentikan sistem, bukan
+// mencabut keputusan pemilik akun.
+func TestApproveMenembusKuotaHarian(t *testing.T) {
+	store := newFakeStore()
+	pub := &fakePublisher{}
+	addUser(store, "u1", "basic", "manual", true)
+
+	// Kuota otomatis sudah penuh: dua trade selesai hari ini.
+	store.daily[dailyKey("u1", runner.DayKey(time.Now()))] = &model.DailySummary{
+		UserID:      "u1",
+		Day:         runner.DayKey(time.Now()),
+		TotalTrades: 2,
+		LossCount:   2,
+	}
+
+	svc := newService(store, pub)
+	svc.HandleSignal(context.Background(), readySignal("XAUUSD", time.Hour))
+
+	reason, err := svc.Approve(context.Background(), "u1", "sig-XAUUSD", "acct-u1")
+	if err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+	if reason != runner.RejectNone {
+		t.Fatalf("eksekusi manual seharusnya lolos walau kuota habis, ditolak: %q", reason)
+	}
+
+	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
+	if len(positions) != 1 {
+		t.Fatalf("posisi terbuka = %d, ingin 1", len(positions))
+	}
+}
+
+// TestApproveTetapMenolakAkunDibanned memastikan override kuota tidak ikut
+// membuka pagar akun. Ban berlaku mutlak.
+func TestApproveTetapMenolakAkunDibanned(t *testing.T) {
+	store := newFakeStore()
+	pub := &fakePublisher{}
+	addUser(store, "u1", "basic", "manual", true)
+	store.users["u1"].Status = "banned"
+
+	store.daily[dailyKey("u1", runner.DayKey(time.Now()))] = &model.DailySummary{
+		UserID: "u1", Day: runner.DayKey(time.Now()), TotalTrades: 5,
+	}
+
+	svc := newService(store, pub)
+	svc.HandleSignal(context.Background(), readySignal("XAUUSD", time.Hour))
+
+	reason, err := svc.Approve(context.Background(), "u1", "sig-XAUUSD", "acct-u1")
+	if err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+	if reason == runner.RejectNone {
+		t.Fatal("akun dibanned tidak boleh lolos walau lewat eksekusi manual")
+	}
+
+	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
+	if len(positions) != 0 {
+		t.Fatalf("posisi terbuka = %d, ingin 0 untuk akun dibanned", len(positions))
 	}
 }

@@ -1441,7 +1441,11 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 		return RejectNone, findErr
 	}
 	if us != nil && IsTerminal(us.Status) {
-		return RejectNotReady, nil
+		// Sinyal yang tertahan kuota bukan alasan menutup pintu manual:
+		// sistem sudah bilang tidak, user masih boleh memutuskan.
+		if !(us.Status == SignalRejected && OverrideKuotaManual(RejectReason(us.RejectReason))) {
+			return RejectNotReady, nil
+		}
 	}
 
 	account, err := s.store.FindBrokerAccount(ctx, accountID, userID)
@@ -1470,9 +1474,16 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 		return RejectNone, evalErr
 	}
 	if reason != RejectNone {
-		return reason, nil
+		// Pagar harian bisa dilewati di jalur manual, pagar lain tidak.
+		// Keputusan menembus kuota dicatat agar bisa diaudit nanti.
+		if !OverrideKuotaManual(reason) {
+			return reason, nil
+		}
+		s.logger.Info("kuota harian dilewati lewat eksekusi manual",
+			"evt", "signal.override.kuota",
+			"user_id", userID, "signal_id", signal.SignalID,
+			"account_id", account.ID, "alasan", string(reason))
 	}
-
 	return RejectNone, s.execute(ctx, user, account, signal)
 }
 

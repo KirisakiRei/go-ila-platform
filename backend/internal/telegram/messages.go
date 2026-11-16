@@ -480,8 +480,8 @@ func FormatCancelledMessage(p HeldParams) Message {
 func penahananTeks(alasan AlasanPenahanan) (emoji, keadaan, penutup, label string, tombol string) {
 	switch alasan {
 	case PenahananKuota:
-		return "🔔", "Tahap " + tahapSiap + " · Ditahan kuota harian",
-			"Kuota trade hari ini udah habis. Pulih besok, atau eksekusi manual kalau disetujui.",
+		return "🔔", "Tahap " + tahapSiap + " · Batas auto-entry",
+			"Kuota auto-entry hari ini udah habis. Kalau mau tetap masuk, eksekusi manual masih bisa.",
 			"⚡ Eksekusi Manual", "eksekusi"
 	case PenahananPosisi:
 		return "🔔", "Tahap " + tahapSiap + " · Ditahan posisi jalan",
@@ -710,7 +710,7 @@ func kuotaTampil(terpakai, maks int) string {
 	if terpakai < 0 {
 		terpakai = 0
 	}
-	return fmt.Sprintf("%d dari %d trade terpakai", terpakai, maks)
+	return fmt.Sprintf("%d dari %d trade otomatis", terpakai, maks)
 }
 
 // ---------------------------------------------------------------------------
