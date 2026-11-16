@@ -227,7 +227,15 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 				item.TakeProfit = signal.TakeProfit
 				item.RiskReward = signal.RiskReward
 				if !model.IsEvaluated(us.EvalStatus) && s.evaluator != nil {
-					if ev, ok := s.evaluator.evaluate(ctx, signal, us.CreatedAt); ok {
+					// Titik awal penilaian diambil dari waktu terbit sinyal, bukan
+					// CreatedAt baris user_signal: baris itu ditulis ulang setiap
+					// status berubah, sehingga CreatedAt bisa jatuh setelah harga
+					// sudah bergerak dan hasilnya terbaca keliru.
+					since := signal.PublishedAt
+					if since.IsZero() {
+						since = us.CreatedAt
+					}
+					if ev, ok := s.evaluator.evaluate(ctx, signal, since); ok {
 						s.simpanEvaluasi(ctx, us.UserID, us.SignalID, ev)
 						us.EvalStatus, us.EvalAt = ev.Status, ev.At
 						us.EvalPrice, us.EvalRLower, us.EvalNote = ev.Price, ev.RLower, ev.Note

@@ -21,7 +21,16 @@ function labelStatus(status: string): string {
       return 'Menunggu keputusan'
     case 'READY_TO_ENTRY':
       return 'Siap entry'
+    case 'WAIT_HTF_SWEEP':
+      return 'Tahap sweep HTF'
+    case 'WAIT_HTF_CANDLE_CLOSE':
+      return 'Tahap tutup candle HTF'
+    case 'WAIT_LTF_CISD':
+      return 'Tahap CISD LTF'
     default:
+      // Status radar ILA 3.0 memakai prefiks yang panjang dan teknis; cukup
+      // ditampilkan sebagai tahap berjalan agar tidak membingungkan.
+      if (status.startsWith('WAIT_ILA3_')) return 'Tahap radar ILA 3.0'
       return status
   }
 }
@@ -57,11 +66,14 @@ function alasanTerbaca(item: JournalSkipped): string {
 function hasilHipotetis(item: JournalSkipped): { label: string; tone: 'positif' | 'negatif' | 'netral' } | null {
   switch (item.eval_status) {
     case 'TP':
-      return { label: 'Akan TP', tone: 'positif' }
+      return {
+        label: item.eval_r_lower ? `Tembus TP (+${formatR(item.eval_r_lower)})` : 'Tembus TP',
+        tone: 'positif',
+      }
     case 'SL':
-      return { label: 'Akan SL', tone: 'negatif' }
+      return { label: 'Tembus SL (-1R)', tone: 'negatif' }
     case 'NO_ENTRY':
-      return { label: 'Tanpa entry', tone: 'netral' }
+      return { label: 'Harga tak sampai entry', tone: 'netral' }
     case 'UNKNOWN':
       return { label: 'Hasil ambigu', tone: 'netral' }
     default:
@@ -140,7 +152,11 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
 
             {hasil && item.eval_at && (
               <p className="text-[10.5px] text-muted-foreground">
-                Dinilai {formatDateTime(item.eval_at)}
+                {/* Harga yang dikenai ditampilkan agar user bisa memeriksa
+                    hasilnya sendiri di chart, bukan hanya percaya label. */}
+                {item.eval_status === 'TP' || item.eval_status === 'SL'
+                  ? `Harga menyentuh ${formatNumber(item.eval_price ?? 0, 5)} · ${formatDateTime(item.eval_at)}`
+                  : `Dinilai ${formatDateTime(item.eval_at)}`}
                 {item.eval_note ? ` · ${item.eval_note}` : ''}
               </p>
             )}

@@ -208,12 +208,24 @@ func (r *journalRepository) SaveSignalEval(ctx context.Context, userID, signalID
 //
 // CONSUMED sengaja tidak termasuk: sinyal itu sudah menjadi posisi, sehingga
 // menampilkannya lagi di daftar "tidak tereksekusi" akan menghitung dua kali.
+//
+// Status radar (WAIT_*) ikut disertakan. Sebelumnya baris ini terlewat sehingga
+// sinyal yang paling sering muncul di radar — justru yang tidak pernah
+// dieksekusi — tidak pernah tercatat di jurnal dan tidak pernah dinilai.
 var skipStatuses = []string{
 	model.SignalStatusRejected,
 	model.SignalStatusSkipped,
 	model.SignalStatusExpired,
 	model.SignalStatusOpportunity,
 	model.SignalStatusReadyToEntry,
+	model.SignalStatusWaitHTFSweep,
+	model.SignalStatusWaitHTFCandleClose,
+	model.SignalStatusWaitLTFCISD,
+	"WAIT_ILA3_HTF_KEY_LEVEL",
+	"WAIT_ILA3_MTF_REVERSAL",
+	"WAIT_ILA3_LTF_CISD_1",
+	"WAIT_ILA3_MTF_FVG_RETR",
+	"WAIT_ILA3_LTF_CISD_2",
 }
 
 // ListSkipped membaca sinyal yang tidak berakhir sebagai posisi.
