@@ -163,3 +163,35 @@ func TestCallbackEksekusiDitolakMenampilkanAlasan(t *testing.T) {
 		t.Fatalf("alasan penolakan hilang dari pesan: %q", sender.edits[0])
 	}
 }
+
+type menuNavigationFake struct{ page int }
+
+func (m *menuNavigationFake) Pantau(ctx context.Context, u *model.User, link string, page int) (telegram.Message, error) {
+	m.page = page
+	return telegram.Message{Text: "Pantau"}, nil
+}
+func (*menuNavigationFake) Riwayat(context.Context, *model.User, int) (telegram.Message, error) {
+	return telegram.Message{Text: "Riwayat"}, nil
+}
+func (*menuNavigationFake) HariIni(context.Context, *model.User, string) (telegram.Message, error) {
+	return telegram.Message{Text: "Hari ini"}, nil
+}
+func TestPantauPaginationAndHelpWorkWithoutApprovalService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sender := &fakeTelegramEditor{}
+	svc := &fakeTelegramService{resolveChatFn: func(context.Context, string) (*model.User, error) { return &model.User{Base: model.Base{ID: "u"}}, nil }}
+	menu := &menuNavigationFake{}
+	h := NewTelegramHandler(svc, "bot", "", sender).WithMenu(menu, nil, "https://rekavia.com", nil)
+	kirimCallback(t, h, "ph:2", 123)
+	if menu.page != 2 || len(sender.edits) != 1 {
+		t.Fatalf("pagination ignored: page=%d edits=%v", menu.page, sender.edits)
+	}
+	kirimCallback(t, h, telegram.CallbackBantuan, 123)
+	if len(sender.edits) != 2 {
+		t.Fatal("inline help ignored")
+	}
+	kirimCallback(t, h, telegram.CallbackNoop, 123)
+	if len(sender.edits) != 2 || len(sender.answered) != 3 {
+		t.Fatalf("no-op must acknowledge without editing: %+v", sender)
+	}
+}

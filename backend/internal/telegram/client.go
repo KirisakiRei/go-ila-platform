@@ -63,6 +63,7 @@ func NewClient(cfg Config, logger *slog.Logger) *Client {
 // URL membuka tautan; CallbackData mengirim tekanan kembali ke webhook.
 type InlineButton struct {
 	Text         string `json:"text"`
+	Style        string `json:"style,omitempty"`
 	URL          string `json:"url,omitempty"`
 	CallbackData string `json:"callback_data,omitempty"`
 }
@@ -225,7 +226,7 @@ func (c *Client) post(ctx context.Context, method string, payload any) (int64, e
 	}()
 	var hasil apiResponse
 	_ = json.NewDecoder(resp.Body).Decode(&hasil)
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK || !hasil.OK {
 		return 0, fmt.Errorf("telegram menolak permintaan: %s", hasil.Description)
 	}
 	return hasil.Result.MessageID, nil
@@ -280,6 +281,9 @@ func AppURL(baseURL, path string) string {
 		return ""
 	}
 	base := trimSlash(baseURL)
+	if i := strings.Index(base, "/app/"); i >= 0 {
+		base = base[:i+4]
+	}
 	if !strings.HasSuffix(base, "/app") {
 		base += "/app"
 	}

@@ -24,6 +24,10 @@ const (
 	CallbackSegarkan          = "px"
 	CallbackHalaman           = "r:"
 	CallbackBantuan           = "help"
+	CallbackNoop              = "noop"
+	CallbackRiwayatMenu       = "history"
+	CallbackSimulasi          = "sim:"
+	CallbackPanduan           = "guide"
 )
 
 // Perintah yang didaftarkan ke Telegram agar muncul di menu "/".
@@ -76,7 +80,7 @@ func AksiDariPerintah(text string) (string, bool) {
 	case CommandPantau:
 		return CallbackPantau, true
 	case CommandRiwayat:
-		return CallbackRiwayat + "0", true
+		return CallbackRiwayatMenu, true
 	case CommandHari:
 		return CallbackHariIni, true
 	case CommandPengaturan:
@@ -97,3 +101,7 @@ func aksiCallback(data string) (string, string) {
 	}
 	return data, ""
 }
+
+// Escape protects user and market text rendered with Telegram HTML parsing.
+func Escape(text string) string            { return escapeHTML(text) }
+func StrategyLabel(strategy string) string { return metodeTampil(strategy) }

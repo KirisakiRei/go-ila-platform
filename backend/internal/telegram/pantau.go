@@ -9,6 +9,10 @@ import (
 
 // BarisPantau adalah satu posisi yang sedang berjalan.
 type BarisPantau struct {
+	DetailURL  string
+	StopLoss   float64
+	TakeProfit float64
+	OpenedAt   time.Time
 	Ticket     string
 	Symbol     string
 	Direction  string
@@ -22,10 +26,12 @@ type BarisPantau struct {
 
 // BarisMenunggu adalah setup yang masih mencari entry.
 type BarisMenunggu struct {
-	Symbol    string
-	Htf       string
-	Ltf       string
-	Direction string
+	DetailURL       string
+	StrategyVersion string
+	Symbol          string
+	Htf             string
+	Ltf             string
+	Direction       string
 	// Tahap adalah penanda siklus seperti "3/6".
 	Tahap string
 	// TahapTeks menjelaskan apa yang sedang ditunggu pada tahap itu.
@@ -70,7 +76,7 @@ func FormatPantauMessage(p PantauParams) Message {
 	var b strings.Builder
 	waktu := ""
 	if !p.Diperbarui.IsZero() {
-		waktu = " · " + p.Diperbarui.In(time.FixedZone("WIB", 7*3600)).Format("15:04") + " WIB"
+		waktu = " · " + p.Diperbarui.In(time.FixedZone("WIB", 7*3600)).Format("02 Jan 2006, 15:04") + " WIB"
 	}
 	b.WriteString("📊 Pantauan" + waktu + "\n")
 	if len(p.Posisi) == 0 && len(p.Menunggu) == 0 && len(p.Selesai) == 0 {
@@ -94,9 +100,9 @@ func FormatPantauMessage(p PantauParams) Message {
 			total = 1
 		}
 		if total > 1 {
-			fmt.Fprintf(&b, "\nMenunggu entry (%d · halaman %d/%d)\n", jumlahMenunggu(p, halaman, total), halaman, total)
+			fmt.Fprintf(&b, "\nSetup yang dipantau · halaman %d/%d\n", halaman, total)
 		} else {
-			fmt.Fprintf(&b, "\nMenunggu entry (%d)\n", len(p.Menunggu))
+			fmt.Fprintf(&b, "\nSetup yang dipantau (%d)\n", len(p.Menunggu))
 		}
 		for _, m := range p.Menunggu {
 			b.WriteString(kotakMenunggu(m))
@@ -109,9 +115,20 @@ func FormatPantauMessage(p PantauParams) Message {
 		}
 	}
 	if !p.HargaTersedia && len(p.Posisi) > 0 {
-		b.WriteString("\nHarga terkini belum bisa diambil dari broker. Coba segarkan lagi sebentar.\n")
+		b.WriteString("\nHarga live dan PnL berjalan tersedia di akun broker; halaman ini tidak mengambil kutipan harga live.\n")
 	}
-	return Message{Text: b.String(), Buttons: tombolPantau(p.DashboardLink, p.Halaman, p.TotalHalaman)}
+	buttons := tombolPantau(p.DashboardLink, p.Halaman, p.TotalHalaman)
+	for i, pos := range p.Posisi {
+		if pos.DetailURL != "" {
+			buttons = append(buttons, []InlineButton{{Text: fmt.Sprintf("Posisi %d · %s", i+1, pos.Symbol), CallbackData: pos.DetailURL}})
+		}
+	}
+	for i, row := range p.Menunggu {
+		if row.DetailURL != "" {
+			buttons = append(buttons, []InlineButton{{Text: fmt.Sprintf("Setup %d · %s %s/%s", i+1, row.Symbol, row.Htf, row.Ltf), CallbackData: row.DetailURL}})
+		}
+	}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // kotakPosisi merangkum satu posisi berjalan.
@@ -148,7 +165,7 @@ func kotakMenunggu(m BarisMenunggu) string {
 	if m.Htf != "" && m.Ltf != "" {
 		judul += " · " + m.Htf + " ➔ " + m.Ltf
 	}
-	baris := [][2]string{{"Arah", arahTampil(m.Direction)}}
+	baris := [][2]string{{"Strategi", metodeTampil(m.StrategyVersion)}, {"Arah", arahTampil(m.Direction)}}
 	if m.Tahap != "" {
 		tahap := m.Tahap
 		if m.TahapTeks != "" {
@@ -202,49 +219,36 @@ func simbolHasil(outcomeR float64) string {
 // sedangkan hari akuntansi dan kebiasaan trader memakai WIB. Tanpa keduanya,
 // trader harus menghitung sendiri selisihnya setiap kali melihat setup.
 func formatWIBdanNY(t time.Time) string {
-	wib := t.In(time.FixedZone("WIB", 7*3600)).Format("15:04")
+	wib := t.In(time.FixedZone("WIB", 7*3600)).Format("02 Jan 2006, 15:04")
 	ny := t.In(timezone.NY).Format("15:04")
 	return wib + " WIB · " + ny + " NY"
 }
 
-// jumlahMenunggu menghitung total setup menunggu dari halaman yang sedang
-// berlaku. Halaman terakhir menentukan sisanya, sehingga angkanya tidak
-// melebihkan saat jumlahnya tepat kelipatan per halaman.
-func jumlahMenunggu(p PantauParams, halaman, total int) int {
-	if total <= 1 {
-		return len(p.Menunggu)
-	}
-	isiPenuh := PantauPerHalaman * (total - 1)
-	return isiPenuh + len(p.Menunggu)
-}
-
 // tombolPantau menyusun tombol bawah halaman pantauan.
 //
-// Navigasi memakai bentuk ‹ Sebelumnya | 1/2 | Berikutnya › agar posisi tombol
-// tidak bergeser antar halaman. Tombol yang tidak mungkin ditekan dikirim tanpa
-// aksi, bukan dihilangkan.
+// Navigation preserves three columns with valid no-op callbacks at page boundaries.
 func tombolPantau(dashboardLink string, halaman, total int) [][]InlineButton {
 	var baris [][]InlineButton
 	if total > 1 {
 		if halaman < 1 {
 			halaman = 1
 		}
-		sebelum := InlineButton{Text: "‹ Sebelumnya"}
+		sebelum := InlineButton{Text: "‹ Sebelumnya", CallbackData: CallbackNoop}
 		if halaman > 1 {
 			sebelum.CallbackData = fmt.Sprintf("%s%d", CallbackPantauHalaman, halaman-1)
 		}
-		berikut := InlineButton{Text: "Berikutnya ›"}
+		berikut := InlineButton{Text: "Berikutnya ›", CallbackData: CallbackNoop}
 		if halaman < total {
 			berikut.CallbackData = fmt.Sprintf("%s%d", CallbackPantauHalaman, halaman+1)
 		}
 		baris = append(baris, []InlineButton{
 			sebelum,
-			{Text: fmt.Sprintf("%d/%d", halaman, total), CallbackData: CallbackMenu},
+			{Text: "Kembali", CallbackData: CallbackMenu},
 			berikut,
 		})
 	}
 	baris = append(baris, []InlineButton{
-		{Text: "Segarkan", CallbackData: CallbackSegarkan},
+		{Text: "Segarkan", CallbackData: fmt.Sprintf("%s%d", CallbackPantauHalaman, max(1, halaman)), Style: "primary"},
 		{Text: LabelMenu, CallbackData: CallbackMenu},
 	})
 	if dashboardLink != "" {

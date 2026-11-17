@@ -210,7 +210,7 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 
 	b.WriteString(makeBox([][2]string{
 		{"Arah", arahTampil(p.Direction)},
-		{"Metode", strategi},
+		{"Metode", metodeTampil(strategi)},
 		{"Entry", formatPrice(p.EntryPrice)},
 		{"Stop", formatPrice(p.StopLoss)},
 		{"Target", formatPrice(p.TakeProfit)},
@@ -218,15 +218,15 @@ func FormatSetupDetailedMessage(p SetupMessageParams) Message {
 		{"Risiko", risikoTampil(p.RiskPercent, p.RiskAmount, p.LotSize)},
 	}))
 
-	b.WriteString("\nJendela entry cuma sebentar. Masuk sekarang atau lewati.\n")
+	b.WriteString("\nSetup memiliki batas waktu entry. Tinjau level dan risiko sebelum mengonfirmasi.\n")
 
 	// Tombol aksi memakai callback agar keputusan selesai di Telegram, tanpa
 	// membuka browser saat harga bergerak. Bila token gagal dibuat, tombol
 	// kembali menjadi tautan dashboard supaya user masih punya jalan.
 	if p.ApproveToken != "" {
 		return Message{Text: b.String(), Buttons: [][]InlineButton{{
-			{Text: "⚡ Eksekusi", CallbackData: CallbackEksekusi + p.ApproveToken},
-			{Text: "🚫 Lewati", CallbackData: CallbackLewati + p.ApproveToken},
+			{Text: "⚡ Eksekusi", CallbackData: CallbackEksekusi + p.ApproveToken, Style: "success"},
+			{Text: "Lewati", CallbackData: CallbackLewati + p.ApproveToken},
 		}}}
 	}
 
@@ -289,6 +289,7 @@ func FormatRadarHTFMessage(p RadarHTFParams) Message {
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
+		{"Strategi", metodeTampil(p.StrategyVersion)},
 		{"Tahap", tahapStruktur + " · Baca " + htf},
 		{"Waktu", p.Siklus},
 		{"Bias", bias},
@@ -296,8 +297,8 @@ func FormatRadarHTFMessage(p RadarHTFParams) Message {
 		{"Batas", formatHargaOpsional(p.StopLoss)},
 	}))
 
-	b.WriteString("\nLagi mantau " + htf + " dulu. Arah belum bisa dipastikan.\n")
-	fmt.Fprintf(&b, "Tunggu candle %s tutup dulu, baru arahnya jelas.\n", htf)
+	b.WriteString("\nMemantau " + htf + " untuk menentukan arah berikutnya.\n")
+	fmt.Fprintf(&b, "Tunggu candle %s ditutup untuk mengonfirmasi arah.\n", htf)
 
 	if detail := Sanitize(p.Details); detail != "" {
 		fmt.Fprintf(&b, "\n%s\n", detail)
@@ -318,10 +319,11 @@ func FormatRadarSweepMessage(p RadarHTFParams) Message {
 	}
 
 	var b strings.Builder
-	b.WriteString(judulPesan("👀", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapKonfirmasi+" · Area "+htf+" kena"))
+	b.WriteString(judulPesan("👀", p.Symbol, p.Htf, p.Ltf, "Tahap "+tahapKonfirmasi+" · Area "+htf+" tersentuh"))
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
+		{"Strategi", metodeTampil(p.StrategyVersion)},
 		{"Tahap", tahapKonfirmasi + " · Tunggu close " + htf},
 		{"Waktu", p.Siklus},
 		{"Bias", arahTampil(p.Direction)},
@@ -329,8 +331,8 @@ func FormatRadarSweepMessage(p RadarHTFParams) Message {
 		{"Batas", formatHargaOpsional(p.StopLoss)},
 	}))
 
-	fmt.Fprintf(&b, "\nHarga sudah nyentuh area %s.\n", htf)
-	fmt.Fprintf(&b, "Tunggu candle %s close dulu buat konfirmasi arah %s.\n", htf, arahTampil(p.Direction))
+	fmt.Fprintf(&b, "\nHarga telah menyentuh area %s.\n", htf)
+	fmt.Fprintf(&b, "Tunggu candle %s ditutup untuk mengonfirmasi arah %s.\n", htf, arahTampil(p.Direction))
 
 	return Message{Text: b.String(), Buttons: tombolRadar("🔍 Buka Radar "+htf, p.DashboardLink)}
 }
@@ -368,6 +370,7 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 	b.WriteString("\n")
 
 	b.WriteString(makeBox([][2]string{
+		{"Strategi", metodeTampil(p.StrategyVersion)},
 		{"Tahap", tahapTrigger + " · Entry " + ltf},
 		{"Waktu", p.Siklus},
 		{"Bias", arahTampil(p.Direction)},
@@ -377,15 +380,15 @@ func FormatRadarLTFMessage(p RadarLTFParams) Message {
 	}))
 
 	if p.CISDLevel > 0 {
-		fmt.Fprintf(&b, "\nTunggu candle %s close nembus %s, itu tanda arah sudah mantap.\n",
+		fmt.Fprintf(&b, "\nTunggu candle %s ditutup melewati %s untuk mengonfirmasi pemicu entry.\n",
 			ltf, formatPrice(p.CISDLevel))
 	} else {
 		// Tingkat acuan belum terbentuk. User tetap diberi tahu apa yang
 		// ditunggu dan di harga mana batasnya, bukan kalimat kosong.
-		fmt.Fprintf(&b, "\nTingkat acuan di %s belum kebentuk.\n", ltf)
-		fmt.Fprintf(&b, "Tunggu candle %s close yang jelas buat nentuin titik entry.\n", ltf)
+		fmt.Fprintf(&b, "\nLevel acuan pada %s belum terbentuk.\n", ltf)
+		fmt.Fprintf(&b, "Tunggu candle %s ditutup untuk menentukan pemicu entry.\n", ltf)
 		if p.StopLoss > 0 {
-			fmt.Fprintf(&b, "Kalau arah sudah mantap, batas risiko di %s.\n", formatPrice(p.StopLoss))
+			fmt.Fprintf(&b, "Batas risiko yang tersedia berada di %s.\n", formatPrice(p.StopLoss))
 		}
 	}
 
@@ -588,7 +591,7 @@ func FormatPositionOpenedMessage(p PositionOpenedParams) Message {
 		{"Masuk", masuk},
 	}))
 
-	b.WriteString("\nPosisi jalan. Biarin sampai kena Stop atau Target.\n")
+	b.WriteString("\nPosisi telah dibuka. Perkembangan hasil akan dikirim setelah posisi ditutup.\n")
 
 	return Message{Text: b.String(), Buttons: tombolRadar("📊 Lihat Posisi", p.PosisiLink)}
 }
@@ -743,6 +746,12 @@ func forbiddenTermPattern(term string) *regexp.Regexp {
 // metodeTampil menyeragamkan nama metode, kosong bila tidak ada yang dikirim.
 func metodeTampil(strategy string) string {
 	s := strings.TrimSpace(strategy)
+	switch strings.ToLower(s) {
+	case "ila-2.0", "ila 2.0":
+		return "ILA 2.0"
+	case "ila-3.0", "ila 3.0":
+		return "ILA 3.0"
+	}
 	if s == "" || s == "ILA" {
 		return ""
 	}

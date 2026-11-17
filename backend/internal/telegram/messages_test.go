@@ -384,7 +384,7 @@ func TestRadarLTFTanpaLevelTetapInformatif(t *testing.T) {
 		StopLoss: 3875.10, TakeProfit: 3910.20, Siklus: "Candle H1 · 09:00 NY",
 	})
 
-	for _, ingin := range []string{"XAUUSD · H1 ➔ M5", "Tahap 3/6", "3.875,10", "3.910,20", "belum kebentuk"} {
+	for _, ingin := range []string{"XAUUSD · H1 ➔ M5", "Tahap 3/6", "3.875,10", "3.910,20", "belum terbentuk"} {
 		if !strings.Contains(msg.Text, ingin) {
 			t.Errorf("pesan tidak memuat %q:\n%s", ingin, msg.Text)
 		}

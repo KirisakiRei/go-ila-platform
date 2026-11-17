@@ -57,12 +57,12 @@ func TestPaginasiRiwayatMentok(t *testing.T) {
 	baris := []BarisRiwayat{{Symbol: "XAUUSD", Direction: "BUY", OutcomeR: 2, ClosedAt: time.Now()}}
 
 	pertama := FormatRiwayatMessage(RiwayatParams{Baris: baris, Halaman: 1, TotalHalaman: 3, TotalPosisi: 11})
-	if nav := navHalaman(t, pertama); nav[0].CallbackData != "" {
+	if nav := navHalaman(t, pertama); nav[0].CallbackData != CallbackNoop {
 		t.Fatal("tombol sebelumnya harus nonaktif di halaman pertama")
 	}
 
 	terakhir := FormatRiwayatMessage(RiwayatParams{Baris: baris, Halaman: 3, TotalHalaman: 3, TotalPosisi: 11})
-	if nav := navHalaman(t, terakhir); nav[2].CallbackData != "" {
+	if nav := navHalaman(t, terakhir); nav[2].CallbackData != CallbackNoop {
 		t.Fatal("tombol berikutnya harus nonaktif di halaman terakhir")
 	}
 
@@ -71,7 +71,7 @@ func TestPaginasiRiwayatMentok(t *testing.T) {
 	if nav[0].CallbackData == "" || nav[2].CallbackData == "" {
 		t.Fatal("di halaman tengah kedua tombol harus aktif")
 	}
-	if !strings.Contains(nav[1].Text, "2/3") {
+	if nav[1].Text != "Kembali" {
 		t.Fatalf("penanda halaman harus 2/3, dapat %q", nav[1].Text)
 	}
 }
@@ -89,7 +89,7 @@ func TestAksiDariPerintah(t *testing.T) {
 	kasus := map[string]string{
 		"/menu":       CallbackMenu,
 		"/pantau":     CallbackPantau,
-		"/riwayat":    CallbackRiwayat + "0",
+		"/riwayat":    CallbackRiwayatMenu,
 		"/hari":       CallbackHariIni,
 		"/pengaturan": CallbackPengaturan,
 		"/bantuan":    CallbackBantuan,

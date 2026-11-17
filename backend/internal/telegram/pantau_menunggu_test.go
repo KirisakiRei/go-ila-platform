@@ -75,10 +75,10 @@ func TestTombolHalamanPantau(t *testing.T) {
 	if len(navigasi) != 3 {
 		t.Fatalf("navigasi harus tiga tombol, dapat %d", len(navigasi))
 	}
-	if navigasi[0].CallbackData != "" {
+	if navigasi[0].CallbackData != CallbackNoop {
 		t.Fatal("tombol sebelumnya harus tanpa aksi di halaman pertama")
 	}
-	if navigasi[1].Text != "1/2" {
+	if navigasi[1].Text != "Kembali" {
 		t.Fatalf("penanda halaman = %q, ingin 1/2", navigasi[1].Text)
 	}
 	if navigasi[2].CallbackData != CallbackPantauHalaman+"2" {
@@ -103,7 +103,7 @@ func TestTombolHalamanPantauTerakhir(t *testing.T) {
 	if navigasi[0].CallbackData != CallbackPantauHalaman+"1" {
 		t.Fatalf("tombol sebelumnya = %q, ingin %s1", navigasi[0].CallbackData, CallbackPantauHalaman)
 	}
-	if navigasi[2].CallbackData != "" {
+	if navigasi[2].CallbackData != CallbackNoop {
 		t.Fatal("tombol berikutnya harus tanpa aksi di halaman terakhir")
 	}
 }

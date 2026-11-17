@@ -9,6 +9,7 @@ import (
 // BarisRiwayat adalah satu posisi pada daftar riwayat.
 type BarisRiwayat struct {
 	PositionID string
+	Status     string
 	Symbol     string
 	Direction  string
 	OutcomeR   float64
@@ -41,12 +42,12 @@ func FormatRiwayatMessage(p RiwayatParams) Message {
 
 	hariTerakhir := ""
 	for _, row := range p.Baris {
-		hari := row.ClosedAt.In(time.FixedZone("WIB", 7*3600)).Format("02 Jan")
+		hari := row.ClosedAt.In(time.FixedZone("WIB", 7*3600)).Format("02 Jan 2006")
 		if hari != hariTerakhir {
 			fmt.Fprintf(&b, "\n%s\n", hari)
 			hariTerakhir = hari
 		}
-		jam := row.ClosedAt.In(time.FixedZone("WIB", 7*3600)).Format("15:04")
+		jam := row.ClosedAt.In(time.FixedZone("WIB", 7*3600)).Format("15:04 WIB")
 		fmt.Fprintf(&b, "%s %s %s · %s · %s\n",
 			simbolHasil(row.OutcomeR),
 			arahTampil(row.Direction),
@@ -56,30 +57,35 @@ func FormatRiwayatMessage(p RiwayatParams) Message {
 		)
 	}
 
-	return Message{Text: b.String(), Buttons: tombolRiwayat(p.Halaman, p.TotalHalaman)}
+	buttons := tombolRiwayat(p.Halaman, p.TotalHalaman)
+	for i, row := range p.Baris {
+		if row.PositionID != "" {
+			buttons = append(buttons, []InlineButton{{Text: fmt.Sprintf("%d · %s", i+1, row.Symbol), CallbackData: "view:history:" + row.PositionID}})
+		}
+	}
+	return Message{Text: b.String(), Buttons: buttons}
 }
 
 // tombolRiwayat menyusun navigasi halaman.
 //
-// Tombol yang tidak mungkin ditekan dikirim sebagai tombol tanpa aksi, supaya
-// tata letaknya tidak bergeser antar halaman.
+// Boundary buttons acknowledge a no-op; Telegram does not allow actionless buttons.
 func tombolRiwayat(halaman, total int) [][]InlineButton {
 	if total <= 1 {
 		return [][]InlineButton{{{Text: LabelMenu, CallbackData: CallbackMenu}}}
 	}
 
-	sebelum := InlineButton{Text: "‹ Sebelumnya"}
+	sebelum := InlineButton{Text: "‹ Sebelumnya", CallbackData: CallbackNoop}
 	if halaman > 1 {
 		sebelum.CallbackData = fmt.Sprintf("%s%d", CallbackRiwayat, (halaman-2)*RiwayatPerHalaman)
 	}
 
-	berikut := InlineButton{Text: "Berikutnya ›"}
+	berikut := InlineButton{Text: "Berikutnya ›", CallbackData: CallbackNoop}
 	if halaman < total {
 		berikut.CallbackData = fmt.Sprintf("%s%d", CallbackRiwayat, halaman*RiwayatPerHalaman)
 	}
 
 	return [][]InlineButton{
-		{sebelum, {Text: fmt.Sprintf("%d/%d", halaman, total), CallbackData: CallbackMenu}, berikut},
+		{sebelum, {Text: "Kembali", CallbackData: CallbackRiwayatMenu}, berikut},
 		{{Text: LabelMenu, CallbackData: CallbackMenu}},
 	}
 }
@@ -100,6 +106,7 @@ type HariParams struct {
 	BulanWinRate  float64
 	BulanNet      float64
 	DashboardLink string
+	UpdatedAt     time.Time
 }
 
 // FormatHariMessage menyusun ringkasan hari ini.
@@ -115,7 +122,7 @@ func FormatHariMessage(p HariParams) Message {
 		{"Trade", kuotaTampil(p.TradeTerpakai, p.TradeMaks)},
 		{"Menang", itoaOpsional(p.Win)},
 		{"Kalah", itoaOpsional(p.Loss)},
-		{"Untung/Rugi", formatProfitHarian(p.ProfitLoss)},
+		{"PnL hari ini", "Belum tersedia"},
 		{"Posisi jalan", itoaOpsional(p.PosisiJalan)},
 	}))
 	if p.BulanTotal > 0 {
@@ -127,11 +134,16 @@ func FormatHariMessage(p HariParams) Message {
 		}))
 	}
 
+	b.WriteString("\nPeriode harian mengikuti jadwal reset trading akun, bukan pergantian hari WIB.\n")
+	if !p.UpdatedAt.IsZero() {
+		b.WriteString("Diperbarui: " + p.UpdatedAt.In(time.FixedZone("WIB", 7*3600)).Format("02 Jan 2006, 15:04 WIB") + "\n")
+	}
 	var tombol [][]InlineButton
 	tombol = append(tombol, []InlineButton{
-		{Text: LabelRiwayat, CallbackData: CallbackRiwayat + "0"},
+		{Text: LabelRiwayat, CallbackData: CallbackRiwayat + "0", Style: "primary"},
 		{Text: LabelMenu, CallbackData: CallbackMenu},
 	})
+	tombol = append(tombol, []InlineButton{{Text: "Pantau", CallbackData: CallbackPantau}, {Text: LabelSegarkan, CallbackData: CallbackHariIni}})
 	if p.DashboardLink != "" {
 		tombol = append(tombol, []InlineButton{{Text: "Buka di dashboard", URL: p.DashboardLink}})
 	}
@@ -145,86 +157,55 @@ func FormatHariMessage(p HariParams) Message {
 // Kalimatnya sengaja menjelaskan alasannya, bukan sekadar melarang. Trader
 // perlu tahu bahwa urusan akun tetap aman di tempat yang semestinya.
 func FormatPengaturanMessage(dashboardLink string) Message {
-	var b strings.Builder
-
-	b.WriteString("⚙️ PENGATURAN\n\n")
-	b.WriteString("Sebagian besar pengaturan tetap dikelola di website, karena menyangkut akun dan uang Anda.\n\n")
-	b.WriteString("Yang bisa Anda atur di website\n")
-	b.WriteString(daftar([][2]string{
-		{"Akun broker", "kredensial dan koneksi"},
-		{"Risiko", "per transaksi dan ukuran lot"},
-		{"Pantauan", "pair dan timeframe"},
-		{"Mode", "otomatis atau manual"},
-		{"Langganan", "notifikasi dan paket"},
-	}))
-	b.WriteString("\nLewat Telegram Anda cukup memantau dan memutuskan entry.\n")
-
-	var tombol [][]InlineButton
+	buttons := [][]InlineButton{}
 	if dashboardLink != "" {
-		tombol = append(tombol, []InlineButton{{Text: "Buka Pengaturan", URL: dashboardLink}})
+		buttons = append(buttons,
+			[]InlineButton{{Text: "Profil akun", URL: AppURL(dashboardLink, "/pengaturan/profil")}, {Text: "Keamanan", URL: AppURL(dashboardLink, "/pengaturan/keamanan")}},
+			[]InlineButton{{Text: "Koneksi Telegram", URL: AppURL(dashboardLink, "/pengaturan")}},
+			[]InlineButton{{Text: "Akun broker", URL: AppURL(dashboardLink, "/akun")}, {Text: "Strategi & eksekusi", URL: AppURL(dashboardLink, "/strategi")}},
+		)
 	}
-	tombol = append(tombol, []InlineButton{{Text: LabelMenu, CallbackData: CallbackMenu}})
-	return Message{Text: b.String(), Buttons: tombol}
+	buttons = append(buttons, []InlineButton{{Text: LabelMenu, CallbackData: CallbackMenu}})
+	return Message{Text: "⚙️ Pengaturan\n\nKelola profil, keamanan, koneksi, dan preferensi trading melalui dashboard. Pilih bagian yang ingin dibuka.", Buttons: buttons}
 }
 
-// FormatMenuMessage menyusun halaman menu utama.
-//
-// Susunannya mengikuti kebiasaan bot yang sudah dikenal trader: identitas
-// singkat di atas, lalu tombol dua kolom supaya mudah ditekan dengan jempol.
+// FormatMenuMessage keeps the home independent of market or broker availability.
 func FormatMenuMessage(nama, paket, dashboardLink string) Message {
-	var b strings.Builder
-
-	b.WriteString("🤖 BOT Trading ILA\n\n")
+	sapaan := "Selamat datang."
 	if nama != "" {
-		b.WriteString("Halo, " + escapeHTML(nama) + " 👋\n")
-	} else {
-		b.WriteString("Halo 👋\n")
+		sapaan = "Halo, " + escapeHTML(nama) + "."
 	}
-	b.WriteString("Mau lihat apa hari ini?\n")
-
-	if paket != "" {
-		b.WriteString("\n")
-		b.WriteString(daftar([][2]string{{"Paket", paket}}))
-	}
-
-	return Message{Text: b.String(), Buttons: tombolMenu(dashboardLink)}
+	return Message{Text: "<b>BOT Trading ILA</b>\n\n" + sapaan + "\n\nPantau perkembangan setup, cek posisi, dan lihat hasil trading dari sini.\n\nPilih menu untuk melanjutkan.", Buttons: tombolMenu(dashboardLink)}
 }
 
-// tombolMenu menyusun tombol halaman menu: dua per baris, dashboard di bawah.
-//
-// Labelnya dipendekkan supaya muat dua kolom di layar ponsel; teks panjang
-// akan terpotong dan sulit dibaca. Tautan dashboard hanya ditampilkan bila
-// alamatnya tersedia, karena tombol URL tanpa alamat akan gagal dikirim.
 func tombolMenu(dashboardLink string) [][]InlineButton {
-	baris := [][]InlineButton{
-		{{Text: "📊 Pantau", CallbackData: CallbackPantau}, {Text: "📋 Riwayat", CallbackData: CallbackRiwayat + "0"}},
-		{{Text: "📈 Hari Ini", CallbackData: CallbackHariIni}, {Text: "⚙️ Pengaturan", CallbackData: CallbackPengaturan}},
+	rows := [][]InlineButton{
+		{{Text: "📡 Pantau saat ini", CallbackData: CallbackPantau, Style: "primary"}},
+		{{Text: "📋 Riwayat", CallbackData: CallbackRiwayatMenu}, {Text: "📈 Ringkasan hari ini", CallbackData: CallbackHariIni}},
 	}
 	if dashboardLink != "" {
-		baris = append(baris, []InlineButton{{Text: CabangDashboard, URL: dashboardLink}})
+		rows = append(rows, []InlineButton{{Text: CabangDashboard, URL: dashboardLink, Style: "primary"}})
 	}
-	return baris
+	return append(rows, []InlineButton{{Text: LabelPengaturan, CallbackData: CallbackPengaturan}, {Text: "❔ Bantuan", CallbackData: CallbackBantuan}})
 }
 
-// FormatBantuanMessage menjelaskan cara pakai bot dengan singkat.
-func FormatBantuanMessage() Message {
-	var b strings.Builder
-
-	b.WriteString("❓ PANDUAN SINGKAT\n\n")
-	b.WriteString("Bot ini mengabari setup ILA dan menjalankan entry tanpa Anda harus membuka website.\n\n")
-	b.WriteString("Cara pakai\n")
-	b.WriteString(daftar([][2]string{
-		{"Notifikasi", "pesan masuk saat setup siap dieksekusi"},
-		{"Eksekusi", "tekan tombol di pesan untuk entry atau lewati"},
-		{"Pantau", "posisi berjalan dan setup yang menunggu"},
-		{"Riwayat", "posisi yang sudah tutup beserta hasilnya"},
-		{"Pengaturan", "akun, risiko, dan mode tetap di website"},
-	}))
-	b.WriteString("\nSemua halaman dibuka lewat tombol di bawah pesan. Ketik / untuk melihat daftar perintah.\n")
-
-	return Message{Text: b.String(), Buttons: [][]InlineButton{
+func FormatRiwayatMenu() Message {
+	return Message{Text: "📋 Riwayat\n\nTransaksi akun mencatat order broker. Tidak tereksekusi menampilkan hasil simulasi sinyal yang tidak menjadi transaksi akun.", Buttons: [][]InlineButton{
+		{{Text: "Transaksi akun", CallbackData: CallbackRiwayat + "0", Style: "primary"}},
+		{{Text: "Tidak tereksekusi", CallbackData: CallbackSimulasi + "1"}},
 		{{Text: LabelMenu, CallbackData: CallbackMenu}},
 	}}
+}
+
+func FormatBantuanMessage() Message {
+	return Message{Text: "❔ Bantuan\n\n<b>Pantau</b>\nLihat posisi aktif dan perkembangan setup.\n\n<b>Riwayat</b>\nTinjau transaksi akun serta hasil simulasi sinyal yang tidak dieksekusi.\n\n<b>Keputusan entry</b>\nKonfirmasi atau lewati sinyal melalui tombol pada notifikasi. Syarat trading tetap diperiksa sebelum order dikirim.\n\nSimulasi bukan transaksi broker dan tidak mengubah saldo akun.", Buttons: [][]InlineButton{
+		{{Text: "Panduan tahap sinyal", CallbackData: CallbackPanduan}},
+		{{Text: LabelPengaturan, CallbackData: CallbackPengaturan}, {Text: LabelMenu, CallbackData: CallbackMenu}},
+	}}
+}
+
+func FormatPanduanMessage() Message {
+	return Message{Text: "Panduan tahap sinyal\n\n1/6 · Membaca struktur timeframe besar\n2/6 · Menunggu konfirmasi candle\n3/6 · Mencari pemicu entry\n4/6 · Setup siap untuk entry\n5/6 · Posisi akun berjalan\n6/6 · Posisi selesai\n\nLabel ILA 2.0 atau ILA 3.0 menunjukkan strategi sumber. Detail kondisi mengikuti strategi tersebut.\n\nTahap ditampilkan sesuai pembaruan yang diterima. Beberapa tahap dapat berlangsung berdekatan atau tidak teramati; bot tidak membuat riwayat tahap yang tidak diterima.", Buttons: [][]InlineButton{{{Text: "Kembali ke Bantuan", CallbackData: CallbackBantuan}, {Text: LabelMenu, CallbackData: CallbackMenu}}}}
 }
 
 // itoaOpsional menampilkan angka atau tanda hubung bila nol.

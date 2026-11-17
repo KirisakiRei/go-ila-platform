@@ -53,18 +53,13 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 	}
 	chatID := strconv.FormatInt(cb.Message.Chat.ID, 10)
 
-	// Spinner pada tombol harus selalu ditutup, termasuk saat pemrosesan gagal.
-	defer func() {
-		if err := h.edit.AnswerCallback(ctx, cb.ID, ""); err != nil && h.logger != nil {
-			h.logger.WarnContext(ctx, "gagal menutup indikator tombol telegram", slog.String("error", err.Error()))
-		}
-	}()
-
-	if h.approve == nil {
-		h.edit.AnswerCallback(ctx, cb.ID, "Menu belum aktif")
+	// Acknowledge before database or broker work so the Telegram spinner ends promptly.
+	if err := h.edit.AnswerCallback(ctx, cb.ID, ""); err != nil {
+		h.logInfo(ctx, "menjawab tombol Telegram gagal", err)
+	}
+	if cb.Data == telegram.CallbackNoop {
 		return
 	}
-
 	user, err := h.telegram.ResolveChat(ctx, chatID)
 	if err != nil {
 		h.tolakCallback(ctx, cb, chatID)
@@ -83,8 +78,16 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 
 	switch aksi := strings.TrimSpace(cb.Data); {
 	case strings.HasPrefix(aksi, telegram.CallbackEksekusi):
+		if h.approve == nil {
+			h.kirimTeks(ctx, chatID, "Konfirmasi entry belum tersedia. Silakan buka dashboard.")
+			return
+		}
 		h.confirmEntry(ctx, user, chatID, messageID, strings.TrimPrefix(aksi, telegram.CallbackEksekusi))
 	case strings.HasPrefix(aksi, telegram.CallbackLewati):
+		if h.approve == nil {
+			h.kirimTeks(ctx, chatID, "Keputusan entry belum dapat diproses. Silakan buka dashboard.")
+			return
+		}
 		h.declineEntry(ctx, user, chatID, messageID, strings.TrimPrefix(aksi, telegram.CallbackLewati))
 	case strings.HasPrefix(aksi, telegram.CallbackRiwayat):
 		if !butuhMenu() {
@@ -94,6 +97,42 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
 			return h.menu.Riwayat(ctx, user, offset)
 		})
+	case strings.HasPrefix(aksi, telegram.CallbackSimulasi):
+		reader, ok := h.menu.(interface {
+			Simulasi(context.Context, *model.User, string, int) (telegram.Message, error)
+		})
+		if !ok {
+			h.kirimTeks(ctx, chatID, "Riwayat simulasi belum tersedia. Silakan buka dashboard.")
+			return
+		}
+		page, _ := strconv.Atoi(strings.TrimPrefix(aksi, telegram.CallbackSimulasi))
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) { return reader.Simulasi(ctx, user, h.dashboardLink(), page) })
+	case strings.HasPrefix(aksi, "view:"):
+		reader, ok := h.menu.(interface {
+			Detail(context.Context, *model.User, string, string, string) (telegram.Message, error)
+		})
+		if !ok {
+			return
+		}
+		parts := strings.SplitN(aksi, ":", 3)
+		if len(parts) != 3 {
+			return
+		}
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
+			return reader.Detail(ctx, user, h.dashboardLink(), parts[1], parts[2])
+		})
+	case aksi == telegram.CallbackBantuan:
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
+			msg := telegram.FormatBantuanMessage()
+			if h.baseURL != "" {
+				msg.Buttons = append([][]telegram.InlineButton{{{Text: "Laporkan masalah", URL: telegram.AppURL(h.baseURL, "/laporkan-bug"), Style: "primary"}}}, msg.Buttons...)
+			}
+			return msg, nil
+		})
+	case aksi == telegram.CallbackPanduan:
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) { return telegram.FormatPanduanMessage(), nil })
+	case aksi == telegram.CallbackRiwayatMenu:
+		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) { return telegram.FormatRiwayatMenu(), nil })
 	case aksi == telegram.CallbackMenu:
 		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
 			return telegram.FormatMenuMessage(namaTampil(user), paketTampil(user), h.dashboardLink()), nil
@@ -105,7 +144,7 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 		h.gantiPesan(ctx, chatID, messageID, func() (telegram.Message, error) {
 			return h.menu.Pantau(ctx, user, h.dashboardLink(), 1)
 		})
-	case aksi == telegram.CallbackPantauHalamanAksi:
+	case strings.HasPrefix(aksi, telegram.CallbackPantauHalaman):
 		if !butuhMenu() {
 			return
 		}
@@ -170,7 +209,7 @@ func (h *TelegramHandler) gantiPesan(ctx context.Context, chatID string, message
 	pesan, err := susun()
 	if err != nil {
 		h.logInfo(ctx, "menyusun halaman menu gagal", err)
-		h.ketikPesan(ctx, chatID, messageID, telegram.Message{Text: "Halaman belum bisa dimuat. Coba lagi sebentar lagi."}, nil)
+		h.ketikPesan(ctx, chatID, messageID, telegram.Message{Text: "Halaman belum dapat dimuat. Silakan coba kembali melalui menu.", Buttons: [][]telegram.InlineButton{{{Text: telegram.LabelMenu, CallbackData: telegram.CallbackMenu}}}}, [][]telegram.InlineButton{{{Text: telegram.LabelMenu, CallbackData: telegram.CallbackMenu}}})
 		return
 	}
 	h.ketikPesan(ctx, chatID, messageID, pesan, pesan.Buttons)
@@ -183,6 +222,9 @@ func (h *TelegramHandler) ketikPesan(ctx context.Context, chatID string, message
 		buttons = [][]telegram.InlineButton{}
 	}
 	if err := h.edit.EditMessageText(ctx, chatID, messageID, pesan.Text, buttons); err != nil {
+		if strings.Contains(err.Error(), "message is not modified") {
+			return
+		}
 		h.logInfo(ctx, "mengganti pesan telegram gagal", err)
 		if _, kirimErr := h.edit.SendMessageReturningID(ctx, chatID, pesan); kirimErr != nil {
 			h.logInfo(ctx, "mengirim pesan pengganti gagal", kirimErr)
@@ -232,6 +274,8 @@ func (h *TelegramHandler) handleMenuTeks(ctx context.Context, chatID, aksi strin
 		pesan, err = h.menu.Pantau(ctx, user, h.dashboardLink(), 1)
 	case aksi == telegram.CallbackHariIni:
 		pesan, err = h.menu.HariIni(ctx, user, h.dashboardLink())
+	case aksi == telegram.CallbackRiwayatMenu:
+		pesan = telegram.FormatRiwayatMenu()
 	case strings.HasPrefix(aksi, telegram.CallbackRiwayat):
 		pesan, err = h.menu.Riwayat(ctx, user, 0)
 	default:

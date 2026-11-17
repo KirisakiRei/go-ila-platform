@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"ila/backend/internal/model"
@@ -88,6 +91,8 @@ func (s *telegramMenuService) Pantau(ctx context.Context, user *model.User, link
 	barisPosisi := make([]telegram.BarisPantau, 0, len(posisi))
 	for _, pos := range posisi {
 		barisPosisi = append(barisPosisi, telegram.BarisPantau{
+			DetailURL: "view:position:" + pos.ID,
+			StopLoss:  pos.StopLoss, TakeProfit: pos.TakeProfit, OpenedAt: pos.OpenedAt,
 			Ticket:     pos.TicketNumber,
 			Symbol:     pos.Symbol,
 			Direction:  pos.Direction,
@@ -132,7 +137,7 @@ func (s *telegramMenuService) Pantau(ctx context.Context, user *model.User, link
 		Selesai:       barisSelesai,
 		HargaTersedia: false,
 		DashboardLink: link,
-		Halaman:       halaman,
+		Halaman:       min(max(1, halaman), max(1, totalHalaman)),
 		TotalHalaman:  totalHalaman,
 	}), nil
 }
@@ -177,6 +182,7 @@ func (s *telegramMenuService) setupMenunggu(ctx context.Context, userID string, 
 			mulai = sig.UpdatedAt
 		}
 		baris = append(baris, telegram.BarisMenunggu{
+			DetailURL: "view:radar:" + radarReference(sig.SignalID), StrategyVersion: sig.StrategyVersion,
 			Symbol:       sig.Symbol,
 			Htf:          sig.Htf,
 			Ltf:          sig.Ltf,
@@ -195,6 +201,7 @@ func (s *telegramMenuService) setupMenunggu(ctx context.Context, userID string, 
 	if halaman < 1 {
 		halaman = 1
 	}
+	halaman = min(halaman, max(1, totalHalaman))
 	awal := (halaman - 1) * telegram.PantauPerHalaman
 	if awal > len(baris) {
 		awal = len(baris)
@@ -241,41 +248,25 @@ func (s *telegramMenuService) Riwayat(ctx context.Context, user *model.User, off
 		offset = 0
 	}
 
-	// Satu baris tambahan dipakai untuk mengetahui apakah masih ada halaman
-	// berikutnya, sehingga jumlah halaman tidak perlu dihitung dua kali.
-	rows, err := s.journal.ListPositions(ctx, user.ID, repository.JournalFilter{},
-		offset+telegram.RiwayatPerHalaman+1)
+	stats, err := s.journal.Stats(ctx, user.ID, repository.JournalFilter{ClosedOnly: true})
 	if err != nil {
-		return telegram.Message{}, fmt.Errorf("membaca riwayat posisi: %w", err)
+		return telegram.Message{}, err
 	}
-
-	stats, err := s.journal.Stats(ctx, user.ID, repository.JournalFilter{})
+	total := stats.ClosedTP + stats.ClosedSL + stats.ClosedManual + stats.Untracked
+	totalHalaman := max(1, (total+telegram.RiwayatPerHalaman-1)/telegram.RiwayatPerHalaman)
+	offset = min(max(0, offset), (totalHalaman-1)*telegram.RiwayatPerHalaman)
+	rows, err := s.journal.ListPositions(ctx, user.ID, repository.JournalFilter{ClosedOnly: true, Offset: offset}, telegram.RiwayatPerHalaman)
 	if err != nil {
-		return telegram.Message{}, fmt.Errorf("menghitung ringkasan posisi: %w", err)
+		return telegram.Message{}, err
 	}
-
-	total := stats.TotalPositions
-	totalHalaman := (total + telegram.RiwayatPerHalaman - 1) / telegram.RiwayatPerHalaman
-	if totalHalaman < 1 {
-		totalHalaman = 1
-	}
-
-	akhir := offset + telegram.RiwayatPerHalaman
-	if akhir > len(rows) {
-		akhir = len(rows)
-	}
-	if offset > len(rows) {
-		offset = len(rows)
-	}
-
 	baris := make([]telegram.BarisRiwayat, 0, telegram.RiwayatPerHalaman)
-	for _, pos := range rows[offset:akhir] {
+	for _, pos := range rows {
 		tutup := time.Time{}
 		if pos.ClosedAt != nil {
 			tutup = *pos.ClosedAt
 		}
 		baris = append(baris, telegram.BarisRiwayat{
-			PositionID: pos.ID,
+			PositionID: pos.ID, Status: pos.Status,
 			Symbol:     pos.Symbol,
 			Direction:  pos.Direction,
 			OutcomeR:   pos.OutcomeR,
@@ -316,7 +307,7 @@ func (s *telegramMenuService) HariIni(ctx context.Context, user *model.User, lin
 	}
 
 	return telegram.FormatHariMessage(telegram.HariParams{
-		Hari:          hari,
+		Hari: hari, UpdatedAt: sekarang,
 		TradeTerpakai: ringkasan.TotalTrades,
 		TradeMaks:     s.maksTrade,
 		Win:           ringkasan.WinCount,
@@ -334,4 +325,196 @@ func (s *telegramMenuService) HariIni(ctx context.Context, user *model.User, lin
 // hariKunci menyusun kunci hari untuk tabel ringkasan harian.
 func hariKunci(t time.Time) string {
 	return t.In(timezone.WIB).Format("2006-01-02")
+}
+
+// Simulasi reads the same persisted outcomes as the website; it never fetches prices.
+func (s *telegramMenuService) Simulasi(ctx context.Context, user *model.User, link string, page int) (telegram.Message, error) {
+	if page < 1 {
+		page = 1
+	}
+	if page > 10000 {
+		page = 10000
+	}
+	total, err := s.journal.CountSkipped(ctx, user.ID, repository.JournalFilter{})
+	if err != nil {
+		return telegram.Message{}, err
+	}
+	pages := max(1, (total+4)/5)
+	page = min(page, pages)
+	rows, err := s.journal.ListSkipped(ctx, user.ID, repository.JournalFilter{}, (page-1)*5, 5)
+	if err != nil {
+		return telegram.Message{}, err
+	}
+	var b strings.Builder
+	var details [][]telegram.InlineButton
+	fmt.Fprintf(&b, "📋 Tidak tereksekusi\nHasil simulasi, bukan PnL akun.\nHalaman %d dari %d\n", page, pages)
+	if len(rows) == 0 {
+		b.WriteString("\nBelum ada sinyal untuk ditampilkan.\n")
+	}
+	for i, row := range rows {
+		details = append(details, []telegram.InlineButton{{Text: fmt.Sprintf("%d · Detail simulasi", i+1), CallbackData: "view:simulation:" + row.ID}})
+		var sig model.Signal
+		if row.EvalSnapshot != "" {
+			if err := json.Unmarshal([]byte(row.EvalSnapshot), &sig); err != nil {
+				return telegram.Message{}, fmt.Errorf("membaca snapshot: %w", err)
+			}
+		}
+		if row.EvalSnapshot == "" {
+			sig.Symbol = "Rincian sinyal belum tersedia"
+		}
+		label := "Menunggu penilaian"
+		switch row.EvalStatus {
+		case model.EvalRunning:
+			label = "Sedang berjalan"
+		case model.EvalTP:
+			label = "Take profit"
+		case model.EvalSL:
+			label = "Stop loss"
+		case model.EvalNoEntry:
+			label = "Tidak masuk"
+		case model.EvalUnknown:
+			label = "Tidak dapat dipastikan"
+		}
+		fmt.Fprintf(&b, "\n%d. %s · %s\n%s → %s · %s\nSimulasi: %s\n", (page-1)*5+i+1, telegram.Escape(sig.Symbol), telegram.Escape(sig.Direction), telegram.Escape(sig.Htf), telegram.Escape(sig.Ltf), telegram.StrategyLabel(sig.StrategyVersion), label)
+		if row.EvalEntryAt != nil {
+			fmt.Fprintf(&b, "Entry: %s\n", row.EvalEntryAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB"))
+		}
+		if row.EvalAt != nil {
+			fmt.Fprintf(&b, "Penilaian akhir: %s\n", row.EvalAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB"))
+		}
+		if row.EvalStatus == model.EvalTP || row.EvalStatus == model.EvalSL {
+			fmt.Fprintf(&b, "Hasil: %+.2fR\n", row.EvalRLower)
+		}
+	}
+	prev, next := telegram.CallbackNoop, telegram.CallbackNoop
+	if page > 1 {
+		prev = fmt.Sprintf("%s%d", telegram.CallbackSimulasi, page-1)
+	}
+	if page < pages {
+		next = fmt.Sprintf("%s%d", telegram.CallbackSimulasi, page+1)
+	}
+	return telegram.Message{Text: b.String(), Buttons: append([][]telegram.InlineButton{
+		{{Text: "‹ Sebelumnya", CallbackData: prev}, {Text: "Kembali", CallbackData: telegram.CallbackRiwayatMenu}, {Text: "Berikutnya ›", CallbackData: next}},
+		{{Text: "Detail & bukti harga", URL: telegram.AppURL(link, "/posisi"), Style: "primary"}},
+	}, details...)}, nil
+}
+
+func radarReference(id string) string { return fmt.Sprintf("%x", sha256.Sum256([]byte(id)))[:16] }
+
+// Detail resolves identifiers only within the authenticated user's data.
+func (s *telegramMenuService) Detail(ctx context.Context, user *model.User, link, kind, id string) (telegram.Message, error) {
+	if kind == "radar" && s.radar != nil {
+		rows, err := s.radar.ListRadarForUser(ctx, user.ID, 100)
+		if err != nil {
+			return telegram.Message{}, err
+		}
+		for _, sig := range rows {
+			if radarReference(sig.SignalID) != id {
+				continue
+			}
+			stage, text := tahapRadar(sig.Status, sig.Htf, sig.Ltf)
+			body := fmt.Sprintf("<b>%s · %s → %s</b>\n%s\n\nTahap %s · %s\nArah: %s\n\nSinyal pertama: %s\nPembaruan terakhir: %s", telegram.Escape(sig.Symbol), telegram.Escape(sig.Htf), telegram.Escape(sig.Ltf), telegram.StrategyLabel(sig.StrategyVersion), stage, telegram.Escape(text), telegram.Escape(sig.Direction), sig.PublishedAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB"), sig.UpdatedAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB"))
+			if sig.EntryPrice > 0 {
+				body += fmt.Sprintf("\n\nRencana entry: %g\nStop loss: %g\nTake profit: %g", sig.EntryPrice, sig.StopLoss, sig.TakeProfit)
+			}
+			return telegram.Message{Text: body, Buttons: [][]telegram.InlineButton{{{Text: "Lihat di dashboard", URL: telegram.AppURL(link, "/sinyal"), Style: "primary"}}, {{Text: "Segarkan", CallbackData: "view:radar:" + id}, {Text: "Kembali ke Pantau", CallbackData: telegram.CallbackPantau}}}}, nil
+		}
+	}
+	if kind == "simulation" {
+		rows, err := s.journal.ListSkipped(ctx, user.ID, repository.JournalFilter{SkippedID: id}, 0, 1)
+		if err != nil {
+			return telegram.Message{}, err
+		}
+		if len(rows) == 1 {
+			row := rows[0]
+			var sig model.Signal
+			if err := json.Unmarshal([]byte(row.EvalSnapshot), &sig); err != nil {
+				return telegram.Message{}, fmt.Errorf("snapshot simulasi tidak tersedia: %w", err)
+			}
+			body := fmt.Sprintf("<b>%s · %s</b>\n%s\nSimulasi sinyal tidak tereksekusi\n\nStatus: %s\nRencana entry: %g\nStop loss: %g\nTake profit: %g", telegram.Escape(sig.Symbol), telegram.Escape(sig.Direction), telegram.StrategyLabel(sig.StrategyVersion), simulationStatusLabel(row.EvalStatus), sig.EntryPrice, sig.StopLoss, sig.TakeProfit)
+			if row.EvalStatus == model.EvalTP || row.EvalStatus == model.EvalSL {
+				body += fmt.Sprintf("%sHasil: %+.2fR", string(rune(10)), row.EvalRLower)
+			}
+			if row.EvalEntryAt != nil {
+				body += "\nEntry simulasi: " + row.EvalEntryAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB")
+			}
+			if row.EvalAt != nil {
+				body += "\nPenilaian akhir: " + row.EvalAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB")
+			}
+			if row.EvalEntryAt != nil && row.EvalAt != nil {
+				body += "\nDurasi: " + lamaRingkas(row.EvalAt.Sub(*row.EvalEntryAt))
+			}
+			if row.RejectReason != "" {
+				body += "\n\nTidak masuk akun: " + telegram.Escape(row.RejectReason)
+			}
+			if row.EvalNote != "" {
+				body += "\nCatatan simulasi: " + telegram.Escape(row.EvalNote)
+			}
+			body += "\n\nHasil simulasi bukan PnL akun. Entry teoritis menggunakan level sinyal, bukan fill broker. Data lama dapat memakai metode penilaian sebelumnya."
+			return telegram.Message{Text: body, Buttons: [][]telegram.InlineButton{{{Text: "Lihat bukti harga di web", URL: telegram.AppURL(link, "/posisi"), Style: "primary"}}, {{Text: "Kembali ke simulasi", CallbackData: telegram.CallbackSimulasi + "1"}, {Text: telegram.LabelMenu, CallbackData: telegram.CallbackMenu}}}}, nil
+		}
+	}
+	if kind == "history" {
+		rows, err := s.journal.ListPositions(ctx, user.ID, repository.JournalFilter{ClosedOnly: true, PositionID: id}, 1)
+		if err != nil {
+			return telegram.Message{}, err
+		}
+		if len(rows) == 1 {
+			pos := rows[0]
+			closed := "Belum tersedia"
+			if pos.ClosedAt != nil {
+				closed = pos.ClosedAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB")
+			}
+			body := fmt.Sprintf("<b>%s · %s</b>\nTransaksi akun\n\nStatus: %s\nEntry: %g\nExit: %g\nStop loss: %g\nTake profit: %g\nHasil: %+.2fR\n\nDibuka: %s\nDitutup: %s", telegram.Escape(pos.Symbol), telegram.Escape(pos.Direction), positionStatusLabel(pos.Status), pos.OpenPrice, pos.ExitPrice, pos.StopLoss, pos.TakeProfit, pos.OutcomeR, pos.OpenedAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB"), closed)
+			if pos.ClosedAt != nil {
+				body += "\nDurasi: " + lamaRingkas(pos.ClosedAt.Sub(pos.OpenedAt))
+			}
+			return telegram.Message{Text: body, Buttons: [][]telegram.InlineButton{{{Text: "Kembali ke transaksi", CallbackData: telegram.CallbackRiwayat + "0"}, {Text: "Menu", CallbackData: telegram.CallbackMenu}}}}, nil
+		}
+	}
+	if kind == "position" {
+		rows, err := s.akun.ListOpenPositionsByUser(ctx, user.ID)
+		if err != nil {
+			return telegram.Message{}, err
+		}
+		for _, pos := range rows {
+			if pos.ID != id {
+				continue
+			}
+			body := fmt.Sprintf("<b>%s · %s</b>\nPosisi akun berjalan\n\nOrder: %s\nLot: %g\nEntry: %g\nStop loss: %g\nTake profit: %g\n\nDibuka: %s\nDurasi: %s\n\nPnL berjalan belum tersedia di halaman ini.", telegram.Escape(pos.Symbol), telegram.Escape(pos.Direction), telegram.Escape(pos.TicketNumber), pos.LotSize, pos.OpenPrice, pos.StopLoss, pos.TakeProfit, pos.OpenedAt.In(timezone.WIB).Format("02 Jan 2006, 15:04 WIB"), lamaRingkas(s.timezone().Sub(pos.OpenedAt)))
+			return telegram.Message{Text: body, Buttons: [][]telegram.InlineButton{{{Text: "Lihat posisi di web", URL: telegram.AppURL(link, "/posisi"), Style: "primary"}}, {{Text: "Segarkan", CallbackData: "view:position:" + id}, {Text: "Kembali ke Pantau", CallbackData: telegram.CallbackPantau}}}}, nil
+		}
+	}
+	return telegram.Message{Text: "Item ini sudah tidak aktif atau tidak tersedia untuk akun Anda.", Buttons: [][]telegram.InlineButton{{{Text: "Kembali ke Pantau", CallbackData: telegram.CallbackPantau}}}}, nil
+}
+
+func simulationStatusLabel(status string) string {
+	switch status {
+	case model.EvalRunning:
+		return "Sedang berjalan"
+	case model.EvalTP:
+		return "Take profit"
+	case model.EvalSL:
+		return "Stop loss"
+	case model.EvalNoEntry:
+		return "Tidak masuk"
+	case model.EvalUnknown:
+		return "Tidak dapat dipastikan"
+	default:
+		return "Menunggu penilaian"
+	}
+}
+func positionStatusLabel(status string) string {
+	switch status {
+	case "CLOSED_TP":
+		return "Take profit"
+	case "CLOSED_SL":
+		return "Stop loss"
+	case "CLOSED_MANUAL":
+		return "Ditutup manual"
+	case "UNTRACKED":
+		return "Hasil belum terverifikasi"
+	default:
+		return "Posisi selesai"
+	}
 }

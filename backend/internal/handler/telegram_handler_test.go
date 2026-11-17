@@ -230,7 +230,7 @@ func TestTelegramWebhookStartReplies(t *testing.T) {
 		if len(sender.messages) != 1 {
 			t.Fatalf("expected 1 message, got %d", len(sender.messages))
 		}
-		if !strings.Contains(sender.messages[0].text, "PANDUAN") {
+		if !strings.Contains(sender.messages[0].text, "Bantuan") {
 			t.Fatalf("pesan tidak memuat panduan: %s", sender.messages[0].text)
 		}
 	})

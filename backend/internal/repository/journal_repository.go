@@ -16,6 +16,10 @@ import (
 // bersama oleh daftar dan ringkasan supaya keduanya selalu berbicara tentang
 // kumpulan data yang sama.
 type JournalFilter struct {
+	Offset     int
+	ClosedOnly bool
+	PositionID string
+	SkippedID  string
 	// From dan To membatasi waktu buka posisi. To eksklusif agar rentang
 	// hari tidak tumpang tindih di batas tengah malam.
 	From time.Time
@@ -87,6 +91,12 @@ func NewJournalRepository(db *gorm.DB) JournalRepository {
 // applyFilter memasang penyaring bersama pada kueri posisi.
 func (r *journalRepository) applyFilter(query *gorm.DB, userID string, filter JournalFilter) *gorm.DB {
 	query = query.Where("user_id = ?", userID)
+	if filter.ClosedOnly {
+		query = query.Where("closed_at IS NOT NULL")
+	}
+	if filter.PositionID != "" {
+		query = query.Where("id = ?", filter.PositionID)
+	}
 
 	if !filter.From.IsZero() {
 		query = query.Where("opened_at >= ?", filter.From)
@@ -111,7 +121,7 @@ func (r *journalRepository) ListPositions(ctx context.Context, userID string, fi
 	var rows []model.Position
 
 	query := r.applyFilter(r.db.WithContext(ctx).Model(&model.Position{}), userID, filter)
-	if err := query.Order("opened_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := query.Order("opened_at DESC").Offset(max(0, filter.Offset)).Limit(min(max(1, limit), 100)).Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("membaca jurnal posisi: %w", err)
 	}
 	return rows, nil
@@ -293,6 +303,9 @@ func (r *journalRepository) skippedQuery(ctx context.Context, userID string, fil
 		Where("user_signal.user_id = ?", userID).
 		Where("user_signal.status IN ?", skipStatuses).
 		Where("user_signal.position_id = ?", "")
+	if filter.SkippedID != "" {
+		query = query.Where("user_signal.id = ?", filter.SkippedID)
+	}
 	if !filter.From.IsZero() {
 		query = query.Where("COALESCE(user_signal.eval_published_at, signal.published_at) >= ?", filter.From)
 	}
