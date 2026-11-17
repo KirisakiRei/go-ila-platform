@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `d13890c` — entri teratas di bagian
+> **Commit terakhir saat log ini ditulis:** `7b08df8` — entri teratas di bagian
 > **DARI CLAUDE** adalah catatan terbaru
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
@@ -41,7 +41,7 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 **Tanggal:** 2026-11-18
 **Pelaku:** Antigravity (Platform Audit & Hardening)
 **Tipe:** Perbaikan edge-case eksekusi, simulasi dry-run, antrean sinyal, & backtest (Kategori 4)
-**Status:** 🟢 SELESAI & teruji penuh
+**Status:** 🟢 SELESAI, teruji penuh & LIVE di VPS 2 pada commit `7b08df8`
 
 **Ringkasan:**
 Menindaklanjuti arahan owner untuk memperbaiki keenam *edge-case* Kategori 4 **tanpa merusak atau mengubah perilaku alur utama yang sudah berjalan akurat** (`RiskMode="percent"`, akun USD bermodal normal, pair USD-quoted `XAUUSD` / `EURUSD` / `USTEC`, dan posisi broker live `IsDryRun=false`):
