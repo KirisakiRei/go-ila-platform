@@ -70,6 +70,11 @@ func IsInternal(err error) bool {
 }
 
 // WrapValidation membungkus satu pesan validasi menjadi error BAD_REQUEST.
+//
+// Pesan keluaran validator (mis. "Key: 'RegisterRequest.Username' Error:Field
+// validation for 'Username' failed on the 'alphanum' tag") diterjemahkan lebih
+// dulu lewat PesanValidasi supaya pengguna membaca kalimat biasa, bukan nama
+// struct Go. Pesan yang sudah ditulis manusia dibiarkan apa adanya.
 func WrapValidation(message string) error {
-	return errors.Join(apperror.ErrBadRequest, errors.New(message))
+	return errors.Join(apperror.ErrBadRequest, errors.New(PesanValidasi(message)))
 }

@@ -6,7 +6,7 @@ package dto
 // dikirim, keduanya divalidasi keunikan dan formatnya (plans/09 §3).
 type RegisterRequest struct {
 	Name     string `json:"name" binding:"required,min=3,max=100"`
-	Username string `json:"username" binding:"omitempty,min=3,max=32,alphanum"`
+	Username string `json:"username" binding:"omitempty,min=3,max=32"`
 	Email    string `json:"email" binding:"required,email,max=150"`
 	Phone    string `json:"phone" binding:"omitempty,max=24"`
 	Password string `json:"password" binding:"required,min=10,max=72"`

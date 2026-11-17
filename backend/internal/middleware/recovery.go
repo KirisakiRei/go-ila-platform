@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"log/slog"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -25,6 +26,18 @@ func Recovery(logger *slog.Logger) gin.HandlerFunc {
 		}()
 		c.Next()
 	}
+}
+
+// pesanTerakhir mengambil baris terakhir dari pesan error gabungan.
+//
+// WrapValidation menyusun error lewat errors.Join(ErrBadRequest, errPesan),
+// sehingga teksnya menjadi "invalid request payload\n<pesan>". Yang pantas
+// dibaca pengguna hanya bagian pesannya saja.
+func pesanTerakhir(pesan string) string {
+	if idx := strings.LastIndex(pesan, "\n"); idx >= 0 {
+		return strings.TrimSpace(pesan[idx+1:])
+	}
+	return pesan
 }
 
 // ErrorHandler memusatkan penerjemahan error domain ke balasan HTTP.
@@ -55,6 +68,11 @@ func ErrorHandler(logger *slog.Logger) gin.HandlerFunc {
 		message := err.Error()
 		if code == "INTERNAL_SERVER_ERROR" {
 			message = "Terjadi kesalahan internal. Silakan coba lagi."
+		} else if code == "BAD_REQUEST" {
+			// WrapValidation menyatukan ErrBadRequest dengan pesan manusia, sehingga
+			// err.Error() berbentuk "invalid request payload\n<pesan>". Klien hanya
+			// perlu pesannya; kalimat pembukanya adalah istilah internal.
+			message = httpx.PesanValidasi(pesanTerakhir(message))
 		}
 		httpx.Error(c, status, code, message, nil)
 		c.Abort()
