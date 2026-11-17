@@ -55,6 +55,12 @@ type RunnerRepository interface {
 	// baru dan harus bisa dikirim lagi, sementara kiriman berulang dengan status
 	// yang sama tetap tertahan.
 	HitungKejadianSinyal(ctx context.Context, userID, signalID string) (int, error)
+	// HitungKejadianSlot mengembalikan jumlah peralihan status untuk satu slot
+	// (pair, HTF, LTF, arah). Dipakai sebagai penanda kejadian pada kunci
+	// notifikasi: satu setup memakai dua signal_id berbeda (baris status untuk
+	// tahap awal, sinyal baru untuk eksekusi), dan hanya slot yang menyatukan
+	// keduanya.
+	HitungKejadianSlot(ctx context.Context, userID, symbol, htf, ltf, direction string) (int, error)
 
 	// Posisi.
 	CreatePosition(ctx context.Context, pos *model.Position) error
@@ -418,6 +424,19 @@ func (r *runnerRepository) RecordSignalEvent(ctx context.Context, event *model.S
 		return fmt.Errorf("mencatat peristiwa sinyal: %w", err)
 	}
 	return nil
+}
+
+func (r *runnerRepository) HitungKejadianSlot(ctx context.Context, userID, symbol, htf, ltf, direction string) (int, error) {
+	var jumlah int64
+	err := r.db.WithContext(ctx).
+		Model(&model.SignalEvent{}).
+		Where("user_id = ? AND symbol = ? AND htf = ? AND ltf = ? AND direction = ?",
+			userID, symbol, htf, ltf, direction).
+		Count(&jumlah).Error
+	if err != nil {
+		return 0, fmt.Errorf("menghitung peristiwa slot: %w", err)
+	}
+	return int(jumlah), nil
 }
 
 func (r *runnerRepository) HitungKejadianSinyal(ctx context.Context, userID, signalID string) (int, error) {

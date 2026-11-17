@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"ila/backend/internal/model"
@@ -213,20 +212,11 @@ func (s *telegramMenuService) setupMenunggu(ctx context.Context, userID string, 
 //
 // String kosong berarti status itu bukan tahap menunggu entry.
 func tahapRadar(status, htf, ltf string) (string, string) {
-	switch status {
-	case model.SignalStatusWaitHTFSweep:
-		return "1/6", "Baca arah " + htf
-	case model.SignalStatusWaitHTFCandleClose:
-		return "2/6", "Tunggu close " + htf
-	case model.SignalStatusWaitLTFCISD:
-		return "3/6", "Cari entry di " + ltf
-	case model.SignalStatusReadyToEntry, model.SignalStatusOpportunity:
-		return "4/6", "Siap masuk"
+	tahap := telegram.TahapDariStatusRadar(status)
+	if tahap == 0 {
+		return "", ""
 	}
-	if strings.HasPrefix(status, "WAIT_ILA3_") {
-		return "3/6", "Menunggu trigger ILA 3.0"
-	}
-	return "", ""
+	return tahap.String(), telegram.KalimatTahapRadar(tahap, htf, ltf)
 }
 
 // lamaRingkas mengubah selang waktu menjadi teks pendek yang mudah dibaca.

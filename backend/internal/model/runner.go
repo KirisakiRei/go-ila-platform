@@ -8,9 +8,16 @@ const RejectReasonMaxLen = 255
 // SignalEvent menyimpan jejak peralihan status sinyal per user.
 // Sinyal global boleh batal; catatan per user wajib tetap ada agar audit jelas.
 type SignalEvent struct {
-	ID         string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	UserID     string    `gorm:"type:varchar(36);index:idx_signal_event_user,priority:1;not null" json:"user_id"`
-	SignalID   string    `gorm:"type:varchar(64);index;not null" json:"signal_id"`
+	ID       string `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	UserID   string `gorm:"type:varchar(36);index:idx_signal_event_user,priority:1;not null" json:"user_id"`
+	SignalID string `gorm:"type:varchar(64);index;not null" json:"signal_id"`
+	// Kolom slot dipakai kunci notifikasi. Satu setup memakai dua signal_id
+	// berbeda (baris status untuk tahap awal, sinyal baru untuk eksekusi),
+	// jadi hanya slot yang menyatukan riwayatnya.
+	Symbol     string    `gorm:"type:varchar(20);index:idx_signal_event_slot,priority:1" json:"symbol"`
+	Htf        string    `gorm:"type:varchar(10);index:idx_signal_event_slot,priority:2" json:"htf"`
+	Ltf        string    `gorm:"type:varchar(10);index:idx_signal_event_slot,priority:3" json:"ltf"`
+	Direction  string    `gorm:"type:varchar(10);index:idx_signal_event_slot,priority:4" json:"direction"`
 	FromStatus string    `gorm:"type:varchar(24)" json:"from_status"`
 	ToStatus   string    `gorm:"type:varchar(24);not null" json:"to_status"`
 	Reason     string    `gorm:"type:varchar(255)" json:"reason"`

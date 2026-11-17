@@ -1408,7 +1408,6 @@ func (s *Service) calculateLot(ctx context.Context, user *model.User, account *m
 	})
 }
 
-
 // ---------------------------------------------------------------------------
 // Pembaruan sinyal (CANCEL / EXPIRE / SUPERSEDE)
 // ---------------------------------------------------------------------------
@@ -1855,6 +1854,13 @@ func (s *Service) recordUserSignal(ctx context.Context, userID, signalID, status
 		ToStatus:   status,
 		Reason:     truncate(reason, model.RejectReasonMaxLen),
 		CreatedAt:  now,
+	}
+	// Slot diisi supaya kunci notifikasi bisa menyatukan tahap awal (baris
+	// status) dan tahap eksekusi (sinyal baru) yang memakai signal_id berbeda.
+	// Kegagalan baca dibiarkan: event tetap tercatat, hanya tanpa slot.
+	if sig, err := s.store.FindSignal(ctx, signalID); err == nil && sig != nil {
+		event.Symbol, event.Htf, event.Ltf, event.Direction =
+			sig.Symbol, sig.Htf, sig.Ltf, sig.Direction
 	}
 	if err := s.store.RecordSignalEvent(ctx, event); err != nil {
 		s.logger.Error("gagal mencatat peristiwa sinyal", "error", err.Error())

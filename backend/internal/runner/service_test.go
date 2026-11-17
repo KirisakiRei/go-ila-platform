@@ -124,6 +124,18 @@ func (s *fakeStore) PerpanjangMasaBerlaku(_ context.Context, signalID string, ex
 	return nil
 }
 
+func (s *fakeStore) HitungKejadianSlot(_ context.Context, userID, symbol, htf, ltf, direction string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	jumlah := 0
+	for _, ev := range s.events {
+		if ev.UserID == userID && ev.Symbol == symbol && ev.Htf == htf && ev.Ltf == ltf && ev.Direction == direction {
+			jumlah++
+		}
+	}
+	return jumlah, nil
+}
+
 func (s *fakeStore) HitungKejadianSinyal(_ context.Context, userID, signalID string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

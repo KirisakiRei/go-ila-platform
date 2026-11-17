@@ -15,6 +15,7 @@ import (
 	"ila/backend/internal/runner/notify"
 	"ila/backend/internal/settings"
 	"ila/backend/internal/telegram"
+	"ila/backend/internal/timezone"
 )
 
 // runnerPublisher menerjemahkan perubahan status Runner menjadi notifikasi.
@@ -52,9 +53,13 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	}
 
 	// Notifikasi hanya untuk status yang punya arti bagi user.
-	// Status standby/idle (WAIT_HTF_SWEEP dan WAIT_ILA3_HTF_KEY_LEVEL) tidak dikirim
-	// ke Telegram agar tidak menyampah saat belum ada reaksi harga aktif.
+	//
+	// WAIT_HTF_SWEEP ikut dikirim: itu tahap 1, titik masuk siklus. Tanpa
+	// kabar tahap 1, user hanya melihat lompatan ke tahap 2 atau 3 tanpa tahu
+	// setup baru dimulai (kasus USTEC 17 Nov 2026). Status idle lain
+	// (WAIT_ILA3_HTF_KEY_LEVEL) tetap diam karena tidak ada reaksi harga.
 	switch status {
+	case model.SignalStatusWaitHTFSweep:
 	case model.SignalStatusReadyToEntry, model.SignalStatusRejected,
 		model.SignalStatusOpportunity,
 		model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_MTF_REVERSAL",
@@ -70,16 +75,25 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 	// mundur ke tahap itu: kunci `WAIT_HTF_SWEEP` pertama dan `WAIT_HTF_SWEEP`
 	// setelah gagal di tahap 3 adalah dua kejadian berbeda. Tanpa penanda ini,
 	// kabar bahwa setup kembali menunggu struktur tidak pernah sampai.
-	messageKey := fmt.Sprintf("sig:%s:%s:%s:%d", signalID, userID, status, p.kejadianSinyal(ctx, userID, signalID))
+	// Kunci notifikasi memakai SLOT, bukan signal_id.
+	//
+	// Engine memakai dua identitas untuk satu setup: baris status menunggu
+	// (`status-USTEC-H4-M15`) untuk tahap 1-3, dan sinyal baru (`sig-...-3`)
+	// untuk tahap 4-6. Dengan signal_id sebagai kunci, tahap 5 tidak sadar
+	// bahwa tahap 3 sudah dikirim untuk slot yang sama, dan mundurnya setup ke
+	// tahap 1 tidak pernah bisa dikenali (kasus USTEC 17 Nov 2026).
+	messageKey := fmt.Sprintf("slot:%s:%s:%s:%s:%s:%d",
+		signal.Symbol, signal.Htf, signal.Ltf, signal.Direction, userID,
+		p.kejadianSlot(ctx, userID, signal))
 
 	p.notifier.EnqueueSignal(userID, messageKey, signalID, func(chatID string) telegram.Message {
 		_ = chatID
 
 		switch status {
-		case model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_MTF_REVERSAL":
+		case model.SignalStatusWaitHTFSweep:
+			// Tahap 1: arah belum dikonfirmasi, jangan pakai kalimat "area kena".
 			return telegram.FormatRadarHTFMessage(p.radarHTFParams(ctx, signal))
-
-		case "WAIT_HTF_SWEEP":
+		case model.SignalStatusWaitHTFCandleClose, "WAIT_ILA3_MTF_REVERSAL":
 			return telegram.FormatRadarSweepMessage(p.radarHTFParams(ctx, signal))
 
 		case model.SignalStatusWaitLTFCISD, "WAIT_ILA3_LTF_CISD_1", "WAIT_ILA3_MTF_FVG_RETR", "WAIT_ILA3_LTF_CISD_2":
@@ -263,11 +277,15 @@ func (p *runnerPublisher) radarHTFParams(ctx context.Context, signal *model.Sign
 }
 
 // siklusCandle menyebut candle yang sedang berjalan dan jam New York-nya.
+//
+// Zona memakai America/New_York, bukan offset tetap: November masih EDT (UTC-4)
+// sementara Desember EST (UTC-5), dan offset tetap membuat jam meleset satu jam
+// selama separuh tahun.
 func siklusCandle(htf string, terbit time.Time) string {
 	if htf == "" || terbit.IsZero() {
 		return ""
 	}
-	ny := terbit.UTC().Add(-5 * time.Hour)
+	ny := terbit.In(timezone.NY)
 	return fmt.Sprintf("Candle %s · %s NY", htf, ny.Format("15:04"))
 }
 
@@ -387,6 +405,27 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 			RiwayatLink: posisiLink,
 		})
 	})
+}
+
+// kejadianSlot mengembalikan nomor peralihan status terakhir untuk satu slot
+// (pair, pasangan timeframe, dan arah) milik satu user.
+//
+// Nomor ini yang membuat tahap yang sama bisa dikirim lagi setelah setup
+// mundur: `WAIT_HTF_SWEEP` pertama dan `WAIT_HTF_SWEEP` setelah gagal di tahap
+// 3 adalah dua kejadian berbeda, sehingga kuncinya berbeda dan kabar mundur
+// tetap sampai.
+//
+// Kegagalan membaca dianggap 0: notifikasi lebih baik terkirim sekali lebih
+// sering daripada hilang sama sekali.
+func (p *runnerPublisher) kejadianSlot(ctx context.Context, userID string, signal *model.Signal) int {
+	jumlah, err := p.store.HitungKejadianSlot(ctx, userID, signal.Symbol, signal.Htf, signal.Ltf, signal.Direction)
+	if err != nil {
+		p.logger.Warn("gagal menghitung peristiwa slot",
+			"symbol", signal.Symbol, "htf", signal.Htf, "ltf", signal.Ltf,
+			"error", err.Error())
+		return 0
+	}
+	return jumlah
 }
 
 // kejadianSinyal mengembalikan nomor peralihan status terakhir untuk satu
