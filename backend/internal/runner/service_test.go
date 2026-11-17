@@ -264,6 +264,21 @@ func (s *fakeStore) FindUserSignalByPosition(_ context.Context, _ string) (*mode
 	return nil, apperror.ErrNotFound
 }
 
+func (s *fakeStore) UsersOfSignal(_ context.Context, signalID string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	seen := map[string]bool{}
+	out := make([]string, 0)
+	for key, us := range s.userSignals {
+		if us.SignalID == signalID && !seen[us.UserID] {
+			seen[us.UserID] = true
+			out = append(out, us.UserID)
+		}
+		_ = key
+	}
+	return out, nil
+}
+
 func (s *fakeStore) RecordSignalEvent(_ context.Context, event *model.SignalEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

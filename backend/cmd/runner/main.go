@@ -26,6 +26,7 @@ import (
 	"ila/backend/internal/config"
 	"ila/backend/internal/engineclient"
 	"ila/backend/internal/logkit"
+	"ila/backend/internal/market"
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
@@ -85,6 +86,8 @@ func main() {
 	}
 
 	store := repository.NewRunnerRepository(db)
+	journalRepo := repository.NewJournalRepository(db)
+	candleProvider := market.NewTradingViewProvider()
 	// Katalog pair dipakai untuk nilai kontrak saat menghitung R posisi.
 	pairCatalog := repository.NewPairRepository(db)
 
@@ -174,6 +177,13 @@ func main() {
 		// diambil dari katalog pair yang diisi admin, dengan cadangan bawaan
 		// per jenis simbol.
 		ValuePerLot: runner.NewCachedValuePerLot(pairCatalog, time.Minute).ValuePerLot,
+		// Setup yang berakhir tanpa dieksekusi dinilai di sini, selagi candle
+		// masih segar. Tanpa ini hasil TP/SL-nya hanya bisa dihitung saat jurnal
+		// dibuka, dan setelah beberapa hari feed tidak lagi memuat waktunya.
+		CandleFetcher: func(ctx context.Context, symbol, feed, timeframe string, limit int) ([]market.Candle, error) {
+			return candleProvider.FetchCandles(ctx, symbol, feed, timeframe, limit)
+		},
+		EvalSink: journalRepo.SaveSignalEval,
 		// Tanpa ini gerbang strategi memakai env saja dan seluruh permintaan
 		// ILA 3.0 tersaring habis walau engine-nya sudah berjalan.
 		Settings: strategySettings,

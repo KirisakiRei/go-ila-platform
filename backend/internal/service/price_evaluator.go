@@ -2,12 +2,11 @@ package service
 
 import (
 	"context"
-	"strings"
 	"time"
 
+	"ila/backend/internal/evalprice"
 	"ila/backend/internal/market"
 	"ila/backend/internal/model"
-	"ila/backend/internal/timezone"
 )
 
 // evalCandleLimit membatasi candle yang diambil. Cukup untuk menutup setup
@@ -56,103 +55,37 @@ func (e *priceEvaluator) evaluate(ctx context.Context, signal *model.Signal, sin
 	if err != nil || len(candles) == 0 {
 		return evalOutcome{}, false
 	}
+	in := evalprice.InputDariSinyal(signal)
+	if evalprice.CandleTerlaluTua(in, candles) {
+		// Feed tidak lagi memuat masa berlaku setup ini. Menyimpulkan apa pun
+		// akan mengarang; baris ditandai supaya tidak terbaca "tidak terjadi
+		// apa-apa" selamanya.
+		out := evalprice.TanpaCandle()
+		return evalOutcome{Status: out.Status, Note: out.Note}, true
+	}
 	return evaluateCandles(signal, candles, since)
 }
 
 // evaluateCandles memisahkan perhitungan dari pengambilan data agar bisa diuji
-// dengan candle buatan.
-//
-// Urutan candle menentukan pemenang saat TP dan SL tersentuh pada lilin yang
-// sama. Kasus itu dilaporkan UNKNOWN, bukan ditebak.
+// dengan candle buatan. Aturannya milik paket evalprice supaya jurnal dan
+// runner tidak pernah menghasilkan angka berbeda untuk setup yang sama.
 func evaluateCandles(signal *model.Signal, candles []market.Candle, since time.Time) (evalOutcome, bool) {
-	buy := strings.EqualFold(signal.Direction, "BUY")
-	sinceUnix := since.Unix()
-	expiresUnix := signal.ExpiresAt.Unix()
-	touched := false
-	var entryAt *time.Time
-	for _, c := range candles {
-		if c.Time < sinceUnix {
-			continue
-		}
-		// Candle di luar jam pasar tidak boleh menilai apa pun.
-		//
-		// Kasus nyata 16 Nov 2026: candle Minggu malam membuat setup berumur 15
-		// menit tertulis "Tembus TP +2R". Pergerakan di luar sesi hanya sisa
-		// penutupan dan spread lebar, bukan harga yang bisa ditradingkan.
-		if !timezone.MarketExpectedOpen(time.Unix(c.Time, 0)) {
-			continue
-		}
-		if !touched {
-			hitEntry := (buy && c.Low <= signal.EntryPrice) || (!buy && c.High >= signal.EntryPrice)
-			if !hitEntry {
-				// Harga tidak pernah menyentuh level entry sebelum kedaluwarsa:
-				// setup tidak pernah berjalan, jadi TP/SL sesudahnya tidak
-				// relevan untuk dinilai.
-				if c.Time > expiresUnix {
-					return evalOutcome{
-						Status: model.EvalNoEntry,
-						At:     utcPtr(time.Unix(expiresUnix, 0)),
-						Note:   "harga tidak pernah menyentuh level entry",
-					}, true
-				}
-				continue
-			}
-			touched = true
-			entryAt = utcPtr(time.Unix(c.Time, 0))
-		}
-
-		hitTP, hitSL := false, false
-		if buy {
-			hitTP = c.High >= signal.TakeProfit
-			hitSL = c.Low <= signal.StopLoss
-		} else {
-			hitTP = c.Low <= signal.TakeProfit
-			hitSL = c.High >= signal.StopLoss
-		}
-
-		switch {
-		case hitTP && hitSL:
-			return evalOutcome{
-				Status:  model.EvalUnknown,
-				EntryAt: entryAt,
-				At:      utcPtr(time.Unix(c.Time, 0)),
-				Note:    "TP dan SL tersentuh pada lilin yang sama",
-			}, true
-		case hitTP:
-			return evalOutcome{
-				Status:  model.EvalTP,
-				EntryAt: entryAt,
-				At:      utcPtr(time.Unix(c.Time, 0)),
-				Price:   signal.TakeProfit,
-				RLower:  signal.RiskReward,
-			}, true
-		case hitSL:
-			return evalOutcome{
-				Status:  model.EvalSL,
-				EntryAt: entryAt,
-				At:      utcPtr(time.Unix(c.Time, 0)),
-				Price:   signal.StopLoss,
-				RLower:  -1,
-			}, true
-		}
+	in := evalprice.InputDariSinyal(signal)
+	// Titik mulai penilaian ditentukan pemanggil: baris user_signal ditulis
+	// ulang setiap status berubah, jadi waktu terbit bisa jatuh setelah harga
+	// bergerak.
+	in.PublishedAt = since
+	out, ok := evalprice.FromCandles(in, candles)
+	if !ok {
+		return evalOutcome{}, false
 	}
-
-	if touched {
-		// Setup sudah tersentuh tetapi belum selesai: sedang berjalan. Jam entry
-		// tetap dilaporkan agar durasi bisa dihitung sejak masuk.
-		return evalOutcome{Status: model.EvalRunning, EntryAt: entryAt}, true
-	}
-	if len(candles) > 0 && candles[len(candles)-1].Time > expiresUnix {
-		return evalOutcome{
-			Status: model.EvalNoEntry,
-			At:     utcPtr(time.Unix(expiresUnix, 0)),
-			Note:   "harga tidak pernah menyentuh level entry",
-		}, true
-	}
-	return evalOutcome{}, false
+	return evalOutcome{
+		Status:  out.Status,
+		EntryAt: out.EntryAt,
+		At:      out.At,
+		Price:   out.Price,
+		RLower:  out.RLower,
+		Note:    out.Note,
+	}, true
 }
 
-func utcPtr(t time.Time) *time.Time {
-	utc := t.UTC()
-	return &utc
-}

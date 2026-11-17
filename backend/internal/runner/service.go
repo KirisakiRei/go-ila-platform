@@ -21,6 +21,7 @@ import (
 	enginev1 "ila/backend/gen/engine/v1"
 	"ila/backend/internal/authstate"
 	"ila/backend/internal/broker"
+	"ila/backend/internal/market"
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	ingest "ila/backend/internal/runner/ingest"
@@ -106,6 +107,15 @@ type Options struct {
 	// tidak bisa dihitung benar. Bila nil, dipakai nilai bawaan per jenis
 	// simbol dari DefaultValuePerLot.
 	ValuePerLot func(symbol string) float64
+	// CandleFetcher mengambil candle untuk menilai setup yang berakhir tanpa
+	// dieksekusi. Bila nil, penilaian hanya terjadi saat jurnal dibaca.
+	//
+	// Runner menilai saat sinyal kedaluwarsa karena itu satu-satunya saat
+	// candle masih segar: setelah beberapa hari feed tidak lagi memuat
+	// waktunya, dan hasil TP/SL setup itu hilang selamanya.
+	CandleFetcher func(ctx context.Context, symbol, feed, timeframe string, limit int) ([]market.Candle, error)
+	// EvalSink menyimpan hasil penilaian agar terbaca di riwayat.
+	EvalSink func(ctx context.Context, userID, signalID string, out *model.UserSignalEval) error
 }
 
 // PairGate memberi tahu Runner simbol mana yang masih boleh diminta ke engine.

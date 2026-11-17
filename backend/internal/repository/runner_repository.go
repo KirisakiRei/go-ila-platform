@@ -61,6 +61,10 @@ type RunnerRepository interface {
 	// tahap awal, sinyal baru untuk eksekusi), dan hanya slot yang menyatukan
 	// keduanya.
 	HitungKejadianSlot(ctx context.Context, userID, symbol, htf, ltf, direction string) (int, error)
+	// UsersOfSignal mengembalikan user yang punya baris status untuk satu sinyal.
+	// Dipakai saat menilai setup yang berakhir: hasilnya harus tersimpan untuk
+	// setiap orang yang melihat setup itu, bukan hanya yang membuka jurnal dulu.
+	UsersOfSignal(ctx context.Context, signalID string) ([]string, error)
 
 	// Posisi.
 	CreatePosition(ctx context.Context, pos *model.Position) error
@@ -424,6 +428,19 @@ func (r *runnerRepository) RecordSignalEvent(ctx context.Context, event *model.S
 		return fmt.Errorf("mencatat peristiwa sinyal: %w", err)
 	}
 	return nil
+}
+
+func (r *runnerRepository) UsersOfSignal(ctx context.Context, signalID string) ([]string, error) {
+	var users []string
+	err := r.db.WithContext(ctx).
+		Model(&model.UserSignal{}).
+		Where("signal_id = ?", signalID).
+		Distinct().
+		Pluck("user_id", &users).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca pemegang sinyal: %w", err)
+	}
+	return users, nil
 }
 
 func (r *runnerRepository) HitungKejadianSlot(ctx context.Context, userID, symbol, htf, ltf, direction string) (int, error) {
