@@ -23,6 +23,7 @@ type RateLimiter struct {
 	buckets map[string]*rateBucket
 	limit   int
 	window  time.Duration
+	ops     uint64
 	now     func() time.Time
 }
 
@@ -53,8 +54,26 @@ func (l *RateLimiter) allow(key string) (bool, time.Duration) {
 	defer l.mu.Unlock()
 
 	now := l.now()
+	l.ops++
+	if l.ops%sweepEveryOps == 0 || len(l.buckets) >= maxLimiterEntries {
+		l.sweepLocked(now)
+	}
+
 	bucket, ok := l.buckets[key]
 	if !ok || now.After(bucket.resetAt) {
+		if !ok && len(l.buckets) >= maxLimiterEntries {
+			var oldestKey string
+			var oldestReset time.Time
+			for k, b := range l.buckets {
+				if oldestKey == "" || b.resetAt.Before(oldestReset) {
+					oldestKey = k
+					oldestReset = b.resetAt
+				}
+			}
+			if oldestKey != "" {
+				delete(l.buckets, oldestKey)
+			}
+		}
 		l.buckets[key] = &rateBucket{count: 1, resetAt: now.Add(l.window)}
 		return true, 0
 	}
@@ -66,12 +85,8 @@ func (l *RateLimiter) allow(key string) (bool, time.Duration) {
 	return true, 0
 }
 
-// sweep membuang entri kedaluwarsa agar peta tidak tumbuh tanpa batas.
-func (l *RateLimiter) sweep() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := l.now()
+// sweepLocked membuang entri kedaluwarsa saat kunci sudah dipegang.
+func (l *RateLimiter) sweepLocked(now time.Time) {
 	for key, bucket := range l.buckets {
 		if now.After(bucket.resetAt) {
 			delete(l.buckets, key)
@@ -81,15 +96,9 @@ func (l *RateLimiter) sweep() {
 
 // Middleware membatasi permintaan per kunci yang dihasilkan keyFunc.
 // Nilai "retry after" dikirim lewat header agar klien tahu kapan mencoba lagi.
+// Pembersihan kedaluwarsa berjalan teramortisasi di allow() sehingga tidak
+// membocorkan goroutine latar saat router dirakit ulang di pengujian.
 func (l *RateLimiter) Middleware(keyFunc func(*gin.Context) string) gin.HandlerFunc {
-	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			l.sweep()
-		}
-	}()
-
 	return func(c *gin.Context) {
 		key := keyFunc(c)
 		if key == "" {

@@ -33,12 +33,14 @@ type MenuRowProps = {
   label: string
   description: string
   to?: string
+  /** Tautan lintas bundel (mis. ke entri publik /bantuan) memakai <a href>. */
+  href?: string
   onClick?: () => void
   trailing?: string
   disabled?: boolean
 }
 
-function MenuRow({ icon: Icon, label, description, to, onClick, trailing, disabled }: MenuRowProps) {
+function MenuRow({ icon: Icon, label, description, to, href, onClick, trailing, disabled }: MenuRowProps) {
   const inner = (
     <>
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
@@ -68,6 +70,14 @@ function MenuRow({ icon: Icon, label, description, to, onClick, trailing, disabl
     'flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors active:bg-secondary/50',
     disabled && 'pointer-events-none opacity-50',
   )
+
+  if (href) {
+    return (
+      <a href={href} className={className}>
+        {inner}
+      </a>
+    )
+  }
 
   if (to) {
     return (
@@ -269,7 +279,7 @@ export function SettingsMobileView() {
           icon={HelpCircle}
           label="Pusat Bantuan"
           description="Panduan setup broker dan bot Telegram"
-          to="/bantuan"
+          href="/bantuan"
         />
         <MenuRow
           icon={FileText}

@@ -33,6 +33,10 @@ func allModels() []any {
 		&model.Page{}, &model.PageSection{}, &model.PageItem{},
 		&model.InviteCode{}, &model.InviteRedemption{},
 		&model.BugReport{}, &model.BugReportAttachment{},
+		&model.TelegramMessage{}, &model.AccountExecutionLock{},
+		&model.PairCategory{}, &model.PairGroup{}, &model.TradingPair{},
+		&model.AccountPairStrategy{}, &model.AccountPairTimeframe{},
+		&model.BacktestRun{}, &model.BacktestTrade{}, &model.BacktestQuota{},
 	}
 }
 

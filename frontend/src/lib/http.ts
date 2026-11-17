@@ -14,21 +14,22 @@ export const CSRF_COOKIE = 'ila_csrf'
 export const ADMIN_CSRF_COOKIE = 'ila_admin_csrf'
 export const CSRF_HEADER = 'X-CSRF-Token'
 
-/** Membaca token CSRF dari cookie; memilih cookie admin bila memanggil endpoint admin. */
+function isAdminEndpoint(path?: string): boolean {
+  return Boolean(path?.startsWith('/admin') || path?.includes('/admin/'))
+}
+
+/**
+ * Membaca token CSRF sesuai ranah sesi.
+ * Cookie pelanggan dan admin sengaja tidak saling jatuh-cadang (fallback) agar
+ * header CSRF dari satu sesi tidak pernah dikirim ke pintu sesi lain.
+ */
 export function readCsrfToken(path?: string): string {
-  const isAdminPath = path?.startsWith('/admin') || path?.includes('/admin/')
-  const primaryCookie = isAdminPath ? ADMIN_CSRF_COOKIE : CSRF_COOKIE
-  const fallbackCookie = isAdminPath ? CSRF_COOKIE : ADMIN_CSRF_COOKIE
+  const cookieName = isAdminEndpoint(path) ? ADMIN_CSRF_COOKIE : CSRF_COOKIE
 
   const cookies = document.cookie.split(';').map((part) => part.trim())
-  const match = cookies.find((part) => part.startsWith(`${primaryCookie}=`))
+  const match = cookies.find((part) => part.startsWith(`${cookieName}=`))
   if (match) {
-    return decodeURIComponent(match.slice(primaryCookie.length + 1))
-  }
-
-  const fallbackMatch = cookies.find((part) => part.startsWith(`${fallbackCookie}=`))
-  if (fallbackMatch) {
-    return decodeURIComponent(fallbackMatch.slice(fallbackCookie.length + 1))
+    return decodeURIComponent(match.slice(cookieName.length + 1))
   }
 
   return ''
@@ -48,9 +49,22 @@ type RequestOptions = {
  * menu yang bukan haknya (plans/23 §6).
  */
 let unauthorizedHandler: (() => void) | null = null
+let adminUnauthorizedHandler: (() => void) | null = null
 
 export function onUnauthorized(handler: (() => void) | null): void {
   unauthorizedHandler = handler
+}
+
+export function onAdminUnauthorized(handler: (() => void) | null): void {
+  adminUnauthorizedHandler = handler
+}
+
+function notifyUnauthorized(path: string): void {
+  if (isAdminEndpoint(path)) {
+    adminUnauthorizedHandler?.()
+    return
+  }
+  unauthorizedHandler?.()
 }
 
 /**
@@ -140,7 +154,7 @@ async function requestEnvelope<T>(
       // Sesi habis hanya bermakna bila endpoint memang butuh sesi.
       // 403 berarti sesi sah tetapi tidak berwenang: pengguna tetap masuk.
       if (response.status === 401 && penandaPemulihan === 0) {
-        unauthorizedHandler?.()
+        notifyUnauthorized(path)
       }
 
       throw new ApiError(
@@ -180,7 +194,7 @@ export async function downloadFile(
   })
 
   if (!response.ok) {
-    if (response.status === 401 && penandaPemulihan === 0) unauthorizedHandler?.()
+    if (response.status === 401 && penandaPemulihan === 0) notifyUnauthorized(path)
     throw new ApiError(messageForStatus(response.status), response.status, 'DOWNLOAD_FAILED')
   }
 
@@ -202,11 +216,32 @@ export async function downloadFile(
   return filename
 }
 
+const GENERIC_SERVER_MESSAGES = new Set([
+  'forbidden',
+  'forbidden resource',
+  'too many',
+  'too many requests',
+  'maintenance',
+  'locked',
+  'unauthorized',
+  'unauthorized access',
+])
+
+function hasSpecificDomainMessage(fallback?: string): fallback is string {
+  if (!fallback) return false
+  const trimmed = fallback.trim()
+  if (!trimmed) return false
+  return !GENERIC_SERVER_MESSAGES.has(trimmed.toLowerCase())
+}
+
 /**
- * messageForStatus memberi pesan yang bisa ditindaklanjuti. Pesan mentah
- * backend dipakai bila ada; status khusus punya penjelasan sendiri.
+ * messageForStatus memberi pesan yang bisa ditindaklanjuti. Pesan spesifik dari
+ * backend dipertahankan bila ada; pesan generik diterjemahkan per status HTTP.
  */
 function messageForStatus(status: number, fallback?: string): string {
+  if (hasSpecificDomainMessage(fallback)) {
+    return fallback.trim()
+  }
   switch (status) {
     case 403:
       return 'Anda tidak punya hak akses untuk tindakan ini.'

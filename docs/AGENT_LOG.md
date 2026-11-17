@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `769c1d6` — entri teratas di bagian
+> **Commit terakhir saat log ini ditulis:** `92b2142` — entri teratas di bagian
 > **DARI CLAUDE** adalah catatan terbaru
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
@@ -35,6 +35,57 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 ---
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
+
+### 2026-11-18 — Hardening Audit Kategori 1 & Kategori 3 (Keamanan, Memori, Sesi, & Alur Operasional)
+
+**Tanggal:** 2026-11-18
+**Pelaku:** Antigravity (Platform Audit & Hardening)
+**Tipe:** Hardening keamanan, stabilitas memori/infrastruktur, & perbaikan alur operasional (Kategori 1 + Kategori 3)
+**Status:** 🟢 SELESAI & teruji penuh — belum di-deploy
+
+**Ringkasan:**
+Menindaklanjuti audit menyeluruh atas Backend API, Runner, Frontend, dan Infrastruktur, seluruh perbaikan pada **Kategori 1 (Critical/High Impact & Low Risk)** serta **Kategori 3 (Medium Risk — Alur Sesi, SSRF, N+1, Bundle Split, & Pemulihan State)** telah diselesaikan dan diuji regresi. Sesuai keputusan owner, **tidak ada satu baris pun logika kalkulasi lot, SL/TP, keputusan sinyal trading, maupun `ila-strategy` (Kategori 4)** atau **alur checkout/billing yang sedang ditutup `INVITE_ONLY=true` (Kategori 2)** yang disentuh.
+
+1. **Infrastruktur, Memori Kontainer, & Build Context (Kategori 1A):**
+   - Menambahkan `.dockerignore` di akar repo agar build Docker tidak lagi menyertakan `.env*`, `ssh/`, `deploy/certs/`, binari lokal `*.exe` (~77 MB), `node_modules`, dan `.git`.
+   - Menambahkan `GOMEMLIMIT: "190MiB"` pada `backend-api` (`mem_limit: 224m`), `GOMEMLIMIT: "135MiB"` pada `runner` (`mem_limit: 160m`), serta `REMOTE_DIR: /remote` pada kontainer `backup` di `deploy/docker-compose.yml`.
+   - Membatasi konkurensi verifikasi/hash Argon2id (`maxArgonConcurrent = 2`, 64 MiB per operasi) dan memvalidasi batas parameter PHC string (`threads == 0` / memori berlebih) di `backend/pkg/utils/hash.go` agar lonjakan login serentak tidak memicu OOM kill pada kontainer 224 MiB.
+   - Menghapus duplikasi `trusted_proxies` dan menambahkan `client_ip_headers Cf-Connecting-Ip X-Forwarded-For` di `deploy/Caddyfile`; mengunci `r.SetTrustedProxies` pada rentang privat/loopback di Gin (`router.go`); memperbaiki tag HTML rusak di `deploy/error/not-found.html`; serta melengkapi `Makefile` (`check-frontend` menjalankan `typecheck` + `lint` + `vitest`, ditambah `test-strategy` untuk `ila-strategy`).
+
+2. **Keamanan Backend, Sesi, RBAC, & Webhook (Kategori 1B & Kategori 3):**
+   - **Path Traversal Log Ingest (`logingest/server.go`):** Memvalidasi karakter nama layanan dan memastikan path tujuan tetap berada di bawah direktori dasar (`filepath.Rel`) sebelum menulis berkas log gRPC.
+   - **Internal Runner Endpoint (`cmd/runner/server.go`):** Mengganti perbandingan `X-Internal-Secret` ke `subtle.ConstantTimeCompare` dan membatasi ukuran body dengan `http.MaxBytesReader` (64 KiB).
+   - **Rate Limiter, 2FA, & Log Forging:** Memasang batas ukuran tabel (`maxLimiterEntries = 8192`) + pembersihan entri kedaluwarsa teramortisasi tanpa goroutine bocor di `ratelimit.go` & `ratelimit_general.go`; memasang rate limit IP `10/menit` pada `POST /api/v1/auth/verify-2fa`; memvalidasi `X-Request-ID` (`<= 64` karakter aman) di `logger.go`.
+   - **2FA Setup Guard & TTL (`twofactor_service.go`):** Menolak `Setup` ulang saat TOTP sudah aktif (`ActivatedAt != nil`) dan menegakkan batas kedaluwarsa `SetupTTL` pada `Activate`.
+   - **Pencabutan Sesi Per-Perangkat Seketika (`authstate`, `user_repository`, `middleware/auth`, `dual_scope`, `permission`):** Menambahkan pemeriksaan `IsSessionActive(ctx, userID, sessionID)` sehingga pencabutan sesi perangkat (`DELETE /api/v1/me/sessions/:id`) langsung menolak JWT perangkat tersebut tanpa menunggu `exp`.
+   - **Admin Heartbeat & RBAC `IsProtected`:** Menyambungkan `WithTokenIssuer` dan `WithSessionExtender` (`SessionRepository.Extend`) ke `AdminAuthHandler.Heartbeat` agar cookie sesi admin memperbarui klaim `exp` JWT sekaligus `expires_at` di tabel `session`; menegakkan larangan hapus/ubah role pada akun `IsProtected` di `admin_user_service.go` dan `role_service.go`.
+   - **Telegram Fail-Closed & Akun Diblokir:** Menolak webhook Telegram di mode produksi bila `TELEGRAM_WEBHOOK_SECRET` kosong (`RequireSecret`) dan menolak perintah bot dari pengguna berstatus `banned`/`deleted` di `telegram_service.go`.
+   - **Perlindungan SSRF & Redaksi Rahasia Broker:** Memblokir skema non-HTTPS dan alamat loopback/privat/link-local pada `BaseURL` Match-Trader (`account_service.go` + `CheckRedirect` & batas baca 4 MiB di `matchtrader/transport.go`); menyaring `*url.Error` pada `ctraderapi/client.go` agar `client_secret` di query URL tidak bocor ke log/error.
+
+3. **Sinkronisasi Operasional, Database, & Performa Backend (Kategori 1C & Kategori 3):**
+   - **Sinkronisasi Konfirmasi Manual Sinyal Kuota Harian (`approve_service.go`):** Menyelaraskan daftar `blockedReason` di API konfirmasi dengan commit `a971c9f` (`runner.OverrideKuotaManual`), sehingga sinyal yang tertahan karena kuota harian (`DAILY_WIN_REACHED`, `DAILY_SIGNAL_QUOTA`, `TWO_CONSECUTIVE_SL`) tetap dapat dikonfirmasi manual oleh pengguna sesuai rancangan Runner.
+   - **Status Koneksi Engine di Runner (`runner/service.go` & `runner_repository.go`):** Memisahkan `UpdateEngineMarketState` dari `UpsertEngineState` agar penandaan jam pasar tutup/akhir pekan (`persistMarketState`) tidak lagi menimpa `connected = false` dan `last_seen_at = NULL` saat stream gRPC Engine sehat.
+   - **Eliminasi N+1 Query Riwayat Order & Filter Akun (`trading_service.go`, `runner_repository.go`, `trading_dto.go`):** Menambahkan batch query `FindUserSignals` dan menyertakan `broker_account_id` di `PositionResponse` agar halaman detail akun broker hanya menampilkan riwayat milik akun tersebut.
+   - **Pemulihan Backtest Menggantung, Edit Halaman CMS, & Skema:** Menambahkan `PulihkanRunMenggantung` saat `BacktestWorker.Start` (menandai job `running` sisa restart/OOM menjadi `failed` dengan `finished_at` terisi); memperbaiki `PageRepository.Save` agar resolusi `slug` eksisting dan penghapusan `Unscoped` bagian/butir lama tidak menabrak `uniqueIndex`; melengkapi hook UUID `TelegramMessage.BeforeCreate`, wiring `legal: deps.Legal` di `NewSystemService`, `readyCheck` ping DB di `/readyz`, tag query filter admin (`admin_user_filter_dto.go`, `admin_audit_dto.go`, `Count()` di `admin_user_repository.go`), serta penanganan error di `backtest_handler.go`.
+
+4. **Perbaikan Sesi, Grafik, Navigasi, & Bundle Frontend (Kategori 1 & Kategori 3):**
+   - **Isolasi Sesi Admin vs Pelanggan & CSRF (`http.ts`, `AdminAuthProvider.tsx`, `AuthProvider.tsx`):** Memisahkan handler 401 (`onUnauthorized` vs `onAdminUnauthorized`), menonaktifkan pemanggilan `/api/v1/admin/auth/me` di luar rute `/admin`, menghapus fallback silang cookie CSRF pelanggan↔admin, mempertahankan pesan domain spesifik backend pada HTTP 403/423/429, serta memperbaiki timer idle (`use-idle-timer.ts`, `use-admin-idle-timer.ts`) agar tombol *"Keluar sekarang"* pada dialog peringatan tidak ter-reset oleh klik mouse itu sendiri.
+   - **ErrorBoundary, Code-Splitting, & Optimasi Polling Mobile:** Menambahkan `ErrorBoundary` di `App.tsx` & `PublicApp.tsx`; mengubah 27 halaman Admin, 4 halaman Backtest, dan `LegalCenterPage` menjadi `React.lazy()` di `AppRoutes.tsx` (menurunkan ukuran chunk utama `app-*.js` dari >1.020 kB menjadi ~601 kB); mempertahankan redirect internal `?next=` saat login/2FA (termasuk tautan Telegram `/app/approve/:token`); dan menghentikan mount/polling ganda `<TradingRadarChart>` tersembunyi pada layar mobile di `SignalsPage.tsx`.
+   - **Akurasi UI, Tautan Lintas Bundel, & Sanitasi Tautan CMS:** Memperbaiki tampilan risiko 100x lipat di `BacktestDetailPage.tsx` (`0,5%`, bukan `50,00%`), memperbaiki tautan lintas bundel SPA (`/syarat` & `/privasi` memakai `<a href>`, pengalihan `VerifyEmailPage` ke `/app/onboarding`), menambahkan menu *Backtest* & *Laporkan Bug* di `MobileMoreDrawer.tsx`, meneruskan `inviteOnly` di `DashboardPage.tsx`, menyatukan `queryKey` konsen legal di `LegalReconsentGate.tsx`, serta menyaring skema berbahaya (`javascript:`/`data:`) pada perender halaman CMS publik (`PageRenderer.tsx`, `PublicSections.tsx`).
+
+**File terdampak:**
+- **Infrastruktur & Build:** `.dockerignore` (baru), `deploy/docker-compose.yml`, `deploy/Caddyfile`, `deploy/error/not-found.html`, `Makefile`.
+- **Backend (`backend/`):** `cmd/runner/server.go`, `pkg/utils/{hash.go,jwt.go,utils_test.go}`, `internal/authstate/authstate.go`, `internal/logingest/{server.go,server_test.go}`, `internal/middleware/{auth.go,dual_scope.go,logger.go,logger_test.go,permission.go,ratelimit.go,ratelimit_general.go,ratelimit_test.go}`, `internal/model/{hooks.go,schema_migrate_test.go}`, `internal/dto/{admin_audit_dto.go,admin_user_filter_dto.go,trading_dto.go}`, `internal/repository/{admin_user_repository.go,backtest_repository.go,backtest_repository_test.go,page_repository.go,runner_repository.go,session_repository.go,user_repository.go}`, `internal/service/{account_service.go,admin_user_service.go,admin_user_support.go,approve_service.go,approve_service_test.go,backtest_worker.go,role_service.go,system_service.go,telegram_service.go,trading_service.go,twofactor_service.go,twofactor_service_test.go}`, `internal/handler/{admin_auth_handler.go,backtest_handler.go,telegram_handler.go}`, `internal/runner/service.go`, `internal/broker/matchtrader/transport.go`, `internal/ctraderapi/client.go`, `internal/router/router.go`.
+- **Frontend (`frontend/`):** `eslint.config.js`, `src/types/api.ts`, `src/lib/http.ts`, `src/components/ui/{error-boundary.tsx,index.ts}`, `src/components/layout/MobileMoreDrawer.tsx`, `src/app/{App.tsx,AppRoutes.tsx,PublicApp.tsx}`, `src/features/admin/{AdminAuthProvider.tsx,hooks/use-admin-idle-timer.ts}`, `src/features/auth/{AuthProvider.tsx,components/LegalReconsentGate.tsx,hooks/use-auth.ts,hooks/use-idle-timer.ts}`, `src/features/charts/{PriceChart.tsx,TradingRadarChart.tsx}`, `src/pages/{AccountDetailPage.tsx,BacktestDetailPage.tsx,DashboardPage.tsx,SignalsPage.tsx,VerifyEmailPage.tsx,components/SettingsMobileView.tsx}`, `src/pages/public/components/{PageRenderer.tsx,PublicSections.tsx}`, `src/test/{http-status.test.ts,idle-timer.test.ts,tautan-lintas-bundel.test.ts}`.
+
+**Bukti uji:**
+- Backend (`backend/`): `go vet ./...` bersih, `go build ./...` bersih, `go test -count=1 ./...` hijau di seluruh paket (termasuk uji regresi baru untuk Argon2id PHC bounds/konkurensi, path traversal logingest, limiter cap, request ID, 2FA setup/TTL, override kuota konfirmasi manual, pemulihan backtest menggantung, penyimpanan ulang halaman CMS, dan isolasi status koneksi Engine).
+- Strategi (`ila-strategy/`): `go vet ./...` & `go test ./...` hijau (tidak ada perubahan kode strategi).
+- Frontend (`frontend/`): `npm run typecheck` bersih, `npm run lint` (`--max-warnings=0`) bersih, `npm test` **41 berkas / 274 tes hijau**, `npm run build` sukses.
+
+**Sengaja ditunda (tidak disentuh pada gelombang ini):**
+- **Kategori 2:** Alur pembayaran/checkout/kupon (`CheckoutPage.tsx`, `billing_service.go`) karena platform sedang berjalan dalam mode tertutup `INVITE_ONLY=true`.
+- **Kategori 4:** Seluruh logika kalkulasi lot (`CalculateLot`, konversi mata uang Match-Trader, `MinLot`), urutan antrean sinyal `PUBLISH` vs `CANCEL`, penutupan `IsDryRun` di `monitor.go`, presisi digit TP `ila-strategy`, serta `potongSampai` di `backtest/engine.go` — memerlukan sesi uji coba simulasi/demo terpisah bersama owner.
 
 ### 2026-11-13 (3) — Lapor bug: formulir pengguna + triage admin
 

@@ -527,6 +527,9 @@ func (s *adminUserService) Delete(ctx context.Context, actor AdminActor, userID 
 	if guardSelf(actor.ID, userID, "menghapus") {
 		return validation("tidak dapat menghapus akun sendiri")
 	}
+	if row.IsProtected {
+		return apperror.ErrForbidden
+	}
 	if row.Status == model.UserStatusDeleted {
 		return validation("akun ini sudah dihapus sebelumnya")
 	}

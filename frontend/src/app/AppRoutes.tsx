@@ -1,13 +1,12 @@
-import type { ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, type ReactNode } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { AdminShell } from '@/features/admin/components/AdminShell'
 import { AdminIdleGuard } from '@/features/admin/components/AdminIdleGuard'
 import { RequireAdminPermission } from '@/features/admin/components/RequireAdminPermission'
 import { useAdminAuth } from '@/features/admin/admin-auth-context'
-import { useAuthContext } from '@/features/auth/hooks/use-auth'
+import { resolveSafeNextPath, useAuthContext } from '@/features/auth/hooks/use-auth'
 import { useInviteOnly } from '@/lib/use-invite-only'
-import AdminLoginPage from '@/pages/admin/AdminLoginPage'
 import ApprovePage from '@/pages/ApprovePage'
 import DashboardPage from '@/pages/DashboardPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
@@ -19,42 +18,11 @@ import SettingsPage from '@/pages/SettingsPage'
 import SignalsPage from '@/pages/SignalsPage'
 import StrategiesPage from '@/pages/StrategiesPage'
 import AccountsPage from '@/pages/AccountsPage'
-import BacktestPage from '@/pages/BacktestPage'
-import BacktestHistoryPage from '@/pages/BacktestHistoryPage'
-import BacktestDetailPage from '@/pages/BacktestDetailPage'
-import BacktestEntryPage from '@/pages/BacktestEntryPage'
 import AccountDetailPage from '@/pages/AccountDetailPage'
 import BillingPage from '@/pages/BillingPage'
 import CheckoutPage from '@/pages/CheckoutPage'
-import LegalCenterPage from '@/pages/public/legal/LegalCenterPage'
-import AdminAuditPage from '@/pages/admin/AdminAuditPage'
-import AdminCmsPage from '@/pages/admin/AdminCmsPage'
-import AdminPageContentPage from '@/pages/admin/AdminPageContentPage'
-import AdminLegalPage from '@/pages/admin/AdminLegalPage'
-import AdminBrokerHealthPage from '@/pages/admin/AdminBrokerHealthPage'
-import AdminEnginePage from '@/pages/admin/AdminEnginePage'
-import AdminHealthPage from '@/pages/admin/AdminHealthPage'
-import AdminRunnerPage from '@/pages/admin/AdminRunnerPage'
-import AdminMaintenancePage from '@/pages/admin/AdminMaintenancePage'
-import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
-import AdminSupportPage from '@/pages/admin/AdminSupportPage'
 import OnboardingPage from '@/pages/OnboardingPage'
 import SecuritySettingsPage from '@/pages/SecuritySettingsPage'
-import AdminCouponsPage from '@/pages/admin/AdminCouponsPage'
-import AdminCreditCodesPage from '@/pages/admin/AdminCreditCodesPage'
-import AdminInvoicesPage from '@/pages/admin/AdminInvoicesPage'
-import AdminTrialsPage from '@/pages/admin/AdminTrialsPage'
-import AdminHomePage from '@/pages/admin/AdminHomePage'
-import AdminPlansPage from '@/pages/admin/AdminPlansPage'
-import AdminPairsPage from '@/pages/admin/AdminPairsPage'
-import AdminReportsPage from '@/pages/admin/AdminReportsPage'
-import AdminRbacPage from '@/pages/admin/AdminRbacPage'
-import AdminSignalsPage from '@/pages/admin/AdminSignalsPage'
-import AdminSignalTracePage from '@/pages/admin/AdminSignalTracePage'
-import AdminUserDetailPage from '@/pages/admin/AdminUserDetailPage'
-import AdminUsersPage from '@/pages/admin/AdminUsersPage'
-import AdminInvitesPage from '@/pages/admin/AdminInvitesPage'
-import AdminBugReportsPage from '@/pages/admin/AdminBugReportsPage'
 import LaporkanBugPage from '@/pages/LaporkanBugPage'
 import RiwayatLaporanBugPage from '@/pages/RiwayatLaporanBugPage'
 import DetailLaporanBugPage from '@/pages/DetailLaporanBugPage'
@@ -64,18 +32,60 @@ import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 import { ScrollToTop } from './ScrollToTop'
 
+// Halaman berat & seluruh panel admin dimuat malas (code-splitting) agar
+// pengunjung halaman masuk/dashboard pelanggan tidak mengunduh bundel admin.
+const BacktestPage = lazy(() => import('@/pages/BacktestPage'))
+const BacktestHistoryPage = lazy(() => import('@/pages/BacktestHistoryPage'))
+const BacktestDetailPage = lazy(() => import('@/pages/BacktestDetailPage'))
+const BacktestEntryPage = lazy(() => import('@/pages/BacktestEntryPage'))
+const LegalCenterPage = lazy(() => import('@/pages/public/legal/LegalCenterPage'))
+
+const AdminLoginPage = lazy(() => import('@/pages/admin/AdminLoginPage'))
+const AdminAuditPage = lazy(() => import('@/pages/admin/AdminAuditPage'))
+const AdminCmsPage = lazy(() => import('@/pages/admin/AdminCmsPage'))
+const AdminPageContentPage = lazy(() => import('@/pages/admin/AdminPageContentPage'))
+const AdminLegalPage = lazy(() => import('@/pages/admin/AdminLegalPage'))
+const AdminBrokerHealthPage = lazy(() => import('@/pages/admin/AdminBrokerHealthPage'))
+const AdminEnginePage = lazy(() => import('@/pages/admin/AdminEnginePage'))
+const AdminHealthPage = lazy(() => import('@/pages/admin/AdminHealthPage'))
+const AdminRunnerPage = lazy(() => import('@/pages/admin/AdminRunnerPage'))
+const AdminMaintenancePage = lazy(() => import('@/pages/admin/AdminMaintenancePage'))
+const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage'))
+const AdminSupportPage = lazy(() => import('@/pages/admin/AdminSupportPage'))
+const AdminCouponsPage = lazy(() => import('@/pages/admin/AdminCouponsPage'))
+const AdminCreditCodesPage = lazy(() => import('@/pages/admin/AdminCreditCodesPage'))
+const AdminInvoicesPage = lazy(() => import('@/pages/admin/AdminInvoicesPage'))
+const AdminTrialsPage = lazy(() => import('@/pages/admin/AdminTrialsPage'))
+const AdminHomePage = lazy(() => import('@/pages/admin/AdminHomePage'))
+const AdminPlansPage = lazy(() => import('@/pages/admin/AdminPlansPage'))
+const AdminPairsPage = lazy(() => import('@/pages/admin/AdminPairsPage'))
+const AdminReportsPage = lazy(() => import('@/pages/admin/AdminReportsPage'))
+const AdminRbacPage = lazy(() => import('@/pages/admin/AdminRbacPage'))
+const AdminSignalsPage = lazy(() => import('@/pages/admin/AdminSignalsPage'))
+const AdminSignalTracePage = lazy(() => import('@/pages/admin/AdminSignalTracePage'))
+const AdminUserDetailPage = lazy(() => import('@/pages/admin/AdminUserDetailPage'))
+const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'))
+const AdminInvitesPage = lazy(() => import('@/pages/admin/AdminInvitesPage'))
+const AdminBugReportsPage = lazy(() => import('@/pages/admin/AdminBugReportsPage'))
+
 function RequireAuth({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuthContext()
+  const location = useLocation()
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    const intended = `${location.pathname}${location.search}`
+    const shouldPreserve = intended && intended !== '/' && intended !== '/dashboard'
+    const target = shouldPreserve ? `/login?next=${encodeURIComponent(intended)}` : '/login'
+    return <Navigate to={target} replace />
   }
   return <>{children}</>
 }
 
 function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuthContext()
+  const location = useLocation()
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    const next = new URLSearchParams(location.search).get('next')
+    return <Navigate to={resolveSafeNextPath(next)} replace />
   }
   return <>{children}</>
 }
@@ -143,6 +153,7 @@ export function AppRoutes() {
     <>
       {/* Panel pelanggan juga perlu kembali ke atas saat berpindah halaman. */}
       <ScrollToTop />
+      <Suspense fallback={<FullPageLoading label="Memuat halaman…" />}>
       <Routes>
         <Route
           path="/login"
@@ -658,6 +669,7 @@ export function AppRoutes() {
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </Suspense>
     </>
   )
 }

@@ -56,6 +56,12 @@ func TestAktivasiBerhasilDanMemberiDelapanKode(t *testing.T) {
 	if status.RecoveryRemaining != RecoveryCodeCount {
 		t.Fatalf("kode pemulihan tersisa = %d; ingin %d", status.RecoveryRemaining, RecoveryCodeCount)
 	}
+
+	// Saat 2FA sudah aktif, Setup baru ditolak agar sesi yang dibajak tidak
+	// bisa mematikan atau menimpa secret 2FA tanpa verifikasi kode/sandi.
+	if _, err := f.svc.Setup(ctx, "u1", "user@ila.id"); err == nil {
+		t.Fatal("Setup ulang pada akun ber-2FA aktif seharusnya ditolak")
+	}
 }
 
 // Kode salah tidak boleh mengaktifkan 2FA.

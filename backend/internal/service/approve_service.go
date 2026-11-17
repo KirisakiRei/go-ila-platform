@@ -342,6 +342,11 @@ func (s *approveService) blockedReason(ctx context.Context, userID string, signa
 	case model.SignalStatusSkipped:
 		return "Sinyal ini sudah Anda lewati."
 	case model.SignalStatusRejected:
+		if runner.OverrideKuotaManual(runner.RejectReason(us.RejectReason)) {
+			// Sesuai commit a971c9f: pagar kuota harian hanya menghentikan auto-entry;
+			// konfirmasi manual oleh pemilik akun tetap diperbolehkan.
+			return ""
+		}
 		if us.RejectReason != "" {
 			return us.RejectReason
 		}

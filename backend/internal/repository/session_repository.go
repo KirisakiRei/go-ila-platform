@@ -21,6 +21,7 @@ type SessionRepository interface {
 	FindByTokenID(ctx context.Context, tokenID string) (*model.Session, error)
 	ListByUser(ctx context.Context, userID, scope string) ([]model.Session, error)
 	Touch(ctx context.Context, id string, at time.Time) error
+	Extend(ctx context.Context, id, userID string, expiresAt time.Time) error
 	Revoke(ctx context.Context, id, userID string) error
 	RevokeAll(ctx context.Context, userID, scope string) error
 }
@@ -75,6 +76,22 @@ func (r *sessionRepository) Touch(ctx context.Context, id string, at time.Time) 
 		UpdateColumn("last_seen_at", at).Error
 	if err != nil {
 		return fmt.Errorf("memperbarui sesi: %w", err)
+	}
+	return nil
+}
+
+// Extend memperpanjang umur baris sesi aktif ketika heartbeat menerbitkan ulang
+// JWT sehingga pemeriksaan IsSessionActive tetap selaras dengan klaim exp baru.
+func (r *sessionRepository) Extend(ctx context.Context, id, userID string, expiresAt time.Time) error {
+	now := time.Now().UTC()
+	err := r.db.WithContext(ctx).Model(&model.Session{}).
+		Where("id = ? AND user_id = ? AND revoked_at IS NULL", id, userID).
+		Updates(map[string]any{
+			"last_seen_at": now,
+			"expires_at":   expiresAt,
+		}).Error
+	if err != nil {
+		return fmt.Errorf("memperpanjang sesi: %w", err)
 	}
 	return nil
 }

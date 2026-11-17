@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import {
   BarChart3,
   Bot,
+  Bug,
   CreditCard,
+  FlaskConical,
   LogOut,
   Radio,
   Settings,
@@ -135,6 +137,20 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                   <p className="truncate text-[10.5px] text-muted-foreground">Kelola Instrumen</p>
                 </div>
               </Link>
+
+              <Link
+                to="/backtest"
+                onClick={onClose}
+                className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-secondary/30 p-2.5 hover:bg-secondary/60 transition-colors"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-foreground shadow-xs">
+                  <FlaskConical className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-foreground">Backtest</p>
+                  <p className="truncate text-[10.5px] text-muted-foreground">Simulasi Historis</p>
+                </div>
+              </Link>
             </div>
           </div>
 
@@ -199,6 +215,20 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-foreground">Pengaturan</p>
                   <p className="truncate text-[10.5px] text-muted-foreground">Preferensi Akun</p>
+                </div>
+              </Link>
+
+              <Link
+                to="/laporkan-bug"
+                onClick={onClose}
+                className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-secondary/30 p-2.5 hover:bg-secondary/60 transition-colors"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-foreground shadow-xs">
+                  <Bug className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-foreground">Laporkan Bug</p>
+                  <p className="truncate text-[10.5px] text-muted-foreground">Kirim Kendala</p>
                 </div>
               </Link>
             </div>

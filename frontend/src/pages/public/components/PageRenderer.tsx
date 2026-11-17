@@ -294,6 +294,15 @@ function CalloutBlock({ section }: { section: PageSection }) {
   )
 }
 
+function isSafeHref(href?: string): href is string {
+  if (!href) return false
+  const trimmed = href.trim()
+  if (!trimmed) return false
+  if (trimmed.startsWith('/')) return !trimmed.startsWith('//')
+  if (trimmed.startsWith('#')) return true
+  return /^(https?:|mailto:|tel:)/i.test(trimmed)
+}
+
 function ItemCard({ item, showNote }: { item: PageItem; showNote?: boolean }) {
   const content = (
     <>
@@ -315,13 +324,19 @@ function ItemCard({ item, showNote }: { item: PageItem; showNote?: boolean }) {
     </>
   )
 
+  const safeHref = isSafeHref(item.href) ? item.href.trim() : ''
+  const isExternalUrl = /^https?:\/\//i.test(safeHref)
   const className =
     'block rounded-xl border border-zinc-200 bg-white p-4 transition-colors sm:p-5' +
-    (item.href ? ' hover:border-zinc-300 hover:bg-[#fafafa]' : '')
+    (safeHref ? ' hover:border-zinc-300 hover:bg-[#fafafa]' : '')
 
-  if (item.href) {
+  if (safeHref) {
     return (
-      <a href={item.href} className={className}>
+      <a
+        href={safeHref}
+        className={className}
+        {...(isExternalUrl ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
         {content}
       </a>
     )

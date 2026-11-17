@@ -190,3 +190,30 @@ func TestTidakAdaBarisKosong(t *testing.T) {
 		t.Fatalf("jumlah newline = %d, ingin 2 (tanpa baris kosong)", got)
 	}
 }
+
+// Nama layanan dengan path traversal ("../") harus ditolak agar berkas log
+// tidak pernah bisa ditulis di luar direktori dasar.
+func TestTolakNamaLayananPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	s := Baru(dir, nil)
+	t.Cleanup(func() { _ = s.Tutup() })
+
+	jam := "2026-11-08T10:00:00.000Z"
+	st := baruAliran(
+		&logkitv1.LogEntry{Baris: []byte(`{"x":1}`), Layanan: "../../luar", Waktu: jam},
+		&logkitv1.LogEntry{Baris: []byte(`{"x":2}`), Layanan: "sub/engine", Waktu: jam},
+		&logkitv1.LogEntry{Baris: []byte(`{"x":3}`), Layanan: `sub\engine`, Waktu: jam},
+		&logkitv1.LogEntry{Baris: []byte(`{"x":4}`), Layanan: ".tersembunyi", Waktu: jam},
+		&logkitv1.LogEntry{Baris: []byte(`{"ok":true}`), Layanan: "engine-3.0", Waktu: jam},
+	)
+	if err := s.KirimLog(st); err != nil {
+		t.Fatalf("KirimLog: %v", err)
+	}
+
+	if st.ringkas.GetDitolak() != 4 {
+		t.Fatalf("ditolak = %d, ingin 4", st.ringkas.GetDitolak())
+	}
+	if st.ringkas.GetDiterima() != 1 {
+		t.Fatalf("diterima = %d, ingin 1", st.ringkas.GetDiterima())
+	}
+}

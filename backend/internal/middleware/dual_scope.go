@@ -84,6 +84,16 @@ func validasiSesi(c *gin.Context, reader authstate.Reader, claims utils.TokenCla
 		c.Abort()
 		return false
 	}
+	if claims.SessionID != "" {
+		if checker, ok := reader.(authstate.SessionActiveChecker); ok {
+			active, err := checker.IsSessionActive(context.WithoutCancel(c.Request.Context()), claims.SessionID, claims.UserID)
+			if err != nil || !active {
+				c.Error(apperror.ErrUnauthorized)
+				c.Abort()
+				return false
+			}
+		}
+	}
 	if account.Status != authstate.StatusActive {
 		c.Error(apperror.ErrForbidden)
 		c.Abort()

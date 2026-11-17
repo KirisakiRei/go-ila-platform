@@ -9,9 +9,8 @@ import { useIdleTimer } from './hooks/use-idle-timer'
 
 type SessionStatus = 'restoring' | 'authenticated' | 'anonymous'
 
-/** Batas diam sebelum peringatan dan sebelum keluar (plans/23 §2). */
+/** Batas diam sebelum peringatan muncul (plans/23 §2). */
 const IDLE_WARN_MINUTES = 25
-const IDLE_LOGOUT_MINUTES = 30
 const IDLE_COUNTDOWN_SECONDS = 60
 
 /** Alasan keluar disimpan agar halaman masuk bisa menjelaskannya. */
@@ -107,25 +106,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [finishSignOut])
 
   const auth = useIdleTimer({
-    // Peringatan muncul lebih dulu; batas keluar ditegakkan server.
+    // Peringatan muncul lebih dulu; saat hitung mundur habis, signOut dipanggil
+    // termasuk menghapus cookie di server.
     warnAfterMinutes: IDLE_WARN_MINUTES,
     countdownSeconds: IDLE_COUNTDOWN_SECONDS,
     enabled: status === 'authenticated' && (user?.idle_warning ?? true),
     onTimeout: () => signOut('idle'),
   })
-
-  // Cadangan bila tab lain sudah lebih dulu keluar.
-  useEffect(() => {
-    if (status !== 'authenticated' || !user?.idle_warning) return
-
-    const timer = window.setTimeout(
-      () => {
-        finishSignOut('idle')
-      },
-      IDLE_LOGOUT_MINUTES * 60_000 + 10_000,
-    )
-    return () => window.clearTimeout(timer)
-  }, [status, finishSignOut, user?.idle_warning])
 
   const value = useMemo<AuthContextValue>(
     () => ({

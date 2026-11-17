@@ -154,7 +154,7 @@ export default function BacktestDetailPage() {
 function TitikAwal({ data }: { data: BacktestRunDetail }) {
   const baris = [
     { label: 'Modal awal', nilai: formatUang(data.equity) },
-    { label: 'Risiko per trade', nilai: `${(data.risk * 100).toFixed(2)}%` },
+    { label: 'Risiko per trade', nilai: `${data.risk.toFixed(2)}%` },
     { label: 'Dibuat', nilai: formatWaktu(data.dibuat_pada) },
     {
       label: 'Selesai',

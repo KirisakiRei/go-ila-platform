@@ -221,6 +221,22 @@ func (r *BacktestRepository) AmbilAntrean(ctx context.Context, limit int) ([]mod
 	return daftar, err
 }
 
+// PulihkanRunMenggantung menandai run yang tertinggal berstatus "running" akibat
+// restart/OOM proses sebelumnya menjadi "failed", supaya pengguna tidak terkunci
+// oleh batas satu job aktif per akun.
+func (r *BacktestRepository) PulihkanRunMenggantung(ctx context.Context, pesan string) (int64, error) {
+	sekarang := time.Now().UTC()
+	hasil := r.db.WithContext(ctx).Model(&model.BacktestRun{}).
+		Where("status = ?", model.BacktestStatusRunning).
+		Updates(map[string]any{
+			"status":      model.BacktestStatusFailed,
+			"error_msg":   pesan,
+			"finished_at": sekarang,
+			"updated_at":  sekarang,
+		})
+	return hasil.RowsAffected, hasil.Error
+}
+
 // JumlahBerjalan menghitung run yang sedang dikerjakan seorang pengguna.
 func (r *BacktestRepository) JumlahBerjalan(ctx context.Context, userID string) (int64, error) {
 	var jumlah int64

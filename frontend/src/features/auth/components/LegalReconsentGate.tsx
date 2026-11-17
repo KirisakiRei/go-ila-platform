@@ -14,7 +14,7 @@ export function LegalReconsentGate() {
   const [notice, setNotice] = useState<string | null>(null)
 
   const status = useQuery({
-    queryKey: ['me', 'legal'],
+    queryKey: ['me', 'legal', 'consent'],
     queryFn: accountFlowApi.legal,
     // Cukup diperiksa sekali per sesi; dokumen jarang berubah.
     staleTime: 5 * 60 * 1000,

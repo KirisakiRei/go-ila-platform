@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -12,11 +13,19 @@ import (
 	"ila/backend/internal/session"
 	"ila/backend/pkg/apperror"
 	"ila/backend/pkg/httpx"
+	"ila/backend/pkg/utils"
 )
+
+// adminSessionExtender memperpanjang baris sesi perangkat saat heartbeat aktif.
+type adminSessionExtender interface {
+	Extend(ctx context.Context, id, userID string, expiresAt time.Time) error
+}
 
 // AdminAuthHandler adalah pintu HTTP masuk pintu admin.
 type AdminAuthHandler struct {
 	auth     service.AdminAuthService
+	issuer   service.TokenIssuer
+	extender adminSessionExtender
 	limiter  LoginLimiter
 	cookies  session.Config
 	csrfName string
@@ -45,6 +54,21 @@ func NewAdminAuthHandler(
 		expiry:   expiry,
 		idle:     idle,
 	}
+}
+
+// WithTokenIssuer memungkinkan heartbeat menerbitkan ulang JWT dengan klaim exp
+// baru sehingga sesi admin yang aktif berinteraksi tidak terputus mendadak saat
+// umur token awal habis.
+func (h *AdminAuthHandler) WithTokenIssuer(issuer service.TokenIssuer) *AdminAuthHandler {
+	h.issuer = issuer
+	return h
+}
+
+// WithSessionExtender menyinkronkan perpanjangan expires_at di tabel session
+// ketika Heartbeat memperbarui JWT admin.
+func (h *AdminAuthHandler) WithSessionExtender(extender adminSessionExtender) *AdminAuthHandler {
+	h.extender = extender
+	return h
 }
 
 // defaultAdminIdle dipakai bila konfigurasi tidak menyebut batas diam.
@@ -143,6 +167,23 @@ func (h *AdminAuthHandler) Heartbeat(c *gin.Context) {
 	}
 
 	expiresAt := time.Now().UTC().Add(h.expiry)
+	if h.issuer != nil {
+		if claims, err := h.issuer.Verify(raw); err == nil {
+			if refreshed, newExp, issueErr := h.issuer.IssueWithClaims(utils.Claims{
+				UserID:    claims.UserID,
+				Role:      claims.Role,
+				Scope:     claims.Scope,
+				Session:   claims.Session,
+				SessionID: claims.SessionID,
+			}); issueErr == nil {
+				raw = refreshed
+				expiresAt = newExp
+				if h.extender != nil && claims.SessionID != "" {
+					_ = h.extender.Extend(c.Request.Context(), claims.SessionID, claims.UserID, newExp)
+				}
+			}
+		}
+	}
 	h.cookies.SetSession(c, raw, expiresAt)
 	httpx.OK(c, "Sesi diperpanjang", gin.H{
 		"expires_at":   expiresAt.Format(time.RFC3339),

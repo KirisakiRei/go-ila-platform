@@ -90,6 +90,10 @@ func (j *JWTIssuer) Verify(raw string) (TokenClaims, error) {
 		return TokenClaims{}, fmt.Errorf("token tidak sah: %w", err)
 	}
 
+	if claims.ExpiresAt == nil {
+		return TokenClaims{}, errors.New("token tidak sah: masa berlaku kosong")
+	}
+
 	scope := claims.Scope
 	if scope == "" {
 		// Token lama sebelum scope diperkenalkan tetap dianggap sesi user.

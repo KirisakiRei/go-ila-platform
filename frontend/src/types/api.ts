@@ -464,6 +464,7 @@ export type MarketCandlesResponse = {
 
 export type Position = {
   id: string
+  broker_account_id?: string
   symbol: string
   strategy_version: StrategyVersion
   direction: TradeDirection

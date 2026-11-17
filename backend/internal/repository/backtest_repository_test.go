@@ -138,3 +138,114 @@ func TestTradeDaftarMengembalikanSeluruhEntry(t *testing.T) {
 		t.Fatalf("urutan seq salah: %d, %d", daftar[0].Seq, daftar[1].Seq)
 	}
 }
+
+func TestPulihkanRunMenggantungSaatStartup(t *testing.T) {
+	db := dbUjiBacktest(t)
+	repo := NewBacktestRepository(db)
+	ctx := context.Background()
+
+	run := &model.BacktestRun{
+		UserID: "user-1", Symbol: "XAUUSD", HTF: "H4", LTF: "M15",
+		RangeFrom: time.Now().UTC().AddDate(0, -1, 0), RangeTo: time.Now().UTC(),
+		Equity: 10000, RiskPercent: 0.5, Strategy: "ila-2.0",
+		StrategyVer: "ila-2.0-v1.0.0", Status: model.BacktestStatusRunning,
+	}
+	if err := repo.Buat(ctx, run); err != nil {
+		t.Fatalf("menyimpan run: %v", err)
+	}
+
+	dipulihkan, err := repo.PulihkanRunMenggantung(ctx, "Layanan dimulai ulang")
+	if err != nil {
+		t.Fatalf("PulihkanRunMenggantung: %v", err)
+	}
+	if dipulihkan != 1 {
+		t.Fatalf("dipulihkan = %d, ingin 1", dipulihkan)
+	}
+
+	aktif, err := repo.JumlahBerjalan(ctx, "user-1")
+	if err != nil {
+		t.Fatalf("JumlahBerjalan: %v", err)
+	}
+	if aktif != 0 {
+		t.Fatalf("run menggantung masih dihitung aktif (%d)", aktif)
+	}
+}
+
+func TestPageRepositorySaveUlangTidakBentrokUniqueIndex(t *testing.T) {
+	db := dbUjiBacktest(t)
+	if err := db.AutoMigrate(&model.Page{}, &model.PageSection{}, &model.PageItem{}); err != nil {
+		t.Fatalf("migrasi page: %v", err)
+	}
+	repo := NewPageRepository(db)
+	ctx := context.Background()
+
+	bundle := &PageBundle{
+		Page: model.Page{Slug: "tentang", Title: "Tentang v1"},
+		Sections: []model.PageSection{
+			{Key: "hero", Kind: "prose", Title: "Judul Awal", SortOrder: 1},
+		},
+		Items: []model.PageItem{
+			{SectionKey: "hero", Label: "Butir 1", SortOrder: 1},
+		},
+	}
+	if err := repo.Save(ctx, bundle); err != nil {
+		t.Fatalf("Save pertama gagal: %v", err)
+	}
+
+	bundle.Page.Title = "Tentang v2"
+	bundle.Sections[0].Title = "Judul Baru"
+	bundle.Items[0].Label = "Butir Baru"
+	if err := repo.Save(ctx, bundle); err != nil {
+		t.Fatalf("Save kedua (edit halaman) gagal: %v", err)
+	}
+
+	saved, err := repo.Find(ctx, "tentang")
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if saved.Page.Title != "Tentang v2" || len(saved.Sections) != 1 || len(saved.Items) != 1 {
+		t.Fatalf("hasil Save kedua tidak konsisten: %+v", saved)
+	}
+}
+
+func TestUpdateEngineMarketStateTidakMenimpaConnected(t *testing.T) {
+	db := dbUjiBacktest(t)
+	if err := db.AutoMigrate(&model.EngineState{}); err != nil {
+		t.Fatalf("migrasi EngineState: %v", err)
+	}
+	repo := NewRunnerRepository(db).(*runnerRepository)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	awal := &model.EngineState{
+		ID:            "engine:ila-2.0",
+		Strategy:      "ila-2.0",
+		Connected:     true,
+		EngineVersion: "v2.4.1",
+		LastSeenAt:    &now,
+		MarketState:   "OPEN",
+		MarkedAt:      &now,
+	}
+	if err := repo.UpsertEngineState(ctx, awal); err != nil {
+		t.Fatalf("UpsertEngineState awal: %v", err)
+	}
+
+	tutup := now.Add(5 * time.Minute)
+	if err := repo.UpdateEngineMarketState(ctx, "CLOSED", tutup); err != nil {
+		t.Fatalf("UpdateEngineMarketState: %v", err)
+	}
+
+	engines, err := repo.ListEngines(ctx)
+	if err != nil {
+		t.Fatalf("ListEngines: %v", err)
+	}
+	if len(engines) != 1 {
+		t.Fatalf("jumlah engine = %d, ingin 1", len(engines))
+	}
+	if !engines[0].Connected {
+		t.Fatal("Connected tertimpa menjadi false saat status pasar berubah")
+	}
+	if engines[0].MarketState != "CLOSED" {
+		t.Fatalf("MarketState = %q, ingin CLOSED", engines[0].MarketState)
+	}
+}

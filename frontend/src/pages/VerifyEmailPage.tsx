@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui'
 import { authApi } from '@/lib/auth-api'
@@ -49,9 +49,9 @@ export default function VerifyEmailPage() {
             Lanjutkan ke langkah berikutnya
           </Button>
           <p className="text-center text-[12px] text-muted-foreground">
-            <Link to="/pengaturan" className="underline">
+            <a href="/app/pengaturan" className="underline">
               Buka pengaturan
-            </Link>
+            </a>
           </p>
         </CardContent>
       </Card>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { onUnauthorized, request } from '@/lib/http'
+import { onAdminUnauthorized, onUnauthorized, request } from '@/lib/http'
 
 function mockFetch(status: number, body: unknown) {
   const fn = vi.fn().mockResolvedValue({
@@ -14,6 +14,8 @@ function mockFetch(status: number, body: unknown) {
 describe('pembedaan status sesi', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    onUnauthorized(null)
+    onAdminUnauthorized(null)
   })
 
   // 401 berarti sesi tidak sah: penangan global harus dipanggil.
@@ -53,5 +55,31 @@ describe('pembedaan status sesi', () => {
     mockFetch(423, { success: false, message: 'maintenance', error: 'LOCKED' })
 
     await expect(request('/me')).rejects.toThrow('pemeliharaan')
+  })
+
+  // 401 dari endpoint /admin/* tidak boleh menendang keluar sesi pelanggan.
+  it('memisahkan handler 401 antara sesi pelanggan dan sesi admin', async () => {
+    const userHandler = vi.fn()
+    const adminHandler = vi.fn()
+    onUnauthorized(userHandler)
+    onAdminUnauthorized(adminHandler)
+    mockFetch(401, { success: false, message: 'unauthorized', error: 'UNAUTHORIZED' })
+
+    await expect(request('/admin/auth/me')).rejects.toThrow()
+    expect(adminHandler).toHaveBeenCalledTimes(1)
+    expect(userHandler).not.toHaveBeenCalled()
+  })
+
+  // Pesan domain spesifik dari backend pada 403 tetap ditampilkan utuh.
+  it('mempertahankan pesan spesifik dari server pada 403', async () => {
+    mockFetch(403, {
+      success: false,
+      message: 'Pendaftaran hanya lewat undangan',
+      error: 'FORBIDDEN',
+    })
+
+    await expect(request('/auth/register', { method: 'POST', body: {} })).rejects.toThrow(
+      'Pendaftaran hanya lewat undangan',
+    )
   })
 })

@@ -25,6 +25,7 @@ type UserFilter struct {
 	OnlyAdmin   bool
 	// RoleID menyaring menurut role RBAC (kolom u.role_id).
 	RoleID string
+	Query  string
 	From   *time.Time
 	To     *time.Time
 }
@@ -142,6 +143,17 @@ func (r *adminUserRepository) Count(ctx context.Context, filter UserFilter) (int
 	}
 	if filter.HasTrial {
 		q = q.Where("trial_used = ?", true)
+	}
+	if filter.HasAccounts != nil {
+		if *filter.HasAccounts {
+			q = q.Where(`EXISTS (SELECT 1 FROM broker_account ba WHERE ba.user_id = "user".id AND ba.deleted_at IS NULL)`)
+		} else {
+			q = q.Where(`NOT EXISTS (SELECT 1 FROM broker_account ba WHERE ba.user_id = "user".id AND ba.deleted_at IS NULL)`)
+		}
+	}
+	if filter.Query != "" {
+		like := pagination.EscapeLike(filter.Query)
+		q = q.Where(`email ILIKE ? OR name ILIKE ? OR id = ?`, like+"%", like+"%", filter.Query)
 	}
 	if filter.From != nil {
 		q = q.Where("created_at >= ?", *filter.From)

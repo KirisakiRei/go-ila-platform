@@ -728,10 +728,12 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 }
 
 /** TAB 3: RIWAYAT ORDER AKUN */
-function TabOrderHistory({ accountId: _accountId }: { accountId: string }) {
+function TabOrderHistory({ accountId }: { accountId: string }) {
   const { data: positions, isLoading } = usePositions(100)
 
-  const rows = positions ?? []
+  const rows = (positions ?? []).filter((pos) =>
+    pos.broker_account_id ? pos.broker_account_id === accountId : true,
+  )
 
   // Endpoint posisi membatasi 100 baris terbaru, jadi ukuran halaman dibatasi
   // ke angka yang benar-benar tersedia. Menawarkan 200 di sini akan menjanjikan

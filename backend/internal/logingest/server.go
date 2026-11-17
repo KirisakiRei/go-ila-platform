@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -99,14 +100,21 @@ func (s *Server) tulis(entri *logkitv1.LogEntry) error {
 	}
 	waktu = waktu.In(s.lokasi)
 
-	layanan := entri.GetLayanan()
+	layanan := strings.TrimSpace(entri.GetLayanan())
 	if layanan == "" {
 		layanan = "engine"
+	}
+	if !namaLayananSah(layanan) {
+		return errors.New("nama layanan log tidak sah")
 	}
 
 	hari := waktu.Format("2006/01/02")
 	nama := layanan + "-" + waktu.Format("2006-01-02") + ".log"
-	jalur := filepath.Join(s.dir, filepath.FromSlash(hari), nama)
+	dasar := filepath.Clean(s.dir)
+	jalur := filepath.Join(dasar, filepath.FromSlash(hari), nama)
+	if rel, relErr := filepath.Rel(dasar, jalur); relErr != nil || strings.HasPrefix(rel, "..") {
+		return errors.New("jalur log di luar direktori dasar")
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -148,4 +156,24 @@ func (s *Server) Tutup() error {
 	err := s.berkas.Close()
 	s.berkas = nil
 	return err
+}
+
+// namaLayananSah membatasi nama berkas log agar karakter pemisah jalur atau
+// ".." tidak pernah bisa keluar dari direktori log.
+func namaLayananSah(s string) bool {
+	if len(s) == 0 || len(s) > 32 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		alfanumerik := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		if !alfanumerik && c != '-' && c != '_' && c != '.' {
+			return false
+		}
+	}
+	// Tolak ".." maupun awalan/akhiran titik agar nama berkas selalu bersih.
+	if s[0] == '.' || s[len(s)-1] == '.' || strings.Contains(s, "..") {
+		return false
+	}
+	return true
 }

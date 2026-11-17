@@ -37,6 +37,16 @@ func RunBacktestWorker(ctx context.Context, svc *BacktestService) {
 	logger := svc.logger
 	logger.Info("worker backtest aktif", "jumlah", jumlahWorkerBacktest)
 
+	// Pulihkan job yang sempat tertinggal di status "running" sebelum proses
+	// mulai ulang, agar kuota aktif pengguna tidak terkunci selamanya.
+	if svc.runs != nil {
+		if jumlah, err := svc.runs.PulihkanRunMenggantung(ctx, "Simulasi terhenti karena pembaruan layanan. Silakan jalankan ulang."); err != nil {
+			logger.Warn("gagal memulihkan backtest menggantung", "error", err.Error())
+		} else if jumlah > 0 {
+			logger.Info("backtest menggantung dipulihkan saat startup", "jumlah", jumlah)
+		}
+	}
+
 	pemicu := make(chan struct{}, 1)
 	svc.pemicuAntrean = pemicu
 

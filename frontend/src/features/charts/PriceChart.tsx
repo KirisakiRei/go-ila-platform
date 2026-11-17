@@ -75,7 +75,18 @@ type PriceChartProps = {
    * desimal sehingga pair 5 desimal (EURUSD) tampil membulat.
    */
   digits?: number
+  /**
+   * Identitas seri (mis. "EURUSD:H4:FOREXCOM"). Pergantian nilai ini memaksa
+   * pemuatan penuh setData agar lilin simbol lama tidak pernah tertinggal saat
+   * dua instrumen memiliki timestamp awal yang sama.
+   */
+  seriesKey?: string
 }
+
+const EMPTY_PRICE_LINES: PriceLineSpec[] = []
+const EMPTY_MARKERS: ChartMarkerSpec[] = []
+const EMPTY_ZONES: ZoneSpec[] = []
+const EMPTY_SEGMENTS: SegmentSpec[] = []
 
 const STYLE_MAP = {
   solid: LineStyle.Solid,
@@ -140,10 +151,10 @@ function snapKeBar(time: number, barTimes: number[]): number | null {
  */
 export function PriceChart({
   candles,
-  priceLines = [],
-  markers = [],
-  zones = [],
-  segments = [],
+  priceLines = EMPTY_PRICE_LINES,
+  markers = EMPTY_MARKERS,
+  zones = EMPTY_ZONES,
+  segments = EMPTY_SEGMENTS,
   height = 380,
   loading = false,
   emptyMessage = 'Belum ada data candle untuk ditampilkan.',
@@ -151,6 +162,7 @@ export function PriceChart({
   focusTime,
   footer,
   digits = 2,
+  seriesKey,
 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -160,6 +172,7 @@ export function PriceChart({
   const zonePrimitiveRef = useRef<ZonePrimitive | null>(null)
   const segmentSeriesRef = useRef<ISeriesApi<'Line'>[]>([])
   const prevDataRef = useRef<CandlestickData<UTCTimestamp>[]>([])
+  const prevSeriesKeyRef = useRef<string | undefined>(seriesKey)
   /** focusTime yang sudah diterapkan; mencegah view ter-reset setiap polling. */
   const focusAppliedRef = useRef<number | null>(null)
   const [dark, setDark] = useState(isDarkMode)
@@ -313,7 +326,13 @@ export function PriceChart({
     }
 
     const prev = prevDataRef.current
+    const seriesChanged = prevSeriesKeyRef.current !== seriesKey
     prevDataRef.current = data
+    prevSeriesKeyRef.current = seriesKey
+
+    if (seriesChanged) {
+      focusAppliedRef.current = null
+    }
 
     if (data.length === 0) {
       series.setData(data)
@@ -322,11 +341,16 @@ export function PriceChart({
 
     const prevLast = prev.length > 0 ? (prev[prev.length - 1] as CandlestickData<UTCTimestamp>).time : null
     const focusPending = focusTime != null && focusAppliedRef.current !== focusTime
+    const sameHeadBar =
+      !seriesChanged &&
+      data[0]?.time === prev[0]?.time &&
+      data[0]?.open === prev[0]?.open &&
+      data[0]?.close === prev[0]?.close
 
-    // Jendela data sama (hanya lilin berjalan yang berubah): cukup perbarui
-    // ekornya. Ini mencegah zoom dan posisi gulir pengguna tereset setiap kali
-    // data disegarkan.
-    if (prevLast !== null && data[0]?.time === prev[0]?.time && !focusPending) {
+    // Jendela data & instrumen sama (hanya lilin berjalan yang berubah): cukup
+    // perbarui ekornya. Ini mencegah zoom dan posisi gulir pengguna tereset
+    // setiap kali data disegarkan, tanpa mencampur lilin saat ganti simbol.
+    if (prevLast !== null && sameHeadBar && !focusPending) {
       const startIndex = data.findIndex((bar) => (bar.time as number) >= (prevLast as number))
       if (startIndex > 0) {
         for (let i = startIndex; i < data.length; i += 1) {
@@ -361,7 +385,7 @@ export function PriceChart({
     }
 
     chart.timeScale().fitContent()
-  }, [candles, focusTime])
+  }, [candles, focusTime, seriesKey])
 
   // Garis harga: Entry, SL, TP, Sweep, CISD.
   useEffect(() => {

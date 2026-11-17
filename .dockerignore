@@ -1,0 +1,45 @@
+# Secrets & environment
+.env
+.env.*
+!.env.example
+ssh/
+certs/
+deploy/certs/
+*.pem
+*.key
+*.crt
+
+# Git & documentation/plans not needed in container build
+.git
+.gitignore
+plans/
+docs/
+.tmp-*
+
+# Compiled local binaries & logs
+bin/
+*.exe
+*.test
+*.out
+*.log
+coverage.out
+coverage.html
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend local artifacts & dev dependencies
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/coverage
+frontend/.claude
+frontend/.devserver.log
+
+# IDE & OS
+.DS_Store
+.idea
+.vscode
+*.swp

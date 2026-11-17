@@ -56,8 +56,12 @@ build-frontend: ## Build frontend ke dist/
 	cd $(FRONTEND_DIR) && npm run build
 
 .PHONY: check-frontend
-check-frontend: ## Type-check frontend tanpa emit
-	cd $(FRONTEND_DIR) && npm run lint
+check-frontend: ## Lint, type-check, dan uji unit frontend
+	cd $(FRONTEND_DIR) && npm run typecheck && npm run lint && npm test
+
+.PHONY: test-strategy
+test-strategy: ## Uji paket strategi backtest (ila-strategy)
+	cd ila-strategy && go vet ./... && go test ./...
 
 # --- Docker -----------------------------------------------------------------
 
@@ -126,4 +130,4 @@ ps: ## Status container
 # --- Gabungan ---------------------------------------------------------------
 
 .PHONY: check
-check: vet test-backend check-frontend ## Semua pemeriksaan sebelum commit
+check: vet test-backend test-strategy check-frontend ## Semua pemeriksaan sebelum commit

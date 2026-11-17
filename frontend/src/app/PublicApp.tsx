@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { FullPageLoading } from '@/app/FullPageLoading'
 import { ScrollToTop } from '@/app/ScrollToTop'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import RegisterPage from '@/pages/RegisterPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
@@ -78,8 +79,10 @@ export function PublicApp({ children }: { children?: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ScrollToTop />
-        <PublicRoutes />
-        {children}
+        <ErrorBoundary>
+          <PublicRoutes />
+          {children}
+        </ErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   )

@@ -245,13 +245,25 @@ func (s *Service) checkSchedule(state enginev1.MarketState) {
 	}
 }
 
-// persistMarketState menyimpan status pasar pada setiap engine yang dikenal.
+type marketStateUpdater interface {
+	UpdateEngineMarketState(ctx context.Context, state string, markedAt time.Time) error
+}
+
+// persistMarketState menyimpan status pasar pada engine yang terdaftar tanpa
+// menimpa kolom connected atau last_seen_at.
 func (s *Service) persistMarketState(state enginev1.MarketState) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	now := s.opts.Clock()
 	label := marketStateLabel(state)
+
+	if updater, ok := s.store.(marketStateUpdater); ok {
+		if err := updater.UpdateEngineMarketState(ctx, label, now); err != nil {
+			s.logger.Warn("gagal menyimpan status pasar", "error", err.Error())
+		}
+		return
+	}
 
 	for _, strategy := range []string{"ila-2.0", "ila-3.0"} {
 		record := &model.EngineState{

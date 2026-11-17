@@ -92,11 +92,12 @@ func (c *Client) ExchangeToken(ctx context.Context, code string) (*TokenResponse
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("menghubungi server token ctrader: %w", err)
+		// Jangan bungkus *url.Error mentah karena URL memuat client_secret.
+		return nil, errors.New("gagal menghubungi server token ctrader")
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("membaca respons token: %w", err)
 	}
@@ -139,7 +140,7 @@ func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (*TokenR
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("menghubungi server refresh token: %w", err)
+		return nil, errors.New("gagal menghubungi server refresh token ctrader")
 	}
 	defer resp.Body.Close()
 

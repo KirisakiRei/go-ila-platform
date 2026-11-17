@@ -16,9 +16,9 @@ import { join } from 'node:path'
 
 const SUMBER = join(process.cwd(), 'src')
 
-/** Hanya berkas di bawah pages/public yang memakai bundel publik. */
+/** Berkas yang dipasang di entri publik (index.html). */
 function berkasPublik(): string[] {
-  const hasil: string[] = []
+  const hasil: string[] = [join(SUMBER, 'pages', 'VerifyEmailPage.tsx')]
 
   function jelajah(direktori: string) {
     for (const nama of readdirSync(direktori)) {
@@ -35,14 +35,37 @@ function berkasPublik(): string[] {
   return hasil
 }
 
+/** Berkas yang dipasang di entri panel (app.html, basename="/app"). */
+function berkasPanel(): string[] {
+  const hasil: string[] = []
+  const publikDir = join(SUMBER, 'pages', 'public')
+  const testDir = join(SUMBER, 'test')
+  const verifyFile = join(SUMBER, 'pages', 'VerifyEmailPage.tsx')
+
+  function jelajah(direktori: string) {
+    for (const nama of readdirSync(direktori)) {
+      const jalur = join(direktori, nama)
+      if (jalur === publikDir || jalur === testDir || jalur === verifyFile) continue
+      if (statSync(jalur).isDirectory()) {
+        jelajah(jalur)
+        continue
+      }
+      if (nama.endsWith('.tsx') || nama.endsWith('.ts')) hasil.push(jalur)
+    }
+  }
+
+  jelajah(SUMBER)
+  return hasil
+}
+
 describe('tautan lintas bundel', () => {
-  it('situs publik tidak memakai <Link> untuk rute /app/*', () => {
+  it('situs publik tidak memakai <Link> untuk rute panel (/app/* atau rute khusus panel)', () => {
     const pelanggaran: string[] = []
 
     for (const berkas of berkasPublik()) {
       const isi = readFileSync(berkas, 'utf-8')
       // <Link ...> dan <NavLink ...> sama-sama memakai navigasi client-side.
-      const pola = /<(Link|NavLink)\b[^>]*\bto=["']\/app\//g
+      const pola = /<(Link|NavLink)\b[^>]*\bto=["'](\/app\/|\/pengaturan|\/dashboard|\/sinyal|\/posisi|\/akun)/g
       for (const cocok of isi.matchAll(pola)) {
         const baris = isi.slice(0, cocok.index).split('\n').length
         pelanggaran.push(`${berkas}:${baris} -> ${cocok[0]}`)
@@ -50,5 +73,20 @@ describe('tautan lintas bundel', () => {
     }
 
     expect(pelanggaran, `pakai <a href> agar bundel panel dimuat ulang:\n${pelanggaran.join('\n')}`).toEqual([])
+  })
+
+  it('panel pelanggan tidak memakai <Link> untuk rute khusus publik (/bantuan, /fitur, /harga, /tentang)', () => {
+    const pelanggaran: string[] = []
+
+    for (const berkas of berkasPanel()) {
+      const isi = readFileSync(berkas, 'utf-8')
+      const pola = /<(Link|NavLink|MenuRow)\b[^>]*\bto=["']\/(bantuan|fitur|harga|tentang)(\/|"|')/g
+      for (const cocok of isi.matchAll(pola)) {
+        const baris = isi.slice(0, cocok.index).split('\n').length
+        pelanggaran.push(`${berkas}:${baris} -> ${cocok[0]}`)
+      }
+    }
+
+    expect(pelanggaran, `pakai <a href> agar bundel publik dimuat dari akar:\n${pelanggaran.join('\n')}`).toEqual([])
   })
 })

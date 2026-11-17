@@ -44,7 +44,7 @@ func (h *BacktestHandler) Cakupan(c *gin.Context) {
 	hasil, err := h.backtest.Cakupan(c.Request.Context(), middleware.CurrentUserID(c),
 		c.Query("symbol"), c.Query("feed"), periksaUlang)
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.OK(c, "Cakupan data historis", hasil)
@@ -54,7 +54,7 @@ func (h *BacktestHandler) Cakupan(c *gin.Context) {
 func (h *BacktestHandler) Kuota(c *gin.Context) {
 	hasil, err := h.backtest.Kuota(c.Request.Context(), middleware.CurrentUserID(c))
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.OK(c, "Sisa jatah backtest", hasil)
@@ -67,7 +67,7 @@ func (h *BacktestHandler) Riwayat(c *gin.Context) {
 
 	daftar, total, err := h.backtest.Riwayat(c.Request.Context(), middleware.CurrentUserID(c), limit, offset)
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.OKWithMeta(c, "Riwayat backtest", daftar, gin.H{
@@ -81,13 +81,13 @@ func (h *BacktestHandler) Riwayat(c *gin.Context) {
 func (h *BacktestHandler) Buat(c *gin.Context) {
 	var req dto.BacktestCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = httpx.Fail(c, httpx.WrapValidation(err.Error()))
+		c.Error(httpx.WrapValidation(err.Error()))
 		return
 	}
 
 	hasil, err := h.backtest.Buat(c.Request.Context(), middleware.CurrentUserID(c), req)
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.Created(c, "Backtest dimasukkan ke antrean", hasil)
@@ -97,7 +97,7 @@ func (h *BacktestHandler) Buat(c *gin.Context) {
 func (h *BacktestHandler) Ambil(c *gin.Context) {
 	hasil, err := h.backtest.Ambil(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id"))
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.OK(c, "Detail backtest", hasil)
@@ -106,7 +106,7 @@ func (h *BacktestHandler) Ambil(c *gin.Context) {
 // Hapus menangani DELETE /api/v1/backtest/:id.
 func (h *BacktestHandler) Hapus(c *gin.Context) {
 	if err := h.backtest.Hapus(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id")); err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.NoContent(c, "Backtest dihapus")
@@ -119,7 +119,7 @@ func (h *BacktestHandler) TradeDaftar(c *gin.Context) {
 
 	daftar, total, err := h.backtest.TradeDaftar(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id"), limit, offset)
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.OKWithMeta(c, "Daftar entry", daftar, gin.H{
@@ -133,13 +133,13 @@ func (h *BacktestHandler) TradeDaftar(c *gin.Context) {
 func (h *BacktestHandler) TradeAmbil(c *gin.Context) {
 	seq, err := strconv.Atoi(c.Param("seq"))
 	if err != nil || seq <= 0 {
-		_ = httpx.Fail(c, httpx.WrapValidation("nomor entry tidak sah"))
+		c.Error(httpx.WrapValidation("nomor entry tidak sah"))
 		return
 	}
 
 	hasil, err := h.backtest.TradeAmbil(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id"), seq)
 	if err != nil {
-		_ = httpx.Fail(c, err)
+		c.Error(err)
 		return
 	}
 	httpx.OK(c, "Detail entry", hasil)

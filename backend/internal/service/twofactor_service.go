@@ -7,6 +7,7 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -157,10 +158,18 @@ func (s *twoFactorService) Status(ctx context.Context, userID string) (*TwoFacto
 	}, nil
 }
 
-// Setup membuat secret baru. Secret lama (bila ada) tidak tersentuh sampai
-// aktivasi berhasil, sehingga percobaan aktivasi yang gagal tidak mematikan
-// 2FA yang sedang berlaku.
+// Setup membuat secret baru bagi akun yang belum mengaktifkan 2FA.
+//
+// Bila 2FA sudah aktif, penyiapan ulang ditolak sampai faktor yang sedang
+// berlaku dinonaktifkan lewat Disable (password + kode TOTP), sehingga sesi
+// yang dibajak tidak pernah bisa menimpa atau mematikan 2FA secara diam-diam.
 func (s *twoFactorService) Setup(ctx context.Context, userID, account string) (*TwoFactorSetup, error) {
+	if existing, err := s.repo.FindByUser(ctx, userID); err == nil && existing != nil && existing.ActivatedAt != nil {
+		return nil, fmt.Errorf("%w: 2FA sudah aktif; nonaktifkan terlebih dahulu sebelum menyetel ulang", apperror.ErrAlreadyExists)
+	} else if err != nil && !errors.Is(err, apperror.ErrNotFound) {
+		return nil, err
+	}
+
 	secret, err := totp.NewSecret()
 	if err != nil {
 		return nil, err
@@ -209,6 +218,13 @@ func (s *twoFactorService) Activate(ctx context.Context, userID, code string) ([
 	}
 
 	now := s.now()
+	if settings.ActivatedAt != nil {
+		return nil, fmt.Errorf("%w: 2FA sudah aktif", apperror.ErrAlreadyExists)
+	}
+	if !settings.UpdatedAt.IsZero() && now.Sub(settings.UpdatedAt) > SetupTTL {
+		return nil, validation("masa penyiapan 2FA berakhir, silakan mulai ulang")
+	}
+
 	ok, err := totp.Validate(secret, code, now)
 	if err != nil {
 		return nil, err

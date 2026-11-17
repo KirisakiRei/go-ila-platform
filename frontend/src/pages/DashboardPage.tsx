@@ -15,6 +15,7 @@ import { KondisiHariIni, KondisiHariIniRingkas } from './components/KondisiHariI
 import { DashboardOnboardingWidget } from './components/DashboardOnboardingWidget'
 import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
 import { POSISI_LIMIT_DASHBOARD } from '@/features/signals/lib/kondisi-pasar'
+import { useInviteOnly } from '@/lib/use-invite-only'
 
 export { POSISI_LIMIT_DASHBOARD }
 
@@ -78,6 +79,7 @@ function RecentPositions() {
 export default function DashboardPage() {
   const { user } = useAuthContext()
   const { data: status } = useSystemStatus()
+  const inviteOnly = useInviteOnly()
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [moreDrawerOpen, setMoreDrawerOpen] = useState(false)
 
@@ -163,6 +165,7 @@ export default function DashboardPage() {
           open={moreDrawerOpen}
           onClose={() => setMoreDrawerOpen(false)}
           user={user}
+          inviteOnly={inviteOnly}
         />
       )}
     </>

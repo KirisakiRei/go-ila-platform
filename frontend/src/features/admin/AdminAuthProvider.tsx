@@ -1,31 +1,43 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { adminAuthApi } from '@/lib/admin-api'
+import { onAdminUnauthorized, selamaPemulihan } from '@/lib/http'
 import { AdminAuthContext, type AdminAuthContextValue, type AdminUser } from './admin-auth-context'
 import { mapProfile } from './lib/profile'
 
-type Status = 'restoring' | 'authenticated' | 'anonymous'
+type Status = 'idle' | 'restoring' | 'authenticated' | 'anonymous'
+
+function isAdminRoutePath(pathname: string): boolean {
+  return /(^|\/)admin(\/|$)/.test(pathname)
+}
 
 /**
  * AdminAuthProvider memulihkan sesi admin dari cookie HttpOnly milik pintu
  * admin, bukan dari sesi pelanggan.
  *
- * Pemisahan ini disengaja: admin dan pelanggan memakai cookie berbeda di
- * server, sehingga masuk sebagai pelanggan tidak otomatis membuka panel admin
- * dan keluar dari panel admin tidak mengeluarkan sesi pelanggan.
+ * Pemulihan hanya dijalankan ketika pengguna benar-benar membuka rute /admin/*,
+ * sehingga halaman pelanggan biasa tidak pernah menembak /admin/auth/me dan
+ * balasan 401 di ranah admin tidak pernah mengganggu sesi pelanggan.
  */
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  const onAdminRoute = isAdminRoutePath(location.pathname)
   const [admin, setAdmin] = useState<AdminUser | null>(null)
-  const [status, setStatus] = useState<Status>('restoring')
+  const [status, setStatus] = useState<Status>(() => (onAdminRoute ? 'restoring' : 'idle'))
+  const restoredOnce = useRef(false)
   const queryClient = useQueryClient()
 
   useEffect(() => {
+    if (!onAdminRoute || restoredOnce.current) return
+    setStatus('restoring')
+
     let active = true
 
-    adminAuthApi
-      .me()
+    selamaPemulihan(() => adminAuthApi.me())
       .then((profile) => {
         if (!active) return
+        restoredOnce.current = true
         setAdmin(mapProfile(profile))
         setStatus('authenticated')
       })
@@ -34,16 +46,26 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         // boleh terbuka. Keduanya berakhir sebagai "belum masuk" agar panel
         // tidak menggantung di layar memuat.
         if (!active) return
+        restoredOnce.current = true
         setStatus('anonymous')
       })
 
     return () => {
       active = false
     }
+  }, [onAdminRoute])
+
+  useEffect(() => {
+    onAdminUnauthorized(() => {
+      setAdmin(null)
+      setStatus('anonymous')
+    })
+    return () => onAdminUnauthorized(null)
   }, [])
 
   const signIn = useCallback(
     (next: AdminUser) => {
+      restoredOnce.current = true
       setAdmin(next)
       setStatus('authenticated')
       // Data panel sebelumnya milik sesi lain; jangan pernah dipakai ulang.
@@ -67,12 +89,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AdminAuthContextValue>(
     () => ({
       admin,
-      isLoading: status === 'restoring',
+      isLoading: status === 'restoring' || (onAdminRoute && status === 'idle'),
       signIn,
       signOut,
       refreshPermissions,
     }),
-    [admin, status, signIn, signOut, refreshPermissions],
+    [admin, onAdminRoute, status, signIn, signOut, refreshPermissions],
   )
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>

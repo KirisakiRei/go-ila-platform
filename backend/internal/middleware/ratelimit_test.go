@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -69,5 +70,23 @@ func TestLoginLimiterTerpisahPerIP(t *testing.T) {
 
 	if limiter.Blocked("5.6.7.8|user@contoh.id") {
 		t.Fatal("IP lain seharusnya tidak ikut terkunci")
+	}
+}
+
+func TestLoginLimiterMenyapuEntriKedaluwarsaDanBatasMaks(t *testing.T) {
+	limiter := NewLoginLimiter()
+	now := time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC)
+	limiter.now = func() time.Time { return now }
+
+	for i := 0; i < 300; i++ {
+		limiter.Fail(fmt.Sprintf("10.0.0.%d|u@x.id", i))
+	}
+	now = now.Add(loginWindow + time.Minute)
+	// Panggilan ke-256 memicu penyapuan entri kedaluwarsa.
+	for i := 0; i < sweepEveryOps; i++ {
+		limiter.Fail("1.1.1.1|baru@x.id")
+	}
+	if len(limiter.entries) != 1 {
+		t.Fatalf("entri tersisa = %d, ingin 1 setelah penyapuan", len(limiter.entries))
 	}
 }

@@ -290,6 +290,9 @@ func (s *roleService) AssignRole(ctx context.Context, actorID, userID string, re
 	if err != nil {
 		return err
 	}
+	if target.IsProtected {
+		return apperror.ErrForbidden
+	}
 	// Hanya akun ber-role kasar admin yang boleh dipegangkan role RBAC.
 	if target.Role != string(config.RoleAdmin) {
 		return validation("akun ini bukan akun admin")

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -877,6 +879,9 @@ func validateCredential(brokerType string, req dto.CreateAccountRequest) error {
 		if len(token) < 20 {
 			return fmt.Errorf("%w: token Match-Trader tampak tidak lengkap", apperror.ErrBadRequest)
 		}
+		if err := validateExternalBrokerURL(req.BaseURL); err != nil {
+			return err
+		}
 	case "ctrader":
 		token := strings.TrimSpace(req.Token)
 		if token == "" {
@@ -887,6 +892,35 @@ func validateCredential(brokerType string, req dto.CreateAccountRequest) error {
 		}
 	default:
 		return fmt.Errorf("%w: platform tidak dikenal", apperror.ErrBadRequest)
+	}
+	return nil
+}
+
+// validateExternalBrokerURL menolak skema non-HTTPS dan alamat jaringan
+// internal/loopback agar BaseURL kiriman user tidak dapat dipakai untuk SSRF.
+func validateExternalBrokerURL(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Host == "" {
+		return fmt.Errorf("%w: alamat server broker tidak sah", apperror.ErrBadRequest)
+	}
+	if !strings.EqualFold(parsed.Scheme, "https") {
+		return fmt.Errorf("%w: alamat server broker wajib memakai https://", apperror.ErrBadRequest)
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("%w: alamat server broker tidak boleh memuat kredensial atau query", apperror.ErrBadRequest)
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" || host == "localhost" || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".internal") || !strings.Contains(host, ".") {
+		return fmt.Errorf("%w: host server broker tidak diizinkan", apperror.ErrBadRequest)
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("%w: alamat IP privat atau lokal tidak diizinkan", apperror.ErrBadRequest)
+		}
 	}
 	return nil
 }
@@ -1046,12 +1080,12 @@ func (s *accountService) ConnectCTrader(ctx context.Context, userID string, req 
 
 	tokenResp, err := s.ctrader.ExchangeToken(ctx, req.Code)
 	if err != nil {
-		return nil, fmt.Errorf("%w: pertukaran token cTrader gagal: %v", apperror.ErrBadRequest, err)
+		return nil, fmt.Errorf("%w: kode otorisasi cTrader tidak sah atau sudah kedaluwarsa", apperror.ErrBadRequest)
 	}
 
 	accounts, err := s.ctrader.GetAccounts(ctx, tokenResp.AccessToken)
 	if err != nil {
-		return nil, fmt.Errorf("%w: mengambil daftar akun cTrader gagal: %v", apperror.ErrBadRequest, err)
+		return nil, fmt.Errorf("%w: gagal mengambil daftar akun dari cTrader", apperror.ErrBadRequest)
 	}
 	if len(accounts) == 0 {
 		return nil, fmt.Errorf("%w: tidak ada akun cTrader yang ditemukan di profil ini", apperror.ErrNotFound)

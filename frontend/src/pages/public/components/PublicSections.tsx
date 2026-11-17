@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 /**
@@ -144,7 +145,17 @@ export function ActionLink({
   variant?: 'primary' | 'secondary' | 'ghost'
   className?: string
 }) {
-  const isExternalBundle = href.startsWith('/app/')
+  const trimmed = href.trim()
+  const isInternalPublic =
+    trimmed.startsWith('/') &&
+    !trimmed.startsWith('//') &&
+    trimmed !== '/app' &&
+    !trimmed.startsWith('/app/')
+  const isSafeExternalOrBundle =
+    trimmed === '/app' ||
+    trimmed.startsWith('/app/') ||
+    trimmed.startsWith('#') ||
+    /^(https?:|mailto:|tel:)/i.test(trimmed)
   const classes = cn(
     'inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-[13px] transition-colors',
     variant === 'primary' && 'bg-[#09090b] font-semibold text-white hover:bg-zinc-800',
@@ -154,19 +165,28 @@ export function ActionLink({
     className,
   )
 
-  if (isExternalBundle) {
+  if (isInternalPublic) {
     return (
-      <a href={href} className={classes}>
+      <Link to={trimmed} className={classes}>
+        {children}
+      </Link>
+    )
+  }
+
+  if (isSafeExternalOrBundle) {
+    const isHttp = /^https?:\/\//i.test(trimmed)
+    return (
+      <a
+        href={trimmed}
+        className={classes}
+        {...(isHttp ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
         {children}
       </a>
     )
   }
 
-  return (
-    <a href={href} className={classes}>
-      {children}
-    </a>
-  )
+  return <span className={classes}>{children}</span>
 }
 
 /** Callout adalah kotak penekanan untuk pernyataan yang tidak boleh terlewat. */

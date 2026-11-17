@@ -84,12 +84,20 @@ describe('useIdleTimer', () => {
     expect(onTimeout).not.toHaveBeenCalled()
   })
 
-  it('tombol keluar langsung mengakhiri sesi', () => {
+  it('tombol keluar langsung mengakhiri sesi meski didahului mousedown', () => {
     const { hook, onTimeout } = renderIdle()
 
     act(() => {
       vi.advanceTimersByTime(25 * 60_000)
     })
+    expect(hook.result.current.warningVisible).toBe(true)
+
+    // Simulasi urutan nyata klik mouse: mousedown pada window terjadi sebelum click.
+    act(() => {
+      window.dispatchEvent(new Event('mousedown'))
+    })
+    expect(hook.result.current.warningVisible).toBe(true)
+
     act(() => {
       hook.result.current.leaveNow()
     })

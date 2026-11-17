@@ -76,6 +76,7 @@ func NewSystemService(deps SystemServiceDeps) SystemService {
 		engines:   deps.Engines,
 		daily:     deps.Daily,
 		positions: deps.Positions,
+		legal:     deps.Legal,
 		maxTrades: maxTrades,
 		clock:     clock,
 	}

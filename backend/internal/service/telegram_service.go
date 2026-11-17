@@ -175,12 +175,19 @@ func (s *telegramService) Disconnect(ctx context.Context, userID string) error {
 	return nil
 }
 
-// ResolveChat mencari pemilik chat yang sudah terhubung.
+// ResolveChat mencari pemilik chat yang sudah terhubung dan belum diblokir.
 func (s *telegramService) ResolveChat(ctx context.Context, chatID string) (*model.User, error) {
 	if strings.TrimSpace(chatID) == "" {
 		return nil, apperror.ErrNotFound
 	}
-	return s.users.FindByTelegramChatID(ctx, chatID)
+	user, err := s.users.FindByTelegramChatID(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Status == model.UserStatusBanned || user.Status == model.UserStatusDeleted {
+		return nil, apperror.ErrForbidden
+	}
+	return user, nil
 }
 
 func (s *telegramService) recordAudit(ctx context.Context, userID, event, entity, entityID string) {

@@ -1,6 +1,13 @@
 package middleware
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+)
 
 func TestSafePathMenyamarkanTokenApprove(t *testing.T) {
 	cases := []struct {
@@ -44,6 +51,36 @@ func TestSafePathTidakMengubahPathBiasa(t *testing.T) {
 	} {
 		if got := safePath(path); got != path {
 			t.Fatalf("safePath(%q) berubah menjadi %q", path, got)
+		}
+	}
+}
+
+func TestRequestIDMenolakHeaderTerlaluPanjangAtauKotor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(RequestID())
+	r.GET("/cek", func(c *gin.Context) {
+		c.String(http.StatusOK, c.GetString(ContextRequestID))
+	})
+
+	// Header sah dipertahankan agar log Caddy dan backend-api tetap tersambung.
+	reqSah := httptest.NewRequest(http.MethodGet, "/cek", nil)
+	reqSah.Header.Set("X-Request-ID", "trace-sah_123:abc.1")
+	wSah := httptest.NewRecorder()
+	r.ServeHTTP(wSah, reqSah)
+	if wSah.Body.String() != "trace-sah_123:abc.1" {
+		t.Fatalf("X-Request-ID sah berubah menjadi %q", wSah.Body.String())
+	}
+
+	// Header > 64 karakter atau memuat karakter kontrol diganti ID baru <= 64 karakter.
+	for _, buruk := range []string{strings.Repeat("a", 80), "jahat\r\nSet-Cookie: x=1", "spasi tidak sah"} {
+		req := httptest.NewRequest(http.MethodGet, "/cek", nil)
+		req.Header.Set("X-Request-ID", buruk)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		got := w.Body.String()
+		if got == "" || got == buruk || len(got) > maxRequestIDLen {
+			t.Fatalf("X-Request-ID buruk %q tidak diganti dengan aman: %q", buruk, got)
 		}
 	}
 }

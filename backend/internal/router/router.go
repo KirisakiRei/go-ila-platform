@@ -112,6 +112,15 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	var backgroundWorkers []func(ctx context.Context)
 
 	r := gin.New()
+	// Hanya percayai proxy di jaringan internal Docker/loopback (Caddy & cloudflared)
+	// supaya X-Forwarded-For kiriman klien tidak bisa memalsukan alamat IP.
+	_ = r.SetTrustedProxies([]string{
+		"127.0.0.0/8",
+		"::1/128",
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+	})
 	r.Use(middleware.RequestID())
 	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Recovery(logger))
@@ -341,7 +350,19 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	// gerbang yang sama dengan billing dan uji coba.
 	authHandler.SetAccessGate(accessGate)
 	approveHandler := handler.NewApproveHandler(approveService)
-	healthHandler := handler.NewHealthHandler(cfg.ServiceName, nil)
+	var readyCheck func() error
+	if db != nil {
+		readyCheck = func() error {
+			sqlDB, dbErr := db.DB()
+			if dbErr != nil {
+				return dbErr
+			}
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return sqlDB.PingContext(pingCtx)
+		}
+	}
+	healthHandler := handler.NewHealthHandler(cfg.ServiceName, readyCheck)
 	accountHandler := handler.NewAccountHandler(accountService)
 	pairHandler := handler.NewPairHandler(pairCatalogService, accountService)
 	riskHandler := handler.NewRiskHandler(service.NewRiskSimulator(accountService, pairCatalogService, nil))
@@ -384,6 +405,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		}, logger)
 	}
 	telegramHandler := handler.NewTelegramHandler(telegramService, cfg.TelegramBotUsername, cfg.TelegramWebhookSecret, tgClient).
+		RequireSecret(cfg.IsProduction()).
 		WithMenu(service.NewTelegramMenuServiceWithRadar(journalRepo, runnerRepo, signalRepo, cfg.MaxDailyTrades), approveService, cfg.PublicURL, logger)
 	trialHandler := handler.NewTrialHandler(trialService)
 	adminAuthHandler := handler.NewAdminAuthHandler(
@@ -393,7 +415,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		cfg.AdminCSRFCookieName,
 		cfg.AdminJWTExpiry,
 		cfg.AdminIdleTimeout,
-	)
+	).WithTokenIssuer(newAdminTokenIssuer(cfg)).WithSessionExtender(sessionRepo)
 	adminRoleHandler := handler.NewAdminRoleHandler(roleService)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
 	auditAdminHandler := handler.NewAdminAuditHandler(auditAdminService)
@@ -508,9 +530,10 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	// API v1
 	auth := r.Group("/api/v1/auth")
 	{
+		twoFactorLimiter := middleware.NewRateLimiter(10, time.Minute)
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
-		auth.POST("/verify-2fa", authHandler.VerifyTwoFactor)
+		auth.POST("/verify-2fa", middleware.RateLimitByIP(twoFactorLimiter), authHandler.VerifyTwoFactor)
 		// Logout hanya menghapus cookie; aman tanpa sesi.
 		auth.POST("/logout", authHandler.Logout)
 		auth.GET("/csrf", authHandler.CSRF)

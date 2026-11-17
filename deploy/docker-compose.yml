@@ -61,6 +61,9 @@ services:
       LOG_DIR: /var/log/ila
       LOG_HARI: "30"
       LOG_BATAS_MB: "1024"
+      # Batas lunak GC Go di bawah mem_limit (224m) agar lonjakan heap memicu GC
+      # lebih agresif sebelum kernel Linux menjatuhkan SIGKILL (OOM).
+      GOMEMLIMIT: "190MiB"
     # Worker backtest hidup di proses ini dan menahan dua deret candle (sampai
     # 5000 baris per timeframe) selama satu run berjalan. Pengukuran di
     # internal/backtest/memori_test.go menunjukkan data terburuk sekitar 4 MB,
@@ -128,6 +131,7 @@ services:
       ENGINE3_MTLS_KEY: /certs/engine-client.key
       ENGINE3_MTLS_CA: /certs/ca.crt
       ENGINE3_SERVER_NAME: ""
+      GOMEMLIMIT: "135MiB"
     mem_limit: 160m
     cpus: "0.8"
     pids_limit: 200
@@ -229,6 +233,7 @@ services:
     environment:
       DB_DSN: postgres://${DB_USER:-ila}:${DB_PASSWORD:?DB_PASSWORD wajib diisi}@postgres:5432/${DB_NAME:-ila}?sslmode=disable
       BACKUP_DIR: /var/backups/ila
+      REMOTE_DIR: /remote
       DAILY_KEEP: "7"
       WEEKLY_KEEP: "4"
     mem_limit: 64m

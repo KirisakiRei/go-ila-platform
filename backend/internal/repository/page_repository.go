@@ -100,11 +100,40 @@ func (r *PageRepository) load(ctx context.Context, page model.Page) (*PageBundle
 func (r *PageRepository) Save(ctx context.Context, bundle *PageBundle) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		page := bundle.Page
+		if page.ID == "" {
+			var existing model.Page
+			err := tx.Unscoped().Where("slug = ?", page.Slug).Take(&existing).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("memeriksa halaman %s: %w", page.Slug, err)
+			}
+			if err == nil {
+				page.ID = existing.ID
+				if page.CreatedAt.IsZero() {
+					page.CreatedAt = existing.CreatedAt
+				}
+				page.DeletedAt = gorm.DeletedAt{}
+			}
+		}
 		if err := tx.Save(&page).Error; err != nil {
 			return fmt.Errorf("menyimpan halaman %s: %w", page.Slug, err)
 		}
+		bundle.Page = page
 
-		if err := tx.Where("page_slug = ?", page.Slug).Delete(&model.PageSection{}).Error; err != nil {
+		// Hapus permanen (Unscoped) butir dan bagian lama sebelum membuat ulang,
+		// agar soft-delete tidak menabrak uniqueIndex (page_slug, key) maupun
+		// meninggalkan baris yatim di page_item.
+		var oldSectionIDs []string
+		if err := tx.Unscoped().Model(&model.PageSection{}).
+			Where("page_slug = ?", page.Slug).
+			Pluck("id", &oldSectionIDs).Error; err != nil {
+			return fmt.Errorf("membaca bagian lama halaman %s: %w", page.Slug, err)
+		}
+		if len(oldSectionIDs) > 0 {
+			if err := tx.Unscoped().Where("section_id IN ?", oldSectionIDs).Delete(&model.PageItem{}).Error; err != nil {
+				return fmt.Errorf("membersihkan butir halaman %s: %w", page.Slug, err)
+			}
+		}
+		if err := tx.Unscoped().Where("page_slug = ?", page.Slug).Delete(&model.PageSection{}).Error; err != nil {
 			return fmt.Errorf("membersihkan bagian halaman %s: %w", page.Slug, err)
 		}
 		for index := range bundle.Sections {

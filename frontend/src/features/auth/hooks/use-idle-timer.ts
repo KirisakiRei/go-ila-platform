@@ -43,6 +43,9 @@ export function useIdleTimer({
   const idleTimer = useRef<number | null>(null)
   const countdownTimer = useRef<number | null>(null)
   const channel = useRef<BroadcastChannel | null>(null)
+  // Saat dialog peringatan tampil, klik/sentuhan umum (mis. menekan tombol
+  // "Keluar sekarang") tidak boleh menutup dialog sebelum event click selesai.
+  const warningVisibleRef = useRef(false)
 
   const clearTimers = useCallback(() => {
     if (idleTimer.current !== null) window.clearTimeout(idleTimer.current)
@@ -52,6 +55,7 @@ export function useIdleTimer({
   }, [])
 
   const startCountdown = useCallback(() => {
+    warningVisibleRef.current = true
     setWarningVisible(true)
     setRemainingSeconds(countdownSeconds)
 
@@ -60,6 +64,7 @@ export function useIdleTimer({
         if (prev <= 1) {
           if (countdownTimer.current !== null) window.clearInterval(countdownTimer.current)
           countdownTimer.current = null
+          warningVisibleRef.current = false
           setWarningVisible(false)
           onTimeout()
           return 0
@@ -81,6 +86,7 @@ export function useIdleTimer({
   }, [clearTimers, enabled, startCountdown, warnAfterMinutes])
 
   const resetIdle = useCallback(() => {
+    warningVisibleRef.current = false
     setWarningVisible(false)
     setRemainingSeconds(countdownSeconds)
     armIdle()
@@ -98,6 +104,7 @@ export function useIdleTimer({
     armIdle()
 
     const onActivity = () => {
+      if (warningVisibleRef.current) return
       resetIdle()
       channel.current?.postMessage({ type: 'activity' })
     }
@@ -130,6 +137,7 @@ export function useIdleTimer({
 
   const leaveNow = useCallback(() => {
     clearTimers()
+    warningVisibleRef.current = false
     setWarningVisible(false)
     onTimeout()
   }, [clearTimers, onTimeout])

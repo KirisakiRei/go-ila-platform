@@ -44,6 +44,12 @@ type UserSignalReader interface {
 	FindUserSignal(ctx context.Context, userID, signalID string) (*model.UserSignal, error)
 }
 
+// batchUserSignalReader adalah perluasan opsional untuk membaca banyak sinyal
+// sekaligus dalam satu query SQL (menghindari N+1 pada daftar sinyal).
+type batchUserSignalReader interface {
+	FindUserSignals(ctx context.Context, userID string, signalIDs []string) (map[string]model.UserSignal, error)
+}
+
 // TradingService menyajikan sinyal dan posisi untuk dashboard.
 type TradingService interface {
 	Signals(ctx context.Context, userID string, limit int) ([]dto.SignalResponse, error)
@@ -138,6 +144,19 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 	gabungan = append(gabungan, rows...)
 	rows = gabungan
 
+	var batchSignals map[string]model.UserSignal
+	if batcher, ok := s.userSignal.(batchUserSignalReader); ok && len(rows) > 0 {
+		ids := make([]string, 0, len(rows))
+		for i := range rows {
+			if rows[i].SignalID != "" {
+				ids = append(ids, rows[i].SignalID)
+			}
+		}
+		if loaded, batchErr := batcher.FindUserSignals(ctx, userID, ids); batchErr == nil {
+			batchSignals = loaded
+		}
+	}
+
 	out := make([]dto.SignalResponse, 0, len(rows))
 	for i := range rows {
 		signal := &rows[i]
@@ -183,7 +202,17 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 		view.HtfSweep = parseHtfSweep(signal.HtfSweepJSON)
 		view.Cisd = parseCISD(signal.CisdJSON)
 
-		if us, usErr := s.userSignal.FindUserSignal(ctx, userID, signal.SignalID); usErr == nil && us != nil {
+		var us *model.UserSignal
+		if batchSignals != nil {
+			if item, found := batchSignals[signal.SignalID]; found {
+				us = &item
+			}
+		} else if s.userSignal != nil {
+			if single, usErr := s.userSignal.FindUserSignal(ctx, userID, signal.SignalID); usErr == nil {
+				us = single
+			}
+		}
+		if us != nil {
 			view.RejectReason = us.RejectReason
 			// Konfirmasi hanya bermakna bila user belum memutuskan apa pun.
 			if us.Status == model.SignalStatusReadyToEntry {
@@ -213,6 +242,7 @@ func (s *tradingService) Positions(ctx context.Context, userID string, limit int
 	for _, pos := range rows {
 		out = append(out, dto.PositionResponse{
 			ID:              pos.ID,
+			BrokerAccountID: pos.BrokerAccountID,
 			Symbol:          pos.Symbol,
 			StrategyVersion: pos.StrategyVersion,
 			Direction:       pos.Direction,

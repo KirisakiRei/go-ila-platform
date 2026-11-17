@@ -344,6 +344,7 @@ export function TradingRadarChart({
         <Skeleton className="h-[340px] w-full rounded-xl" />
       ) : (
         <PriceChart
+          seriesKey={`${symbol}:${activeTab?.timeframe ?? ''}:${feed}`}
           candles={candles}
           priceLines={priceLines}
           markers={markers}

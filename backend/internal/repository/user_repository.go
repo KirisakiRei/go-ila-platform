@@ -146,6 +146,21 @@ func (r *userRepository) FindSessionUser(ctx context.Context, id string) (*auths
 	}, nil
 }
 
+// IsSessionActive memeriksa apakah baris sesi perangkat masih hidup dan belum
+// dicabut lewat halaman Perangkat.
+func (r *userRepository) IsSessionActive(ctx context.Context, sessionID, userID string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Session{}).
+		Where("id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?", sessionID, userID, time.Now().UTC()).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("memeriksa status sesi perangkat: %w", err)
+	}
+	return count > 0, nil
+}
+
 // RevokeSessions menaikkan session_version sehingga seluruh token lama ditolak.
 // Dipakai saat ganti password, ban, atau perubahan role.
 func (r *userRepository) RevokeSessions(ctx context.Context, id string) error {

@@ -18,6 +18,11 @@ const (
 	registerMaxPerIP   = 5
 	registerWindow     = time.Hour
 	registerEmailLimit = 1
+
+	// Batas keras entri di memori agar banjir kunci acak tidak menghabiskan RAM
+	// container 224 MB.
+	maxLimiterEntries = 8192
+	sweepEveryOps     = 256
 )
 
 // LoginLimiter menghitung kegagalan per kunci (email + IP) di memori.
@@ -27,6 +32,7 @@ const (
 type LoginLimiter struct {
 	mu      sync.Mutex
 	entries map[string]*loginEntry
+	ops     uint64
 	now     func() time.Time
 }
 
@@ -44,6 +50,7 @@ type RegisterLimiter struct {
 	mu     sync.Mutex
 	byIP   map[string][]time.Time
 	byMail map[string][]time.Time
+	ops    uint64
 	now    func() time.Time
 }
 
@@ -78,8 +85,35 @@ func (l *RegisterLimiter) Record(ip, email string) {
 	defer l.mu.Unlock()
 
 	now := l.now()
-	l.byIP[ip] = append(pruneSlice(l.byIP[ip], now), now)
-	l.byMail[email] = append(pruneSlice(l.byMail[email], now), now)
+	l.ops++
+	if l.ops%sweepEveryOps == 0 || len(l.byIP) >= maxLimiterEntries || len(l.byMail) >= maxLimiterEntries {
+		l.sweepLocked(now)
+	}
+	if len(l.byIP) < maxLimiterEntries {
+		l.byIP[ip] = append(pruneSlice(l.byIP[ip], now), now)
+	}
+	if len(l.byMail) < maxLimiterEntries {
+		l.byMail[email] = append(pruneSlice(l.byMail[email], now), now)
+	}
+}
+
+func (l *RegisterLimiter) sweepLocked(now time.Time) {
+	for k, times := range l.byIP {
+		kept := pruneSlice(times, now)
+		if len(kept) == 0 {
+			delete(l.byIP, k)
+		} else {
+			l.byIP[k] = kept
+		}
+	}
+	for k, times := range l.byMail {
+		kept := pruneSlice(times, now)
+		if len(kept) == 0 {
+			delete(l.byMail, k)
+		} else {
+			l.byMail[k] = kept
+		}
+	}
 }
 
 // pruneWindow memangkas catatan lama lalu mengembalikan jumlah dan sisa detik.
@@ -137,12 +171,44 @@ func (l *LoginLimiter) Fail(key string) {
 	defer l.mu.Unlock()
 
 	now := l.now()
+	l.ops++
+	if l.ops%sweepEveryOps == 0 || len(l.entries) >= maxLimiterEntries {
+		l.sweepLocked(now)
+	}
+
 	entry, ok := l.entries[key]
 	if !ok || now.After(entry.resetAt) {
+		if !ok && len(l.entries) >= maxLimiterEntries {
+			// Bila tabel penuh oleh kunci aktif sekaligus, buang satu entri paling
+			// dekat kedaluwarsa agar memori tetap berbatas atas.
+			l.evictEarliestLocked()
+		}
 		l.entries[key] = &loginEntry{failures: 1, resetAt: now.Add(loginWindow)}
 		return
 	}
 	entry.failures++
+}
+
+func (l *LoginLimiter) sweepLocked(now time.Time) {
+	for k, entry := range l.entries {
+		if now.After(entry.resetAt) {
+			delete(l.entries, k)
+		}
+	}
+}
+
+func (l *LoginLimiter) evictEarliestLocked() {
+	var oldestKey string
+	var oldestReset time.Time
+	for k, entry := range l.entries {
+		if oldestKey == "" || entry.resetAt.Before(oldestReset) {
+			oldestKey = k
+			oldestReset = entry.resetAt
+		}
+	}
+	if oldestKey != "" {
+		delete(l.entries, oldestKey)
+	}
 }
 
 // Reset menghapus hitungan setelah login berhasil.

@@ -39,6 +39,10 @@ var httpTransport = &http.Transport{
 	ForceAttemptHTTP2:     true,
 }
 
+// maxBrokerResponseBytes membatasi ukuran balasan broker agar endpoint rusak
+// tidak dapat menghabiskan RAM container Runner (160 MiB).
+const maxBrokerResponseBytes = 4 << 20
+
 func newTransport(baseURL, token string) *transport {
 	return &transport{
 		baseURL: baseURL,
@@ -46,6 +50,17 @@ func newTransport(baseURL, token string) *transport {
 		http: &http.Client{
 			Timeout:   15 * time.Second,
 			Transport: httpTransport,
+			// Jangan ikuti redirect lintas host atau penurunan skema ke HTTP agar
+			// header Authorization: Bearer tidak pernah dibelokkan keluar.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 3 {
+					return errors.New("terlalu banyak pengalihan dari server broker")
+				}
+				if len(via) > 0 && (!equalFoldASCII(req.URL.Host, via[0].URL.Host) || !equalFoldASCII(req.URL.Scheme, via[0].URL.Scheme)) {
+					return http.ErrUseLastResponse
+				}
+				return nil
+			},
 		},
 	}
 }
@@ -88,7 +103,7 @@ func (t *transport) do(req *http.Request, out any) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBrokerResponseBytes))
 	if err != nil {
 		return err
 	}

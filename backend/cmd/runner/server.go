@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -51,9 +52,13 @@ func (s *internalServer) health(w http.ResponseWriter, _ *http.Request) {
 // authenticate menolak permintaan tanpa secret yang cocok.
 func (s *internalServer) authenticate(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.secret == "" || r.Header.Get("X-Internal-Secret") != s.secret {
+		got := r.Header.Get("X-Internal-Secret")
+		if s.secret == "" || subtle.ConstantTimeCompare([]byte(got), []byte(s.secret)) != 1 {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "tidak berwenang"})
 			return
+		}
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		}
 		next(w, r)
 	}

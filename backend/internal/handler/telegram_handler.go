@@ -32,15 +32,16 @@ type telegramEditor interface {
 
 // TelegramHandler melayani penghubungan chat dan webhook dari Telegram.
 type TelegramHandler struct {
-	telegram service.TelegramService
-	botName  string
-	secret   string
-	sender   telegramSender
-	menu     service.TelegramMenuService
-	approve  service.ApproveService
-	baseURL  string
-	logger   *slog.Logger
-	edit     telegramEditor
+	telegram      service.TelegramService
+	botName       string
+	secret        string
+	requireSecret bool
+	sender        telegramSender
+	menu          service.TelegramMenuService
+	approve       service.ApproveService
+	baseURL       string
+	logger        *slog.Logger
+	edit          telegramEditor
 }
 
 // NewTelegramHandler merangkai handler Telegram.
@@ -57,6 +58,13 @@ func NewTelegramHandler(telegram service.TelegramService, botUsername, webhookSe
 	if editor, ok := sender.(telegramEditor); ok {
 		h.edit = editor
 	}
+	return h
+}
+
+// RequireSecret menolak webhook di produksi bila TELEGRAM_WEBHOOK_SECRET belum
+// diisi, sehingga pintu bot tidak pernah terbuka tanpa autentikasi.
+func (h *TelegramHandler) RequireSecret(required bool) *TelegramHandler {
+	h.requireSecret = required
 	return h
 }
 
@@ -165,7 +173,7 @@ func (h *TelegramHandler) handlePerintah(ctx context.Context, chatID, text strin
 // Tanpa rahasia yang cocok, permintaan dianggap bukan dari Telegram.
 func (h *TelegramHandler) authorized(c *gin.Context) bool {
 	if h.secret == "" {
-		return true
+		return !h.requireSecret
 	}
 	got := c.GetHeader("X-Telegram-Bot-Api-Secret-Token")
 	return subtle.ConstantTimeCompare([]byte(got), []byte(h.secret)) == 1

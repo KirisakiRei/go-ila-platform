@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -37,7 +37,28 @@ import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimefra
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 import { SignalsMobileView } from './components/SignalsMobileView'
 
+function useIsDesktopViewport(): boolean {
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
+    const mql = window.matchMedia('(min-width: 1024px)')
+    // Di lingkungan uji (JSDOM) innerWidth bawaan 1024 walau matchMedia palsu.
+    if (!mql.matches && window.innerWidth >= 1024) return true
+    return mql.matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mql = window.matchMedia('(min-width: 1024px)')
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mql.addEventListener?.('change', onChange)
+    return () => mql.removeEventListener?.('change', onChange)
+  }, [])
+
+  return isDesktop
+}
+
 export default function SignalsPage() {
+  const isDesktop = useIsDesktopViewport()
   const [params, setParams] = useSearchParams()
   const pairParam = params.get('pair')
 
@@ -268,17 +289,20 @@ export default function SignalsPage() {
                 />
               </Section>
 
-              {/* Chart setup: lilin, sweep, FVG, CISD, dan level order. */}
-              <Section
-                title="Chart Setup"
-                description={`Lilin ${activePair} dari feed yang sama dengan evaluasi engine.`}
-              >
-                <TradingRadarChart
-                  symbol={activePair}
-                  signals={filteredSignals}
-                  strategy={activeStrategyFilter}
-                />
-              </Section>
+              {/* Chart setup: hanya di-mount pada layar desktop agar ponsel
+                  tidak menembak polling candle tersembunyi di latar belakang. */}
+              {isDesktop && (
+                <Section
+                  title="Chart Setup"
+                  description={`Lilin ${activePair} dari feed yang sama dengan evaluasi engine.`}
+                >
+                  <TradingRadarChart
+                    symbol={activePair}
+                    signals={filteredSignals}
+                    strategy={activeStrategyFilter}
+                  />
+                </Section>
+              )}
             </div>
 
             {/* Riwayat Setup Sinyal Pair Ini dengan Pagination */}

@@ -22,6 +22,12 @@ type Reader interface {
 	FindSessionUser(ctx context.Context, id string) (*User, error)
 }
 
+// SessionActiveChecker adalah perluasan opsional Reader untuk memeriksa apakah
+// satu sesi perangkat (kolom session.id) belum dicabut dan belum kedaluwarsa.
+type SessionActiveChecker interface {
+	IsSessionActive(ctx context.Context, sessionID, userID string) (bool, error)
+}
+
 // Status akun yang dikenal platform.
 const (
 	StatusActive    = "active"

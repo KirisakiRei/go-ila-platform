@@ -408,6 +408,27 @@ func (r *runnerRepository) FindUserSignal(ctx context.Context, userID, signalID 
 	return &us, nil
 }
 
+// FindUserSignals membaca status sinyal user secara batch agar halaman daftar
+// sinyal tidak menembak satu query per baris (N+1).
+func (r *runnerRepository) FindUserSignals(ctx context.Context, userID string, signalIDs []string) (map[string]model.UserSignal, error) {
+	out := make(map[string]model.UserSignal, len(signalIDs))
+	if userID == "" || len(signalIDs) == 0 {
+		return out, nil
+	}
+
+	var rows []model.UserSignal
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND signal_id IN ?", userID, signalIDs).
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("membaca daftar status sinyal user: %w", err)
+	}
+	for _, row := range rows {
+		out[row.SignalID] = row
+	}
+	return out, nil
+}
+
 func (r *runnerRepository) FindUserSignalByPosition(ctx context.Context, positionID string) (*model.UserSignal, error) {
 	var us model.UserSignal
 	err := r.db.WithContext(ctx).Where("position_id = ?", positionID).First(&us).Error
@@ -1164,17 +1185,38 @@ func (r *runnerRepository) PairFeeds(ctx context.Context) (map[string]string, er
 
 func (r *runnerRepository) UpsertEngineState(ctx context.Context, state *model.EngineState) error {
 	state.UpdatedAt = time.Now().UTC()
+	cols := []string{
+		"connected", "engine_version", "strategy",
+		"last_error", "last_seen_at", "updated_at",
+	}
+	if state.MarketState != "" {
+		cols = append(cols, "market_state", "marked_at")
+	}
 	err := r.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"connected", "engine_version", "strategy",
-				"last_error", "last_seen_at", "updated_at",
-			}),
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns(cols),
 		}).
 		Create(state).Error
 	if err != nil {
 		return fmt.Errorf("menyimpan status engine: %w", err)
+	}
+	return nil
+}
+
+// UpdateEngineMarketState hanya memperbarui kolom status pasar pada baris
+// engine yang sudah tercatat, sehingga tidak pernah merusak connected/last_seen_at.
+func (r *runnerRepository) UpdateEngineMarketState(ctx context.Context, marketState string, markedAt time.Time) error {
+	err := r.db.WithContext(ctx).
+		Model(&model.EngineState{}).
+		Where("1 = 1").
+		Updates(map[string]any{
+			"market_state": marketState,
+			"marked_at":    markedAt,
+			"updated_at":   time.Now().UTC(),
+		}).Error
+	if err != nil {
+		return fmt.Errorf("memperbarui status pasar engine: %w", err)
 	}
 	return nil
 }

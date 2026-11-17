@@ -56,6 +56,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
   const idleTimer = useRef<number | null>(null)
   const countdownTimer = useRef<number | null>(null)
   const firedRef = useRef(false)
+  const warningVisibleRef = useRef(false)
 
   // Callback disimpan di ref agar perubahan identitas fungsi dari pemanggil
   // tidak memasang ulang listener dan tidak memicu heartbeat tambahan.
@@ -106,6 +107,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
   }, [])
 
   const startCountdown = useCallback(() => {
+    warningVisibleRef.current = true
     setWarningVisible(true)
     setRemainingSeconds(COUNTDOWN_SECONDS)
 
@@ -116,6 +118,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
           countdownTimer.current = null
           if (!firedRef.current) {
             firedRef.current = true
+            warningVisibleRef.current = false
             setWarningVisible(false)
             onTimeoutRef.current()
           }
@@ -134,6 +137,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
 
   const resetIdle = useCallback(() => {
     firedRef.current = false
+    warningVisibleRef.current = false
     setWarningVisible(false)
     setRemainingSeconds(COUNTDOWN_SECONDS)
     armIdle()
@@ -153,7 +157,10 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
     ping()
 
     const events = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
-    const onActivity = () => resetIdle()
+    const onActivity = () => {
+      if (warningVisibleRef.current) return
+      resetIdle()
+    }
 
     events.forEach((name) => window.addEventListener(name, onActivity, { passive: true }))
     return () => {
@@ -165,6 +172,7 @@ export function useAdminIdleTimer({ enabled, onTimeout }: Options): AdminIdleSta
   const leaveNow = useCallback(() => {
     clearTimers()
     firedRef.current = true
+    warningVisibleRef.current = false
     setWarningVisible(false)
     onTimeoutRef.current()
   }, [clearTimers])

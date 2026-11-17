@@ -3,18 +3,18 @@ package dto
 // AdminAuditFilter adalah masukan daftar audit. Rentang tanggal wajib agar
 // halaman ini tidak pernah memindai seluruh tabel (plans/24 §4.3).
 type AdminAuditFilter struct {
-	Page       int
-	PerPage    int
-	Cursor     string
-	Query      string
-	Sort       string
-	Order      string
-	From       string
-	To         string
-	ActorID    string
-	Action     string
-	TargetType string
-	TargetID   string
+	Page       int    `form:"page"`
+	PerPage    int    `form:"per_page"`
+	Cursor     string `form:"cursor"`
+	Query      string `form:"q"`
+	Sort       string `form:"sort"`
+	Order      string `form:"order"`
+	From       string `form:"from"`
+	To         string `form:"to"`
+	ActorID    string `form:"actor_id"`
+	Action     string `form:"action"`
+	TargetType string `form:"target_type"`
+	TargetID   string `form:"target_id"`
 }
 
 // AuditEntry adalah satu baris audit yang dikirim ke panel admin.

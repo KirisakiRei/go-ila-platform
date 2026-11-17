@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { AdminAuthProvider } from '@/features/admin/AdminAuthProvider'
 import { AppRoutes } from './AppRoutes'
@@ -31,7 +32,9 @@ export function App() {
             sehingga keduanya tidak saling membuka atau menutup pintu. */}
         <AuthProvider>
           <AdminAuthProvider>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </AdminAuthProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -308,14 +308,15 @@ func TestPreviewMenolakSinyalLewatBatasKeras(t *testing.T) {
 	}
 }
 
-// Penolakan aturan harian ikut tampil sebagai alasan.
-func TestPreviewShowsDailyRejectionReason(t *testing.T) {
+// Penolakan keras (mis. posisi terbuka) tetap menonaktifkan tombol beserta alasannya,
+// sedangkan batas kuota harian boleh dilewati secara manual (commit a971c9f).
+func TestPreviewShowsNonOverridableRejectionAndAllowsDailyQuotaOverride(t *testing.T) {
 	h := newHarness()
 	h.tokens.token = freshToken("u1")
 	h.signals.signal = freshSignal()
 	h.users.signal = &model.UserSignal{
 		Status:       model.SignalStatusRejected,
-		RejectReason: "Target harian tercapai (1 win). Trading dihentikan hari ini.",
+		RejectReason: "Masih ada posisi terbuka. Tunggu sampai ditutup.",
 	}
 
 	preview, err := h.svc.Resolve(context.Background(), "u1", rawToken)
@@ -323,10 +324,24 @@ func TestPreviewShowsDailyRejectionReason(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if preview.CanConfirm {
-		t.Fatal("sinyal tertahan tidak boleh dikonfirmasi")
+		t.Fatal("sinyal tertahan posisi terbuka tidak boleh dikonfirmasi")
 	}
 	if preview.BlockedReason != h.users.signal.RejectReason {
 		t.Fatalf("alasan = %q", preview.BlockedReason)
+	}
+
+	// Kuota harian hanya menghentikan auto-entry; manual tetap bisa dikonfirmasi.
+	h.users.signal = &model.UserSignal{
+		Status:          model.SignalStatusRejected,
+		RejectReason:    "Target harian tercapai (1 win). Trading dihentikan hari ini.",
+		BrokerAccountID: "acct-1",
+	}
+	previewKuota, err := h.svc.Resolve(context.Background(), "u1", rawToken)
+	if err != nil {
+		t.Fatalf("Resolve kuota: %v", err)
+	}
+	if !previewKuota.CanConfirm {
+		t.Fatalf("batas harian seharusnya tetap mengizinkan konfirmasi manual, alasan: %q", previewKuota.BlockedReason)
 	}
 }
 

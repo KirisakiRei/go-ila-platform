@@ -8,7 +8,7 @@ import globals from 'globals'
 
 export default [
   {
-    ignores: ['dist', 'node_modules', 'coverage'],
+    ignores: ['dist', 'node_modules', 'coverage', '.claude'],
   },
   js.configs.recommended,
   {
@@ -30,6 +30,9 @@ export default [
     rules: {
       ...tsPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      // TypeScript (tsc --noEmit) sudah memeriksa pengenal tak terdefinisi
+      // termasuk namespace tipe global seperti React dan RequestInfo.
+      'no-undef': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],

@@ -29,7 +29,7 @@
 	# IP asli di X-Forwarded-For.
 	servers {
 		trusted_proxies static private_ranges
-		trusted_proxies static 172.16.0.0/12 192.168.0.0/16
+		client_ip_headers Cf-Connecting-Ip X-Forwarded-For
 	}
 
 	log default {
