@@ -18,7 +18,7 @@
 
 ## 📍 PENANDA SINKRONISASI
 
-> **Commit terakhir saat log ini ditulis:** `92b2142` — entri teratas di bagian
+> **Commit terakhir saat log ini ditulis:** `d13890c` — entri teratas di bagian
 > **DARI CLAUDE** adalah catatan terbaru
 > **Repo ini:** `go-ila-platform` (Runner, Backend, Frontend)
 > **Repo engine:** `go-trade` (Hermes) — punya `docs/AGENT_LOG.md` sendiri
@@ -41,7 +41,7 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 **Tanggal:** 2026-11-18
 **Pelaku:** Antigravity (Platform Audit & Hardening)
 **Tipe:** Hardening keamanan, stabilitas memori/infrastruktur, & perbaikan alur operasional (Kategori 1 + Kategori 3)
-**Status:** 🟢 SELESAI & teruji penuh — belum di-deploy
+**Status:** 🟢 SELESAI, teruji penuh & LIVE di VPS 2 pada commit `d13890c`
 
 **Ringkasan:**
 Menindaklanjuti audit menyeluruh atas Backend API, Runner, Frontend, dan Infrastruktur, seluruh perbaikan pada **Kategori 1 (Critical/High Impact & Low Risk)** serta **Kategori 3 (Medium Risk — Alur Sesi, SSRF, N+1, Bundle Split, & Pemulihan State)** telah diselesaikan dan diuji regresi. Sesuai keputusan owner, **tidak ada satu baris pun logika kalkulasi lot, SL/TP, keputusan sinyal trading, maupun `ila-strategy` (Kategori 4)** atau **alur checkout/billing yang sedang ditutup `INVITE_ONLY=true` (Kategori 2)** yang disentuh.
