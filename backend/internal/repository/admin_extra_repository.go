@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -213,15 +214,15 @@ func NewAdminLegalRepository(db *gorm.DB) *adminLegalRepository {
 
 func (r *adminLegalRepository) ListAcceptance(ctx context.Context, userID string) ([]model.AdminLegalAcceptance, error) {
 	var rows []model.AdminLegalAcceptance
-	const query = `SELECT d.slug, d.title, d.version, a.accepted_at, a.ip_hash
+	const query = `SELECT a.document_slug AS slug, COALESCE(d.title, a.document_slug) AS title, a.version, a.accepted_at, a.ip_hash
 		FROM legal_acceptance a
-		JOIN legal_document d ON d.id = a.document_id
+		LEFT JOIN legal_document d ON d.slug = a.document_slug AND d.version = a.version
 		WHERE a.user_id = ?
 		ORDER BY a.accepted_at DESC`
 	var raw []struct {
 		Slug       string
 		Title      string
-		Version    string
+		Version    int
 		AcceptedAt time.Time
 		IPHash     string
 	}
@@ -233,7 +234,7 @@ func (r *adminLegalRepository) ListAcceptance(ctx context.Context, userID string
 		rows = append(rows, model.AdminLegalAcceptance{
 			Slug:       item.Slug,
 			Title:      item.Title,
-			Version:    item.Version,
+			Version:    strconv.Itoa(item.Version),
 			AcceptedAt: item.AcceptedAt,
 			IPHash:     item.IPHash,
 		})

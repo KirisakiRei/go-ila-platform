@@ -102,9 +102,19 @@ type openPositionRequest struct {
 	SLPrice *float64 `json:"slPrice,omitempty"`
 	TPPrice *float64 `json:"tpPrice,omitempty"`
 	Comment string   `json:"comment,omitempty"`
-	// ClientId membuat order idempoten: kiriman ulang dengan id sama tidak
+	// ClientId membuat order idempotensi: kiriman ulang dengan id sama tidak
 	// membuka posisi kedua (plans/12 §4.4).
 	ClientId string `json:"clientId,omitempty"`
+}
+
+// openPositionResponse menampung balasan POST /v1/positions.
+// Match-Trader mengembalikan orderId pada pembukaan posisi baru, sedangkan
+// sebagian implementasi kompatibel memakai id atau positionId.
+type openPositionResponse struct {
+	ID         string  `json:"id"`
+	OrderID    string  `json:"orderId"`
+	PositionID string  `json:"positionId"`
+	OpenPrice  float64 `json:"openPrice"`
 }
 
 // apiError adalah amplop error standar broker.

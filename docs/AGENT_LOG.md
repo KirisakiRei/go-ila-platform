@@ -59,9 +59,14 @@ Menindaklanjuti arahan owner untuk memperbaiki keenam *edge-case* Kategori 4 **t
    - Mengantrekan pembaruan sinyal lewat `HandleUpdateAsync`, memasang kunci per `signal_id` (`lockSignalOp`), dan mencatat pembatalan dini (`rememberEarlyCancel`) secara sinkron saat paket tiba dari stream sehingga sinyal yang dibatalkan Engine tidak pernah tetap tereksekusi akibat jadwal worker paralel.
 6. **Anti Look-Ahead Candle HTF Berjalan pada Mesin Backtest (`backtest/engine.go`):**
    - Menyusun candle HTF terakhir yang belum tutup pada saat evaluasi LTF (`susunHTFSampai`) murni dari agregasi candle LTF yang sudah lewat dengan penanda `IsClosed = false` (selaras penuh dengan `go-trade` Engine live), sehingga ekor high/low masa depan di akhir bar H4/H1 tidak pernah bocor ke menit-menit awal bar tersebut.
+7. **Temuan Tambahan dari Log Produksi VPS 2 (`matchtrader/client.go`, `model/broker_account.go`, `repository/admin_extra_repository.go`):**
+   - Membaca `orderId` / `positionId` (selain `id`) pada respons `POST /v1/positions` Match-Trader sehingga pembukaan posisi live langsung mengembalikan nomor tiket tanpa memicu log error semu `"match-trader tidak mengembalikan id posisi"`.
+   - Menambahkan kolom `frozen_at` & `frozen_reason` ke skema migrasi `BrokerAccount` serta memperbaiki join `legal_acceptance` (`document_slug` + `version`) pada endpoint admin detail pelanggan (`/api/v1/admin/users/:id/accounts` & `/legal`).
 
 **File terdampak:**
 - `backend/cmd/runner/main.go`
+- `backend/internal/model/broker_account.go`
+- `backend/internal/repository/admin_extra_repository.go`
 - `backend/internal/runner/{rules.go,service.go,monitor.go,kategori4_test.go}`
 - `backend/internal/broker/matchtrader/{types.go,client.go,client_test.go}`
 - `backend/internal/backtest/{engine.go,engine_test.go}`

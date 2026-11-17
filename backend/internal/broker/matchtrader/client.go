@@ -219,16 +219,23 @@ func (c *Client) OpenPosition(ctx context.Context, req broker.OpenRequest) (brok
 		body.TPPrice = &v
 	}
 
-	var out position
+	var out openPositionResponse
 	if err := t.postJSON(ctx, "/v1/positions", body, &out); err != nil {
 		return broker.OpenResult{}, err
 	}
-	if out.ID == "" {
+	ticket := strings.TrimSpace(out.ID)
+	if ticket == "" {
+		ticket = strings.TrimSpace(out.OrderID)
+	}
+	if ticket == "" {
+		ticket = strings.TrimSpace(out.PositionID)
+	}
+	if ticket == "" {
 		return broker.OpenResult{}, fmt.Errorf("match-trader tidak mengembalikan id posisi")
 	}
 
 	result := broker.OpenResult{
-		Ticket:        out.ID,
+		Ticket:        ticket,
 		Lots:          body.Volume,
 		StopLoss:      req.StopLoss,
 		TakeProfit:    req.TakeProfit,
@@ -237,7 +244,7 @@ func (c *Client) OpenPosition(ctx context.Context, req broker.OpenRequest) (brok
 
 	// Harga isi asli wajib akurat: bila kosong, tarik dari daftar posisi.
 	if result.ExecutedPrice <= 0 {
-		if filled, ok := c.findOpenPrice(ctx, out.ID); ok {
+		if filled, ok := c.findOpenPrice(ctx, ticket); ok {
 			result.ExecutedPrice = filled
 		}
 	}

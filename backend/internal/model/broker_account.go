@@ -26,6 +26,8 @@ type BrokerAccount struct {
 	LotSize        float64    `gorm:"type:numeric(10,2);not null;default:0.01" json:"lot_size"`
 	IsActive       bool       `gorm:"not null;default:true" json:"is_active"`
 	IsFrozen       bool       `gorm:"not null;default:false" json:"is_frozen"`
+	FrozenAt       *time.Time `json:"frozen_at,omitempty"`
+	FrozenReason   string     `gorm:"type:varchar(255)" json:"frozen_reason,omitempty"`
 	IsDryRun       bool       `gorm:"not null;default:true" json:"is_dry_run"`
 	LastVerifiedAt *time.Time `json:"last_verified_at"`
 	LastError      string     `gorm:"type:varchar(255)" json:"last_error"`
