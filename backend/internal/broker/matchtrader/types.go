@@ -5,6 +5,7 @@ package matchtrader
 
 // accountSummary adalah ringkasan saldo akun.
 type accountSummary struct {
+	Currency  string  `json:"currency"`
 	Balance   float64 `json:"balance"`
 	Credit    float64 `json:"credit"`
 	Equity    float64 `json:"equity"`

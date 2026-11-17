@@ -111,9 +111,14 @@ func (c *Client) Account(ctx context.Context) (broker.AccountSnapshot, error) {
 		return broker.AccountSnapshot{}, err
 	}
 
+	currency := strings.ToUpper(strings.TrimSpace(sum.Currency))
+	if currency == "" {
+		currency = "USD"
+	}
+
 	return broker.AccountSnapshot{
 		AccountID:  c.accountID,
-		Currency:   "USD",
+		Currency:   currency,
 		Balance:    sum.Balance,
 		Equity:     sum.Equity,
 		FreeMargin: sum.FreeFunds,
@@ -121,12 +126,24 @@ func (c *Client) Account(ctx context.Context) (broker.AccountSnapshot, error) {
 }
 
 // Symbol mengembalikan spesifikasi simbol dari broker, bukan tebakan.
+//
+// Untuk simbol forex dengan mata uang kutipan non-USD (mis. USDJPY, USDCAD),
+// nilai contractSize dikonversi ke ekuivalen USD memakai harga pasar terkini
+// sehingga perhitungan lot berbasis ekuitas USD tetap akurat. Simbol ber-USD
+// (EURUSD, XAUUSD, US100) dikembalikan apa adanya tanpa panggilan tambahan.
 func (c *Client) Symbol(ctx context.Context, symbol string) (broker.SymbolSpec, error) {
 	info, err := c.symbolInfo(ctx, symbol)
 	if err != nil {
 		return broker.SymbolSpec{}, err
 	}
-	return toSpec(info), nil
+	spec := toSpec(info)
+	if info.Multiplier <= 0 && info.ContractSize > 0 {
+		baseCur, quoteCur := resolveCurrencies(info)
+		if quoteCur != "" && quoteCur != "USD" {
+			spec.ValuePerLot = c.convertQuoteValueToUSD(ctx, symbol, info.ContractSize, baseCur, quoteCur)
+		}
+	}
+	return spec, nil
 }
 
 // Quote mengembalikan bid/ask terakhir beserta waktunya.
@@ -363,6 +380,56 @@ func valuePerLot(s symbolInfo) float64 {
 		return s.Multiplier
 	}
 	return s.ContractSize
+}
+
+func resolveCurrencies(s symbolInfo) (string, string) {
+	base := strings.ToUpper(strings.TrimSpace(s.BaseCurrency))
+	quote := strings.ToUpper(strings.TrimSpace(s.QuoteCurrency))
+	if base != "" && quote != "" {
+		return base, quote
+	}
+	clean := strings.ToUpper(strings.TrimSpace(s.Symbol))
+	clean = strings.ReplaceAll(clean, "/", "")
+	if idx := strings.IndexAny(clean, "._-"); idx > 0 {
+		clean = clean[:idx]
+	}
+	if len(clean) == 6 && isLettersOnly(clean) {
+		if base == "" {
+			base = clean[:3]
+		}
+		if quote == "" {
+			quote = clean[3:]
+		}
+	}
+	return base, quote
+}
+
+func isLettersOnly(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 'A' || s[i] > 'Z' {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+func (c *Client) convertQuoteValueToUSD(ctx context.Context, symbol string, contractSize float64, baseCur, quoteCur string) float64 {
+	if baseCur == "USD" {
+		if rate, err := c.CurrentPrice(ctx, symbol); err == nil && rate > 0 {
+			return contractSize / rate
+		}
+	} else {
+		if rate, err := c.CurrentPrice(ctx, "USD"+quoteCur); err == nil && rate > 0 {
+			return contractSize / rate
+		}
+		if rate, err := c.CurrentPrice(ctx, quoteCur+"USD"); err == nil && rate > 0 {
+			return contractSize * rate
+		}
+	}
+	if quoteCur == "JPY" {
+		return contractSize / 100
+	}
+	return contractSize
 }
 
 // mapSymbol menyelaraskan nama simbol engine dengan nama di broker.

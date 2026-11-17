@@ -3,9 +3,12 @@ package runner
 import (
 	"context"
 	"math"
+	"sort"
+	"strings"
 	"time"
 
 	"ila/backend/internal/broker"
+	"ila/backend/internal/market"
 	"ila/backend/internal/model"
 )
 
@@ -79,6 +82,146 @@ func (s *Service) MonitorPositions(ctx context.Context) {
 			return
 		}
 		s.syncPosition(ctx, &positions[i])
+	}
+}
+
+// MonitorDryRunPositions menilai penutupan posisi simulasi (IsDryRun=true)
+// terhadap candle pasar yang sudah tutup.
+//
+// Sengaja dijalankan terpisah dari MonitorPositions agar pemanggilan feed candle
+// tidak pernah menunda pemantauan posisi nyata di broker. Posisi nyata
+// (IsDryRun=false) sama sekali tidak disentuh oleh fungsi ini.
+func (s *Service) MonitorDryRunPositions(ctx context.Context) {
+	if s.opts.CandleFetcher == nil {
+		return
+	}
+
+	positions, err := s.store.ListOpenPositions(ctx)
+	if err != nil {
+		s.logger.Warn("simulasi: gagal membaca posisi terbuka", "error", err.Error())
+		return
+	}
+
+	type dryFeedKey struct {
+		symbol    string
+		feed      string
+		timeframe string
+	}
+	groups := make(map[dryFeedKey][]*model.Position)
+	var keys []dryFeedKey
+
+	for i := range positions {
+		pos := &positions[i]
+		if !pos.IsDryRun {
+			continue
+		}
+		tf := "M5"
+		feed := ""
+		if pos.SourceSignalID != "" {
+			if sig, sigErr := s.store.FindSignal(ctx, pos.SourceSignalID); sigErr == nil && sig != nil {
+				if strings.TrimSpace(sig.Ltf) != "" {
+					tf = strings.TrimSpace(sig.Ltf)
+				}
+				feed = sig.FeedSource
+			}
+		}
+		k := dryFeedKey{symbol: pos.Symbol, feed: feed, timeframe: tf}
+		if _, exists := groups[k]; !exists {
+			keys = append(keys, k)
+		}
+		groups[k] = append(groups[k], pos)
+	}
+
+	if len(keys) == 0 {
+		return
+	}
+
+	now := s.opts.Clock().UTC()
+	for _, k := range keys {
+		if ctx.Err() != nil {
+			return
+		}
+		seconds := evalCandleSeconds(k.timeframe)
+		if seconds <= 0 {
+			seconds = 300
+		}
+		fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		candles, fetchErr := s.opts.CandleFetcher(fetchCtx, k.symbol, k.feed, k.timeframe, EvalCandleLimit)
+		cancel()
+		if fetchErr != nil || len(candles) == 0 {
+			s.logger.Warn("simulasi: feed candle belum tersedia",
+				"symbol", k.symbol, "timeframe", k.timeframe, "error", errText(fetchErr))
+			continue
+		}
+
+		sorted := append([]market.Candle(nil), candles...)
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i].Time < sorted[j].Time })
+
+		closed := make([]market.Candle, 0, len(sorted))
+		for _, c := range sorted {
+			if c.Time+seconds <= now.Unix() && c.Low > 0 && c.High >= c.Low {
+				closed = append(closed, c)
+			}
+		}
+		if len(closed) == 0 {
+			continue
+		}
+
+		for _, pos := range groups[k] {
+			s.evaluateDryRunPosition(ctx, pos, closed, seconds)
+		}
+	}
+}
+
+func (s *Service) evaluateDryRunPosition(ctx context.Context, pos *model.Position, closed []market.Candle, seconds int64) {
+	buy := strings.EqualFold(pos.Direction, "BUY")
+	openedUnix := pos.OpenedAt.Unix()
+
+	for _, c := range closed {
+		// Hanya nilai candle utuh sesudah posisi dibuka agar ekor sebelum entry
+		// pada candle pembuka tidak pernah menutup posisi secara keliru.
+		if c.Time < openedUnix {
+			continue
+		}
+		if !ExpectedOpen(time.Unix(c.Time, 0)) {
+			continue
+		}
+
+		var hitTP, hitSL bool
+		if buy {
+			hitTP = pos.TakeProfit > 0 && c.High >= pos.TakeProfit
+			hitSL = pos.StopLoss > 0 && c.Low <= pos.StopLoss
+		} else {
+			hitTP = pos.TakeProfit > 0 && c.Low <= pos.TakeProfit
+			hitSL = pos.StopLoss > 0 && c.High >= pos.StopLoss
+		}
+		if !hitTP && !hitSL {
+			continue
+		}
+
+		// Aturan konservatif: bila TP dan SL tersentuh pada satu candle yang sama,
+		// catat sebagai SL agar simulasi tidak pernah melebih-lebihkan kemenangan.
+		reason := broker.CloseReasonTP
+		exitPrice := pos.TakeProfit
+		if hitSL {
+			reason = broker.CloseReasonSL
+			exitPrice = pos.StopLoss
+		}
+
+		move := exitPrice - pos.OpenPrice
+		if !buy {
+			move = pos.OpenPrice - exitPrice
+		}
+		profit := roundTo(move*pos.LotSize*s.valuePerLotRunner(pos.Symbol), 2)
+
+		s.applyClose(ctx, pos, broker.ClosedPosition{
+			Ticket:    pos.TicketNumber,
+			Reason:    reason,
+			ExitPrice: exitPrice,
+			Profit:    profit,
+			ClosedAt:  c.Time + seconds,
+		})
+		return
 	}
 }
 

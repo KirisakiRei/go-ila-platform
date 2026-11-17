@@ -45,6 +45,7 @@ const (
 	RejectReadOnly    RejectReason = "Mode hanya-baca aktif. Setup tetap tampil, entry baru ditahan sementara."
 	RejectDuplicate   RejectReason = "Sinyal ini sudah pernah dieksekusi untuk akun ini."
 	RejectBadSignal   RejectReason = "Data sinyal tidak lengkap atau tidak sah."
+	RejectLotTooSmall RejectReason = "Ukuran lot minimum broker melampaui batas risiko aman untuk ekuitas akun Anda."
 )
 
 // Status sinyal dirujuk dari paket model agar hanya ada satu sumber nilai.
@@ -411,6 +412,76 @@ func CalculateLot(req LotRequest) (LotCalculation, error) {
 
 	calc.Lots = math.Round(lots*100) / 100
 	return calc, nil
+}
+
+// Batas lot tetap platform agar selaras dengan validasi pengaturan akun.
+const (
+	MinFixedLot = 0.01
+	MaxFixedLot = 10.00
+)
+
+// CalculateFixedLot menghitung ukuran posisi ketika akun memakai RiskMode="lot".
+//
+// Ukuran lot mengikuti pilihan eksplisit pengguna (dibatasi pagar platform
+// 0,01–10,00 lot serta batas simbol broker), lalu risiko nominal dan persentase
+// efektif terhadap ekuitas dihitung jujur untuk pencatatan posisi.
+func CalculateFixedLot(requestedLot float64, req LotRequest) (LotCalculation, error) {
+	if requestedLot <= 0 {
+		return LotCalculation{}, fmt.Errorf("%w: ukuran lot tetap belum diatur", ErrNoLot)
+	}
+	if req.Spec.ValuePerLotPerPrice <= 0 {
+		return LotCalculation{}, fmt.Errorf("%w: nilai per lot tidak diketahui", ErrNoLot)
+	}
+
+	stopDistance := math.Abs(req.EntryPrice - req.StopLoss)
+	if stopDistance <= 0 {
+		return LotCalculation{}, fmt.Errorf("%w: jarak stop loss nol", ErrNoLot)
+	}
+
+	lots := requestedLot
+	if lots < MinFixedLot {
+		lots = MinFixedLot
+	}
+	if lots > MaxFixedLot {
+		lots = MaxFixedLot
+	}
+
+	var clampedMin, clampedMax bool
+	if req.Spec.MinLot > 0 && lots < req.Spec.MinLot {
+		lots = req.Spec.MinLot
+		clampedMin = true
+	}
+	if req.Spec.MaxLot > 0 && lots > req.Spec.MaxLot {
+		lots = req.Spec.MaxLot
+		clampedMax = true
+	}
+
+	step := req.Spec.LotStep
+	if step <= 0 {
+		step = 0.01
+	}
+	lots = math.Floor(lots/step+1e-9) * step
+	lots = math.Round(lots*100) / 100
+	if lots <= 0 {
+		return LotCalculation{}, ErrNoLot
+	}
+
+	valuePerLot := stopDistance * req.Spec.ValuePerLotPerPrice
+	riskAmount := lots * valuePerLot
+	riskPercent := 0.0
+	if req.Equity > 0 {
+		riskPercent = math.Round((riskAmount/req.Equity*100)*100) / 100
+	}
+
+	return LotCalculation{
+		Lots:         lots,
+		RiskAmount:   math.Round(riskAmount*100) / 100,
+		RiskPercent:  riskPercent,
+		StopDistance: stopDistance,
+		ValuePerLot:  valuePerLot,
+		ClampedMin:   clampedMin,
+		ClampedMax:   clampedMax,
+	}, nil
 }
 
 // EffectiveTier mengembalikan tier yang berlaku saat ini.

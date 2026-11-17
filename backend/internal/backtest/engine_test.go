@@ -185,3 +185,42 @@ func TestTutupPosisiMenghitungModal(t *testing.T) {
 		t.Fatalf("modal setelah SL: dapat %v, harap 10098", modal)
 	}
 }
+
+func TestSusunHTFSampaiTidakMembocorkanHighLowCandleBerjalan(t *testing.T) {
+	awal := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	htf := []indicators.Candle{
+		{Timestamp: awal, Open: 4100, High: 4120, Low: 4090, Close: 4110, IsClosed: true},
+		// Candle H4 04:00–08:00 nanti di jam 07:30 menyentuh High 4300; pada jam 04:15
+		// angka 4300 itu belum terjadi dan tidak boleh terlihat oleh evaluator.
+		{Timestamp: awal.Add(4 * time.Hour), Open: 4110, High: 4300, Low: 4080, Close: 4290, IsClosed: true},
+	}
+	ltf := []indicators.Candle{
+		{Timestamp: awal.Add(4 * time.Hour), Open: 4110, High: 4115, Low: 4108, Close: 4112, IsClosed: true},
+		{Timestamp: awal.Add(4*time.Hour + 15*time.Minute), Open: 4112, High: 4118, Low: 4111, Close: 4116, IsClosed: true},
+	}
+
+	var buf []indicators.Candle
+	terlihat := susunHTFSampai(htf, ltf, ltf[1].Timestamp, 4*time.Hour, 15*time.Minute, &buf)
+	if len(terlihat) != 2 {
+		t.Fatalf("len(terlihat) = %d, ingin 2", len(terlihat))
+	}
+	if !terlihat[0].IsClosed {
+		t.Fatal("candle H4 pertama sudah tutup, harus IsClosed=true")
+	}
+	berjalan := terlihat[1]
+	if berjalan.IsClosed {
+		t.Fatal("candle H4 kedua masih berjalan pada 04:30, harus IsClosed=false")
+	}
+	if berjalan.High != 4118 || berjalan.Close != 4116 {
+		t.Fatalf("candle HTF berjalan membocorkan masa depan: High=%v Close=%v (ingin 4118 dan 4116)", berjalan.High, berjalan.Close)
+	}
+
+	// Pada penutupan bar M15 terakhir di 07:45 (07:45 + 15m = 08:00), candle H4 04:00 sudah resmi tutup.
+	ltfAkhir := append(ltf, indicators.Candle{
+		Timestamp: awal.Add(7*time.Hour + 45*time.Minute), Open: 4280, High: 4300, Low: 4275, Close: 4290, IsClosed: true,
+	})
+	penuh := susunHTFSampai(htf, ltfAkhir, ltfAkhir[len(ltfAkhir)-1].Timestamp, 4*time.Hour, 15*time.Minute, &buf)
+	if len(penuh) != 2 || !penuh[1].IsClosed || penuh[1].High != 4300 {
+		t.Fatalf("pada 08:00 candle H4 kedua seharusnya resmi tutup penuh: %+v", penuh[1])
+	}
+}

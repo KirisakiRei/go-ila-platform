@@ -36,6 +36,39 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-18 (2) — Perbaikan Presisi Kategori 4 Tanpa Mengubah Alur Eksekusi Live Utama
+
+**Tanggal:** 2026-11-18
+**Pelaku:** Antigravity (Platform Audit & Hardening)
+**Tipe:** Perbaikan edge-case eksekusi, simulasi dry-run, antrean sinyal, & backtest (Kategori 4)
+**Status:** 🟢 SELESAI & teruji penuh
+
+**Ringkasan:**
+Menindaklanjuti arahan owner untuk memperbaiki keenam *edge-case* Kategori 4 **tanpa merusak atau mengubah perilaku alur utama yang sudah berjalan akurat** (`RiskMode="percent"`, akun USD bermodal normal, pair USD-quoted `XAUUSD` / `EURUSD` / `USTEC`, dan posisi broker live `IsDryRun=false`):
+
+1. **Dukungan Penuh `RiskMode = "lot"` (Lot Tetap) di Runner (`rules.go`, `service.go`):**
+   - Menambahkan `CalculateFixedLot` (pagar platform `0,01–10,00` lot + batas simbol broker `MinLot`/`MaxLot`/`LotStep`) dan menghubungkannya di `Service.calculateLot` khusus saat `account.RiskMode == "lot"`. Mode `"percent"` tetap memakai jalur `CalculateLot` yang sama persis seperti sebelumnya.
+2. **Pagar Pembengkakan Risiko `MinLot` pada Akun Modal Sangat Kecil (`rules.go`, `service.go`):**
+   - Menolak pembulatan paksa ke `MinLot` (`RejectLotTooSmall`) hanya bila pembulatan tersebut membuat risiko aktual melebihi `max(2%, 2x RiskPercent)` (mis. modal \$200 dipaksa membuka `0,01` lot berisiko 4% ekuitas), serta memisahkan pesan penolakannya dari `RejectAccountFrozen`. Akun bermodal wajar tidak terdampak sama sekali.
+3. **Konversi Nilai Kontrak Pair Non-USD Quote & Mata Uang Akun Match-Trader (`matchtrader/types.go`, `matchtrader/client.go`, `runner/service.go`):**
+   - Membaca kolom `currency` dari `/v1/account-summary` (default `"USD"` bila kosong) dan mengonversi ekuitas akun non-USD (`EUR`, `GBP`, `JPY`, `USC`) ke ekuivalen USD saat menghitung lot.
+   - Mengonversi `contractSize` pair forex non-USD quote (seperti `USDJPY`, `USDCAD`, `EURJPY`) ke USD memakai quote terkini. Untuk `XAUUSD`, `EURUSD`, dan `USTEC`/`US100`, nilai kontrak tetap identik 100% tanpa panggilan jaringan tambahan.
+4. **Penutupan Otomatis Posisi Simulasi (`IsDryRun = true`) (`runner/monitor.go`, `cmd/runner/main.go`):**
+   - Menambahkan `MonitorDryRunPositions` di goroutine evaluasi candle (terpisah dari `MonitorPositions` agar feed candle tidak pernah menunda pemantauan tiket broker live). Posisi `SIM-...` kini tertutup otomatis saat candle tutup menyentuh TP/SL (aturan konservatif SL bila keduanya tersentuh dalam satu candle), memperbarui `OutcomeR`, kuota harian, dan notifikasi penutupan.
+5. **Serialisasi & Anti-Balapan `PUBLISH` vs `CANCEL / EXPIRE / SUPERSEDE` (`runner/service.go`, `cmd/runner/main.go`):**
+   - Mengantrekan pembaruan sinyal lewat `HandleUpdateAsync`, memasang kunci per `signal_id` (`lockSignalOp`), dan mencatat pembatalan dini (`rememberEarlyCancel`) secara sinkron saat paket tiba dari stream sehingga sinyal yang dibatalkan Engine tidak pernah tetap tereksekusi akibat jadwal worker paralel.
+6. **Anti Look-Ahead Candle HTF Berjalan pada Mesin Backtest (`backtest/engine.go`):**
+   - Menyusun candle HTF terakhir yang belum tutup pada saat evaluasi LTF (`susunHTFSampai`) murni dari agregasi candle LTF yang sudah lewat dengan penanda `IsClosed = false` (selaras penuh dengan `go-trade` Engine live), sehingga ekor high/low masa depan di akhir bar H4/H1 tidak pernah bocor ke menit-menit awal bar tersebut.
+
+**File terdampak:**
+- `backend/cmd/runner/main.go`
+- `backend/internal/runner/{rules.go,service.go,monitor.go,kategori4_test.go}`
+- `backend/internal/broker/matchtrader/{types.go,client.go,client_test.go}`
+- `backend/internal/backtest/{engine.go,engine_test.go}`
+
+**Bukti uji:**
+- Seluruh paket uji lama + uji regresi baru (`kategori4_test.go`, `TestSymbolKonversiNonUSDQuoteDanMataUangAkun`, `TestSusunHTFSampaiTidakMembocorkanHighLowCandleBerjalan`, `TestInvarianUrutanEntry`, `TestJejakMemoriDataTerburuk`) lulus 100% (`go vet ./...`, `go build ./...`, `go test -count=1 ./...`).
+
 ### 2026-11-18 — Hardening Audit Kategori 1 & Kategori 3 (Keamanan, Memori, Sesi, & Alur Operasional)
 
 **Tanggal:** 2026-11-18

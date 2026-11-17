@@ -243,6 +243,7 @@ func main() {
 		ticker := time.NewTicker(runner.MonitorInterval)
 		defer ticker.Stop()
 		for {
+			svc.MonitorDryRunPositions(ctx)
 			svc.MonitorSignalEvaluations(ctx)
 			select {
 			case <-ctx.Done():
@@ -539,7 +540,7 @@ func streamOnce(
 				svc.HandleSignalAsync(ctx, signal)
 			},
 			OnUpdate: func(update *enginev1.SignalUpdate) {
-				svc.HandleUpdate(ctx, update)
+				svc.HandleUpdateAsync(ctx, update)
 			},
 			OnMarketState: func(state *enginev1.MarketStateEvent) {
 				svc.SetMarketState(state.GetState())

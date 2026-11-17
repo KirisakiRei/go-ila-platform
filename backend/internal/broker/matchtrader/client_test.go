@@ -267,3 +267,54 @@ func TestTruncateComment(t *testing.T) {
 		t.Errorf("panjang komentar=%d, want 64", got)
 	}
 }
+
+func TestSymbolKonversiNonUSDQuoteDanMataUangAkun(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/account-summary", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"currency":"EUR","balance":5000,"equity":5000,"freeFunds":5000}`))
+	})
+	mux.HandleFunc("/v1/symbols", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"symbols":[
+			{"symbol":"EURUSD","baseCurrency":"EUR","quoteCurrency":"USD","contractSize":100000,"pricePrecision":5,"volumeMin":0.01,"volumeMax":100,"volumeStep":0.01},
+			{"symbol":"USDJPY","baseCurrency":"USD","quoteCurrency":"JPY","contractSize":100000,"pricePrecision":3,"volumeMin":0.01,"volumeMax":100,"volumeStep":0.01}
+		]}`))
+	})
+	mux.HandleFunc("/v1/quotes", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("symbol") == "USDJPY" {
+			_, _ = w.Write([]byte(`{"quotes":[{"symbol":"USDJPY","bid":154.99,"ask":155.01}]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := connectTest(t, srv, "good")
+	defer c.Close()
+
+	acc, err := c.Account(context.Background())
+	if err != nil {
+		t.Fatalf("Account: %v", err)
+	}
+	if acc.Currency != "EUR" {
+		t.Fatalf("Currency = %q, ingin EUR", acc.Currency)
+	}
+
+	eurSpec, err := c.Symbol(context.Background(), "EURUSD")
+	if err != nil {
+		t.Fatalf("Symbol EURUSD: %v", err)
+	}
+	if eurSpec.ValuePerLot != 100000 {
+		t.Fatalf("EURUSD ValuePerLot = %v, harus tetap 100000", eurSpec.ValuePerLot)
+	}
+
+	jpySpec, err := c.Symbol(context.Background(), "USDJPY")
+	if err != nil {
+		t.Fatalf("Symbol USDJPY: %v", err)
+	}
+	// 100000 / 155.00 = ~645.16129 USD per 1.0 gerak harga
+	want := 100000.0 / 155.0
+	if jpySpec.ValuePerLot < want-0.5 || jpySpec.ValuePerLot > want+0.5 {
+		t.Fatalf("USDJPY ValuePerLot = %v, ingin sekitar %v", jpySpec.ValuePerLot, want)
+	}
+}

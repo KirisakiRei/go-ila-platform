@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"ila-strategy/ila"
@@ -100,6 +102,10 @@ func (e *Engine) Run(params Params, htfCandles, ltfCandles []indicators.Candle) 
 		modal = 10_000
 	}
 
+	durHTF := durasiTimeframeBacktest(params.HTF)
+	durLTF := durasiTimeframeBacktest(params.LTF)
+	htfBuf := make([]indicators.Candle, 0, len(htfCandles))
+
 	for iLTF := range ltfCandles {
 		candleLTF := ltfCandles[iLTF]
 
@@ -145,10 +151,11 @@ func (e *Engine) Run(params Params, htfCandles, ltfCandles []indicators.Candle) 
 
 		// 3. Potong data sampai titik waktu ini saja.
 		//
-		// Inilah pengaman anti look-ahead. htfSampai dan ltfSampai hanya
-		// memuat candle yang waktunya tidak melewati candle sekarang.
-		htfSampai := potongSampai(htfCandles, candleLTF.Timestamp)
+		// Inilah pengaman anti look-ahead. Candle HTF yang belum selesai pada
+		// penutupan candle LTF ini dibentuk hanya dari pergerakan LTF yang sudah
+		// lewat dan ditandai IsClosed=false persis seperti di engine live.
 		ltfSampai := ltfCandles[:iLTF+1]
+		htfSampai := susunHTFSampai(htfCandles, ltfSampai, candleLTF.Timestamp, durHTF, durLTF, &htfBuf)
 
 		if len(htfSampai) < MinimalCandleHTF || len(ltfSampai) < MinimalCandleLTF {
 			continue
@@ -291,6 +298,113 @@ func potongSampai(candles []indicators.Candle, batas time.Time) []indicators.Can
 		return !candles[i].Timestamp.Before(batas)
 	})
 	return candles[:idx]
+}
+
+// susunHTFSampai menyusun deret candle HTF yang terlihat pada penutupan satu
+// candle LTF tanpa membocorkan high/low/close masa depan dari bar HTF berjalan.
+func susunHTFSampai(
+	htfCandles []indicators.Candle,
+	ltfSampai []indicators.Candle,
+	waktuBukaLTF time.Time,
+	durHTF, durLTF time.Duration,
+	buf *[]indicators.Candle,
+) []indicators.Candle {
+	if durHTF <= 0 || durLTF <= 0 || durHTF <= durLTF {
+		return potongSampai(htfCandles, waktuBukaLTF)
+	}
+
+	waktuEvaluasi := waktuBukaLTF.Add(durLTF)
+	idx := sort.Search(len(htfCandles), func(i int) bool {
+		return !htfCandles[i].Timestamp.Before(waktuEvaluasi)
+	})
+	if idx == 0 {
+		return nil
+	}
+
+	terakhir := htfCandles[idx-1]
+	// Bila candle HTF terakhir sudah resmi tutup pada waktu evaluasi ini,
+	// pakai irisan asli tanpa alokasi baru.
+	if !terakhir.Timestamp.Add(durHTF).After(waktuEvaluasi) {
+		return htfCandles[:idx]
+	}
+
+	// Candle HTF terakhir masih berjalan: bentuk OHLC-nya murni dari candle LTF
+	// yang sudah lewat di dalam rentang tersebut dengan IsClosed=false.
+	berjalan := bentukCandleHTFBerjalan(terakhir, ltfSampai)
+	out := (*buf)[:0]
+	out = append(out, htfCandles[:idx-1]...)
+	out = append(out, berjalan)
+	*buf = out
+	return out
+}
+
+func bentukCandleHTFBerjalan(acuan indicators.Candle, ltfSampai []indicators.Candle) indicators.Candle {
+	mulai := sort.Search(len(ltfSampai), func(i int) bool {
+		return !ltfSampai[i].Timestamp.Before(acuan.Timestamp)
+	})
+	if mulai >= len(ltfSampai) {
+		return indicators.Candle{
+			Timestamp: acuan.Timestamp,
+			Open:      acuan.Open,
+			High:      acuan.Open,
+			Low:       acuan.Open,
+			Close:     acuan.Open,
+			IsClosed:  false,
+		}
+	}
+
+	pertama := ltfSampai[mulai]
+	c := indicators.Candle{
+		Timestamp: acuan.Timestamp,
+		Open:      pertama.Open,
+		High:      pertama.High,
+		Low:       pertama.Low,
+		Close:     pertama.Close,
+		Volume:    pertama.Volume,
+		IsClosed:  false,
+	}
+	for i := mulai + 1; i < len(ltfSampai); i++ {
+		b := ltfSampai[i]
+		if b.High > c.High {
+			c.High = b.High
+		}
+		if b.Low < c.Low {
+			c.Low = b.Low
+		}
+		c.Close = b.Close
+		c.Volume += b.Volume
+	}
+	return c
+}
+
+func durasiTimeframeBacktest(tf string) time.Duration {
+	tf = strings.ToUpper(strings.TrimSpace(tf))
+	if tf == "D" || tf == "W" {
+		tf += "1"
+	}
+	if len(tf) < 2 {
+		return 0
+	}
+	unit, digits := tf[0], tf[1:]
+	if unit >= '0' && unit <= '9' {
+		unit, digits = tf[len(tf)-1], tf[:len(tf)-1]
+	}
+	n, err := strconv.ParseInt(digits, 10, 64)
+	if err != nil || n <= 0 || n > 10080 {
+		return 0
+	}
+	switch unit {
+	case 'M':
+		return time.Duration(n) * time.Minute
+	case 'H':
+		return time.Duration(n) * time.Hour
+	case 'D':
+		return time.Duration(n) * 24 * time.Hour
+	case 'W':
+		return time.Duration(n) * 7 * 24 * time.Hour
+	default:
+		return 0
+	}
 }
 
 // potongJendela mengambil sejumlah candle di kiri dan kanan sebuah titik waktu.

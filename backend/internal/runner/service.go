@@ -168,6 +168,19 @@ type Service struct {
 	// antrean memisahkan pembacaan stream engine dari pemrosesan sinyal,
 	// sehingga sinyal siap entry tidak menunggu status WAIT_* di depannya.
 	antrean *signalQueue
+
+	// signalLockMu menyerikan PUBLISH dan CANCEL/EXPIRE/SUPERSEDE untuk signal_id
+	// yang sama, serta mengingat pembatalan dini agar tidak pernah dibalik urutan.
+	signalLockMu  sync.Mutex
+	signalLocks   map[string]*sync.Mutex
+	recentCancels map[string]earlySignalCancel
+}
+
+type earlySignalCancel struct {
+	status     string
+	reason     string
+	superseded string
+	recordedAt time.Time
 }
 
 // NewService membuat Runner.
@@ -184,17 +197,82 @@ func NewService(store Store, brokers *broker.Registry, pub Publisher, logger *sl
 	opts.Policy = opts.Policy.Clamp()
 
 	return &Service{
-		store:    store,
-		brokers:  brokers,
-		pub:      pub,
-		logger:   logger,
-		opts:     opts,
-		market:   enginev1.MarketState_MARKET_OPEN,
-		clients:  make(map[string]broker.Client),
-		schedule: NewScheduleWatch(10*time.Minute, 10*time.Minute),
-		accounts: newAccountSnapshotCache(opts.Clock),
-		antrean:  newSignalQueue(0),
+		store:         store,
+		brokers:       brokers,
+		pub:           pub,
+		logger:        logger,
+		opts:          opts,
+		market:        enginev1.MarketState_MARKET_OPEN,
+		clients:       make(map[string]broker.Client),
+		schedule:      NewScheduleWatch(10*time.Minute, 10*time.Minute),
+		accounts:      newAccountSnapshotCache(opts.Clock),
+		antrean:       newSignalQueue(0),
+		signalLocks:   make(map[string]*sync.Mutex),
+		recentCancels: make(map[string]earlySignalCancel),
 	}
+}
+
+func (s *Service) lockSignalOp(signalID string) func() {
+	if signalID == "" {
+		return func() {}
+	}
+	s.signalLockMu.Lock()
+	if len(s.signalLocks) > 2048 {
+		// Bersihkan entri tidak terkunci secara oportunistis agar peta tetap kecil.
+		for k, m := range s.signalLocks {
+			if k != signalID && m.TryLock() {
+				m.Unlock()
+				delete(s.signalLocks, k)
+			}
+		}
+	}
+	m, ok := s.signalLocks[signalID]
+	if !ok {
+		m = &sync.Mutex{}
+		s.signalLocks[signalID] = m
+	}
+	s.signalLockMu.Unlock()
+
+	m.Lock()
+	return m.Unlock
+}
+
+func (s *Service) rememberEarlyCancel(signalID, status, reason, supersededBy string) {
+	now := s.opts.Clock()
+	s.signalLockMu.Lock()
+	defer s.signalLockMu.Unlock()
+	for k, v := range s.recentCancels {
+		if now.Sub(v.recordedAt) > 10*time.Minute {
+			delete(s.recentCancels, k)
+		}
+	}
+	if len(s.recentCancels) >= 1024 {
+		for k := range s.recentCancels {
+			delete(s.recentCancels, k)
+			break
+		}
+	}
+	s.recentCancels[signalID] = earlySignalCancel{
+		status:     status,
+		reason:     reason,
+		superseded: supersededBy,
+		recordedAt: now,
+	}
+}
+
+func (s *Service) takeEarlyCancel(signalID string) (earlySignalCancel, bool) {
+	now := s.opts.Clock()
+	s.signalLockMu.Lock()
+	defer s.signalLockMu.Unlock()
+	item, ok := s.recentCancels[signalID]
+	if !ok {
+		return earlySignalCancel{}, false
+	}
+	delete(s.recentCancels, signalID)
+	if now.Sub(item.recordedAt) > 10*time.Minute {
+		return earlySignalCancel{}, false
+	}
+	return item, true
 }
 
 // SetMarketState mencatat status pasar terakhir dari engine.
@@ -392,6 +470,17 @@ func (s *Service) HandleSignal(ctx context.Context, in *enginev1.Signal) {
 // Antrean berprioritas membalik urutan itu: sinyal siap entry didahulukan,
 // sedangkan status WAIT_* menyusul di belakang.
 func (s *Service) HandleSignalAsync(ctx context.Context, in *enginev1.Signal) {
+	if action := in.GetAction(); action != enginev1.SignalAction_SIGNAL_ACTION_PUBLISH &&
+		action != enginev1.SignalAction_SIGNAL_ACTION_UNSPECIFIED {
+		s.HandleUpdateAsync(ctx, &enginev1.SignalUpdate{
+			SignalId:  in.GetSignalId(),
+			Action:    action,
+			Reason:    alasanPenarikan(action),
+			UpdatedAt: in.GetPublishedAt(),
+		})
+		return
+	}
+
 	signal := s.siapkanSinyal(ctx, in)
 	if signal == nil {
 		return
@@ -411,6 +500,34 @@ func (s *Service) HandleSignalAsync(ctx context.Context, in *enginev1.Signal) {
 			"evt", "signal.antrean.penuh",
 			"signal_id", signal.SignalID, "status", signal.Status,
 			"siap", siap, "tunggu", tunggu, "dibuang", dibuang)
+	}
+}
+
+// HandleUpdateAsync mengantrekan penarikan sinyal (CANCEL / EXPIRE / SUPERSEDE)
+// lewat antrean prioritas yang sama dengan PUBLISH agar pembaruan tidak pernah
+// melompati sinyal yang masih mengantre untuk ditulis ke database.
+func (s *Service) HandleUpdateAsync(ctx context.Context, in *enginev1.SignalUpdate) {
+	if in == nil || in.GetSignalId() == "" {
+		return
+	}
+	// Catat pembatalan dini secara sinkron saat paket tiba dari stream supaya
+	// pekerja paralel yang sedang mengambil PUBLISH sinyal yang sama langsung
+	// menahan eksekusi meskipun jadwal goroutine mendahulukan pekerja PUBLISH.
+	if status := ingest.UpdateStatus(in.GetAction()); status != "" {
+		if _, err := s.store.FindSignal(ctx, in.GetSignalId()); err != nil {
+			s.rememberEarlyCancel(in.GetSignalId(), status, in.GetReason(), in.GetSupersededBy())
+		}
+	}
+	salinan := &enginev1.SignalUpdate{
+		SignalId:     in.GetSignalId(),
+		Action:       in.GetAction(),
+		Reason:       in.GetReason(),
+		SupersededBy: in.GetSupersededBy(),
+		UpdatedAt:    in.GetUpdatedAt(),
+	}
+	if !s.antrean.push(PrioritasSiap, func() { s.HandleUpdate(ctx, salinan) }) {
+		// Bila antrean penuh, jalankan langsung agar penarikan tidak pernah hilang.
+		s.HandleUpdate(ctx, salinan)
 	}
 }
 
@@ -444,6 +561,9 @@ func (s *Service) siapkanSinyal(ctx context.Context, in *enginev1.Signal) *model
 
 // prosesSinyalMasuk menyimpan sinyal lalu menyebarkannya ke akun.
 func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
+	unlock := s.lockSignalOp(signal.SignalID)
+	defer unlock()
+
 	// Sinyal yang lahir saat pasar tutup tidak dicatat sama sekali.
 	//
 	// Kasus nyata 16 Nov 2026: tiga setup terbit pada Minggu malam NY dengan
@@ -484,6 +604,20 @@ func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
 		s.logger.Error("gagal menyimpan sinyal",
 			"evt", "signal.simpan.gagal",
 			"signal_id", signal.SignalID, "error", err.Error())
+		return
+	}
+
+	// Bila CANCEL/EXPIRE/SUPERSEDE sempat tiba lebih dulu sebelum PUBLISH ini
+	// tersimpan ke database, terapkan penarikan itu sekarang dan batalkan eksekusi.
+	if early, canceled := s.takeEarlyCancel(signal.SignalID); canceled {
+		if early.status == SignalSuperseded {
+			_ = s.store.MarkSuperseded(ctx, signal.SignalID, early.superseded, early.reason)
+		} else {
+			_ = s.store.UpdateSignalStatus(ctx, signal.SignalID, early.status, early.reason)
+		}
+		s.logger.Info("sinyal sudah dibatalkan lebih dulu sebelum publish selesai, eksekusi ditahan",
+			"evt", "signal.batal.dini",
+			"signal_id", signal.SignalID, "status", early.status)
 		return
 	}
 
@@ -1270,6 +1404,9 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 	calc, err := s.calculateLot(ctx, user, account, signal, dryRun)
 	if err != nil {
 		s.failExecution(ctx, key, err)
+		if errors.Is(err, ErrNoLot) {
+			return s.reject(ctx, user.ID, signal.SignalID, RejectLotTooSmall)
+		}
 		return s.reject(ctx, user.ID, signal.SignalID, RejectAccountFrozen)
 	}
 	position.LotSize = calc.Lots
@@ -1407,13 +1544,16 @@ func (s *Service) calculateLot(ctx context.Context, user *model.User, account *m
 		if err != nil {
 			return LotCalculation{}, err
 		}
+		if cur := strings.ToUpper(strings.TrimSpace(snapshot.Currency)); cur != "" && cur != "USD" {
+			equity = convertAccountEquityToUSD(ctx, client, equity, cur)
+		}
 		if brokerSpec, specErr := client.Symbol(ctx, signal.Symbol); specErr == nil {
 			spec = brokerSpec
 		}
 	}
 
 	_ = user
-	return CalculateLot(LotRequest{
+	lotReq := LotRequest{
 		Equity:      equity,
 		RiskPercent: riskPercent,
 		EntryPrice:  signal.EntryPrice,
@@ -1424,7 +1564,42 @@ func (s *Service) calculateLot(ctx context.Context, user *model.User, account *m
 			MaxLot:              spec.MaxLot,
 			LotStep:             spec.LotStep,
 		},
-	})
+	}
+
+	if account.RiskMode == model.RiskModeLot {
+		return CalculateFixedLot(account.LotSize, lotReq)
+	}
+
+	calc, err := CalculateLot(lotReq)
+	if err != nil {
+		return LotCalculation{}, err
+	}
+	// Cegah pembulatan paksa ke MinLot bila lot minimum menyebabkan risiko aktual
+	// membengkak melewati 2x batas risiko akun sekaligus di atas 2% ekuitas.
+	if calc.ClampedMin && equity > 0 && calc.ValuePerLot > 0 {
+		actualRiskPct := (calc.Lots * calc.ValuePerLot) / equity * 100
+		safeCeiling := math.Max(MaxRiskPercent*2, riskPercent*2)
+		if actualRiskPct > safeCeiling+1e-9 {
+			return LotCalculation{}, fmt.Errorf("%w: risiko lot minimum %.2f%% melampaui batas aman %.2f%%", ErrNoLot, actualRiskPct, safeCeiling)
+		}
+	}
+	return calc, nil
+}
+
+func convertAccountEquityToUSD(ctx context.Context, client broker.Client, equity float64, currency string) float64 {
+	if equity <= 0 || currency == "" || currency == "USD" {
+		return equity
+	}
+	if currency == "USC" {
+		return equity / 100
+	}
+	if rate, err := client.CurrentPrice(ctx, currency+"USD"); err == nil && rate > 0 {
+		return equity * rate
+	}
+	if rate, err := client.CurrentPrice(ctx, "USD"+currency); err == nil && rate > 0 {
+		return equity / rate
+	}
+	return equity
 }
 
 // ---------------------------------------------------------------------------
@@ -1462,12 +1637,20 @@ func (s *Service) HandleUpdate(ctx context.Context, in *enginev1.SignalUpdate) {
 		return
 	}
 
+	unlock := s.lockSignalOp(in.GetSignalId())
+	defer unlock()
+
 	signal, err := s.store.FindSignal(ctx, in.GetSignalId())
 	if err != nil {
+		// Simpan jejak pembatalan dini agar bila PUBLISH sinyal yang sama masih
+		// berada di belakangnya, eksekusi tidak akan pernah dilanjutkan.
+		s.rememberEarlyCancel(in.GetSignalId(), status, in.GetReason(), in.GetSupersededBy())
 		s.logger.Warn("pembaruan untuk sinyal tak dikenal",
 			"signal_id", in.GetSignalId())
 		return
 	}
+	// Sinyal sudah ada di database: bersihkan jejak dini bila sempat tercatat.
+	_, _ = s.takeEarlyCancel(in.GetSignalId())
 
 	if IsTerminal(signal.Status) {
 		return
