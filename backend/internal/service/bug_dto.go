@@ -23,6 +23,8 @@ type BugAttachmentItem struct {
 	FileName  string `json:"file_name"`
 	MimeType  string `json:"mime_type"`
 	SizeBytes int64  `json:"size_bytes"`
+	// FromAdmin membedakan lampiran pelapor dari tanggapan tim.
+	FromAdmin bool `json:"from_admin"`
 }
 
 // BugDetail adalah laporan lengkap untuk admin dan pemiliknya.
@@ -59,6 +61,7 @@ func toBugDetail(row model.BugReport, atts []model.BugReportAttachment) *BugDeta
 	for _, att := range atts {
 		out.Attachments = append(out.Attachments, BugAttachmentItem{
 			ID: att.ID, FileName: att.FileName, MimeType: att.MimeType, SizeBytes: att.SizeBytes,
+			FromAdmin: att.FromAdmin,
 		})
 	}
 	return out

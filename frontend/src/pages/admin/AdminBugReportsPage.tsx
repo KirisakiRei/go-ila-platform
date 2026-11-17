@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Paperclip } from 'lucide-react'
-import { bugApi, type BugDetail, type BugStatus } from '@/lib/bug-api'
+import {
+  BUG_MAKS_LAMPIRAN_MB,
+  BUG_MAX_LAMPIRAN_BYTE,
+  bugApi,
+  type BugDetail,
+  type BugStatus,
+} from '@/lib/bug-api'
 import { Can } from '@/features/admin/components/Can'
 import { formatDate } from '@/lib/format'
 import {
@@ -62,8 +68,22 @@ export default function AdminBugReportsPage() {
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['admin', 'bug-reports'] })
 
   const ubah = useMutation({
-    mutationFn: ({ id, next, note }: { id: string; next: BugStatus; note: string }) =>
-      bugApi.adminUpdate(id, { status: next, note }),
+    mutationFn: ({
+      id,
+      next,
+      note,
+      lampiran,
+    }: {
+      id: string
+      next: BugStatus
+      note: string
+      lampiran?: File | null
+    }) =>
+      // Lampiran hanya ada di jalur tanggapan; perubahan status biasa tetap
+      // lewat PATCH JSON agar triage cepat tidak menyentuh berkas sama sekali.
+      lampiran
+        ? bugApi.adminReply(id, { note, attachment: lampiran }).then(() => undefined)
+        : bugApi.adminUpdate(id, { status: next, note }),
     onSuccess: () => {
       setDipilih(null)
       invalidate()
@@ -220,7 +240,7 @@ export default function AdminBugReportsPage() {
             awal={dipilih.status}
             catatanAwal={dipilih.admin_note}
             sedangKirim={ubah.isPending}
-            onSubmit={(next, note) => ubah.mutate({ id: dipilih.id, next, note })}
+            onSubmit={(next, note, lampiran) => ubah.mutate({ id: dipilih.id, next, note, lampiran })}
           />
         </Card>
       )}
@@ -238,10 +258,27 @@ function TriageForm({
   awal: BugStatus
   catatanAwal: string
   sedangKirim: boolean
-  onSubmit: (next: BugStatus, note: string) => void
+  // Lampiran balasan selalu diterima pelapor sebagai laporan selesai.
+  onSubmit: (next: BugStatus, note: string, lampiran?: File | null) => void
 }) {
   const [next, setNext] = useState<BugStatus>(awal)
   const [note, setNote] = useState(catatanAwal)
+  const [lampiran, setLampiran] = useState<File | null>(null)
+  const [galatBerkas, setGalatBerkas] = useState<string | null>(null)
+
+  function pilihBerkas(file: File | undefined) {
+    setGalatBerkas(null)
+    if (!file) return setLampiran(null)
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type)) {
+      setLampiran(null)
+      return setGalatBerkas('Lampiran harus gambar (png, jpg, webp, gif) atau PDF.')
+    }
+    if (file.size > BUG_MAX_LAMPIRAN_BYTE) {
+      setLampiran(null)
+      return setGalatBerkas(`Ukuran lampiran maksimal ${BUG_MAKS_LAMPIRAN_MB} MB.`)
+    }
+    setLampiran(file)
+  }
 
   return (
     <Can permission="user.edit">
@@ -261,7 +298,7 @@ function TriageForm({
               <option value="ditolak">Ditolak</option>
             </Select>
           </div>
-          <Button size="sm" isLoading={sedangKirim} onClick={() => onSubmit(next, note)}>
+          <Button size="sm" isLoading={sedangKirim} onClick={() => onSubmit(next, note, lampiran)}>
             Simpan
           </Button>
         </div>
@@ -275,6 +312,22 @@ function TriageForm({
             onChange={(e) => setNote(e.target.value)}
             className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="triage-lampiran">Lampiran tanggapan (opsional)</Label>
+          <input
+            id="triage-lampiran"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+            onChange={(e) => pilihBerkas(e.target.files?.[0])}
+            className="text-[11.5px] text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-card file:px-2.5 file:py-1 file:text-[11.5px] file:font-semibold file:text-foreground"
+          />
+          <p className="text-[10.5px] text-muted-foreground">
+            {lampiran
+              ? `${lampiran.name} · lampiran ini akan ditutup sebagai laporan selesai`
+              : 'Gambar atau PDF, maksimal 1 MB. Menyertakan lampiran otomatis menutup laporan sebagai selesai.'}
+          </p>
+          {galatBerkas && <p className="text-[10.5px] text-destructive">{galatBerkas}</p>}
         </div>
       </div>
     </Can>

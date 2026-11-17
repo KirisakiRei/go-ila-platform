@@ -24,6 +24,7 @@ export type BugAttachmentItem = {
   file_name: string
   mime_type: string
   size_bytes: number
+  from_admin?: boolean
 }
 
 /** Laporan lengkap: dipakai daftar milik sendiri dan panel admin. */
@@ -68,9 +69,19 @@ export const bugApi = {
   /**
    * Unduh lampiran. Path langsung dipakai tautan `<a href>` sehingga cookie
    * sesi ikut terkirim tanpa perlu fetch manual.
+   *
+   * Prefix /api/v1 wajib ditulis di sini: tautan ini tidak melewati buildUrl,
+   * jadi tanpa prefix browser membuka halaman aplikasi dan hasilnya 404.
    */
   attachmentUrl: (reportID: string, attachmentID: string) =>
-    `/bug-reports/${reportID}/attachments/${attachmentID}`,
+    `/api/v1/bug-reports/${reportID}/attachments/${attachmentID}`,
+  detail: (id: string) => request<BugDetail>(`/bug-reports/${id}`),
+  adminReply: (id: string, payload: { note: string; attachment?: File | null }) => {
+    const form = new FormData()
+    form.append('note', payload.note)
+    if (payload.attachment) form.append('attachment', payload.attachment)
+    return request<void>(`/admin/bug-reports/${id}/reply`, { method: 'POST', body: form })
+  },
 
   adminList: (query?: { status?: string; category?: string }) =>
     request<BugDetail[]>('/admin/bug-reports', { query }),
@@ -96,5 +107,24 @@ export function useKirimLaporanBug() {
   return useMutation({
     mutationFn: bugApi.create,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['bug', 'mine'] }),
+  })
+}
+
+/** useBugDetail membaca satu laporan milik pengguna untuk halaman detail. */
+export function useBugDetail(id: string | undefined) {
+  return useQuery({
+    queryKey: ['bug', 'detail', id],
+    queryFn: () => bugApi.detail(id as string),
+    enabled: Boolean(id),
+  })
+}
+
+/** useBalasBug menyimpan tanggapan tim beserta lampiran opsional. */
+export function useBalasBug() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: string; note: string; attachment?: File | null }) =>
+      bugApi.adminReply(id, payload),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['bug'] }),
   })
 }

@@ -57,6 +57,7 @@ import AdminInvitesPage from '@/pages/admin/AdminInvitesPage'
 import AdminBugReportsPage from '@/pages/admin/AdminBugReportsPage'
 import LaporkanBugPage from '@/pages/LaporkanBugPage'
 import RiwayatLaporanBugPage from '@/pages/RiwayatLaporanBugPage'
+import DetailLaporanBugPage from '@/pages/DetailLaporanBugPage'
 import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 import { ScrollToTop } from './ScrollToTop'
@@ -348,6 +349,16 @@ export function AppRoutes() {
             <RequireAuth>
               <ShellPage>
                 <RiwayatLaporanBugPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/laporkan-bug/riwayat/:id"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <DetailLaporanBugPage />
               </ShellPage>
             </RequireAuth>
           }

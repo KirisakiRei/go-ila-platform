@@ -1,4 +1,7 @@
+import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { EmptyState } from '@/components/ui'
+import { SkippedEvidenceChart } from '@/features/charts/SkippedEvidenceChart'
 import { formatDateTime, formatNumber, formatR } from '@/lib/format'
 import type { JournalSkipped } from '@/types/api'
 
@@ -117,6 +120,9 @@ const TONE_CLASS: Record<'positif' | 'negatif' | 'netral', string> = {
  * melihat trade yang jadi dan tidak tahu berapa banyak setup yang terlewat.
  */
 export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
+  // Hanya satu baris yang membuka chart, supaya membuka beberapa sekaligus
+  // tidak memicu banyak permintaan candle dari feed yang sama.
+  const [terbuka, setTerbuka] = useState<string | null>(null)
   if (items.length === 0) {
     return (
       <EmptyState
@@ -129,11 +135,12 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
   return (
     <ul className="divide-y divide-border rounded-xl border border-border bg-card">
       {items.map((item) => {
+        const kunci = `${item.signal_id}-${item.occurred_at}`
         const pasangan = item.htf && item.ltf ? `${item.htf} → ${item.ltf}` : ''
         const hasil = hasilHipotetis(item)
 
         return (
-          <li key={`${item.signal_id}-${item.occurred_at}`} className="flex flex-col gap-1.5 p-3">
+          <li key={kunci} className="flex flex-col gap-1.5 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">{item.symbol || '—'}</span>
@@ -194,6 +201,24 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
             )}
 
             <p className="text-[10.5px] text-muted-foreground">{formatDateTime(item.occurred_at)}</p>
+            {item.entry_price > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setTerbuka(kunci === terbuka ? null : kunci)}
+                  aria-expanded={terbuka === kunci}
+                  className="inline-flex w-fit items-center gap-1 rounded-md border border-border px-2 py-1 text-[10.5px] font-semibold text-foreground transition-colors duration-150 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
+                >
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform duration-150 ${terbuka === kunci ? 'rotate-180' : ''}`}
+                  />
+                  {terbuka === kunci ? 'Tutup bukti harga' : 'Lihat bukti harga'}
+                </button>
+                {terbuka === kunci && (
+                  <SkippedEvidenceChart item={item} enabled height={280} />
+                )}
+              </>
+            )}
           </li>
         )
       })}

@@ -33,6 +33,9 @@ func (h *BugHandler) RegisterUser(g *gin.RouterGroup) {
 	g.POST("/bug-reports", h.Create)
 	g.GET("/bug-reports", h.ListMine)
 	g.GET("/bug-reports/categories", h.Kategori)
+	// Detail per laporan ditempatkan setelah "categories" agar kata itu tidak
+	// tertangkap pola :id.
+	g.GET("/bug-reports/:id", h.Detail)
 }
 
 // RegisterAttachment memasang route lampiran pada grup yang menerima sesi
@@ -45,6 +48,7 @@ func (h *BugHandler) RegisterAttachment(g *gin.RouterGroup) {
 func (h *BugHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 	g.GET("/bug-reports", guard(http.MethodGet, "/bug-reports", authz.UserView), h.AdminList)
 	g.PATCH("/bug-reports/:id", guard(http.MethodPatch, "/bug-reports/:id", authz.UserEdit), h.AdminUpdate)
+	g.POST("/bug-reports/:id/reply", guard(http.MethodPost, "/bug-reports/:id/reply", authz.UserEdit), h.AdminReply)
 }
 
 // Create menangani POST /api/v1/bug-reports (multipart).
@@ -109,6 +113,16 @@ func (h *BugHandler) Kategori(c *gin.Context) {
 	httpx.OK(c, "Kategori laporan", service.KategoriLaporan())
 }
 
+// Detail menangani GET /api/v1/bug-reports/:id.
+func (h *BugHandler) Detail(c *gin.Context) {
+	detail, err := h.svc.Detail(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id"))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Detail laporan", detail)
+}
+
 // Attachment menangani GET /api/v1/bug-reports/:id/attachments/:aid.
 //
 // Header sengaja dipasang agar berkas TIDAK PERNAH dirender peramban: lampiran
@@ -165,6 +179,43 @@ func (h *BugHandler) AdminUpdate(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Status laporan diperbarui", nil)
+}
+
+// AdminReply menangani POST /api/v1/admin/bug-reports/:id/reply (multipart).
+//
+// Badan dibatasi dengan cara yang sama seperti unggahan pengguna: berkas besar
+// tidak boleh masuk ke memori proses sebelum ditolak.
+func (h *BugHandler) AdminReply(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, service.BugMaxLampiranByte+64*1024)
+	if err := c.Request.ParseMultipartForm(service.BugMaxLampiranByte + 32*1024); err != nil {
+		if isTooLarge(err) {
+			c.Error(service.ErrLampiranTerlaluBesar)
+			return
+		}
+		c.Error(httpx.WrapValidation("formulir tanggapan tidak terbaca"))
+		return
+	}
+	in := service.BugReplyInput{Note: c.PostForm("note")}
+	fileHeader, err := c.FormFile("attachment")
+	switch {
+	case err == nil && fileHeader != nil:
+		berkas, openErr := fileHeader.Open()
+		if openErr != nil {
+			c.Error(httpx.WrapValidation("lampiran tidak terbaca"))
+			return
+		}
+		defer func() { _ = berkas.Close() }()
+		in.Lampiran = &service.BugUpload{FileName: fileHeader.Filename, Reader: berkas}
+	case err != nil && isTooLarge(err):
+		c.Error(service.ErrLampiranTerlaluBesar)
+		return
+	}
+	actor := service.AdminActor{ID: middleware.CurrentUserID(c), RequestID: c.GetString(middleware.ContextRequestID)}
+	if err := h.admin.Reply(c.Request.Context(), actor, c.Param("id"), in.Note, in.Lampiran); err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Tanggapan terkirim", nil)
 }
 
 // isTooLarge mengenali galat batas ukuran dari net/http.

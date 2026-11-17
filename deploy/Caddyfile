@@ -156,7 +156,12 @@
 	}
 
 	# Ukuran badan permintaan dibatasi agar tidak ada unggahan tak terduga.
+	#
+	# 2MB, bukan 1MB: batas lampiran aplikasi 1 MiB, dan badan multipart
+	# membawa boundary, nama berkas, serta kolom formulir di samping isinya.
+	# Dengan 1MB, berkas tepat 1 MB yang sah sudah ditolak Caddy dan pengguna
+	# hanya melihat halaman galat proxy, bukan pesan aplikasi.
 	request_body {
-		max_size 1MB
+		max_size 2MB
 	}
 }

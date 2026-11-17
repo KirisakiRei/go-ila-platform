@@ -50,23 +50,28 @@ export default function RiwayatLaporanBugPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {rows.map((row) => (
-            <Card key={row.id} className="flex flex-col gap-1.5 p-3.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[13px] font-semibold text-foreground">{row.title}</p>
-                <span
-                  className={`rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
-                >
-                  {LABEL_STATUS[row.status]}
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                {row.category} · {formatDate(row.created_at)}
-              </p>
-              {row.admin_note && (
-                <p className="rounded-lg border border-border bg-secondary/40 p-2 text-[11.5px] text-foreground">
-                  Catatan tim: {row.admin_note}
+            <Card key={row.id} className="p-0">
+              <Link
+                to={`/laporkan-bug/riwayat/${row.id}`}
+                className="flex flex-col gap-1.5 rounded-2xl p-3.5 transition-colors duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[13px] font-semibold text-foreground">{row.title}</p>
+                  <span
+                    className={`rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
+                  >
+                    {LABEL_STATUS[row.status]}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {row.category} · {formatDate(row.created_at)}
                 </p>
-              )}
+                {row.admin_note && (
+                  <p className="rounded-lg border border-border bg-secondary/40 p-2 text-[11.5px] text-foreground">
+                    Catatan tim: {row.admin_note}
+                  </p>
+                )}
+              </Link>
             </Card>
           ))}
         </div>

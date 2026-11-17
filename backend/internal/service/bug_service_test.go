@@ -338,3 +338,72 @@ func TestWaktuLaporanTerbentuk(t *testing.T) {
 		t.Fatalf("created_at bukan RFC3339: %q", detail.CreatedAt)
 	}
 }
+
+// TestDetailHanyaUntukPemilik mengunci halaman detail: pemilik membaca
+// laporannya, orang lain mendapat 404 (bukan 403) agar keberadaannya tidak
+// bisa ditebak.
+func TestDetailHanyaUntukPemilik(t *testing.T) {
+	store := newBugStoreTiruan()
+	svc := NewBugService(store, t.TempDir(), nil)
+	dibuat, err := svc.Create(context.Background(), "pemilik", inputLaporan())
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	detail, err := svc.Detail(context.Background(), "pemilik", dibuat.ID)
+	if err != nil {
+		t.Fatalf("pemilik ditolak: %v", err)
+	}
+	if detail.Title != "Tombol hilang" || detail.Body == "" {
+		t.Fatalf("detail = %+v; ingin isi laporan lengkap", detail)
+	}
+
+	if _, err := svc.Detail(context.Background(), "orang-lain", dibuat.ID); !errors.Is(err, apperror.ErrNotFound) {
+		t.Fatalf("error = %v; ingin ErrNotFound", err)
+	}
+}
+
+// TestTanggapanAdminMenandaiLampiran memastikan lampiran balasan tersimpan
+// sebagai milik tim dan laporannya ditutup selesai.
+func TestTanggapanAdminMenandaiLampiran(t *testing.T) {
+	store := newBugStoreTiruan()
+	svc := NewBugService(store, t.TempDir(), nil)
+	dibuat, err := svc.Create(context.Background(), "pelapor", inputLaporan())
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	lampiran := &BugUpload{FileName: "perbaikan.png", Reader: bytes.NewReader(pngPalsu(256))}
+	actor := AdminActor{ID: "admin-1"}
+	if err := svc.Reply(context.Background(), actor, dibuat.ID, "Sudah diperbaiki.", lampiran); err != nil {
+		t.Fatalf("Reply error: %v", err)
+	}
+
+	detail, err := svc.Detail(context.Background(), "pelapor", dibuat.ID)
+	if err != nil {
+		t.Fatalf("Detail error: %v", err)
+	}
+	if detail.Status != model.BugStatusSelesai {
+		t.Fatalf("status = %q; ingin selesai", detail.Status)
+	}
+	if detail.AdminNote != "Sudah diperbaiki." {
+		t.Fatalf("catatan = %q", detail.AdminNote)
+	}
+	if len(detail.Attachments) != 1 || !detail.Attachments[0].FromAdmin {
+		t.Fatalf("lampiran = %+v; ingin satu lampiran bertanda admin", detail.Attachments)
+	}
+}
+
+// Tanggapan tanpa teks tidak boleh hanya berisi berkas: pelapor akan melihat
+// laporan tertutup tanpa penjelasan apa pun.
+func TestTanggapanTanpaTeksDitolak(t *testing.T) {
+	store := newBugStoreTiruan()
+	svc := NewBugService(store, t.TempDir(), nil)
+	dibuat, _ := svc.Create(context.Background(), "pelapor", inputLaporan())
+
+	err := svc.Reply(context.Background(), AdminActor{ID: "admin-1"}, dibuat.ID, "   ",
+		&BugUpload{FileName: "x.png", Reader: bytes.NewReader(pngPalsu(64))})
+	if err == nil {
+		t.Fatal("tanggapan berkas tanpa teks harus ditolak")
+	}
+}

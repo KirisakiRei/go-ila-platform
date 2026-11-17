@@ -81,6 +81,8 @@ var harapanAksiAudit = map[string]audit.Action{
 	// Triage laporan bug: mengubah status yang dilihat pelapor, jadi
 	// perubahannya harus punya jejak pelaku.
 	"PATCH /api/v1/admin/bug-reports/:id": audit.BugReportTriage,
+	// Tanggapan tim ikut menutup laporan, jadi memakai aksi audit yang sama.
+	"POST /api/v1/admin/bug-reports/:id/reply": audit.BugReportTriage,
 
 	// Konten: FAQ dan pengumuman tidak menyentuh uang maupun trading.
 	"POST /api/v1/admin/faq":                 audit.CMSFaqChange,

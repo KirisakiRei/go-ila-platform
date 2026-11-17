@@ -54,12 +54,19 @@ type BugService interface {
 	ListMine(ctx context.Context, userID string) ([]BugItem, error)
 	// OpenAttachment memeriksa hak akses lalu mengembalikan berkas yang siap dibaca.
 	OpenAttachment(ctx context.Context, actor BugActor, reportID, attachmentID string) (*BugFile, error)
+	// Detail membaca satu laporan milik pemiliknya, termasuk lampiran dan
+	// catatan tim. Dipakai halaman riwayat untuk menampilkan jejak penanganan.
+	Detail(ctx context.Context, userID, reportID string) (*BugDetail, error)
 }
 
 // AdminBugService adalah triage laporan di panel admin.
 type AdminBugService interface {
 	List(ctx context.Context, status, category string) ([]BugDetail, error)
 	UpdateStatus(ctx context.Context, actor AdminActor, reportID, status, note string) error
+	// Reply menyimpan tanggapan tim beserta lampiran opsional lalu menutup
+	// laporan. Dipisah dari UpdateStatus agar unggahan berkas tidak merepotkan
+	// jalur triage yang hanya mengubah catatan.
+	Reply(ctx context.Context, actor AdminActor, reportID, note string, lampiran *BugUpload) error
 }
 
 // BugActor adalah peminta berkas lampiran.
@@ -86,6 +93,12 @@ type BugUpload struct {
 	// Isi dibaca lewat pembaca, bukan seluruhnya ke memori: batas memori
 	// backend-api hanya 160 MB dan setiap unggahan tidak boleh menahannya.
 	Reader io.Reader
+}
+
+// BugReplyInput adalah tanggapan tim atas satu laporan.
+type BugReplyInput struct {
+	Note     string
+	Lampiran *BugUpload
 }
 
 // BugFile adalah lampiran yang siap disajikan handler.
@@ -204,6 +217,11 @@ func (s *bugService) Create(ctx context.Context, userID string, in BugInput) (*B
 // pun ditulis, dan nama simpan adalah UUID sehingga nama kiriman pengguna tidak
 // pernah menyentuh jalur berkas (mencegah path traversal).
 func (s *bugService) simpanLampiran(ctx context.Context, reportID string, up *BugUpload) (*model.BugReportAttachment, error) {
+	return s.simpanLampiranDari(ctx, reportID, up, false)
+}
+
+// simpanLampiranDari menulis lampiran dengan penanda pengirimnya.
+func (s *bugService) simpanLampiranDari(ctx context.Context, reportID string, up *BugUpload, dariAdmin bool) (*model.BugReportAttachment, error) {
 	if strings.TrimSpace(s.dir) == "" {
 		return nil, errors.Join(apperror.ErrServiceUnavailable, errors.New("penyimpanan lampiran belum dikonfigurasi"))
 	}
@@ -263,6 +281,7 @@ func (s *bugService) simpanLampiran(ctx context.Context, reportID string, up *Bu
 		MimeType:  mime,
 		SizeBytes: written,
 		StoredAs:  storedAs,
+		FromAdmin: dariAdmin,
 	}
 	if err := s.store.AddAttachment(ctx, att); err != nil {
 		// Baris gagal disimpan: berkasnya tidak ada gunanya, hapus.
@@ -283,6 +302,25 @@ func (s *bugService) ListMine(ctx context.Context, userID string) ([]BugItem, er
 		out = append(out, toBugItem(row))
 	}
 	return out, nil
+}
+
+// Detail membaca satu laporan milik pemiliknya.
+//
+// Laporan orang lain dijawab 404, bukan 403, agar keberadaannya tidak bisa
+// ditebak dari beda pesan.
+func (s *bugService) Detail(ctx context.Context, userID, reportID string) (*BugDetail, error) {
+	report, err := s.store.FindByID(ctx, reportID)
+	if err != nil {
+		return nil, err
+	}
+	if report.UserID != userID {
+		return nil, apperror.ErrNotFound
+	}
+	atts, err := s.store.AttachmentsOf(ctx, reportID)
+	if err != nil {
+		return nil, err
+	}
+	return toBugDetail(*report, atts), nil
 }
 
 // OpenAttachment memeriksa hak akses lalu membuka berkas lampiran.
@@ -352,6 +390,30 @@ func (s *bugService) UpdateStatus(ctx context.Context, actor AdminActor, reportI
 			RequestID: actor.RequestID,
 			After:     map[string]any{"status": status},
 		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Reply menyimpan catatan penutup dan lampiran opsional dari tim.
+//
+// Status selalu diset selesai: tanggapan tim adalah penutup laporan. Lampiran
+// disimpan setelah catatan tersimpan, sehingga kegagalan unggah tidak
+// membatalkan tanggapan yang sudah ditulis.
+func (s *bugService) Reply(ctx context.Context, actor AdminActor, reportID, note string, lampiran *BugUpload) error {
+	if _, err := s.store.FindByID(ctx, reportID); err != nil {
+		return err
+	}
+	note = strings.TrimSpace(note)
+	if lampiran != nil && note == "" {
+		return validation("tulis tanggapan sebelum melampirkan berkas")
+	}
+	if err := s.UpdateStatus(ctx, actor, reportID, model.BugStatusSelesai, note); err != nil {
+		return err
+	}
+	if lampiran != nil {
+		if _, err := s.simpanLampiranDari(ctx, reportID, lampiran, true); err != nil {
 			return err
 		}
 	}

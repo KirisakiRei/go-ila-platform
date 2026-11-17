@@ -61,6 +61,10 @@ type BugReportAttachment struct {
 	MimeType  string `gorm:"type:varchar(80);not null" json:"mime_type"`
 	SizeBytes int64  `gorm:"not null" json:"size_bytes"`
 	StoredAs  string `gorm:"type:varchar(160);not null" json:"-"`
+	// FromAdmin menandai lampiran yang dilampirkan petugas saat menutup laporan.
+	// Tanpa penanda ini pelapor tidak bisa membedakan bukti yang ia kirim dari
+	// tanggapan tim, dan keduanya tampil di daftar yang sama.
+	FromAdmin bool `gorm:"not null;default:false" json:"from_admin"`
 }
 
 // TableName menetapkan nama tabel.
