@@ -526,7 +526,7 @@ function TwoFactorCard() {
   )
 }
 
-function SessionsCard() {
+export function SessionsCard() {
   const queryClient = useQueryClient()
   const [notice, setNotice] = useState<string | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<Session | null>(null)
@@ -688,7 +688,7 @@ function SessionsCard() {
   )
 }
 
-function IdleWarningCard() {
+export function IdleWarningCard() {
   const queryClient = useQueryClient()
   const me = useQuery({ queryKey: ['auth', 'me'], queryFn: authApi.me })
   const [notice, setNotice] = useState<string | null>(null)

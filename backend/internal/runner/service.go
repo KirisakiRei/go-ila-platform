@@ -1372,7 +1372,9 @@ func (s *Service) calculateLot(ctx context.Context, user *model.User, account *m
 		riskPercent = 0.5
 	}
 
-	spec := broker.SymbolSpec{ValuePerLot: valuePerLotFallback(signal.Symbol), MinLot: 0.01, MaxLot: 100, LotStep: 0.01}
+	// Nilai cadangan dipakai juga untuk simulasi: satu sumber supaya angka di
+	// lot dan di R tidak pernah berbeda.
+	spec := broker.SymbolSpec{ValuePerLot: s.valuePerLotRunner(signal.Symbol), MinLot: 0.01, MaxLot: 100, LotStep: 0.01}
 	equity := 10_000.0 // asumsi simulasi saat akun nyata tidak bisa dibaca
 
 	if !dryRun {
@@ -1406,18 +1408,6 @@ func (s *Service) calculateLot(ctx context.Context, user *model.User, account *m
 	})
 }
 
-// valuePerLotFallback adalah nilai per lot teoretis bila broker tidak
-// mengirim spesifikasi simbol. Dipakai hanya untuk simulasi.
-func valuePerLotFallback(symbol string) float64 {
-	switch symbol {
-	case "XAUUSD":
-		return 100 // 1 lot = 100 oz
-	case "USTEC", "US100", "NAS100":
-		return 1
-	default:
-		return 100_000 // kontrak forex standar
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Pembaruan sinyal (CANCEL / EXPIRE / SUPERSEDE)

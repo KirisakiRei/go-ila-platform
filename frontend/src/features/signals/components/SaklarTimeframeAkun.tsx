@@ -78,9 +78,11 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                   <tr>
                     <th className="px-3.5 py-2.5 font-medium">Akun</th>
                     <th className="px-3.5 py-2.5 font-medium">Timeframe</th>
-                    <th className="px-3.5 py-2.5 text-center font-medium">Pantau</th>
+                    {/* Lebar saklar dipatok: tanpa ini kolom Pantau dan Eksekusi
+                        bergeser antar grup karena isi tiap tabel berbeda panjang. */}
+                    <th className="w-24 px-3.5 py-2.5 text-center font-medium">Pantau</th>
                     {data?.auto_allowed && (
-                      <th className="px-3.5 py-2.5 text-center font-medium">Eksekusi</th>
+                      <th className="w-24 px-3.5 py-2.5 text-center font-medium">Eksekusi</th>
                     )}
                   </tr>
                 </thead>

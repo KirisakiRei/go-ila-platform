@@ -121,7 +121,8 @@ export default function SignalsPage() {
 
   // Pagination untuk riwayat setup sinyal agar tidak melar panjang ke bawah
   const [historyPage, setHistoryPage] = useState(1)
-  const historyPerPage = 5
+  // 4 per halaman agar chart di atasnya tetap lega dibaca.
+  const historyPerPage = 4
   const totalHistoryPages = Math.ceil(signalsRiwayat.length / historyPerPage) || 1
   const paginatedSignals = useMemo(() => {
     const start = (historyPage - 1) * historyPerPage

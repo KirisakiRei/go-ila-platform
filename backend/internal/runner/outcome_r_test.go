@@ -106,8 +106,8 @@ func TestDefaultValuePerLot(t *testing.T) {
 		"XAUUSD": 100,
 		"GOLD":   100,
 		"XAGUSD": 5000,
-		"USTEC":  1,
-		"NAS100": 1,
+		"USTEC":  23.71,
+		"NAS100": 23.71,
 		"BTCUSD": 1,
 		"USOIL":  1000,
 	}
@@ -115,5 +115,24 @@ func TestDefaultValuePerLot(t *testing.T) {
 		if hasil := runner.DefaultValuePerLot(simbol); hasil != ingin {
 			t.Errorf("DefaultValuePerLot(%q) = %v, ingin %v", simbol, hasil, ingin)
 		}
+	}
+}
+
+// Kasus nyata 17 Nov 2026: USTEC SELL 0,09 lot, entry 27281,59, SL 27339,50,
+// PnL -123,57 USD. Broker menutup di SL, jadi hasilnya harus -1R, bukan -23,71R
+// yang muncul saat nilai per lot masih dibaca 1.
+func TestOutcomeRIndeksMemakaiNilaiKontrakBroker(t *testing.T) {
+	pos := &model.Position{
+		Symbol:    "USTEC",
+		Direction: "SELL",
+		LotSize:   0.09,
+		OpenPrice: 27281.59,
+		StopLoss:  27339.50,
+	}
+	svc := newService(newFakeStore(), &fakePublisher{})
+	svc.ApplyClose(context.Background(), pos, model.PositionStatusClosedSL, 27350.24, -123.57)
+
+	if pos.OutcomeR > -0.9 || pos.OutcomeR < -1.1 {
+		t.Fatalf("outcome R = %v, ingin sekitar -1 (bukan -23,71)", pos.OutcomeR)
 	}
 }

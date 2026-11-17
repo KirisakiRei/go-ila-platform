@@ -65,6 +65,14 @@ export function SignalsMobileView({
   // Chart dilipat secara bawaan agar daftar sinyal tetap jadi fokus utama di
   // layar kecil; trader membukanya saat butuh melihat struktur.
   const [chartOpen, setChartOpen] = useState(false)
+  // Riwayat dibatasi 4 per halaman agar chart di atasnya tetap lega dibaca.
+  const [posisiHalaman, setPosisiHalaman] = useState(1)
+  const POSISI_PER_HALAMAN = 4
+  const totalHalamanPosisi = Math.ceil(filteredPositions.length / POSISI_PER_HALAMAN) || 1
+  const posisiTampil = filteredPositions.slice(
+    (posisiHalaman - 1) * POSISI_PER_HALAMAN,
+    posisiHalaman * POSISI_PER_HALAMAN,
+  )
 
   // Base list of signals: if activePair is chosen, filter by activePair; else use all signals matching active watchlist pairs
   const baseSignals = useMemo(() => {
@@ -588,7 +596,7 @@ export function SignalsMobileView({
               </p>
             ) : (
               <div className="space-y-2">
-                {filteredPositions.slice(0, 5).map((pos) => (
+                {posisiTampil.map((pos) => (
                   <div
                     key={pos.id}
                     className="flex items-center justify-between rounded-xl border border-border/80 bg-secondary/30 p-2.5 text-xs"
@@ -635,6 +643,29 @@ export function SignalsMobileView({
                     </div>
                   </div>
                 ))}
+                {totalHalamanPosisi > 1 && (
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setPosisiHalaman((p) => Math.max(1, p - 1))}
+                      disabled={posisiHalaman <= 1}
+                      className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors duration-150 disabled:opacity-40"
+                    >
+                      Sebelumnya
+                    </button>
+                    <span className="text-[11px] text-muted-foreground">
+                      {posisiHalaman} / {totalHalamanPosisi}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPosisiHalaman((p) => Math.min(totalHalamanPosisi, p + 1))}
+                      disabled={posisiHalaman >= totalHalamanPosisi}
+                      className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors duration-150 disabled:opacity-40"
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

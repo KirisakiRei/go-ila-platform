@@ -43,8 +43,13 @@ func DefaultValuePerLot(symbol string) float64 {
 		// Perak: 1 lot = 5.000 ons.
 		return 5_000
 	case "USTEC", "NAS100", "US100", "US30", "US500", "GER40", "UK100", "JP225", "HK50":
-		// Indeks: pergerakan 1,0 poin senilai 1 USD per lot.
-		return 1
+		// Indeks: satu poin senilai 23,71 USD per lot di akun matchtrader ini
+		// (terbukti dari posisi USTEC: 0,09 lot x 57,91 poin = 123,57 USD).
+		//
+		// Angka ini berbeda per broker dan per jenis akun, jadi katalog pair
+		// tetap yang menentukan bila sudah diisi. Nilai bawaan ini cadangan:
+		// dengan 1, kerugian -1R terbaca -23,71R.
+		return 23.71
 	case "USOIL", "UKOIL":
 		return 1_000
 	case "NATGAS":

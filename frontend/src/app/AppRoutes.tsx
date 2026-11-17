@@ -58,6 +58,8 @@ import AdminBugReportsPage from '@/pages/admin/AdminBugReportsPage'
 import LaporkanBugPage from '@/pages/LaporkanBugPage'
 import RiwayatLaporanBugPage from '@/pages/RiwayatLaporanBugPage'
 import DetailLaporanBugPage from '@/pages/DetailLaporanBugPage'
+import ProfilPage from '@/pages/ProfilPage'
+import PerangkatPage from '@/pages/PerangkatPage'
 import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 import { ScrollToTop } from './ScrollToTop'
@@ -328,6 +330,26 @@ export function AppRoutes() {
             <RequireAuth>
               <ShellPage>
                 <SecuritySettingsPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/pengaturan/profil"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <ProfilPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/pengaturan/perangkat"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <PerangkatPage />
               </ShellPage>
             </RequireAuth>
           }
