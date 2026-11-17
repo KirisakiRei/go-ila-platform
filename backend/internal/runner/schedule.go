@@ -34,18 +34,11 @@ func ExpectedOpen(t time.Time) bool {
 // expectedOpen memperkirakan apakah pasar seharusnya buka pada waktu t.
 // Aturan: tutup penuh Sabtu dan Minggu; Jumat tutup sejak 17:00 NY dan
 // Minggu baru buka 17:00 NY (plans/22 §3).
+//
+// Aturannya tinggal di package timezone agar penilai harga memakai definisi
+// yang sama; fungsi ini hanya nama lokalnya.
 func expectedOpen(t time.Time) bool {
-	ny := t.In(NY)
-	switch ny.Weekday() {
-	case time.Saturday:
-		return false
-	case time.Sunday:
-		return ny.Hour() >= 17
-	case time.Friday:
-		return ny.Hour() < 17
-	default:
-		return true
-	}
+	return timezone.MarketExpectedOpen(t)
 }
 
 // CheckMarketSchedule membandingkan status dari engine dengan perkiraan jadwal.

@@ -139,3 +139,33 @@ func TestEvaluateCandlesSellSL(t *testing.T) {
 		t.Fatalf("hasil = %+v ok=%v, ingin SL", hasil, ok)
 	}
 }
+
+// Kasus nyata 16 Nov 2026: EURUSD H1/M5 terbit Minggu 20:10 NY dengan masa
+// berlaku 5 menit. Candle yang lahir di luar sesi (mis. Sabtu pagi NY) hanya
+// sisa penutupan, jadi tidak boleh ikut menilai TP/SL.
+func TestEvaluateCandlesMengabaikanCandleLuarSesi(t *testing.T) {
+	// Sabtu 14 Nov 2026 07:00 NY = 12:00 UTC. Pasar tutup penuh hari Sabtu.
+	tutup := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	sejak := tutup.Add(-10 * time.Minute)
+	signal := &model.Signal{
+		SignalID:   "sig-uji-tutup",
+		Symbol:     "EURUSD",
+		Direction:  "SELL",
+		EntryPrice: 1.10218,
+		StopLoss:   1.102395,
+		TakeProfit: 1.10175,
+		RiskReward: 2,
+		ExpiresAt:  sejak.Add(5 * time.Minute),
+	}
+
+	// Candle Sabtu menyentuh entry dan TP sekaligus.
+	hasil, ok := evaluateCandles(signal, []market.Candle{
+		lilin(tutup.Unix(), 1.1025, 1.1017),
+	}, sejak)
+
+	// Candle itu boleh membuat setup dinilai NO_ENTRY (memang tak ada harga sah
+	// yang menyentuh entry), tetapi tidak boleh menghasilkan TP/SL.
+	if ok && (hasil.Status == model.EvalTP || hasil.Status == model.EvalSL) {
+		t.Fatalf("candle luar sesi menghasilkan %+v; TP/SL tidak boleh muncul dari sesi tutup", hasil)
+	}
+}

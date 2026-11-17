@@ -7,6 +7,7 @@ import (
 
 	"ila/backend/internal/market"
 	"ila/backend/internal/model"
+	"ila/backend/internal/timezone"
 )
 
 // evalCandleLimit membatasi candle yang diambil. Cukup untuk menutup setup
@@ -67,11 +68,18 @@ func evaluateCandles(signal *model.Signal, candles []market.Candle, since time.T
 	buy := strings.EqualFold(signal.Direction, "BUY")
 	sinceUnix := since.Unix()
 	expiresUnix := signal.ExpiresAt.Unix()
-
 	touched := false
 	var entryAt *time.Time
 	for _, c := range candles {
 		if c.Time < sinceUnix {
+			continue
+		}
+		// Candle di luar jam pasar tidak boleh menilai apa pun.
+		//
+		// Kasus nyata 16 Nov 2026: candle Minggu malam membuat setup berumur 15
+		// menit tertulis "Tembus TP +2R". Pergerakan di luar sesi hanya sisa
+		// penutupan dan spread lebar, bukan harga yang bisa ditradingkan.
+		if !timezone.MarketExpectedOpen(time.Unix(c.Time, 0)) {
 			continue
 		}
 		if !touched {

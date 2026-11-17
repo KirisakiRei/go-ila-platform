@@ -1389,3 +1389,41 @@ func TestKlaimBaruTidakDiambilAlih(t *testing.T) {
 		t.Fatalf("posisi terbuka = %d, ingin 1 karena kunci idempotensi", len(positions))
 	}
 }
+
+// Kasus nyata 16 Nov 2026: sinyal terbit Minggu 20:10 NY (pasar tutup) dengan
+// masa berlaku 5 menit. Sinyal seperti itu tidak bisa dieksekusi dan hanya
+// mengotori jurnal, jadi harus dibuang sebelum ada yang tersimpan.
+func TestSinyalSaatPasarTutupTidakDisimpan(t *testing.T) {
+	store := newFakeStore()
+	svc := newService(store, &fakePublisher{})
+
+	// Sabtu 14 Nov 2026 12:00 UTC = 07:00 NY, pasar tutup penuh.
+	tutup := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	in := readySignal("EURUSD", 5*time.Minute)
+	in.PublishedAt = timestamppb.New(tutup)
+	in.ExpiresAt = timestamppb.New(tutup.Add(5 * time.Minute))
+
+	svc.HandleSignal(context.Background(), in)
+
+	if _, ada := store.signals[in.SignalId]; ada {
+		t.Fatal("sinyal terbit saat pasar tutup tidak boleh tersimpan")
+	}
+}
+
+// Sinyal yang terbit saat pasar buka tetap tersimpan seperti biasa.
+func TestSinyalSaatPasarBukaTetapDisimpan(t *testing.T) {
+	store := newFakeStore()
+	svc := newService(store, &fakePublisher{})
+
+	// Senin 16 Nov 2026 15:00 UTC = 10:00 NY, pasar buka.
+	buka := time.Date(2026, 11, 16, 15, 0, 0, 0, time.UTC)
+	in := readySignal("EURUSD", 5*time.Minute)
+	in.PublishedAt = timestamppb.New(buka)
+	in.ExpiresAt = timestamppb.New(buka.Add(5 * time.Minute))
+
+	svc.HandleSignal(context.Background(), in)
+
+	if _, ada := store.signals[in.SignalId]; !ada {
+		t.Fatal("sinyal saat pasar buka harus tersimpan")
+	}
+}

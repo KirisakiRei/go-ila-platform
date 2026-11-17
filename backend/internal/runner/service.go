@@ -425,6 +425,21 @@ func (s *Service) siapkanSinyal(ctx context.Context, in *enginev1.Signal) *model
 
 // prosesSinyalMasuk menyimpan sinyal lalu menyebarkannya ke akun.
 func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
+	// Sinyal yang lahir saat pasar tutup tidak dicatat sama sekali.
+	//
+	// Kasus nyata 16 Nov 2026: tiga setup terbit pada Minggu malam NY dengan
+	// masa berlaku 5-15 menit, lalu dinilai TP/SL memakai candle di luar sesi.
+	// Baris seperti itu tidak bisa dieksekusi siapa pun dan hanya mengotori
+	// jurnal, jadi dibuang di gerbang ini sebelum ada yang tersimpan.
+	if !ExpectedOpen(signal.PublishedAt) {
+		s.logger.Info("sinyal terbit saat pasar tutup, diabaikan",
+			"evt", "signal.skip.closed",
+			"signal_id", signal.SignalID,
+			"symbol", signal.Symbol,
+			"published_at", signal.PublishedAt)
+		return
+	}
+
 	existing, findErr := s.store.FindSignal(ctx, signal.SignalID)
 	if findErr == nil && IsTerminal(existing.Status) {
 		// Sinyal terminal tidak boleh dihidupkan kembali oleh kiriman ulang.

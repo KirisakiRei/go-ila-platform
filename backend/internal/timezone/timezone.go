@@ -53,3 +53,23 @@ func DayStart(t time.Time) time.Time {
 func DayEnd(t time.Time) time.Time {
 	return DayStart(t).AddDate(0, 0, 1)
 }
+
+// MarketExpectedOpen memperkirakan apakah pasar forex buka pada waktu t.
+//
+// Aturan: tutup penuh Sabtu dan Minggu; Jumat tutup sejak 17:00 NY dan
+// Senin/Sunday dibuka sejak 17:00 NY. Diletakkan di sini agar pipeline runner
+// dan penilai harga memakai aturan yang sama, bukan dua salinan yang bisa
+// berbeda.
+func MarketExpectedOpen(t time.Time) bool {
+	ny := t.In(NY)
+	switch ny.Weekday() {
+	case time.Saturday:
+		return false
+	case time.Sunday:
+		return ny.Hour() >= 17
+	case time.Friday:
+		return ny.Hour() < 17
+	default:
+		return true
+	}
+}
