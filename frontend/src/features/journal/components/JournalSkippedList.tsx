@@ -46,6 +46,13 @@ function labelStatus(status: string): string {
  * setup-nya memang sudah tidak layak dimasuki.
  */
 function alasanTerbaca(item: JournalSkipped): string {
+  // Alasan penolakan adalah kondisi saat sinyal tiba, bukan kesimpulan akhir.
+  // Begitu hasil evaluasi harga ada, kondisinya sudah lampau dan bisa
+  // bertentangan dengan hasilnya (mis. "Pasar sedang tutup" pada sinyal yang
+  // ternyata dinilai memakai candle sesi buka). Hasil evaluasi yang berlaku.
+  if (item.eval_status && item.eval_status !== 'PENDING' && item.eval_note) {
+    return item.eval_note
+  }
   if (item.reason) return item.reason
   switch (item.status) {
     case 'OPPORTUNITY':
@@ -196,9 +203,6 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
               </p>
             )}
 
-            {hasil && item.eval_note && (
-              <p className="text-[10.5px] text-muted-foreground">{item.eval_note}</p>
-            )}
 
             <p className="text-[10.5px] text-muted-foreground">{formatDateTime(item.occurred_at)}</p>
             {item.entry_price > 0 && (

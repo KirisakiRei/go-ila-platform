@@ -563,3 +563,46 @@ func RejectTerkirimKeTelegram(reason RejectReason) bool {
 func (r RejectReason) Teks() string {
 	return string(r)
 }
+
+// alasanMenggantikan melaporkan apakah alasan baru harus menimpa alasan lama
+// pada baris user_signal.
+//
+// Sebagian alasan hanya berlaku sesaat: "Pasar sedang tutup" benar saat sinyal
+// tiba, tetapi menyesatkan bila menempel di riwayat setelah setup kedaluwarsa
+// (kasus 16 Nov 2026: sinyal terbit Minggu malam NY lalu tertulis "pasar tutup"
+// padahal sesinya sudah buka). Alasan akhir selalu menimpa alasan sesaat;
+// sesama alasan sesaat, yang terbaru berlaku.
+func alasanMenggantikan(lama, baru string) bool {
+	if baru == "" {
+		return false
+	}
+	if lama == "" {
+		return true
+	}
+	if lama == baru {
+		return true
+	}
+	return !alasanAkhir(lama) || alasanAkhir(baru)
+}
+
+// alasanAkhir menandai alasan yang menyatakan nasib akhir sinyal.
+func alasanAkhir(reason string) bool {
+	switch RejectReason(reason) {
+	case RejectExpired, RejectWaitingNext, RejectNotReady, RejectTerminal,
+		RejectBadSignal, RejectDuplicate:
+		return true
+	}
+	return false
+}
+
+// alasanTerbaru memilih alasan yang disimpan pada baris user_signal.
+//
+// Alasan lama dipertahankan hanya bila alasan baru kosong atau sama-sama
+// sesaat dan yang baru tidak berhak menimpanya. Hasilnya dipakai untuk
+// penyimpanan sekaligus untuk event, agar keduanya tidak pernah berbeda.
+func alasanTerbaru(lama, baru string) string {
+	if alasanMenggantikan(lama, baru) {
+		return baru
+	}
+	return lama
+}

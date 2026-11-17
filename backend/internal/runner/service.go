@@ -318,28 +318,27 @@ const marketStatusMaxAge = 3 * time.Minute
 // sehingga koneksi engine yang bertahan lama membuat Runner menahan semua
 // sinyal dengan alasan "Pasar sedang tutup" padahal pasar sudah buka.
 func (s *Service) marketOpen() bool {
+	return s.marketOpenAt(s.opts.Clock())
+}
+
+// marketOpenAt menguji status pasar pada satu waktu tertentu.
+//
+// Dipakai saat menilai sinyal: alasannya dibaca user sebagai keterangan tentang
+// jam sinyal itu, bukan tentang jam pemeriksaan. Memakai jam sekarang membuat
+// sinyal yang terbit saat sesi buka tertulis "Pasar sedang tutup" hanya karena
+// diperiksa setelah sesi berganti (kasus USTEC 16 Nov 2026).
+func (s *Service) marketOpenAt(t time.Time) bool {
 	s.mu.Lock()
 	state, at := s.market, s.marketAt
 	s.mu.Unlock()
-
-	now := s.opts.Clock()
-	if at.IsZero() || now.Sub(at) > marketStatusMaxAge {
+	if at.IsZero() || s.opts.Clock().Sub(at) > marketStatusMaxAge {
 		if s.logger != nil {
 			s.logger.Warn("status pasar dari engine basi, memakai jadwal lokal",
-				"umur", now.Sub(at).String(), "dari_engine", state.String())
+				"umur", s.opts.Clock().Sub(at).String(), "dari_engine", state.String())
 		}
-		return ingest.MarketOpen(s.localMarketState(now))
+		return ExpectedOpen(t)
 	}
 	return ingest.MarketOpen(state)
-}
-
-// localMarketState menerjemahkan jadwal pasar New York menjadi status kontrak
-// engine, dipakai saat status dari engine tidak tersedia atau sudah basi.
-func (s *Service) localMarketState(now time.Time) enginev1.MarketState {
-	if !ExpectedOpen(now) {
-		return enginev1.MarketState_MARKET_CLOSED
-	}
-	return enginev1.MarketState_MARKET_OPEN
 }
 
 // ---------------------------------------------------------------------------
@@ -959,7 +958,7 @@ func (s *Service) validateSignalMode(ctx context.Context, signal *model.Signal, 
 			return RejectExpired
 		}
 	}
-	if s.marketOpenRequired(ctx) && !s.marketOpen() {
+	if s.marketOpenRequired(ctx) && !s.marketOpenAt(now) {
 		return RejectMarketClosed
 	}
 	return RejectNone
@@ -1824,10 +1823,13 @@ func (s *Service) recordUserSignal(ctx context.Context, userID, signalID, status
 	// berulang. Kegagalan baca diperlakukan sebagai "belum ada": status tetap
 	// disimpan, hanya jejak asalnya yang kosong.
 	asal := ""
+	alasanLama := ""
 	if lama, err := s.store.FindUserSignal(ctx, userID, signalID); err == nil && lama != nil {
 		asal = lama.Status
+		alasanLama = lama.RejectReason
 	}
-
+	// Alasan sesaat tidak boleh menempel setelah nasib sinyal berakhir.
+	reason = alasanTerbaru(alasanLama, reason)
 	us := &model.UserSignal{
 		UserID:       userID,
 		SignalID:     signalID,
