@@ -15,6 +15,7 @@ import type {
   CreateAccountPayload,
   CreateSubscriptionPayload,
   JournalResponse,
+  JournalEvalStatus,
   MarketCandlesResponse,
   PairCatalogResponse,
   Position,
@@ -132,6 +133,7 @@ export const tradingApi = {
     limit?: number
     skippedLimit?: number
     skippedPage?: number
+    evalStatus?: JournalEvalStatus | ''
   }) =>
     request<JournalResponse>('/journal', {
       query: {
@@ -143,6 +145,7 @@ export const tradingApi = {
         limit: params.limit,
         skipped_limit: params.skippedLimit,
         skipped_page: params.skippedPage,
+        eval_status: params.evalStatus || undefined,
       },
     }),
 }

@@ -63,6 +63,7 @@ func (h *TradingHandler) Journal(c *gin.Context) {
 		Hari:           hari,
 		Strategy:       c.Query("strategy"),
 		Symbol:         c.Query("symbol"),
+		EvalStatus:     c.Query("eval_status"),
 		LimitPositions: limitPositions,
 		LimitSkipped:   limitSkipped,
 		HalamanSkipped: skippedPage,

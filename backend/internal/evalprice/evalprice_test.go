@@ -32,8 +32,8 @@ func TestMenentukanTPBesertasJam(t *testing.T) {
 	in := sinyalSELL(terbit)
 
 	out, ok := FromCandles(in, []market.Candle{
-		lilin(terbit.Unix()+3600, 101.2, 100.8),  // menyentuh entry
-		lilin(terbit.Unix()+7200, 100.9, 98.9),   // menembus TP 99
+		lilin(terbit.Unix()+3600, 101.2, 100.8), // menyentuh entry
+		lilin(terbit.Unix()+7200, 100.9, 98.9),  // menembus TP 99
 	})
 	if !ok || out.Status != model.EvalTP {
 		t.Fatalf("hasil = %+v ok=%v, ingin TP", out, ok)
@@ -110,6 +110,40 @@ func TestCandleLuarSesiDiabaikan(t *testing.T) {
 
 // Setup yang sudah tersentuh tidak boleh macet berjalan: ketika candle
 // sesudahnya tersedia, hasilnya wajib menjadi final tanpa menunggu siapa pun.
+func TestForwardCheckpointAndIncompleteEvidence(t *testing.T) {
+	start := time.Date(2026, 11, 16, 15, 0, 0, 0, time.UTC)
+	in := sinyalSELL(start)
+	in.CandleSeconds = 60
+	out, ok := FromCandles(in, []market.Candle{lilin(start.Unix(), 100.9, 100.5)})
+	if !ok || out.Status != model.EvalRunning || out.EntryAt == nil || !out.EntryAt.Equal(start) || out.CheckedAt == nil {
+		t.Fatalf("market signal must enter without retest: %+v", out)
+	}
+	in.ResumeEntryAt, in.ResumeAfter = out.EntryAt, out.CheckedAt
+	out, ok = FromCandles(in, []market.Candle{lilin(start.Unix()+60, 100.8, 98.8)})
+	if !ok || out.Status != model.EvalTP || out.Evidence == "" || out.RLower != 2 {
+		t.Fatalf("resume must reach TP with evidence: %+v", out)
+	}
+	out, ok = FromCandles(in, []market.Candle{lilin(start.Unix()+120, 100.8, 98.8)})
+	if !ok || out.Status != model.EvalUnknown || out.EntryAt == nil {
+		t.Fatalf("missing candle cannot become a win or lose entry: %+v", out)
+	}
+	in = sinyalSELL(start.Add(30 * time.Second))
+	in.CandleSeconds = 60
+	out, ok = FromCandles(in, []market.Candle{lilin(start.Unix(), 101.5, 100), lilin(start.Unix()+60, 101, 98.8)})
+	if !ok || out.Status != model.EvalTP {
+		t.Fatalf("safe partial candle can advance: %+v", out)
+	}
+	out, ok = FromCandles(in, []market.Candle{lilin(start.Unix(), 102.5, 100)})
+	if !ok || out.Status != model.EvalUnknown {
+		t.Fatalf("touch in partial candle is ambiguous: %+v", out)
+	}
+	in.PublishedAt = start
+	out, ok = FromCandles(in, []market.Candle{lilin(start.Unix(), 102.5, 98)})
+	if !ok || out.Status != model.EvalUnknown || out.At != nil {
+		t.Fatalf("both barriers cannot have a fabricated exit: %+v", out)
+	}
+}
+
 func TestBerjalanMenjadiFinalSaatCandleBertambah(t *testing.T) {
 	terbit := time.Date(2026, 11, 16, 15, 0, 0, 0, time.UTC)
 	in := sinyalSELL(terbit)
@@ -126,5 +160,17 @@ func TestBerjalanMenjadiFinalSaatCandleBertambah(t *testing.T) {
 	})
 	if !ok || out.Status != model.EvalSL {
 		t.Fatalf("hasil = %+v ok=%v, ingin SL", out, ok)
+	}
+}
+
+func TestLegacyRunningCannotExitBeforeEntry(t *testing.T) {
+	start := time.Date(2026, 11, 16, 15, 0, 0, 0, time.UTC)
+	in := sinyalSELL(start)
+	in.CandleSeconds = 60
+	entry := start.Add(5 * time.Minute)
+	in.ResumeEntryAt = &entry
+	out, ok := FromCandles(in, []market.Candle{lilin(start.Unix()+60, 101, 98)})
+	if !ok || out.Status != model.EvalUnknown || out.At != nil || out.EntryAt == nil || !out.EntryAt.Equal(entry) {
+		t.Fatalf("legacy entry must not produce an earlier exit: %+v", out)
 	}
 }

@@ -1,11 +1,14 @@
 // Package evalprice menilai nasib setup yang tidak dieksekusi.
 //
-// Satu aturan dipakai dua tempat: Runner saat sinyal berakhir (candle masih
-// segar) dan jurnal saat baris lama dibaca. Dengan begitu angka di riwayat
-// tidak bergantung pada siapa yang menghitung lebih dulu.
+// Runner memakai checkpoint persisten untuk memantau forward test tanpa order
+// broker. Jalur candle tanpa resolusi dipertahankan untuk kompatibilitas aturan
+// penilaian historis; jurnal HTTP tidak menjalankan penilaian harga.
 package evalprice
 
 import (
+	"encoding/json"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,23 +19,28 @@ import (
 
 // Outcome adalah hasil penilaian satu setup.
 type Outcome struct {
-	Status  string
-	EntryAt *time.Time
-	At      *time.Time
-	Price   float64
-	RLower  float64
-	Note    string
+	Status    string
+	EntryAt   *time.Time
+	At        *time.Time
+	Price     float64
+	RLower    float64
+	Note      string
+	CheckedAt *time.Time
+	Evidence  string
 }
 
 // Input adalah data sinyal yang dibutuhkan untuk menilai.
 type Input struct {
-	Direction   string
-	EntryPrice  float64
-	StopLoss    float64
-	TakeProfit  float64
-	RiskReward  float64
-	PublishedAt time.Time
-	ExpiresAt   time.Time
+	Direction     string
+	EntryPrice    float64
+	StopLoss      float64
+	TakeProfit    float64
+	RiskReward    float64
+	PublishedAt   time.Time
+	ExpiresAt     time.Time
+	ResumeEntryAt *time.Time
+	ResumeAfter   *time.Time
+	CandleSeconds int64
 }
 
 // InputDariSinyal menyalin kolom sinyal yang dibutuhkan penilai.
@@ -56,6 +64,9 @@ func InputDariSinyal(s *model.Signal) Input {
 // Urutan candle menentukan pemenang saat TP dan SL tersentuh pada lilin yang
 // sama. Kasus itu dilaporkan UNKNOWN, bukan ditebak.
 func FromCandles(in Input, candles []market.Candle) (Outcome, bool) {
+	if in.CandleSeconds > 0 {
+		return forwardTest(in, candles)
+	}
 	if in.EntryPrice <= 0 || in.ExpiresAt.IsZero() {
 		return Outcome{}, false
 	}
@@ -157,6 +168,107 @@ func TanpaCandle() Outcome {
 		Status: model.EvalUnknown,
 		Note:   "data candle tidak tersedia karena sinyal sudah terlalu lama",
 	}
+}
+
+// forwardTest models a theoretical fill at the published signal level. It does
+// not claim broker execution or intrabar precision. CheckedAt is the end of the
+// last fully observed candle, so a restart never replays an already checked bar.
+func forwardTest(in Input, candles []market.Candle) (Outcome, bool) {
+	buy := strings.EqualFold(in.Direction, "BUY")
+	if (!buy && !strings.EqualFold(in.Direction, "SELL")) || in.PublishedAt.IsZero() || in.EntryPrice <= 0 || in.StopLoss <= 0 || in.TakeProfit <= 0 || math.IsNaN(in.EntryPrice+in.StopLoss+in.TakeProfit) || math.IsInf(in.EntryPrice+in.StopLoss+in.TakeProfit, 0) {
+		return Outcome{}, false
+	}
+	if (buy && !(in.StopLoss < in.EntryPrice && in.EntryPrice < in.TakeProfit)) || (!buy && !(in.TakeProfit < in.EntryPrice && in.EntryPrice < in.StopLoss)) {
+		return Outcome{}, false
+	}
+	out := Outcome{Status: model.EvalRunning, EntryAt: utcPtr(in.PublishedAt), CheckedAt: in.ResumeAfter}
+	if in.ResumeEntryAt != nil {
+		out.EntryAt = utcPtr(*in.ResumeEntryAt)
+	}
+	unknown := func(note string) (Outcome, bool) {
+		out.Status, out.Note = model.EvalUnknown, note
+		out.Evidence = `{"method":"signal_forward_v1","resolution":"candle","incomplete":true}`
+		return out, true
+	}
+	if in.ResumeEntryAt != nil && in.ResumeAfter == nil {
+		return unknown("Simulasi lama tidak memiliki checkpoint harga; hasil tidak dapat diteruskan memakai aturan entry saat publikasi.")
+	}
+	if !timezone.MarketExpectedOpen(*out.EntryAt) {
+		return unknown("Sinyal terbit di luar sesi pasar; entry simulasi tidak dapat diverifikasi.")
+	}
+	bars := append([]market.Candle(nil), candles...)
+	sort.Slice(bars, func(i, j int) bool { return bars[i].Time < bars[j].Time })
+	cursor := in.PublishedAt.Unix()
+	if in.ResumeAfter != nil {
+		cursor = in.ResumeAfter.Unix()
+	}
+	for _, c := range bars {
+		end := c.Time + in.CandleSeconds
+		if end <= cursor {
+			continue
+		}
+		if !timezone.MarketExpectedOpen(time.Unix(c.Time, 0)) {
+			continue
+		}
+		if c.Time < cursor {
+			// A partial publication candle is safe only when neither barrier
+			// appears anywhere in its range. Otherwise the touch may predate entry.
+			safe := c.Low > 0 && c.High >= c.Low && !math.IsNaN(c.High+c.Low) && !math.IsInf(c.High+c.Low, 0)
+			if buy {
+				safe = safe && c.High < in.TakeProfit && c.Low > in.StopLoss
+			} else {
+				safe = safe && c.Low > in.TakeProfit && c.High < in.StopLoss
+			}
+			if !safe {
+				return unknown("Candle mencakup waktu sebelum sinyal terbit; urutan harga setelah entry tidak dapat dipastikan.")
+			}
+			out.CheckedAt = utcPtr(time.Unix(end, 0))
+			cursor = end
+			continue
+		}
+		// Weekend gaps are expected. Missing bars during an open session are
+		// not: a skipped interval could have hit the opposite barrier first.
+		for missing := cursor; missing < c.Time; missing += in.CandleSeconds {
+			if timezone.MarketExpectedOpen(time.Unix(missing, 0)) {
+				return unknown("Data candle tidak mencakup seluruh periode pemantauan; TP/SL lebih dahulu tidak dapat dipastikan.")
+			}
+		}
+		if c.Low <= 0 || c.High < c.Low || math.IsNaN(c.High+c.Low) || math.IsInf(c.High+c.Low, 0) {
+			return unknown("Data candle tidak valid; hasil tidak dapat dipastikan.")
+		}
+		out.CheckedAt = utcPtr(time.Unix(end, 0))
+		hitTP, hitSL := c.Low <= in.TakeProfit, c.High >= in.StopLoss
+		if buy {
+			hitTP, hitSL = c.High >= in.TakeProfit, c.Low <= in.StopLoss
+		}
+		data, err := json.Marshal(struct {
+			Method  string        `json:"method"`
+			Seconds int64         `json:"candle_seconds"`
+			Candle  market.Candle `json:"candle"`
+		}{"signal_forward_v1", in.CandleSeconds, c})
+		if err != nil {
+			return unknown("Bukti harga tidak dapat disimpan.")
+		}
+		out.Evidence = string(data)
+		if hitTP && hitSL {
+			return unknown("TP dan SL tersentuh pada candle yang sama; urutannya tidak dapat dipastikan.")
+		}
+		if hitTP || hitSL {
+			out.At = utcPtr(time.Unix(c.Time, 0))
+			if hitTP {
+				out.Status, out.Price = model.EvalTP, in.TakeProfit
+				out.RLower = math.Abs(in.TakeProfit-in.EntryPrice) / math.Abs(in.EntryPrice-in.StopLoss)
+			} else {
+				out.Status, out.Price, out.RLower = model.EvalSL, in.StopLoss, -1
+			}
+			return out, true
+		}
+		cursor = end
+	}
+	if out.CheckedAt == nil {
+		return Outcome{}, false
+	}
+	return out, true
 }
 
 func utcPtr(t time.Time) *time.Time {

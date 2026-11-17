@@ -33,7 +33,7 @@ func newJournalTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("koneksi: %v", err)
 	}
-	if err := db.AutoMigrate(&model.Position{}, &model.UserSignal{}, &model.Signal{}); err != nil {
+	if err := db.AutoMigrate(&model.Position{}, &model.UserSignal{}, &model.Signal{}, &model.ExecutionRecord{}); err != nil {
 		t.Fatalf("migrasi: %v", err)
 	}
 	return db

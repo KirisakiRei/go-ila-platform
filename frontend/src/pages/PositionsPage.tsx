@@ -25,7 +25,7 @@ import { downloadFile } from '@/lib/http'
 import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
-import type { JournalResponse, Position, PositionStatus } from '@/types/api'
+import type { JournalEvalStatus, JournalResponse, Position, PositionStatus } from '@/types/api'
 import { PositionExecutionChart } from '@/features/charts/PositionExecutionChart'
 import { chartTheme } from '@/features/charts/lib/theme'
 import { JournalSummary } from '@/features/journal/components/JournalSummary'
@@ -57,7 +57,7 @@ const TABS: { id: Tab; label: string; keterangan: string }[] = [
   {
     id: 'terlewat',
     label: 'Tidak Tereksekusi',
-    keterangan: 'Sinyal yang tidak berakhir sebagai posisi, beserta alasannya.',
+    keterangan: 'Simulasi hasil sinyal yang tidak menjadi transaksi akun. Bukan PnL akun.',
   },
 ]
 
@@ -90,6 +90,7 @@ export default function PositionsPage() {
   const [hari, setHari] = useState(30)
   const [strategi, setStrategi] = useState('')
   const [symbol, setSymbol] = useState('')
+  const [evalStatus, setEvalStatus] = useState<JournalEvalStatus | ''>('')
   // Rentang tanggal khusus. Dideklarasikan sebelum useJournal karena dipakai
   // sebagai bagian kunci permintaan.
   const [from, setFrom] = useState('')
@@ -106,6 +107,7 @@ export default function PositionsPage() {
     symbol: symbol,
     skippedPage: peluang.page,
     skippedLimit: peluang.limit,
+    evalStatus,
   })
 
   const [downloading, setDownloading] = useState(false)
@@ -160,12 +162,19 @@ export default function PositionsPage() {
   }
 
   /** jumlahFilter menghitung filter aktif selain periode bawaan. */
-  const filterAktif = [strategi !== '', symbol !== '', from !== '', to !== ''].filter(Boolean).length
+  const filterAktif = [
+    strategi !== '',
+    symbol !== '',
+    from !== '',
+    to !== '',
+    evalStatus !== '',
+  ].filter(Boolean).length
 
   /** resetFilter mengembalikan filter ke keadaan awal tanpa menyentuh tab. */
   const resetFilter = () => {
     setStrategi('')
     setSymbol('')
+    setEvalStatus('')
     setFrom('')
     setTo('')
     setHari(30)
@@ -174,8 +183,7 @@ export default function PositionsPage() {
 
   const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id))
 
-  const pnlColor = (position: Position) =>
-    position.profit_loss >= 0 ? theme.profit : theme.loss
+  const pnlColor = (position: Position) => (position.profit_loss >= 0 ? theme.profit : theme.loss)
 
   const tampil = tab === 'aktif' ? aktif : riwayat
   const kosong = data && positions.length === 0
@@ -290,15 +298,15 @@ export default function PositionsPage() {
             />
           </div>
           <div className="flex items-end gap-2 lg:col-span-2">
+            <Button variant="outline" size="sm" disabled={filterAktif === 0} onClick={resetFilter}>
+              Reset filter{filterAktif > 0 ? ` (${filterAktif})` : ''}
+            </Button>
             <Button
               variant="outline"
               size="sm"
-              disabled={filterAktif === 0}
-              onClick={resetFilter}
+              disabled={downloading}
+              onClick={() => void download()}
             >
-              Reset filter{filterAktif > 0 ? ` (${filterAktif})` : ''}
-            </Button>
-            <Button variant="outline" size="sm" disabled={downloading} onClick={() => void download()}>
               {downloading ? 'Menyiapkan…' : 'Export CSV'}
             </Button>
           </div>
@@ -353,8 +361,41 @@ export default function PositionsPage() {
       {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}
 
       {/* --- Tab: peluang terlewat ----------------------------------------- */}
-      {tab === 'terlewat' && data && (
-        <JournalSkippedTab data={data} isFetching={isFetching} onUbah={setPeluang} />
+      {tab === 'terlewat' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="journal-eval-status" className="text-xs font-medium">
+              Status simulasi
+            </label>
+            <select
+              id="journal-eval-status"
+              value={evalStatus}
+              onChange={(event) => {
+                setEvalStatus(event.target.value as JournalEvalStatus | '')
+                setPeluang((current) => ({ ...current, page: 1 }))
+              }}
+              className="h-9 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Semua status</option>
+              <option value="PENDING">Menunggu penilaian</option>
+              <option value="RUNNING">Sedang berjalan</option>
+              <option value="TP">TP</option>
+              <option value="SL">SL</option>
+              <option value="NO_ENTRY">Tidak masuk</option>
+              <option value="UNKNOWN">Tidak dapat dipastikan</option>
+            </select>
+            {isFetching && (
+              <span role="status" className="text-xs text-muted-foreground">
+                Memuat hasil…
+              </span>
+            )}
+          </div>
+          {data && (
+            <div aria-busy={isFetching}>
+              <JournalSkippedTab data={data} isFetching={isFetching} onUbah={setPeluang} />
+            </div>
+          )}
+        </div>
       )}
 
       {/* --- Tab: posisi --------------------------------------------------- */}
@@ -434,13 +475,22 @@ export default function PositionsPage() {
                         {formatNumber(position.lot_size, 2)}
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right">
-                        {formatPrice(position.open_price, priceDigits(position.symbol, position.open_price))}
+                        {formatPrice(
+                          position.open_price,
+                          priceDigits(position.symbol, position.open_price),
+                        )}
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right text-muted-foreground">
-                        {formatPrice(position.stop_loss, priceDigits(position.symbol, position.open_price))}
+                        {formatPrice(
+                          position.stop_loss,
+                          priceDigits(position.symbol, position.open_price),
+                        )}
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right text-muted-foreground">
-                        {formatPrice(position.take_profit, priceDigits(position.symbol, position.open_price))}
+                        {formatPrice(
+                          position.take_profit,
+                          priceDigits(position.symbol, position.open_price),
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right font-medium">
                         {position.pnl_known ? (
@@ -451,13 +501,18 @@ export default function PositionsPage() {
                             </span>
                           </>
                         ) : (
-                          <span className="text-muted-foreground" title="Hasil belum dilaporkan broker">
+                          <span
+                            className="text-muted-foreground"
+                            title="Hasil belum dilaporkan broker"
+                          >
                             —
                           </span>
                         )}
                       </TableCell>
                       <TableCell>
-                        <StatusPill tone={TONE[position.status]}>{LABEL[position.status]}</StatusPill>
+                        <StatusPill tone={TONE[position.status]}>
+                          {LABEL[position.status]}
+                        </StatusPill>
                       </TableCell>
                       <TableCell className="tabular whitespace-nowrap text-right text-muted-foreground">
                         {formatDateTime(position.opened_at)}
@@ -489,7 +544,10 @@ export default function PositionsPage() {
           {tampil.map((position) => {
             const expanded = expandedId === position.id
             return (
-              <div key={position.id} className="overflow-hidden rounded-xl border border-border bg-card">
+              <div
+                key={position.id}
+                className="overflow-hidden rounded-xl border border-border bg-card"
+              >
                 <button
                   type="button"
                   onClick={() => toggle(position.id)}
@@ -509,7 +567,10 @@ export default function PositionsPage() {
                       {expanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                        <ChevronRight
+                          className="h-4 w-4 text-muted-foreground"
+                          aria-hidden="true"
+                        />
                       )}
                     </div>
                   </div>
@@ -518,14 +579,24 @@ export default function PositionsPage() {
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
                       <p className="tabular font-semibold">
-                        {formatPrice(position.open_price, priceDigits(position.symbol, position.open_price))}
+                        {formatPrice(
+                          position.open_price,
+                          priceDigits(position.symbol, position.open_price),
+                        )}
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
                       <p className="tabular text-muted-foreground">
-                        {formatPrice(position.stop_loss, priceDigits(position.symbol, position.open_price))} /{' '}
-                        {formatPrice(position.take_profit, priceDigits(position.symbol, position.open_price))}
+                        {formatPrice(
+                          position.stop_loss,
+                          priceDigits(position.symbol, position.open_price),
+                        )}{' '}
+                        /{' '}
+                        {formatPrice(
+                          position.take_profit,
+                          priceDigits(position.symbol, position.open_price),
+                        )}
                       </p>
                     </div>
                     <div className="text-right">
@@ -620,7 +691,7 @@ function JournalSkippedTab({
           Kembalikan pengguna ke halaman terakhir yang benar-benar ada. */}
       {data.skipped.length === 0 && meta.total > 0 && meta.page > 1 && (
         <Alert>
-          Halaman ini sudah tidak berisi data.{" "}
+          Halaman ini sudah tidak berisi data.{' '}
           <button
             type="button"
             className="font-semibold underline underline-offset-2"

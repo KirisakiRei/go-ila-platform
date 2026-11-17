@@ -26,6 +26,8 @@ type JournalFilter struct {
 	Symbol string
 	// Status membatasi status posisi, mis. hanya CLOSED_TP.
 	Status string
+	// EvalStatus filters skipped results only; PENDING also includes unevaluated rows.
+	EvalStatus string
 }
 
 // JournalStats adalah ringkasan angka jurnal eksekusi.
@@ -187,9 +189,13 @@ func (r *journalRepository) Stats(ctx context.Context, userID string, filter Jou
 }
 
 func (r *journalRepository) SaveSignalEval(ctx context.Context, userID, signalID string, out *model.UserSignalEval) error {
-	err := r.db.WithContext(ctx).
-		Model(&model.UserSignal{}).
-		Where("user_id = ? AND signal_id = ? AND position_id = ?", userID, signalID, "").
+	if out == nil {
+		return fmt.Errorf("nil signal evaluation")
+	}
+	// Legacy writers cannot overwrite durable checkpoints or final outcomes.
+	err := openEval(r.db.WithContext(ctx).Model(&model.UserSignal{})).
+		Where("user_id = ? AND signal_id = ? AND eval_checked_at IS NULL AND eval_entry_at IS NULL", userID, signalID).
+		Where("COALESCE(eval_status, '') <> ?", model.EvalRunning).
 		Updates(map[string]any{
 			"eval_status":   out.Status,
 			"eval_entry_at": out.EntryAt,
@@ -247,10 +253,15 @@ func (r *journalRepository) ListSkipped(ctx context.Context, userID string, filt
 	// (id, status, created_at) saat hasil dipindai ke struct.
 	if err := query.
 		Select(`user_signal.*, signal.published_at AS published_at`).
-		Order("signal.published_at DESC").
+		Order("COALESCE(user_signal.eval_published_at, signal.published_at) DESC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("membaca sinyal tidak tereksekusi: %w", err)
+	}
+	for i := range rows {
+		if rows[i].EvalPublishedAt != nil {
+			rows[i].PublishedAt = rows[i].EvalPublishedAt
+		}
 	}
 	return rows, nil
 }
@@ -270,8 +281,7 @@ func (r *journalRepository) CountSkipped(ctx context.Context, userID string, fil
 //
 // Engine menerbitkan ulang setup yang sama dengan signal_id baru, sehingga satu
 // setup bisa punya beberapa baris. Bentuk grouping di sini mengambil satu baris
-// per setup: baris dengan hasil final (TP/SL) didahulukan, lalu penerbitan
-// paling awal karena itulah saat setup benar-benar lahir.
+// per setup: penerbitan paling awal, sama dengan antrean forward test.
 //
 // Filter metode dan pair ikut diterapkan di sini. Sebelumnya keduanya diabaikan,
 // sehingga memilih "ILA 3.0" atau satu pair tetap menampilkan seluruh peluang
@@ -284,10 +294,10 @@ func (r *journalRepository) skippedQuery(ctx context.Context, userID string, fil
 		Where("user_signal.status IN ?", skipStatuses).
 		Where("user_signal.position_id = ?", "")
 	if !filter.From.IsZero() {
-		query = query.Where("signal.published_at >= ?", filter.From)
+		query = query.Where("COALESCE(user_signal.eval_published_at, signal.published_at) >= ?", filter.From)
 	}
 	if !filter.To.IsZero() {
-		query = query.Where("signal.published_at < ?", filter.To)
+		query = query.Where("COALESCE(user_signal.eval_published_at, signal.published_at) < ?", filter.To)
 	}
 	if filter.StrategyVersion != "" {
 		query = query.Where("signal.strategy_version = ?", filter.StrategyVersion)
@@ -295,19 +305,11 @@ func (r *journalRepository) skippedQuery(ctx context.Context, userID string, fil
 	if filter.Symbol != "" {
 		query = query.Where("signal.symbol = ?", filter.Symbol)
 	}
-	// Urutan prioritas dalam satu setup: hasil final lebih dulu, lalu yang
-	// terbit paling awal. DISTINCT ON memakai urutan ini untuk memilih baris.
-	query = query.Where(`user_signal.id IN (
-		SELECT DISTINCT ON (s.symbol, s.htf, s.ltf, s.direction, s.entry_price, s.stop_loss, s.take_profit)
-			us.id
-		FROM user_signal us
-		JOIN signal s ON s.signal_id = us.signal_id
-		WHERE us.user_id = ?
-		  AND us.status IN ?
-		  AND us.position_id = ''
-		ORDER BY s.symbol, s.htf, s.ltf, s.direction, s.entry_price, s.stop_loss, s.take_profit,
-			CASE WHEN us.eval_status IN ('TP','SL') THEN 0 ELSE 1 END,
-			s.published_at ASC
-	)`, userID, skipStatuses)
+	if filter.EvalStatus == model.EvalPending {
+		query = query.Where("COALESCE(user_signal.eval_status, '') IN ?", []string{"", model.EvalPending})
+	} else if filter.EvalStatus != "" {
+		query = query.Where("user_signal.eval_status = ?", filter.EvalStatus)
+	}
+	query = nonexecutedEval(query).Where("signal.deleted_at IS NULL OR COALESCE(user_signal.eval_snapshot, '') <> ''").Where(canonicalEvalSQL)
 	return query
 }

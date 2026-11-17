@@ -1,6 +1,7 @@
 package service
 
 import (
+	"ila/backend/internal/evalprice"
 	"testing"
 	"time"
 
@@ -168,4 +169,36 @@ func TestEvaluateCandlesMengabaikanCandleLuarSesi(t *testing.T) {
 	if ok && (hasil.Status == model.EvalTP || hasil.Status == model.EvalSL) {
 		t.Fatalf("candle luar sesi menghasilkan %+v; TP/SL tidak boleh muncul dari sesi tutup", hasil)
 	}
+}
+
+// Legacy calculation is test-only; production journal/evidence never evaluates candles.
+type evalOutcome struct {
+	Status string
+	// EntryAt adalah waktu harga pertama menyentuh level entry. Diisi juga untuk
+	// hasil RUNNING sehingga durasi bisa dihitung sejak masuk, bukan sejak terbit.
+	EntryAt *time.Time
+	At      *time.Time
+	Price   float64
+	RLower  float64
+	Note    string
+}
+
+func evaluateCandles(signal *model.Signal, candles []market.Candle, since time.Time) (evalOutcome, bool) {
+	in := evalprice.InputDariSinyal(signal)
+	// Titik mulai penilaian ditentukan pemanggil: baris user_signal ditulis
+	// ulang setiap status berubah, jadi waktu terbit bisa jatuh setelah harga
+	// bergerak.
+	in.PublishedAt = since
+	out, ok := evalprice.FromCandles(in, candles)
+	if !ok {
+		return evalOutcome{}, false
+	}
+	return evalOutcome{
+		Status:  out.Status,
+		EntryAt: out.EntryAt,
+		At:      out.At,
+		Price:   out.Price,
+		RLower:  out.RLower,
+		Note:    out.Note,
+	}, true
 }

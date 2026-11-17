@@ -77,6 +77,14 @@ func TestTabelBaruPunyaKolomWajib(t *testing.T) {
 		value any
 		field string
 	}{
+		{&model.UserSignal{}, "EvalCanonicalID"},
+		{&model.UserSignal{}, "EvalCohortKey"},
+		{&model.UserSignal{}, "EvalPublishedAt"},
+		{&model.UserSignal{}, "EvalExpiresAt"},
+		{&model.UserSignal{}, "EvalCheckedAt"},
+		{&model.UserSignal{}, "EvalNextAt"},
+		{&model.UserSignal{}, "EvalSnapshot"},
+		{&model.UserSignal{}, "EvalEvidence"},
 		{&model.SystemSetting{}, "Value"},
 		{&model.SystemSetting{}, "Reason"},
 		{&model.SystemState{}, "Mode"},

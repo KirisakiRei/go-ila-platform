@@ -45,12 +45,20 @@ type UserSignal struct {
 	// Hasil hipotetis untuk setup yang tidak dieksekusi. Tanpa kolom ini, setup
 	// yang terlewat hilang tanpa jejak sehingga strategi tidak bisa dinilai.
 	// Posisi nyata tidak memakai kolom ini; hasilnya ada di tabel position.
-	EvalStatus  string     `gorm:"type:varchar(16);index" json:"eval_status"`
-	EvalEntryAt *time.Time `json:"eval_entry_at"`
-	EvalAt      *time.Time `json:"eval_at"`
-	EvalPrice   float64    `json:"eval_price"`
-	EvalRLower  float64    `json:"eval_r_lower"`
-	EvalNote    string     `gorm:"type:varchar(255)" json:"eval_note"`
+	EvalCanonicalID string     `gorm:"type:varchar(36);index" json:"-"`
+	EvalCohortKey   string     `gorm:"type:varchar(64);index" json:"-"`
+	EvalPublishedAt *time.Time `gorm:"index" json:"-"`
+	EvalExpiresAt   *time.Time `json:"-"`
+	EvalCheckedAt   *time.Time `json:"eval_checked_at"`
+	EvalNextAt      *time.Time `gorm:"index" json:"-"`
+	EvalEvidence    string     `gorm:"type:text" json:"eval_evidence"`
+	EvalSnapshot    string     `gorm:"type:text" json:"-"`
+	EvalStatus      string     `gorm:"type:varchar(16);index" json:"eval_status"`
+	EvalEntryAt     *time.Time `json:"eval_entry_at"`
+	EvalAt          *time.Time `json:"eval_at"`
+	EvalPrice       float64    `json:"eval_price"`
+	EvalRLower      float64    `json:"eval_r_lower"`
+	EvalNote        string     `gorm:"type:varchar(255)" json:"eval_note"`
 	// PublishedAt adalah waktu terbit sinyal, dibaca lewat join untuk jurnal.
 	// Bukan kolom tabel user_signal; ditandai read-only agar tidak ikut disimpan.
 	PublishedAt *time.Time `gorm:"->;-:migration" json:"published_at,omitempty"`
@@ -78,12 +86,14 @@ const (
 // UserSignalEval adalah hasil hipotetis untuk setup yang tidak dieksekusi.
 // Dipisahkan dari UserSignal agar penyimpanan hanya menyentuh kolom evaluasi.
 type UserSignalEval struct {
-	Status  string
-	EntryAt *time.Time
-	At      *time.Time
-	Price   float64
-	RLower  float64
-	Note    string
+	CheckedAt *time.Time
+	Evidence  string
+	Status    string
+	EntryAt   *time.Time
+	At        *time.Time
+	Price     float64
+	RLower    float64
+	Note      string
 }
 
 // IsEvaluated menandai hasil hipotetis yang sudah final sehingga tidak dihitung

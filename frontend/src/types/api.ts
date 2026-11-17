@@ -518,6 +518,8 @@ export type JournalStats = {
  * Ditampilkan agar jurnal tidak hanya berisi trade yang jadi: peluang yang
  * terlewat juga bagian dari rekam jejak.
  */
+export type JournalEvalStatus = 'PENDING' | 'RUNNING' | 'TP' | 'SL' | 'NO_ENTRY' | 'UNKNOWN'
+
 export type JournalSkipped = {
   signal_id: string
   symbol: string
@@ -539,11 +541,17 @@ export type JournalSkipped = {
    * lebih dulu, SL lebih dulu, atau tidak pernah menyentuh level entry.
    * Kosong berarti belum dinilai.
    */
-  eval_status?: 'PENDING' | 'RUNNING' | 'TP' | 'SL' | 'NO_ENTRY' | 'UNKNOWN'
-  /** Waktu harga menyentuh level entry. */
+  eval_status?: JournalEvalStatus
+  /** JSON evidence; method signal_forward_v1 memakai entry teoritis saat publikasi. */
+  eval_evidence?: string
+  /** Makna waktu entry mengikuti metode pada eval_evidence, bukan fill broker. */
   eval_entry_at?: string
   eval_at?: string
+  /** Harga exit simulasi (field lama, tetap didukung). */
   eval_price?: number
+  eval_checked_at?: string
+  eval_entry_price?: number
+  eval_exit_price?: number
   eval_r_lower?: number
   eval_note?: string
 }
@@ -560,6 +568,7 @@ export type JournalResponse = {
     to?: string
     strategy_version?: string
     symbol?: string
+    eval_status?: JournalEvalStatus | ''
   }
 }
 

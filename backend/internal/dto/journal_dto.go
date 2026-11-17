@@ -46,10 +46,12 @@ type JournalSkippedResponse struct {
 	OccurredAt   time.Time `json:"occurred_at"`
 	OccurredPair TimePair  `json:"occurred_at_pair"`
 	// Hasil hipotetis setup ini bila tidak dieksekusi. Kosong berarti belum
-	// dinilai; nilainya PENDING, TP, SL, NO_ENTRY, atau UNKNOWN.
-	EvalStatus string `json:"eval_status,omitempty"`
-	// EvalEntryAt adalah waktu harga menyentuh level entry. Dipakai bersama
-	// EvalAt untuk menghitung durasi setup.
+	// dinilai; nilainya PENDING, RUNNING, TP, SL, NO_ENTRY, atau UNKNOWN.
+	EvalStatus    string     `json:"eval_status,omitempty"`
+	EvalCheckedAt *time.Time `json:"eval_checked_at,omitempty"`
+	EvalEvidence  string     `json:"eval_evidence,omitempty"`
+	// EvalEntryAt adalah waktu entry teoritis pada level sinyal saat publikasi,
+	// bukan fill broker atau waktu retest. EvalAt menandai akhir setup.
 	EvalEntryAt *time.Time `json:"eval_entry_at,omitempty"`
 	EvalAt      *time.Time `json:"eval_at,omitempty"`
 	EvalPrice   float64    `json:"eval_price,omitempty"`
@@ -85,4 +87,5 @@ type JournalFiltersResponse struct {
 	To              string `json:"to,omitempty"`
 	StrategyVersion string `json:"strategy_version,omitempty"`
 	Symbol          string `json:"symbol,omitempty"`
+	EvalStatus      string `json:"eval_status,omitempty"`
 }

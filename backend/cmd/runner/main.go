@@ -86,7 +86,6 @@ func main() {
 	}
 
 	store := repository.NewRunnerRepository(db)
-	journalRepo := repository.NewJournalRepository(db)
 	candleProvider := market.NewTradingViewProvider()
 	// Katalog pair dipakai untuk nilai kontrak saat menghitung R posisi.
 	pairCatalog := repository.NewPairRepository(db)
@@ -183,7 +182,7 @@ func main() {
 		CandleFetcher: func(ctx context.Context, symbol, feed, timeframe string, limit int) ([]market.Candle, error) {
 			return candleProvider.FetchCandles(ctx, symbol, feed, timeframe, limit)
 		},
-		EvalSink: journalRepo.SaveSignalEval,
+		Evaluations: repository.NewSignalEvalRepository(db),
 		// Tanpa ini gerbang strategi memakai env saja dan seluruh permintaan
 		// ILA 3.0 tersaring habis walau engine-nya sudah berjalan.
 		Settings: strategySettings,
@@ -235,6 +234,22 @@ func main() {
 	go func() {
 		defer wg.Done()
 		runMonitor(ctx, svc, logger)
+	}()
+
+	// Candle feeds must never delay live broker position monitoring.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(runner.MonitorInterval)
+		defer ticker.Stop()
+		for {
+			svc.MonitorSignalEvaluations(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
 	}()
 
 	// Telemetry saldo akun: cukup sekali per menit (plans/05 par.9).

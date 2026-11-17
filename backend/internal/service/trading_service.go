@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"ila/backend/internal/dto"
-	"ila/backend/internal/market"
 	"ila/backend/internal/model"
 )
 
@@ -65,9 +64,6 @@ type tradingService struct {
 	// lama (dan pengujian yang sudah ada) tetap sah tanpa perubahan.
 	journal      JournalRepositoryReader
 	signalDetail SignalDetailReader
-	// evaluator menilai nasib setup yang tidak dieksekusi. Nilainya opsional:
-	// tanpa evaluator jurnal tetap terbaca, hanya tanpa hasil hipotetis.
-	evaluator *priceEvaluator
 }
 
 // NewTradingService membuat service tampilan trading.
@@ -99,21 +95,6 @@ type TradingServiceBuilder struct {
 func (b *TradingServiceBuilder) WithJournal(journal JournalRepositoryReader, detail SignalDetailReader) *TradingServiceBuilder {
 	b.journal = journal
 	b.signalDetail = detail
-	return b
-}
-
-// WithSignalEvaluator memasang penilai harga untuk setup yang tidak dieksekusi.
-//
-// Sink boleh nil: bila pembaca jurnal juga mengimplementasikan EvalSink, hasil
-// disimpan ke sana. Tanpa keduanya, jurnal tetap terbaca tanpa hasil hipotetis.
-func (b *TradingServiceBuilder) WithSignalEvaluator(provider market.Provider, sink EvalSink) *TradingServiceBuilder {
-	if provider == nil {
-		return b
-	}
-	if sink == nil {
-		sink, _ = b.journal.(EvalSink)
-	}
-	b.evaluator = &priceEvaluator{candles: provider, sink: sink}
 	return b
 }
 

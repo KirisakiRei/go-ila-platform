@@ -113,7 +113,7 @@ export function SkippedEvidenceChart({
         position: buy ? 'belowBar' : 'aboveBar',
         color: buy ? theme.up : theme.down,
         shape: buy ? 'arrowUp' : 'arrowDown',
-        text: `Harga menyentuh entry ${formatPrice(item.entry_price, digits)}`,
+        text: `Entry simulasi ${formatPrice(item.entry_price, digits)}`,
       })
     }
     if (selesai > 0 && item.eval_status && item.eval_status !== 'NO_ENTRY') {
@@ -155,9 +155,9 @@ export function SkippedEvidenceChart({
         focusTime={masuk || mulai}
         footer={
           <p className="text-[10.5px] leading-relaxed text-muted-foreground">
-            Garis putus-putus adalah level entry, garis penuh adalah SL dan TP. Tanda panah
-            menempel di candle tempat harga pertama kali menyentuh entry; lingkaran menandai candle
-            penentu hasil.
+            Garis putus-putus adalah level entry, garis penuh adalah SL dan TP. Tanda panah menempel
+            di candle waktu entry simulasi sesuai metode evaluasi, bukan fill broker; lingkaran
+            menandai candle penentu hasil.
           </p>
         }
       />

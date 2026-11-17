@@ -1,10 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/react'
 import { JournalSummary } from '@/features/journal/components/JournalSummary'
-import { formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatPrice } from '@/lib/format'
 import { JournalSkippedList } from '@/features/journal/components/JournalSkippedList'
 import { SimulasiBadge } from '@/features/journal/components/SimulasiBadge'
 import type { JournalSkipped, JournalStats } from '@/types/api'
+
+vi.mock('@/features/charts/SkippedEvidenceChart', () => ({
+  SkippedEvidenceChart: () => <div data-testid="skipped-chart">Chart simulasi</div>,
+}))
 
 /** statsDasar membuat ringkasan dengan nilai yang bisa ditimpa per uji. */
 function statsDasar(overrides: Partial<JournalStats> = {}): JournalStats {
@@ -116,14 +121,188 @@ describe('JournalSkippedList', () => {
   it('memberi keterangan bawaan saat peluang menunggu keputusan', () => {
     render(
       <JournalSkippedList
-        items={[
-          { ...terlewat, signal_id: 'sig-uji-2', status: 'OPPORTUNITY', reason: '' },
-        ]}
+        items={[{ ...terlewat, signal_id: 'sig-uji-2', status: 'OPPORTUNITY', reason: '' }]}
       />,
     )
 
     expect(screen.getByText('Menunggu keputusan')).toBeInTheDocument()
     expect(screen.getByText(/Eksekusi otomatis tidak aktif/i)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['PENDING', 'Menunggu penilaian'],
+    ['RUNNING', 'Sedang berjalan'],
+    ['TP', 'TP (+2.00R)'],
+    ['SL', 'SL (-1R)'],
+    ['NO_ENTRY', 'Tidak masuk'],
+    ['UNKNOWN', 'Tidak dapat dipastikan'],
+  ] as const)('menampilkan status simulasi %s tanpa menimpa alasan akun', (eval_status, label) => {
+    render(
+      <JournalSkippedList
+        items={[
+          {
+            ...terlewat,
+            eval_status,
+            eval_r_lower: 2,
+            eval_note: 'Catatan penilaian harga.',
+          },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText(`Simulasi · ${label}`)).toBeInTheDocument()
+    expect(screen.getByText(terlewat.reason!)).toBeInTheDocument()
+    expect(screen.getByText('Catatan simulasi: Catatan penilaian harga.')).toBeInTheDocument()
+    expect(screen.getByText(/tidak menjadi transaksi akun.*Bukan PnL akun/)).toBeInTheDocument()
+    expect(screen.queryByText(/\+\+/)).not.toBeInTheDocument()
+  })
+
+  it('menampilkan waktu WIB, harga sesuai pair, dan exit legacy', () => {
+    const entry = '2026-11-12T12:00:00Z'
+    const exit = '2026-11-12T14:30:00Z'
+    render(
+      <JournalSkippedList
+        items={[
+          {
+            ...terlewat,
+            eval_status: 'TP',
+            eval_entry_at: entry,
+            eval_at: exit,
+            eval_entry_price: 4051.32,
+            eval_price: 4145.34,
+          },
+        ]}
+      />,
+    )
+
+    expect(
+      screen.getByText(`Waktu sinyal: ${formatDateTime(terlewat.occurred_at)}`),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        `Entry simulasi: ${formatDateTime(entry)} · Harga ${formatPrice(4051.32, 2)}`,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(`Exit simulasi: ${formatDateTime(exit)} · Harga ${formatPrice(4145.34, 2)}`),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Durasi simulasi: 2 jam 30 menit')).toBeInTheDocument()
+    expect(screen.getByText(/Rencana entry/)).toHaveTextContent(
+      formatPrice(terlewat.entry_price, 2),
+    )
+    expect(screen.getByText(/Rencana entry/)).not.toHaveTextContent('4051,31500')
+  })
+
+  it('entry forward memakai level publikasi dan tidak mengklaim fill broker', () => {
+    render(
+      <JournalSkippedList
+        items={[
+          {
+            ...terlewat,
+            eval_status: 'RUNNING',
+            eval_evidence: '{"method":"signal_forward_v1"}',
+            eval_entry_at: terlewat.occurred_at,
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByText(/Entry simulasi \(teoritis\):/)).toHaveTextContent(
+      formatPrice(terlewat.entry_price, 2),
+    )
+    expect(screen.getByText(/bukan fill broker atau waktu retest/)).toBeInTheDocument()
+  })
+
+  it.each([undefined, '', '{invalid', 'null', '{"method":"legacy"}'])(
+    'evidence lama atau invalid %s tidak diklaim teoritis',
+    (eval_evidence) => {
+      render(
+        <JournalSkippedList
+          items={[
+            {
+              ...terlewat,
+              eval_evidence,
+              eval_entry_at: terlewat.occurred_at,
+            },
+          ]}
+        />,
+      )
+      expect(
+        screen.getByText(`Entry simulasi: ${formatDateTime(terlewat.occurred_at)}`),
+      ).toBeInTheDocument()
+      expect(screen.queryByText(/Entry simulasi \(teoritis\)/)).not.toBeInTheDocument()
+    },
+  )
+
+  it('mengutamakan harga exit additive dibanding field legacy', () => {
+    render(
+      <JournalSkippedList
+        items={[
+          {
+            ...terlewat,
+            eval_status: 'TP',
+            eval_price: 1,
+            eval_exit_price: 4145.34,
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByText(/Exit simulasi:/)).toHaveTextContent(formatPrice(4145.34, 2))
+  })
+
+  it('durasi running dibatasi penilaian terakhir dan eval_at bukan exit', () => {
+    render(
+      <JournalSkippedList
+        items={[
+          {
+            ...terlewat,
+            eval_status: 'RUNNING',
+            eval_entry_at: '2026-11-12T12:00:00Z',
+            eval_checked_at: '2026-11-12T14:30:00Z',
+            eval_at: '2026-11-12T14:00:00Z',
+            eval_price: 4100,
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByText(/Durasi berjalan:/)).toHaveTextContent('2 jam 30 menit')
+    expect(screen.getByText('Exit simulasi: —')).toBeInTheDocument()
+    expect(screen.getByText(/Terakhir dinilai:/)).toHaveTextContent('WIB')
+  })
+
+  it('tidak mengarang durasi atau harga entry pada DTO lama', () => {
+    render(
+      <JournalSkippedList
+        items={[
+          {
+            ...terlewat,
+            eval_status: 'RUNNING',
+            eval_entry_at: 'invalid',
+          },
+        ]}
+      />,
+    )
+    expect(screen.getByText('Entry simulasi: —')).toBeInTheDocument()
+    expect(screen.getByText(/Durasi berjalan:/)).toHaveTextContent('Durasi berjalan: —')
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument()
+  })
+
+  it('membuka chart dengan keyboard dan hanya satu detail sekaligus', async () => {
+    const user = userEvent.setup()
+    render(<JournalSkippedList items={[terlewat, { ...terlewat, signal_id: 'sig-2' }]} />)
+    expect(screen.queryByTestId('skipped-chart')).not.toBeInTheDocument()
+    const buttons = screen.getAllByRole('button', { name: 'Lihat bukti harga' })
+    await user.tab()
+    expect(buttons[0]).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(buttons[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(buttons[0]!.getAttribute('aria-controls')!)).toContainElement(
+      screen.getByTestId('skipped-chart'),
+    )
+    await user.click(buttons[1]!)
+    expect(screen.getAllByTestId('skipped-chart')).toHaveLength(1)
+    expect(buttons[0]).toHaveAttribute('aria-expanded', 'false')
+    await user.click(buttons[1]!)
+    expect(screen.queryByTestId('skipped-chart')).not.toBeInTheDocument()
   })
 
   it('menampilkan keadaan kosong yang menjelaskan', () => {

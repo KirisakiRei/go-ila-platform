@@ -21,6 +21,7 @@ import type {
   BacktestCreatePayload,
   CreateAccountPayload,
   CreateSubscriptionPayload,
+  JournalEvalStatus,
   StrategyVersion,
   TimeframeSwitchItem,
   UpdateAccountPayload,
@@ -284,6 +285,7 @@ export type JournalParams = {
   skippedPage?: number
   /** Jumlah baris peluang per halaman. */
   skippedLimit?: number
+  evalStatus?: JournalEvalStatus | ''
 }
 
 /**

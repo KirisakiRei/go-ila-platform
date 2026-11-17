@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"ila/backend/internal/model"
 	"ila/backend/internal/repository"
 	"ila/backend/internal/timezone"
+	"ila/backend/pkg/apperror"
 )
 
 // JournalQuery adalah permintaan jurnal eksekusi dari antarmuka.
@@ -16,11 +19,12 @@ import (
 // Semua kolom opsional. PeriodeHari dipakai bila From/To kosong agar
 // antarmuka cukup mengirim "30" untuk jurnal 30 hari terakhir.
 type JournalQuery struct {
-	From     time.Time
-	To       time.Time
-	Hari     int
-	Strategy string
-	Symbol   string
+	From       time.Time
+	To         time.Time
+	Hari       int
+	Strategy   string
+	Symbol     string
+	EvalStatus string
 	// LimitPositions dan LimitSkipped membatasi jumlah baris per bagian.
 	LimitPositions int
 	LimitSkipped   int
@@ -55,6 +59,11 @@ type SignalDetailReader interface {
 // dan daftar sinyal yang tidak menjadi posisi - kebutuhan yang tidak dimiliki
 // daftar posisi biasa.
 func (s *tradingService) Journal(ctx context.Context, userID string, query JournalQuery) (*dto.JournalResponse, error) {
+	switch query.EvalStatus {
+	case "", model.EvalPending, model.EvalRunning, model.EvalTP, model.EvalSL, model.EvalNoEntry, model.EvalUnknown:
+	default:
+		return nil, fmt.Errorf("%w: eval_status must be PENDING, RUNNING, TP, SL, NO_ENTRY, UNKNOWN, or empty", apperror.ErrBadRequest)
+	}
 	filter := jurnalFilter(query)
 
 	limitPositions := query.LimitPositions
@@ -103,6 +112,7 @@ func (s *tradingService) Journal(ctx context.Context, userID string, query Journ
 			To:              formatOptionalDay(filter.To),
 			StrategyVersion: filter.StrategyVersion,
 			Symbol:          filter.Symbol,
+			EvalStatus:      filter.EvalStatus,
 		},
 	}, nil
 }
@@ -117,6 +127,7 @@ func jurnalFilter(query JournalQuery) repository.JournalFilter {
 		To:              query.To,
 		StrategyVersion: query.Strategy,
 		Symbol:          query.Symbol,
+		EvalStatus:      query.EvalStatus,
 	}
 
 	if filter.From.IsZero() && filter.To.IsZero() {
@@ -201,9 +212,7 @@ func jurnalPositionsResponse(rows []model.Position) []dto.PositionResponse {
 // Kegagalan membaca satu sinyal tidak menggugurkan barisnya: pengguna tetap
 // perlu tahu bahwa peluang itu ada, walau rincian harganya tidak tersedia.
 //
-// Baris yang belum punya hasil hipotetis dinilai di sini, sekali, lalu hasil
-// finalnya disimpan. Penilaian sengaja tidak menahan halaman: bila feed gagal,
-// baris tetap tampil dengan status menunggu.
+// Hasil evaluasi dibaca dari checkpoint runner; GET tidak mengambil candle atau menulis hasil.
 func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model.UserSignal) []dto.JournalSkippedResponse {
 	out := make([]dto.JournalSkippedResponse, 0, len(rows))
 	for i := range rows {
@@ -215,36 +224,37 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 			OccurredAt:   us.CreatedAt,
 			OccurredPair: dto.NewTimePair(us.CreatedAt),
 		}
-		if s.signalDetail != nil {
-			if signal, err := s.signalDetail.FindSignal(ctx, us.SignalID); err == nil && signal != nil {
-				item.Symbol = signal.Symbol
-				item.StrategyVersion = signal.StrategyVersion
-				item.Direction = signal.Direction
-				item.Htf = signal.Htf
-				item.Ltf = signal.Ltf
-				item.EntryPrice = signal.EntryPrice
-				item.StopLoss = signal.StopLoss
-				item.TakeProfit = signal.TakeProfit
-				item.RiskReward = signal.RiskReward
-				if !model.IsEvaluated(us.EvalStatus) && s.evaluator != nil {
-					// Titik awal penilaian diambil dari waktu terbit sinyal, bukan
-					// CreatedAt baris user_signal: baris itu ditulis ulang setiap
-					// status berubah, sehingga CreatedAt bisa jatuh setelah harga
-					// sudah bergerak dan hasilnya terbaca keliru.
-					since := signal.PublishedAt
-					if since.IsZero() {
-						since = us.CreatedAt
-					}
-					if ev, ok := s.evaluator.evaluate(ctx, signal, since); ok {
-						s.simpanEvaluasi(ctx, us.UserID, us.SignalID, ev)
-						us.EvalStatus, us.EvalAt = ev.Status, ev.At
-						us.EvalEntryAt = ev.EntryAt
-						us.EvalPrice, us.EvalRLower, us.EvalNote = ev.Price, ev.RLower, ev.Note
-					}
-				}
+		var signal *model.Signal
+		if us.EvalSnapshot != "" {
+			var snapshot model.Signal
+			if err := json.Unmarshal([]byte(us.EvalSnapshot), &snapshot); err == nil {
+				signal = &snapshot
 			}
 		}
+		if us.EvalSnapshot == "" && s.signalDetail != nil {
+			// Missing details do not remove the persisted evaluation from the journal.
+			if detail, err := s.signalDetail.FindSignal(ctx, us.SignalID); err == nil {
+				signal = detail
+			}
+		}
+		if signal != nil {
+			if !signal.PublishedAt.IsZero() {
+				item.OccurredAt = signal.PublishedAt
+				item.OccurredPair = dto.NewTimePair(signal.PublishedAt)
+			}
+			item.Symbol = signal.Symbol
+			item.StrategyVersion = signal.StrategyVersion
+			item.Direction = signal.Direction
+			item.Htf = signal.Htf
+			item.Ltf = signal.Ltf
+			item.EntryPrice = signal.EntryPrice
+			item.StopLoss = signal.StopLoss
+			item.TakeProfit = signal.TakeProfit
+			item.RiskReward = signal.RiskReward
+		}
 		item.EvalStatus = us.EvalStatus
+		item.EvalCheckedAt = us.EvalCheckedAt
+		item.EvalEvidence = us.EvalEvidence
 		item.EvalEntryAt = us.EvalEntryAt
 		item.EvalAt = us.EvalAt
 		item.EvalPrice = us.EvalPrice
@@ -253,23 +263,6 @@ func (s *tradingService) jurnalSkippedResponse(ctx context.Context, rows []model
 		out = append(out, item)
 	}
 	return out
-}
-
-// simpanEvaluasi menulis hasil hipotetis ke penyimpanan. Kegagalan disimpan
-// sebagai peringatan saja: jurnal tetap harus tampil.
-func (s *tradingService) simpanEvaluasi(ctx context.Context, userID, signalID string, ev evalOutcome) {
-	if s.evaluator == nil || s.evaluator.sink == nil {
-		return
-	}
-	out := &model.UserSignalEval{
-		Status:  ev.Status,
-		EntryAt: ev.EntryAt,
-		At:      ev.At,
-		Price:   ev.Price,
-		RLower:  ev.RLower,
-		Note:    ev.Note,
-	}
-	_ = s.evaluator.sink.SaveSignalEval(ctx, userID, signalID, out)
 }
 
 // jurnalMetaResponse menyusun ringkasan halaman untuk daftar peluang terlewat.
