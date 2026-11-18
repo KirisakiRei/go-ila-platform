@@ -444,3 +444,53 @@ func (s *Service) lockFor(key string) *sync.Mutex {
 	}
 	return lock
 }
+
+// UpdateLatestBars menyegarkan ekor cache REST yang sejalan dengan stream aktif
+// tanpa memicu koneksi baru ke feed.
+func (s *Service) UpdateLatestBars(bars []Candle, streamKey string) {
+	if s == nil || len(bars) == 0 || streamKey == "" {
+		return
+	}
+	parts := strings.Split(streamKey, "|")
+	if len(parts) != 2 {
+		return
+	}
+	tvSym, res := parts[0], parts[1]
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for k, entry := range s.cache {
+		if len(entry.candles) == 0 {
+			continue
+		}
+		kParts := strings.Split(k, "|")
+		if len(kParts) != 4 {
+			continue
+		}
+		if MapSymbol(kParts[0], kParts[1]) != tvSym || MapResolution(kParts[2]) != res {
+			continue
+		}
+		updated := append([]Candle(nil), entry.candles...)
+		for _, bar := range bars {
+			if bar.Time <= 0 {
+				continue
+			}
+			lastIdx := len(updated) - 1
+			if updated[lastIdx].Time == bar.Time {
+				updated[lastIdx] = bar
+			} else if bar.Time > updated[lastIdx].Time {
+				updated = append(updated, bar)
+				if len(updated) > s.maxBar {
+					updated = updated[len(updated)-s.maxBar:]
+				}
+			} else if lastIdx >= 1 && updated[lastIdx-1].Time == bar.Time {
+				updated[lastIdx-1] = bar
+			}
+		}
+		s.cache[k] = cacheEntry{
+			candles: updated,
+			expires: s.clock().Add(s.ttl),
+		}
+	}
+}

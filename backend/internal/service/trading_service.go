@@ -116,32 +116,59 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 		return nil, err
 	}
 
-	if limit <= 0 || limit > DefaultSignalLimit {
+	if limit <= 0 {
 		limit = DefaultSignalLimit
+	}
+	if limit > MaxSignalLimit {
+		limit = MaxSignalLimit
 	}
 
 	now := s.clock()
 	tier := effectiveTier(user, now)
 
 	// Ambil jendela lebih lebar agar sinyal yang masih ditunda tetap terhitung
-	// pada retensi riwayat tier tersebut.
+	// pada retensi riwayat tier tersebut, dan duplikat penerbitan ulang tidak
+	// menghabiskan jatah limit setup unik.
 	since := now.Add(-signalRetention(tier))
+	fetchLimit := limit * 3
+	if fetchLimit > 300 {
+		fetchLimit = 300
+	}
 
-	rows, err := s.signals.ListForUser(ctx, userID, since, limit)
+	rows, err := s.signals.ListForUser(ctx, userID, since, fetchLimit)
 	if err != nil {
 		return nil, err
 	}
 
 	// Baris radar diambil terpisah dan ditaruh paling depan. Penggabungan ini
 	// menjaga urutan yang sudah dikenal frontend: radar dulu, lalu riwayat
-	// terbaru. Yang berubah hanya sumber datanya, bukan bentuk respons.
+	// terbaru, sambil menyaring bila ada signal_id yang bertumpuk.
 	radar, err := s.signals.ListRadarForUser(ctx, userID, DefaultRadarLimit)
 	if err != nil {
 		return nil, err
 	}
+	seenSignalID := make(map[string]struct{}, len(radar)+len(rows))
 	gabungan := make([]model.Signal, 0, len(radar)+len(rows))
-	gabungan = append(gabungan, radar...)
-	gabungan = append(gabungan, rows...)
+	for i := range radar {
+		id := radar[i].SignalID
+		if id != "" {
+			if _, dup := seenSignalID[id]; dup {
+				continue
+			}
+			seenSignalID[id] = struct{}{}
+		}
+		gabungan = append(gabungan, radar[i])
+	}
+	for i := range rows {
+		id := rows[i].SignalID
+		if id != "" {
+			if _, dup := seenSignalID[id]; dup {
+				continue
+			}
+			seenSignalID[id] = struct{}{}
+		}
+		gabungan = append(gabungan, rows[i])
+	}
 	rows = gabungan
 
 	var batchSignals map[string]model.UserSignal
@@ -154,6 +181,26 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 		}
 		if loaded, batchErr := batcher.FindUserSignals(ctx, userID, ids); batchErr == nil {
 			batchSignals = loaded
+		}
+	}
+
+	var posBySignalID map[string]model.Position
+	var posByID map[string]model.Position
+	if s.positions != nil && len(rows) > 0 {
+		if userPositions, posErr := s.positions.ListByUser(ctx, userID, DefaultPositionLimit*2); posErr == nil && len(userPositions) > 0 {
+			posBySignalID = make(map[string]model.Position, len(userPositions))
+			posByID = make(map[string]model.Position, len(userPositions))
+			for i := range userPositions {
+				p := userPositions[i]
+				if p.ID != "" {
+					posByID[p.ID] = p
+				}
+				if p.SourceSignalID != "" {
+					if _, exists := posBySignalID[p.SourceSignalID]; !exists {
+						posBySignalID[p.SourceSignalID] = p
+					}
+				}
+			}
 		}
 	}
 
@@ -219,12 +266,33 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 				view.Status = model.SignalStatusReadyToEntry
 				view.CanConfirm = signal.Status == model.SignalStatusReadyToEntry &&
 					now.Before(signal.ExpiresAt)
+			} else if us.Status == model.SignalStatusOpportunity && now.Before(signal.ExpiresAt) {
+				view.Status = model.SignalStatusOpportunity
+			} else if us.Status == model.SignalStatusConsumed {
+				view.Status = model.SignalStatusConsumed
 			}
+		}
+
+		var matchedPos *model.Position
+		if posBySignalID != nil {
+			if p, ok := posBySignalID[signal.SignalID]; ok {
+				matchedPos = &p
+			}
+		}
+		if matchedPos == nil && us != nil && us.PositionID != "" && posByID != nil {
+			if p, ok := posByID[us.PositionID]; ok {
+				matchedPos = &p
+			}
+		}
+
+		if !isRadarSignalRow(signal) {
+			applySignalEvaluation(&view, signal, us)
+			applySignalPosition(&view, matchedPos)
 		}
 
 		out = append(out, view)
 	}
-	return out, nil
+	return dedupeSignalViews(out, now, limit), nil
 }
 
 // Positions mengembalikan posisi user, terbaru lebih dulu.

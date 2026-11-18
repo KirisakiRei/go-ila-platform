@@ -86,6 +86,21 @@ type Signal struct {
 	ExpiresAt    time.Time `gorm:"index" json:"expires_at"`
 	SupersededBy string    `gorm:"type:varchar(64)" json:"superseded_by"`
 	CancelReason string    `gorm:"type:varchar(255)" json:"cancel_reason"`
+
+	// Hasil evaluasi harga setup terhadap candle pasar (forward test).
+	// Memakai prefiks setup_* agar tidak pernah bertabrakan nama kolom dengan
+	// user_signal.eval_* pada query JOIN jurnal.
+	SetupCanonicalID string     `gorm:"type:varchar(64);index" json:"-"`
+	SetupCohortKey   string     `gorm:"type:varchar(64);index" json:"-"`
+	SetupCheckedAt   *time.Time `json:"setup_checked_at,omitempty"`
+	SetupNextAt      *time.Time `gorm:"index" json:"-"`
+	SetupEvidence    string     `gorm:"type:text" json:"-"`
+	SetupEvalStatus  string     `gorm:"type:varchar(16);index" json:"setup_eval_status,omitempty"`
+	SetupEntryAt     *time.Time `json:"setup_entry_at,omitempty"`
+	SetupEvalAt      *time.Time `json:"setup_eval_at,omitempty"`
+	SetupEvalPrice   float64    `json:"setup_eval_price,omitempty"`
+	SetupEvalRLower  float64    `json:"setup_eval_r_lower,omitempty"`
+	SetupEvalNote    string     `gorm:"type:varchar(255)" json:"setup_eval_note,omitempty"`
 }
 
 // TableName menetapkan nama tabel.

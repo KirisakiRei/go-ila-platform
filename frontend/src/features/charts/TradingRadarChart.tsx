@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Badge, Skeleton } from '@/components/ui'
+import { History, X } from 'lucide-react'
+import { Badge, Button, Skeleton } from '@/components/ui'
 import { useMarketCandles } from '@/lib/queries'
-import { formatPrice } from '@/lib/format'
+import { useLiveCandleStream } from '@/lib/use-live-candle-stream'
+import { formatDateTime, formatPrice } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
 import { SIGNAL_LABEL, getIla3Mtf, isFinal } from '@/features/signals/lib/status'
+import { mapSignalsToSlots } from '@/features/signals/lib/signal-slots'
+import { OUTCOME_BADGE_CLASS, describeSignalOutcome } from '@/features/signals/lib/outcome'
 import { PriceChart, type ChartMarkerSpec, type PriceLineSpec } from './PriceChart'
 import { arahBearish } from './lib/direction'
 import { chartTheme } from './lib/theme'
@@ -17,8 +21,13 @@ type TradingRadarChartProps = {
   symbol: string | null
   signals: Signal[]
   strategy: StrategyFilter
+  /** Kunci slot pasangan timeframe yang dipilih pada TimeframeRadarMatrix. */
+  selectedSlotKey?: string | null
+  /** Sinyal histori yang dipilih untuk ditampilkan sebagai potongan statis. */
+  snapshotSignal?: Signal | null
+  onClearSnapshot?: () => void
   className?: string
-  /** false menunda permintaan candle (mis. chart mobile yang masih terlipat). */
+  /** false menunda permintaan candle & stream (mis. chart mobile yang terlipat). */
   enabled?: boolean
 }
 
@@ -27,23 +36,38 @@ type Tab = {
   label: string
 }
 
-/**
- * SUPPORTED_TIMEFRAMES mencerminkan MapResolution di backend market service.
- *
- * getIla3Mtf() mengembalikan "MTF" untuk kombinasi timeframe yang tidak
- * dikenal; nilai itu bukan timeframe nyata, jadi tab-nya harus dilewati agar
- * permintaan candle tidak ditolak backend dengan 400.
- */
 const SUPPORTED_TIMEFRAMES = new Set([
   '1M', 'M1', '3M', 'M3', '5M', 'M5', '15M', 'M15', '30M', 'M30',
   '1H', 'H1', '2H', 'H2', '4H', 'H4', '1D', 'D1', 'D', '1W', 'W1', 'W',
 ])
 
+const BAR_SECONDS: Record<string, number> = {
+  '1M': 60,
+  M1: 60,
+  '3M': 180,
+  M3: 180,
+  '5M': 300,
+  M5: 300,
+  '15M': 900,
+  M15: 900,
+  '30M': 1800,
+  M30: 1800,
+  '1H': 3600,
+  H1: 3600,
+  '4H': 14400,
+  H4: 14400,
+  D: 86400,
+  D1: 86400,
+  '1D': 86400,
+  W: 604800,
+  W1: 604800,
+  '1W': 604800,
+}
+
 function timeframeValid(timeframe: string): boolean {
   return SUPPORTED_TIMEFRAMES.has((timeframe || '').toUpperCase().trim())
 }
 
-/** rapikanTab membuang timeframe tak dikenal dan tab duplikat. */
 function rapikanTab(tabs: Tab[]): Tab[] {
   const terpakai = new Set<string>()
   const hasil: Tab[] = []
@@ -56,52 +80,82 @@ function rapikanTab(tabs: Tab[]): Tab[] {
   return hasil
 }
 
-/** sinyalAktif memilih sinyal paling relevan untuk digambar di chart. */
-function sinyalAktif(signals: Signal[]): Signal | null {
-  if (signals.length === 0) return null
-
-  const berbobot = signals.filter((signal) => !isFinal(signal.status))
-  const kandidat = berbobot.length > 0 ? berbobot : signals
-
-  return (
-    [...kandidat].sort((a, b) => {
-      const aTime = new Date(a.updated_at || a.published_at).getTime()
-      const bTime = new Date(b.updated_at || b.published_at).getTime()
-      return bTime - aTime
-    })[0] ?? null
-  )
+function toUnixSec(iso: string | null | undefined): number {
+  if (!iso) return 0
+  const ms = new Date(iso).getTime()
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : 0
 }
 
-function times(signal: Signal) {
-  const htf = signal.htf?.toUpperCase() || ''
-  const ltf = signal.ltf?.toUpperCase() || ''
-  return { htf, ltf }
+function isLiveOverlayRelevant(sig: Signal | undefined | null): sig is Signal {
+  if (!sig) return false
+  if (!isFinal(sig.status)) return true
+  if (sig.eval_status === 'RUNNING') return true
+  if (sig.is_executed && sig.position_status === 'OPEN') return true
+  return false
 }
 
 export function TradingRadarChart({
   symbol,
   signals,
   strategy,
+  selectedSlotKey,
+  snapshotSignal = null,
+  onClearSnapshot,
   className,
   enabled = true,
 }: TradingRadarChartProps) {
-  // Chart dikunci ke satu metode. Penyaringan ini pengaman tambahan supaya chart
-  // tidak pernah memilih sinyal dari metode lain walau daftar sinyal tercampur.
-  const signal = useMemo(
-    () => sinyalAktif(signals.filter((s) => s.strategy_version === strategy)),
+  const isSnapshotMode = Boolean(snapshotSignal)
+
+  const strategySignals = useMemo(
+    () => signals.filter((s) => s.strategy_version === strategy),
     [signals, strategy],
   )
 
+  const slots = useMemo(
+    () => mapSignalsToSlots(strategySignals, strategy),
+    [strategySignals, strategy],
+  )
+
+  const activeSlot = useMemo(() => {
+    if (selectedSlotKey) {
+      const matched = slots.find((s) => s.key === selectedSlotKey)
+      if (matched) return matched
+    }
+    return slots.find((s) => s.status === 'READY') ?? slots[0] ?? null
+  }, [slots, selectedSlotKey])
+
+  // Dalam mode live, overlay hanya digambar jika slot tersebut punya setup yang
+  // sedang berjalan / dipantau agar chart scanning tidak dikotori garis basi.
+  const signal = useMemo(() => {
+    if (snapshotSignal) return snapshotSignal
+    const slotSig = activeSlot?.latestSignal ?? null
+    return isLiveOverlayRelevant(slotSig) ? slotSig : null
+  }, [snapshotSignal, activeSlot])
+
   const tabs = useMemo<Tab[]>(() => {
-    if (!signal) return []
+    if (snapshotSignal) {
+      const htf = snapshotSignal.htf?.toUpperCase() || ''
+      const ltf = snapshotSignal.ltf?.toUpperCase() || ''
+      if (snapshotSignal.strategy_version === 'ila-3.0') {
+        const mtf = getIla3Mtf(htf, ltf)
+        return rapikanTab([
+          { timeframe: htf, label: `${htf} Macro` },
+          { timeframe: mtf, label: `${mtf} Alignment` },
+          { timeframe: ltf, label: `${ltf} Trigger` },
+        ])
+      }
+      return rapikanTab([
+        { timeframe: htf, label: `${htf} Setup` },
+        { timeframe: ltf, label: `${ltf} Trigger` },
+      ])
+    }
 
-    const { htf, ltf } = times(signal)
-    if (!htf || !ltf) return []
+    if (!activeSlot) return []
+    const htf = activeSlot.htf.toUpperCase()
+    const ltf = activeSlot.ltf.toUpperCase()
 
-    const ila3 = signal.strategy_version === 'ila-3.0'
-
-    if (ila3) {
-      const mtf = getIla3Mtf(htf, ltf)
+    if (strategy === 'ila-3.0') {
+      const mtf = (activeSlot.mtf || getIla3Mtf(htf, ltf)).toUpperCase()
       return rapikanTab([
         { timeframe: htf, label: `${htf} Macro` },
         { timeframe: mtf, label: `${mtf} Alignment` },
@@ -113,27 +167,66 @@ export function TradingRadarChart({
       { timeframe: htf, label: `${htf} Setup` },
       { timeframe: ltf, label: `${ltf} Trigger` },
     ])
-  }, [signal])
+  }, [snapshotSignal, activeSlot, strategy])
 
-  const [activeIndex, setActiveIndex] = useState(0)
-  const tabIndex = Math.min(activeIndex, Math.max(tabs.length - 1, 0))
+  const [nowSec] = useState(() => Math.floor(Date.now() / 1000))
+  const modeContextKey = snapshotSignal?.signal_id ? `snap:${snapshotSignal.signal_id}` : 'live'
+  const [tabState, setTabState] = useState<{ contextKey: string; index: number }>({
+    contextKey: modeContextKey,
+    index: 0,
+  })
+
+  // Dalam mode potongan histori, bawaan langsung membuka tab Trigger (LTF)
+  // tanpa useEffect berantai; klik manual pada tab tetap dihormati.
+  const rawIndex =
+    tabState.contextKey === modeContextKey
+      ? tabState.index
+      : snapshotSignal && tabs.length > 0
+        ? tabs.length - 1
+        : 0
+  const tabIndex = Math.min(rawIndex, Math.max(tabs.length - 1, 0))
   const activeTab = tabs[tabIndex]
+
+  const snapshotFocusTime = useMemo(() => {
+    if (!snapshotSignal) return undefined
+    const pub = toUnixSec(snapshotSignal.published_at)
+    return pub > 0 ? pub : undefined
+  }, [snapshotSignal])
+
+  const candleLimit = useMemo(() => {
+    if (!snapshotSignal || !activeTab) return 200
+    const barSec = BAR_SECONDS[activeTab.timeframe.toUpperCase()] ?? 900
+    const pubSec = toUnixSec(snapshotSignal.published_at)
+    if (pubSec <= 0) return 300
+    const barsFromNow = Math.ceil(Math.max(0, nowSec - pubSec) / barSec) + 80
+    return Math.min(500, Math.max(250, barsFromNow))
+  }, [snapshotSignal, activeTab, nowSec])
+
+  const chartEnabled = enabled && Boolean(symbol) && tabs.length > 0
+
+  const { isLive } = useLiveCandleStream({
+    symbol,
+    timeframe: activeTab?.timeframe,
+    limit: candleLimit,
+    enabled: chartEnabled && !isSnapshotMode,
+  })
 
   const query = useMarketCandles(
     symbol,
     activeTab?.timeframe ?? 'H4',
-    200,
-    enabled && Boolean(symbol) && tabs.length > 0,
+    candleLimit,
+    chartEnabled,
+    {
+      staticSnapshot: isSnapshotMode,
+      liveStreaming: isLive,
+    },
   )
 
   const theme = chartTheme()
   const candles = query.data?.candles ?? []
   const feed = query.data?.feed ?? ''
 
-  // Presisi level mengikuti pair yang dipantau engine. Garis Sweep, FVG, dan
-  // CISD adalah titik analisis: membulatkannya ke 2 desimal membuat EURUSD
-  // kehilangan seluruh selisihnya (1.08471 dan 1.08476 tampil sama).
-  const digits = priceDigits(symbol, candles[0]?.close)
+  const digits = priceDigits(symbol, candles[0]?.close ?? signal?.entry_price)
 
   const { priceLines, markers, zones } = useMemo(() => {
     const lines: PriceLineSpec[] = []
@@ -147,8 +240,6 @@ export function TradingRadarChart({
 
     // --- Timeframe besar: level sweep dan kotak FVG -------------------------
     if (tabIndex === 0) {
-      // Sweep yang masih berjalan pun sudah punya lilin nyata dari engine, jadi
-      // ikut digambar: trader perlu melihat level yang sedang diuji.
       if (sweep && (sweep.detected || sweep.sweep_in_progress)) {
         const level = sweepLevel(sweep)
         if (level > 0) {
@@ -161,8 +252,6 @@ export function TradingRadarChart({
           })
         }
 
-        // Penanda diletakkan pada lilin yang menyapu (sweep candle), bukan pada
-        // lilin yang tersapu: sweep terjadi ketika candle itu ditutup.
         const waktuSweep = waktuSweepDetik(sweep)
         if (waktuSweep > 0) {
           marks.push({
@@ -174,8 +263,6 @@ export function TradingRadarChart({
           })
         }
 
-        // Batas risiko dan target yang dihitung engine ikut ditampilkan agar
-        // angka di chart sama dengan angka yang dipakai untuk entry nanti.
         if (sweep.stop_loss > 0) {
           lines.push({
             price: sweep.stop_loss,
@@ -211,7 +298,7 @@ export function TradingRadarChart({
       }
     }
 
-    // --- Timeframe trigger: CISD, entry, SL, TP -----------------------------
+    // --- Timeframe trigger: CISD, entry, SL, TP, dan penanda histori --------
     if (isLast && tabs.length > 0) {
       if (cisd?.detected && cisd.cisd_level > 0) {
         lines.push({
@@ -263,9 +350,39 @@ export function TradingRadarChart({
           width: 1,
         })
       }
+
+      if (isSnapshotMode) {
+        const isBuy = signal.direction === 'BUY'
+        const pubTime = toUnixSec(signal.published_at)
+        if (pubTime > 0) {
+          marks.push({
+            time: pubTime,
+            position: isBuy ? 'belowBar' : 'aboveBar',
+            color: isBuy ? theme.up : theme.down,
+            shape: isBuy ? 'arrowUp' : 'arrowDown',
+            text: `Setup ${signal.direction}`,
+          })
+        }
+
+        const resolvedIso = signal.closed_at || signal.eval_at
+        const resolvedSec = toUnixSec(resolvedIso)
+        const hitTP =
+          signal.position_status === 'CLOSED_TP' || (!signal.is_executed && signal.eval_status === 'TP')
+        const hitSL =
+          signal.position_status === 'CLOSED_SL' || (!signal.is_executed && signal.eval_status === 'SL')
+
+        if (resolvedSec > 0 && (hitTP || hitSL)) {
+          marks.push({
+            time: resolvedSec,
+            position: hitTP ? (isBuy ? 'aboveBar' : 'belowBar') : isBuy ? 'belowBar' : 'aboveBar',
+            color: hitTP ? theme.takeProfit : theme.stopLoss,
+            shape: 'circle',
+            text: hitTP ? 'TP' : 'SL',
+          })
+        }
+      }
     }
 
-    // Timeframe tengah ILA 3.0 tetap menampilkan FVG MTF bila ada.
     if (tabs.length === 3 && tabIndex === 1 && sweep?.fvg) {
       const start = sweep.fvg.candle3_time
         ? Math.floor(new Date(sweep.fvg.candle3_time).getTime() / 1000)
@@ -281,7 +398,7 @@ export function TradingRadarChart({
     }
 
     return { priceLines: lines, markers: marks, zones: areas }
-  }, [signal, activeTab, tabIndex, tabs.length, theme, digits])
+  }, [signal, activeTab, tabIndex, tabs.length, theme, digits, isSnapshotMode])
 
   if (!symbol) {
     return (
@@ -291,18 +408,56 @@ export function TradingRadarChart({
     )
   }
 
+  const snapshotOutcome = snapshotSignal ? describeSignalOutcome(snapshotSignal) : null
+
   return (
     <div className={cn('space-y-3', className)}>
+      {snapshotSignal && snapshotOutcome && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-secondary/50 px-3 py-2 text-xs">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+              <History className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span>
+                Potongan Histori · {snapshotSignal.direction} {snapshotSignal.htf}/{snapshotSignal.ltf}
+              </span>
+            </span>
+            <span
+              className={cn(
+                'inline-flex items-center rounded-md border px-2 py-0.5 text-[10.5px] font-semibold',
+                OUTCOME_BADGE_CLASS[snapshotOutcome.tone],
+              )}
+            >
+              {snapshotOutcome.label}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {formatDateTime(snapshotSignal.published_at)}
+            </span>
+          </div>
+
+          {onClearSnapshot && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onClearSnapshot}
+              className="h-7 gap-1 px-2.5 text-[11px]"
+            >
+              <X className="h-3 w-3" />
+              Kembali ke Live Chart
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {tabs.length === 0 ? (
-            <span className="text-xs text-muted-foreground">Belum ada setup untuk digambar.</span>
+            <span className="text-xs text-muted-foreground">Belum ada timeframe untuk digambar.</span>
           ) : (
             tabs.map((tab, index) => (
               <button
                 key={`${tab.timeframe}-${index}`}
                 type="button"
-                onClick={() => setActiveIndex(index)}
+                onClick={() => setTabState({ contextKey: modeContextKey, index })}
                 className={cn(
                   'rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors',
                   index === tabIndex
@@ -316,39 +471,54 @@ export function TradingRadarChart({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {!isSnapshotMode && isLive && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400"
+              title="Aliran harga candle berjalan secara langsung"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </span>
+          )}
+          {isSnapshotMode && (
+            <Badge variant="outline" className="text-[10px]">
+              Statis
+            </Badge>
+          )}
           {feed && (
             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
               {feed}
             </Badge>
           )}
-          {/* Setup lama bisa dihitung pada feed berbeda bila admin baru mengganti
-              feed pair; trader perlu tahu agar tidak mengira garisnya meleset. */}
           {signal?.feed_source && feed && signal.feed_source !== feed && (
             <Badge variant="muted" className="text-[10px]" title="Setup dihitung sebelum feed pair diubah">
               Setup: {signal.feed_source}
             </Badge>
           )}
-          {signal && (
+          {!isSnapshotMode && signal && (
             <Badge variant="muted" className="text-[10px]">
               {SIGNAL_LABEL[signal.status] ?? signal.status}
+            </Badge>
+          )}
+          {!isSnapshotMode && !signal && activeSlot && (
+            <Badge variant="muted" className="text-[10px]">
+              Scanning · {activeSlot.label}
             </Badge>
           )}
         </div>
       </div>
 
-      {/* Skeleton hanya untuk pemuatan pertama. Saat data lama masih ada
-          (ganti timeframe atau penyegaran berkala), chart lama dipertahankan
-          agar tampilan tidak berkedip. */}
       {query.isLoading && candles.length === 0 ? (
         <Skeleton className="h-[340px] w-full rounded-xl" />
       ) : (
         <PriceChart
-          seriesKey={`${symbol}:${activeTab?.timeframe ?? ''}:${feed}`}
+          seriesKey={`${symbol}:${activeTab?.timeframe ?? ''}:${feed}:${snapshotSignal?.signal_id ?? 'live'}`}
           candles={candles}
           priceLines={priceLines}
           markers={markers}
           zones={zones}
+          focusTime={snapshotFocusTime}
           height={340}
           digits={digits}
           loading={query.isFetching && candles.length === 0}
@@ -385,14 +555,6 @@ function LegendItem({ color, label }: { color: string; label: string }) {
   )
 }
 
-/**
- * sweepLevel menentukan harga likuiditas yang tersapu, persis seperti yang
- * dihitung engine: high lilin sebelumnya untuk struktur BEARISH, low-nya untuk
- * BULLISH.
- *
- * Semua angka diambil dari payload engine; tidak ada harga yang diturunkan
- * ulang di browser.
- */
 function sweepLevel(sweep: NonNullable<Signal['htf_sweep']>): number {
   const bearish = arahBearish(sweep.direction)
   const swept = sweep.swept_candle
@@ -401,13 +563,6 @@ function sweepLevel(sweep: NonNullable<Signal['htf_sweep']>): number {
   return Number.isFinite(level) && level > 0 ? level : 0
 }
 
-/**
- * waktuSweepDetik memilih waktu lilin sweep dari payload engine.
- *
- * Engine mengisi sweep_time sama dengan timestamp lilin penyapu; keduanya bisa
- * dipakai, sedangkan lilin tersapu waktunya lebih awal dan membuat penanda
- * tampak mundur satu candle.
- */
 function waktuSweepDetik(sweep: NonNullable<Signal['htf_sweep']>): number {
   const kandidat = [sweep.sweep_time, sweep.sweep_candle?.timestamp]
   for (const nilai of kandidat) {

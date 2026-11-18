@@ -197,6 +197,13 @@ export const marketApi = {
     request<MarketCandlesResponse>('/market/candles', {
       query: { symbol, tf, limit },
     }),
+  candlesStreamUrl: (symbol: string, tf: string) => {
+    const params = new URLSearchParams({
+      symbol: symbol.trim().toUpperCase(),
+      tf: tf.trim().toUpperCase(),
+    })
+    return `/api/v1/market/candles/stream?${params.toString()}`
+  },
 }
 
 export const systemApi = {

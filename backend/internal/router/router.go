@@ -403,9 +403,17 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 
 	// Data candle untuk chart dashboard. Cache pendek disimpan di proses ini
 	// agar satu halaman yang terus diperbarui tidak menembak feed untuk setiap
-	// permintaan.
-	marketService := market.NewService(market.NewTradingViewProvider(), 10*time.Second)
-	marketHandler := handler.NewMarketHandler(marketService, pairRepo)
+	// permintaan, ditambah hub SSE berbagi-pakai untuk pergerakan lilin live.
+	marketProvider := market.NewTradingViewProvider()
+	marketService := market.NewService(marketProvider, 10*time.Second)
+	marketStreamHub := market.NewStreamHub(marketProvider, market.StreamHubOptions{
+		Cache: marketService,
+	})
+	backgroundWorkers = append(backgroundWorkers, func(ctx context.Context) {
+		<-ctx.Done()
+		marketStreamHub.Close()
+	})
+	marketHandler := handler.NewMarketHandler(marketService, pairRepo).WithStream(marketStreamHub)
 	systemHandler := handler.NewSystemHandler(systemService)
 	tgClient := pilihan.tgClient
 	if tgClient == nil {
@@ -655,6 +663,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		// Candle untuk chart radar sinyal dan peninjau posisi. Feed mengikuti
 		// pair yang dipilih admin agar selaras dengan evaluasi engine.
 		me.GET("/market/candles", marketHandler.Candles)
+		me.GET("/market/candles/stream", marketHandler.StreamCandles)
 
 		// Persetujuan dokumen legal. `blocked` pada balasan berarti eksekusi
 		// dan pembayaran ditahan sampai dokumen wajib disetujui.

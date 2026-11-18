@@ -85,6 +85,24 @@ type SignalResponse struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 	CanConfirm bool      `json:"can_confirm"`
 	Delayed    bool      `json:"delayed"`
+
+	// Hasil akhir / progres setup untuk Histori Setup Sinyal.
+	// Bila setup dieksekusi oleh akun user, status posisi nyata disertakan;
+	// bila tidak dieksekusi, status evaluasi harga pasar (TP/SL/RUNNING) dipakai.
+	EvalStatus     string     `json:"eval_status,omitempty"`
+	EvalEntryAt    *time.Time `json:"eval_entry_at,omitempty"`
+	EvalAt         *time.Time `json:"eval_at,omitempty"`
+	EvalPrice      float64    `json:"eval_price,omitempty"`
+	EvalRLower     float64    `json:"eval_r_lower,omitempty"`
+	EvalNote       string     `json:"eval_note,omitempty"`
+	EvalEvidence   string     `json:"eval_evidence,omitempty"`
+	IsExecuted     bool       `json:"is_executed"`
+	PositionID     string     `json:"position_id,omitempty"`
+	PositionStatus string     `json:"position_status,omitempty"`
+	OutcomeR       float64    `json:"outcome_r,omitempty"`
+	ProfitLoss     float64    `json:"profit_loss,omitempty"`
+	PnLKnown       bool       `json:"pnl_known,omitempty"`
+	ClosedAt       *time.Time `json:"closed_at,omitempty"`
 }
 
 // PositionResponse adalah posisi hidup atau tertutup milik user.

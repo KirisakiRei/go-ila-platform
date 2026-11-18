@@ -330,13 +330,16 @@ export function useMarketCandles(
   timeframe: string,
   limit = 200,
   enabled = true,
+  options?: { staticSnapshot?: boolean; liveStreaming?: boolean },
 ) {
+  const isStatic = Boolean(options?.staticSnapshot)
+  const isStreaming = Boolean(options?.liveStreaming)
   return useQuery({
     queryKey: queryKeys.marketCandles(symbol ?? '', timeframe, limit),
     queryFn: () => marketApi.candles(symbol ?? '', timeframe, limit),
     enabled: Boolean(symbol) && enabled,
-    staleTime: 8_000,
-    refetchInterval: 20_000,
+    staleTime: isStatic ? 60_000 : 8_000,
+    refetchInterval: isStatic ? false : isStreaming ? 60_000 : 20_000,
     // Pertahankan candle sebelumnya saat timeframe berganti, supaya chart tidak
     // berkedip kembali ke skeleton di tengah pemakaian.
     placeholderData: keepPreviousData,

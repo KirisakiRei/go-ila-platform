@@ -606,6 +606,24 @@ func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
 		}
 	}
 
+	// Engine menerbitkan ulang setup yang sama dengan signal_id baru setiap siklus.
+	// Bila sinyal dengan ID baru ini murni pengulangan setup yang masih hidup (dan
+	// tidak ada posisi terbuka yang perlu menerima log penolakan), tahan sebelum
+	// UpsertSignal agar tabel signal tidak dikotori baris kembar.
+	if signal.Status == SignalReady && findErr != nil {
+		if asal, ok := s.penerbitanUlang(ctx, signal); ok {
+			s.ackDuplikat(ctx, signal)
+			s.logger.Info("penerbitan ulang setup ditahan",
+				"evt", "signal.duplikat.ditahan",
+				"signal_id", signal.SignalID,
+				"signal_asal", asal.SignalID,
+				"symbol", signal.Symbol,
+				"htf", signal.Htf, "ltf", signal.Ltf,
+				"status_asal", asal.Status)
+			return
+		}
+	}
+
 	if err := s.store.UpsertSignal(ctx, signal); err != nil {
 		s.logger.Error("gagal menyimpan sinyal",
 			"evt", "signal.simpan.gagal",

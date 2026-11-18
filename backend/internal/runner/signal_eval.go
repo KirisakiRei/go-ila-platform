@@ -14,6 +14,11 @@ import (
 	"ila/backend/internal/repository"
 )
 
+type globalSignalEvaluator interface {
+	ClaimSignals(context.Context, time.Time, int) ([]repository.GlobalSignalEvalCandidate, error)
+	SaveSignal(context.Context, repository.GlobalSignalEvalCandidate, *model.UserSignalEval) error
+}
+
 // MonitorSignalEvaluations runs on the existing monitor cadence, independently
 // of signal expiry and journal reads. Failed fetches leave checkpoints intact.
 func (s *Service) MonitorSignalEvaluations(ctx context.Context) {
@@ -28,21 +33,48 @@ func (s *Service) MonitorSignalEvaluations(ctx context.Context) {
 		s.logger.Warn("claim signal evaluations", "error", err)
 		return
 	}
+
+	var globalJobs []repository.GlobalSignalEvalCandidate
+	globalEval, hasGlobalEval := s.opts.Evaluations.(globalSignalEvaluator)
+	if hasGlobalEval {
+		claimedGlobal, gErr := globalEval.ClaimSignals(ctx, now, 20)
+		if gErr != nil {
+			s.logger.Warn("claim global signal evaluations", "error", gErr)
+		} else {
+			globalJobs = claimedGlobal
+		}
+	}
+
 	type feedKey struct{ symbol, feed, timeframe string }
 	groups := make(map[feedKey][]repository.SignalEvalCandidate)
+	globalGroups := make(map[feedKey][]repository.GlobalSignalEvalCandidate)
+	seenKeys := make(map[feedKey]struct{})
 	var keys []feedKey
+	addKey := func(k feedKey) {
+		if _, ok := seenKeys[k]; !ok {
+			seenKeys[k] = struct{}{}
+			keys = append(keys, k)
+		}
+	}
 	for _, job := range jobs {
 		key := feedKey{job.Signal.Symbol, job.Signal.FeedSource, job.Signal.Ltf}
-		if _, ok := groups[key]; !ok {
-			keys = append(keys, key)
-		}
+		addKey(key)
 		groups[key] = append(groups[key], job)
 	}
-	// Twenty jobs and five concurrent fetches fit within the 45-second pass
-	// even when every distinct feed uses its full ten-second timeout.
+	for _, gjob := range globalJobs {
+		key := feedKey{gjob.Signal.Symbol, gjob.Signal.FeedSource, gjob.Signal.Ltf}
+		addKey(key)
+		globalGroups[key] = append(globalGroups[key], gjob)
+	}
+	if len(keys) == 0 {
+		return
+	}
+	// Shared feed fetches cover both per-user journal evaluations and global signal
+	// setup outcomes without doubling upstream candle requests.
 	var wg sync.WaitGroup
 	slots := make(chan struct{}, 5)
 	for _, key := range keys {
+		key := key
 		slots <- struct{}{}
 		wg.Add(1)
 		go func() {
@@ -83,6 +115,22 @@ func (s *Service) MonitorSignalEvaluations(ctx context.Context) {
 				ev := &model.UserSignalEval{Status: out.Status, EntryAt: out.EntryAt, At: out.At, Price: out.Price, RLower: out.RLower, Note: out.Note, CheckedAt: out.CheckedAt, Evidence: out.Evidence}
 				if err := s.opts.Evaluations.Save(ctx, job, ev); err != nil {
 					s.logger.Warn("save signal evaluation", "signal_id", job.Signal.SignalID, "error", err)
+				}
+			}
+			if hasGlobalEval {
+				for _, gjob := range globalGroups[key] {
+					in := evalprice.InputDariSinyal(&gjob.Signal)
+					in.ResumeEntryAt = gjob.Signal.SetupEntryAt
+					in.ResumeAfter = gjob.Signal.SetupCheckedAt
+					in.CandleSeconds = seconds
+					out, ok := evalprice.FromCandles(in, closed)
+					if !ok {
+						continue
+					}
+					ev := &model.UserSignalEval{Status: out.Status, EntryAt: out.EntryAt, At: out.At, Price: out.Price, RLower: out.RLower, Note: out.Note, CheckedAt: out.CheckedAt, Evidence: out.Evidence}
+					if err := globalEval.SaveSignal(ctx, gjob, ev); err != nil {
+						s.logger.Warn("save global signal evaluation", "signal_id", gjob.Signal.SignalID, "error", err)
+					}
 				}
 			}
 		}()

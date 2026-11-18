@@ -20,13 +20,19 @@ import {
   PageHeader,
   Section,
   Skeleton,
-  StatusPill,
 } from '@/components/ui'
 import { usePositions, useSignals, useStrategies, useSubscriptions, useTimeframeSwitchMatrix } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
-import { SIGNAL_LABEL, SIGNAL_TONE } from '@/features/signals/lib/status'
+import { getIla3Mtf } from '@/features/signals/lib/status'
+import {
+  OUTCOME_BADGE_CLASS,
+  dedupeSetupSignals,
+  describeSignalOutcome,
+  isRadarProgressSignal,
+} from '@/features/signals/lib/outcome'
+import type { Signal } from '@/types/api'
 import { setTimeframeDipantau, mapSignalsToSlots, ringkasanSlot } from '@/features/signals/lib/signal-slots'
 import { slotPalingDekat, stageOf, type SlotStage } from '@/features/signals/lib/slot-stage'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
@@ -88,6 +94,10 @@ export default function SignalsPage() {
   )
 
   const [activeStrategyFilter, setActiveStrategyFilter] = useState<'ila-2.0' | 'ila-3.0'>('ila-2.0')
+  const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null)
+  const [snapshotSignal, setSnapshotSignal] = useState<Signal | null>(null)
+
+  const cleanSignals = useMemo(() => dedupeSetupSignals(signals ?? []), [signals])
 
   // Filter metode yang ditawarkan mengikuti hak akses tier pengguna.
   const strategiTersedia = useMemo(
@@ -120,8 +130,8 @@ export default function SignalsPage() {
   // Sinyal dan posisi untuk pair yang sedang aktif
   const pairSignals = useMemo(() => {
     if (!activePair) return []
-    return (signals ?? []).filter((s) => s.symbol.toUpperCase() === activePair)
-  }, [signals, activePair])
+    return cleanSignals.filter((s) => s.symbol.toUpperCase() === activePair)
+  }, [cleanSignals, activePair])
 
   const pairPositions = useMemo(() => {
     if (!activePair) return []
@@ -134,16 +144,11 @@ export default function SignalsPage() {
     return pairSignals.filter((s) => s.strategy_version === activeStrategyFilter)
   }, [pairSignals, activeStrategyFilter])
 
-  // Daftar riwayat hanya berisi sinyal sungguhan, bukan baris radar.
-  //
-  // Baris radar memakai ID tetap per slot (`status-*`) dan tanggal terbitnya
-  // beku sejak slot lahir, sehingga bila ikut masuk daftar ini ia muncul seolah
-  // sinyal lama dan menggeser riwayat yang benar-benar baru.
+  // Daftar riwayat hanya berisi setup sungguhan yang memiliki harga entry,
+  // bukan baris pantauan radar (`status-*` / `WAIT_*` berharga 0).
   const signalsRiwayat = useMemo(() => {
     return filteredSignals
-      .filter((s) => !s.signal_id?.startsWith('status-'))
-      // Diurutkan sendiri, tidak bergantung pada urutan API: riwayat harus selalu
-      // menampilkan yang terbaru lebih dulu.
+      .filter((s) => !isRadarProgressSignal(s))
       .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
   }, [filteredSignals])
 
@@ -162,10 +167,15 @@ export default function SignalsPage() {
   }, [signalsRiwayat, historyPage])
 
   const handleSelectPair = (symbol: string) => {
+    setSelectedSlotKey(null)
+    setSnapshotSignal(null)
+    setHistoryPage(1)
     setParams({ pair: symbol })
   }
 
   const handleBackToPairs = () => {
+    setSelectedSlotKey(null)
+    setSnapshotSignal(null)
     params.delete('pair')
     setParams(params)
   }
@@ -188,7 +198,7 @@ export default function SignalsPage() {
   if (!isDesktop) {
     return (
       <SignalsMobileView
-        signals={signals}
+        signals={cleanSignals}
         allPairs={allPairs}
         activePair={activePair}
         onSelectPair={handleSelectPair}
@@ -200,11 +210,20 @@ export default function SignalsPage() {
         activeStrategyFilter={activeStrategyFilter}
         onSelectStrategy={(strat) => {
           setActiveStrategyFilter(strat)
+          setSelectedSlotKey(null)
+          setSnapshotSignal(null)
           setHistoryPage(1)
         }}
         filteredSignals={filteredSignals}
         filteredPositions={filteredPositions}
         timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
+        selectedSlotKey={selectedSlotKey}
+        onSelectSlot={(key) => {
+          setSelectedSlotKey(key)
+          setSnapshotSignal(null)
+        }}
+        snapshotSignal={snapshotSignal}
+        onSelectSnapshot={setSnapshotSignal}
       />
     )
   }
@@ -265,6 +284,8 @@ export default function SignalsPage() {
                     className="h-8 text-xs font-medium"
                     onClick={() => {
                       setActiveStrategyFilter(strat)
+                      setSelectedSlotKey(null)
+                      setSnapshotSignal(null)
                       setHistoryPage(1)
                     }}
                   >
@@ -275,7 +296,7 @@ export default function SignalsPage() {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              Menampilkan {filteredSignals.length} sinyal · {filteredPositions.length} posisi
+              Menampilkan {signalsRiwayat.length} setup · {filteredPositions.length} posisi
             </div>
           </div>
 
@@ -294,6 +315,11 @@ export default function SignalsPage() {
                   strategy={activeStrategyFilter}
                   symbol={activePair}
                   timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
+                  activeSlotKey={selectedSlotKey}
+                  onSelectSlot={(key) => {
+                    setSelectedSlotKey(key)
+                    setSnapshotSignal(null)
+                  }}
                 />
               </Section>
 
@@ -308,6 +334,9 @@ export default function SignalsPage() {
                     symbol={activePair}
                     signals={filteredSignals}
                     strategy={activeStrategyFilter}
+                    selectedSlotKey={selectedSlotKey}
+                    snapshotSignal={snapshotSignal}
+                    onClearSnapshot={() => setSnapshotSignal(null)}
                   />
                 </Section>
               )}
@@ -317,7 +346,7 @@ export default function SignalsPage() {
             <div className="lg:col-span-4">
               <Section
                 title="Histori Setup Sinyal"
-                description={`${signalsRiwayat.length} setup terakhir pada ${activePair}`}
+                description={`${signalsRiwayat.length} setup unik pada ${activePair} · klik untuk pratinjau chart`}
               >
                 {signalsRiwayat.length === 0 ? (
                   <Card>
@@ -333,72 +362,124 @@ export default function SignalsPage() {
                   </Card>
                 ) : (
                   <div className="space-y-2.5">
-                    {paginatedSignals.map((signal) => (
-                      <div
-                        key={signal.signal_id}
-                        className="rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-zinc-300"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
+                    {paginatedSignals.map((signal) => {
+                      const outcome = describeSignalOutcome(signal)
+                      const decimals = priceDigits(signal.symbol, signal.entry_price)
+                      const isSelected = snapshotSignal?.signal_id === signal.signal_id
+
+                      return (
+                        <button
+                          key={signal.signal_id}
+                          type="button"
+                          onClick={() =>
+                            setSnapshotSignal((prev) =>
+                              prev?.signal_id === signal.signal_id ? null : signal,
+                            )
+                          }
+                          aria-pressed={isSelected}
+                          className={cn(
+                            'w-full rounded-xl border bg-card p-3.5 text-left transition-all',
+                            isSelected
+                              ? 'border-foreground ring-1 ring-foreground/20'
+                              : 'border-border hover:border-zinc-400',
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-1 text-xs font-bold',
+                                  signal.direction === 'BUY'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : signal.direction === 'SELL'
+                                      ? 'text-rose-600 dark:text-rose-400'
+                                      : 'text-muted-foreground',
+                                )}
+                              >
+                                {signal.direction === 'BUY' ? (
+                                  <TrendingUp className="h-3.5 w-3.5" />
+                                ) : signal.direction === 'SELL' ? (
+                                  <TrendingDown className="h-3.5 w-3.5" />
+                                ) : null}
+                                {signal.direction}
+                              </span>
+                              <TimeframeBadge
+                                htf={signal.htf}
+                                mtf={
+                                  signal.strategy_version === 'ila-3.0'
+                                    ? getIla3Mtf(signal.htf, signal.ltf)
+                                    : undefined
+                                }
+                                ltf={signal.ltf}
+                              />
+                              {outcome.executedBadge && (
+                                <Badge variant="outline" className="px-1.5 py-0 text-[9.5px]">
+                                  Dieksekusi
+                                </Badge>
+                              )}
+                            </div>
                             <span
                               className={cn(
-                                'inline-flex items-center gap-1 font-bold text-xs',
-                                signal.direction === 'BUY'
-                                  ? 'text-emerald-600'
-                                  : signal.direction === 'SELL'
-                                    ? 'text-rose-600'
-                                    : 'text-muted-foreground',
+                                'inline-flex items-center rounded-md border px-2 py-0.5 text-[10.5px] font-semibold',
+                                OUTCOME_BADGE_CLASS[outcome.tone],
                               )}
                             >
-                              {signal.direction === 'BUY' ? (
-                                <TrendingUp className="h-3.5 w-3.5" />
-                              ) : signal.direction === 'SELL' ? (
-                                <TrendingDown className="h-3.5 w-3.5" />
-                              ) : null}
-                              {signal.direction}
+                              {outcome.label}
                             </span>
-                            <Badge variant="outline" className="text-[10.5px]">
-                              {signal.strategy_version}
-                            </Badge>
-                            <TimeframeBadge htf={signal.htf} ltf={signal.ltf} />
                           </div>
-                          <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[11px]">
-                            {SIGNAL_LABEL[signal.status]}
-                          </StatusPill>
-                        </div>
 
-                        {signal.entry_price > 0 && (
-                          <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-border pt-2 text-[11.5px]">
-                            <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
-                              <p className="font-semibold tabular-nums font-mono">
-                                {formatNumber(signal.entry_price, 5)}
-                              </p>
+                          {signal.entry_price > 0 && (
+                            <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-border pt-2 text-[11.5px]">
+                              <div className="min-w-0">
+                                <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
+                                <p className="truncate font-mono font-semibold tabular-nums">
+                                  {formatNumber(signal.entry_price, decimals)}
+                                </p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
+                                <p className="truncate font-mono text-[10.5px] tabular-nums text-muted-foreground">
+                                  {formatNumber(signal.stop_loss, decimals)} /{' '}
+                                  {formatNumber(signal.take_profit, decimals)}
+                                </p>
+                              </div>
+                              <div className="min-w-0 text-right">
+                                <p className="text-[10px] uppercase text-muted-foreground">
+                                  {outcome.subtext ? 'PnL' : 'R:R'}
+                                </p>
+                                <p
+                                  className={cn(
+                                    'truncate font-mono font-semibold tabular-nums',
+                                    outcome.subtext
+                                      ? outcome.tone === 'tp'
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : outcome.tone === 'sl'
+                                          ? 'text-rose-600 dark:text-rose-400'
+                                          : 'text-foreground'
+                                      : 'text-foreground',
+                                  )}
+                                >
+                                  {outcome.subtext ?? `1:${formatNumber(signal.risk_reward, 2)}`}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
-                              <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground">
-                                {formatNumber(signal.stop_loss, 4)} /{' '}
-                                {formatNumber(signal.take_profit, 4)}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] uppercase text-muted-foreground">R:R</p>
-                              <p className="font-semibold tabular-nums font-mono">
-                                1:{formatNumber(signal.risk_reward, 2)}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
-                          <span>Terbit: {formatDateTime(signal.published_at)}</span>
-                          {signal.delayed && (
-                            <span className="font-semibold uppercase text-amber-600">Delayed 15m</span>
                           )}
-                        </div>
-                      </div>
-                    ))}
+
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10.5px] text-muted-foreground">
+                            <span>Terbit: {formatDateTime(signal.published_at)}</span>
+                            {outcome.resolvedAt ? (
+                              <span>Selesai: {formatDateTime(outcome.resolvedAt)}</span>
+                            ) : signal.delayed ? (
+                              <span className="font-semibold uppercase text-amber-600">Delayed 15m</span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-foreground/70">
+                                {isSelected ? 'Sedang tampil di chart' : 'Lihat chart'}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
 
                     {/* Pagination Controls */}
                     {totalHistoryPages > 1 && (
@@ -575,7 +656,8 @@ export default function SignalsPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {allPairs.map((symbol) => {
-                const pairSigs = (signals ?? []).filter((s) => s.symbol.toUpperCase() === symbol)
+                const pairSigs = cleanSignals.filter((s) => s.symbol.toUpperCase() === symbol)
+                const pairSetupCount = pairSigs.filter((s) => !isRadarProgressSignal(s)).length
                 const pairPos = (positions ?? []).filter((p) => p.symbol.toUpperCase() === symbol)
 
                 // Slot per metode menggantikan `find()` yang dulu mengambil satu
@@ -620,7 +702,7 @@ export default function SignalsPage() {
                             <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Aktif dipantau" />
                           )}
                           <Badge variant="outline" className="text-[10px]">
-                            {pairSigs.length} Setup
+                            {pairSetupCount} Setup
                           </Badge>
                         </div>
                       </div>

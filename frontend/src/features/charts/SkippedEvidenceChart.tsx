@@ -63,7 +63,9 @@ export function SkippedEvidenceChart({
 
   const bar = BAR_SECONDS[item.ltf?.toUpperCase()] ?? 0
   const limit = jumlahCandle(mulai, akhir === mulai ? nowSec : akhir, bar)
-  const query = useMarketCandles(item.symbol, item.ltf, limit, enabled)
+  const query = useMarketCandles(item.symbol, item.ltf, limit, enabled, {
+    staticSnapshot: true,
+  })
   const candles = query.data?.candles ?? []
 
   const { priceLines, markers } = useMemo(() => {

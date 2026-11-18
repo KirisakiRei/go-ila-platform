@@ -440,6 +440,22 @@ export type Signal = {
   expires_at: string
   can_confirm: boolean
   delayed: boolean
+  /** Hasil evaluasi setup pasar (forward test) selaras dengan jurnal. */
+  eval_status?: JournalEvalStatus
+  eval_entry_at?: string | null
+  eval_at?: string | null
+  eval_price?: number
+  eval_r_lower?: number
+  eval_note?: string
+  eval_evidence?: string
+  /** Penanda bahwa setup ini telah dieksekusi oleh akun trading user. */
+  is_executed?: boolean
+  position_id?: string
+  position_status?: PositionStatus
+  outcome_r?: number
+  profit_loss?: number
+  pnl_known?: boolean
+  closed_at?: string | null
 }
 
 export type PositionStatus = 'OPEN' | 'CLOSED_TP' | 'CLOSED_SL' | 'CLOSED_MANUAL' | 'UNTRACKED'

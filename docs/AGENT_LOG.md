@@ -36,6 +36,25 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-18 (4) — Deduplikasi Kohort Histori Setup Sinyal, Outcome TP/SL Selaras Jurnal, Sinkronisasi Timeframe Chart & Live Candle SSE
+
+**Tanggal:** 2026-11-18
+**Pelaku:** Antigravity (Full-Stack Signal & Real-Time Chart Engineering)
+**Tipe:** Signal History Deduplication + TP/SL Outcome Enrichment + Live Multiplexed SSE Candle Stream
+**Status:** 🟢 SELESAI & Teruji Penuh Lokal (`go vet`, `go test ./...`, `tsc`, `eslint --max-warnings=0`, `vitest` 281/281, `vite build`)
+
+**Ringkasan:**
+1. **Deduplikasi Kohort Setup & Status `TP / SL / Posisi Aktif` pada Histori Setup Sinyal:**
+   - Menyatukan penerbitan ulang setup identik `(Symbol, StrategyVersion, kanon(HTF), kanon(LTF), Direction, Entry, SL, TP)` menjadi 1 kartu kanonik (`backend/internal/service/signal_history.go`, `backend/internal/runner/service.go`, `frontend/src/features/signals/lib/outcome.ts`).
+   - Memperluas evaluasi forward-test berbasis `evalprice.FromCandles` ke akar setup global pada tabel `signal` (`SetupCanonicalID`, `SetupEvalStatus`, `SetupEvalRLower`, dll. di `backend/internal/repository/signal_global_eval.go` & `backend/internal/runner/signal_eval.go`) dengan berbagi satu fetch candle bersama evaluasi `user_signal` jurnal tanpa menggandakan request feed.
+   - Memperkaya `GET /api/v1/signals` (`dto.SignalResponse` & `trading_service.go`) dengan status posisi nyata jika dieksekusi user (`Posisi Aktif`, `Hit TP`, `Hit SL`, `Tutup Manual` beserta R/PnL) serta status pasar (`Target TP`, `Stop Loss`, `Setup Berjalan`) jika tidak dieksekusi.
+2. **Sinkronisasi Slot Timeframe Radar ↔ Chart & Live Streaming Candle (`SSE`):**
+   - Menyinkronkan pilihan slot pasangan timeframe di `TimeframeRadarMatrix.tsx` langsung ke `TradingRadarChart.tsx` (Desktop `SignalsPage.tsx` & Mobile `SignalsMobileView.tsx`) sehingga pergantian `H4 · M15` ↔ `H1 · M5` (maupun siklus ILA 3.0) langsung mengganti tab timeframe chart.
+   - Membangun `market.StreamHub` *on-demand* dengan multiplexing 1 WebSocket per `(simbol, feed, resolusi)`, *idle auto-sleep* 15 detik, *rate throttle* 300ms, dan *hard cap* aman bagi VPS 1 GB (`backend/internal/market/stream.go`, `GET /api/v1/market/candles/stream` di `market_handler.go`, `flush_interval -1` di `deploy/Caddyfile`, dan `use-live-candle-stream.ts`).
+   - Mode **Potongan Histori Statis** saat kartu di *Histori Setup Sinyal* diklik (serta pada `SkippedEvidenceChart` & posisi tertutup di `PositionExecutionChart`) berjalan murni statis tanpa live stream.
+
+---
+
 ### 2026-11-18 (3) — Perombakan UI/UX Mobile Panel Pelanggan (360px–430px) & Sistem PWA + Web Push Notification
 
 **Tanggal:** 2026-11-18

@@ -18,13 +18,18 @@ import {
   MobileSegmentedTabs,
   Pagination,
   Skeleton,
-  StatusPill,
   usePaginasiLokal,
 } from '@/components/ui'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
-import { SIGNAL_LABEL, SIGNAL_TONE, getIla3Mtf, isFinal } from '@/features/signals/lib/status'
+import { getIla3Mtf, isFinal } from '@/features/signals/lib/status'
+import {
+  OUTCOME_BADGE_CLASS,
+  dedupeSetupSignals,
+  describeSignalOutcome,
+  isRadarProgressSignal,
+} from '@/features/signals/lib/outcome'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
 import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
@@ -54,6 +59,10 @@ type SignalsMobileViewProps = {
    * Pasangan timeframe yang sedang dipantau. `null` berarti belum diketahui.
    */
   timeframeAktif?: Set<string> | null
+  selectedSlotKey?: string | null
+  onSelectSlot?: (key: string) => void
+  snapshotSignal?: Signal | null
+  onSelectSnapshot?: (signal: Signal | null) => void
 }
 
 export function SignalsMobileView({
@@ -71,6 +80,10 @@ export function SignalsMobileView({
   filteredSignals,
   filteredPositions,
   timeframeAktif,
+  selectedSlotKey = null,
+  onSelectSlot,
+  snapshotSignal = null,
+  onSelectSnapshot,
 }: SignalsMobileViewProps) {
   const [activeTab, setActiveTab] = useState<TabFilter>('all')
   const [pairSection, setPairSection] = useState<PairSection>('radar')
@@ -94,59 +107,73 @@ export function SignalsMobileView({
   }, [])
 
   const baseSignals = useMemo(() => {
-    if (activePair) {
-      return filteredSignals
-    }
-    const activePairSet = new Set(allPairs.map((p) => p.toUpperCase()))
-    return signals.filter((s) => {
-      const matchPair = activePairSet.has(s.symbol.toUpperCase())
-      const matchStrategy = s.strategy_version === activeStrategyFilter
-      return matchPair && matchStrategy
-    })
+    const source = activePair
+      ? filteredSignals
+      : signals.filter((s) => {
+          const activePairSet = new Set(allPairs.map((p) => p.toUpperCase()))
+          const matchPair = activePairSet.has(s.symbol.toUpperCase())
+          const matchStrategy = s.strategy_version === activeStrategyFilter
+          return matchPair && matchStrategy
+        })
+    return dedupeSetupSignals(source)
   }, [activePair, filteredSignals, signals, allPairs, activeStrategyFilter])
 
   const tabFilteredSignals = useMemo(() => {
-    return baseSignals.filter((s) => {
+    const filtered = baseSignals.filter((s) => {
+      const isRadarRow = isRadarProgressSignal(s)
       const isReady =
-        s.status === 'READY_TO_ENTRY' ||
-        s.status === 'OPPORTUNITY' ||
-        s.status.toUpperCase().includes('READY')
-      const isWaiting = s.signal_id?.startsWith('status-') || s.status.toUpperCase().startsWith('WAIT')
-      const isFinalStatus = isFinal(s.status) && !isWaiting
+        !isRadarRow &&
+        (s.status === 'READY_TO_ENTRY' ||
+          s.status === 'OPPORTUNITY' ||
+          s.status.toUpperCase().includes('READY')) &&
+        !isFinal(s.status)
 
-      if (activeTab === 'ready') return isReady && !isFinalStatus
-      if (activeTab === 'monitoring') return !isReady && !isFinalStatus
-      if (activeTab === 'history') return isFinalStatus
-      return true
+      if (activeTab === 'ready') return isReady
+      if (activeTab === 'monitoring') return isRadarRow || s.eval_status === 'RUNNING'
+      if (activeTab === 'history') return !isRadarRow && !isReady
+      // Tab "Semua" fokus pada setup nyata (memiliki harga Entry/SL/TP) agar
+      // tidak tercampur baris radar mentah berharga 0.
+      return !isRadarRow
     })
+
+    return [...filtered].sort(
+      (a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime(),
+    )
   }, [baseSignals, activeTab])
 
   const signalPaginasi = usePaginasiLokal(tabFilteredSignals, 8)
 
   const tabCounts = useMemo(() => {
+    let allSetups = 0
     let readyCount = 0
     let monitoringCount = 0
     let historyCount = 0
 
     for (const s of baseSignals) {
+      const isRadarRow = isRadarProgressSignal(s)
       const isReady =
-        s.status === 'READY_TO_ENTRY' ||
-        s.status === 'OPPORTUNITY' ||
-        s.status.toUpperCase().includes('READY')
-      const isWaiting = s.signal_id?.startsWith('status-') || s.status.toUpperCase().startsWith('WAIT')
-      const isFinalStatus = isFinal(s.status) && !isWaiting
+        !isRadarRow &&
+        (s.status === 'READY_TO_ENTRY' ||
+          s.status === 'OPPORTUNITY' ||
+          s.status.toUpperCase().includes('READY')) &&
+        !isFinal(s.status)
 
-      if (isFinalStatus) {
-        historyCount++
-      } else if (isReady) {
+      if (!isRadarRow) {
+        allSetups++
+      }
+      if (isReady) {
         readyCount++
-      } else {
+      }
+      if (isRadarRow || s.eval_status === 'RUNNING') {
         monitoringCount++
+      }
+      if (!isRadarRow && !isReady) {
+        historyCount++
       }
     }
 
     return {
-      all: baseSignals.length,
+      all: allSetups,
       ready: readyCount,
       monitoring: monitoringCount,
       history: historyCount,
@@ -256,8 +283,11 @@ export function SignalsMobileView({
             const isBuy = signal.direction === 'BUY'
             const isSell = signal.direction === 'SELL'
             const isReady =
-              signal.status === 'READY_TO_ENTRY' || signal.status === 'OPPORTUNITY'
+              !isFinal(signal.status) &&
+              (signal.status === 'READY_TO_ENTRY' || signal.status === 'OPPORTUNITY')
             const decimals = priceDigits(signal.symbol, signal.entry_price)
+            const outcome = describeSignalOutcome(signal)
+            const isRadarRow = isRadarProgressSignal(signal)
 
             return (
               <div
@@ -290,6 +320,11 @@ export function SignalsMobileView({
                         <Badge variant="outline" className="px-1.5 py-0 text-[9.5px]">
                           {signal.strategy_version}
                         </Badge>
+                        {outcome.executedBadge && (
+                          <Badge variant="outline" className="px-1.5 py-0 text-[9.5px]">
+                            Dieksekusi
+                          </Badge>
+                        )}
                         {isReady && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
                             <Zap className="h-3 w-3" />
@@ -319,56 +354,76 @@ export function SignalsMobileView({
                       <span>{signal.direction}</span>
                     </div>
 
-                    <StatusPill tone={SIGNAL_TONE[signal.status]} className="text-[10px]">
-                      {SIGNAL_LABEL[signal.status]}
-                    </StatusPill>
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold',
+                        OUTCOME_BADGE_CLASS[outcome.tone],
+                      )}
+                    >
+                      {outcome.label}
+                    </span>
                   </div>
                 </div>
 
                 {/* 2x2 Grid Metric di layar sempit (4 kolom di >= sm) bebas tabrakan */}
-                <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/80 bg-secondary/40 p-2.5 sm:grid-cols-4">
-                  <div className="min-w-0">
-                    <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Entry
-                    </span>
-                    <span className="block truncate font-mono text-xs font-bold tabular-nums text-foreground">
-                      {signal.entry_price > 0
-                        ? formatNumber(signal.entry_price, decimals)
-                        : '—'}
-                    </span>
-                  </div>
+                {!isRadarRow && (
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/80 bg-secondary/40 p-2.5 sm:grid-cols-4">
+                    <div className="min-w-0">
+                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Entry
+                      </span>
+                      <span className="block truncate font-mono text-xs font-bold tabular-nums text-foreground">
+                        {signal.entry_price > 0
+                          ? formatNumber(signal.entry_price, decimals)
+                          : '—'}
+                      </span>
+                    </div>
 
-                  <div className="min-w-0 text-right sm:text-left">
-                    <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                      R:R
-                    </span>
-                    <span className="block truncate font-mono text-xs font-bold tabular-nums text-foreground">
-                      {signal.risk_reward > 0
-                        ? `1:${formatNumber(signal.risk_reward, 2)}`
-                        : '—'}
-                    </span>
-                  </div>
+                    <div className="min-w-0 text-right sm:text-left">
+                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                        {outcome.subtext ? 'PnL' : 'R:R'}
+                      </span>
+                      <span
+                        className={cn(
+                          'block truncate font-mono text-xs font-bold tabular-nums',
+                          outcome.subtext
+                            ? outcome.tone === 'tp'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : outcome.tone === 'sl'
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-foreground'
+                            : 'text-foreground',
+                        )}
+                      >
+                        {outcome.subtext
+                          ? outcome.subtext
+                          : signal.risk_reward > 0
+                            ? `1:${formatNumber(signal.risk_reward, 2)}`
+                            : '—'}
+                      </span>
+                    </div>
 
-                  <div className="min-w-0">
-                    <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Stop Loss
-                    </span>
-                    <span className="block truncate font-mono text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-400">
-                      {signal.stop_loss > 0 ? formatNumber(signal.stop_loss, decimals) : '—'}
-                    </span>
-                  </div>
+                    <div className="min-w-0">
+                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Stop Loss
+                      </span>
+                      <span className="block truncate font-mono text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                        {signal.stop_loss > 0 ? formatNumber(signal.stop_loss, decimals) : '—'}
+                      </span>
+                    </div>
 
-                  <div className="min-w-0 text-right">
-                    <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Take Profit
-                    </span>
-                    <span className="block truncate font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                      {signal.take_profit > 0
-                        ? formatNumber(signal.take_profit, decimals)
-                        : '—'}
-                    </span>
+                    <div className="min-w-0 text-right">
+                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Take Profit
+                      </span>
+                      <span className="block truncate font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {signal.take_profit > 0
+                          ? formatNumber(signal.take_profit, decimals)
+                          : '—'}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {signal.summary && (
                   <p className="line-clamp-2 text-[11.5px] leading-relaxed text-muted-foreground">
@@ -377,7 +432,7 @@ export function SignalsMobileView({
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px] text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                     <Clock className="h-3 w-3 shrink-0" />
                     <span>{formatDateTime(signal.published_at)}</span>
                     {signal.delayed && (
@@ -387,7 +442,7 @@ export function SignalsMobileView({
                     )}
                   </div>
 
-                  {!activePair && (
+                  {!activePair ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -399,7 +454,20 @@ export function SignalsMobileView({
                       <span>Buka Pair</span>
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
-                  )}
+                  ) : !isRadarRow && onSelectSnapshot ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectSnapshot(signal)
+                        setPairSection('radar')
+                        setChartOpen(true)
+                      }}
+                      className="inline-flex items-center gap-1 font-semibold text-foreground hover:underline"
+                    >
+                      <span>Lihat Chart</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
             )
@@ -616,6 +684,9 @@ export function SignalsMobileView({
                       symbol={activePair}
                       signals={filteredSignals}
                       strategy={activeStrategyFilter}
+                      selectedSlotKey={selectedSlotKey}
+                      snapshotSignal={snapshotSignal}
+                      onClearSnapshot={onSelectSnapshot ? () => onSelectSnapshot(null) : undefined}
                       enabled={chartOpen}
                     />
                   </div>
@@ -628,6 +699,11 @@ export function SignalsMobileView({
                   strategy={activeStrategyFilter}
                   symbol={activePair}
                   timeframeAktif={timeframeAktif}
+                  activeSlotKey={selectedSlotKey}
+                  onSelectSlot={(key) => {
+                    onSelectSlot?.(key)
+                    onSelectSnapshot?.(null)
+                  }}
                 />
               </div>
             </div>

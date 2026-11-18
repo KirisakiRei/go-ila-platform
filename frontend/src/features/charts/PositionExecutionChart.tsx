@@ -78,7 +78,9 @@ export function PositionExecutionChart({
     [timeframe, entryTime, nowSec],
   )
 
-  const query = useMarketCandles(position.symbol, chartTimeframe, POSITION_LIMIT, enabled)
+  const query = useMarketCandles(position.symbol, chartTimeframe, POSITION_LIMIT, enabled, {
+    staticSnapshot: isClosed,
+  })
 
   const candles = query.data?.candles ?? []
   const windowStart = candles.length > 0 ? (candles[0]?.time ?? 0) : 0

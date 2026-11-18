@@ -92,10 +92,20 @@
 		}
 	}
 
-	# Kompresi untuk aset teks.
-	encode zstd gzip
+	# Kompresi untuk aset teks (dikecualikan pada SSE agar potongan frame kecil
+	# langsung dikirim tanpa tertahan buffer kompresor).
+	@bukanStream not path /api/v1/market/candles/stream
+	encode @bukanStream zstd gzip
 
 	# --- API -----------------------------------------------------------------
+	# Stream candle SSE wajib tanpa buffer (flush_interval -1) supaya pergerakan
+	# lilin berjalan tiba seketika di browser.
+	handle /api/v1/market/candles/stream {
+		reverse_proxy backend-api:8080 {
+			flush_interval -1
+		}
+	}
+
 	# Prefix sudah sama dengan yang dipakai backend (/api/v1), jadi tidak ada
 	# penulisan ulang path.
 	handle /api/* {

@@ -21,6 +21,8 @@ export function TimeframeRadarMatrix({
   strategy,
   symbol,
   timeframeAktif,
+  activeSlotKey,
+  onSelectSlot,
 }: {
   signals: Signal[]
   strategy: 'ila-2.0' | 'ila-3.0'
@@ -30,6 +32,9 @@ export function TimeframeRadarMatrix({
    * `null` berarti belum diketahui, sehingga slot tidak ditandai mati.
    */
   timeframeAktif?: Set<string> | null
+  /** Kunci slot aktif bila disinkronkan dengan komponen luar (mis. Chart Setup). */
+  activeSlotKey?: string | null
+  onSelectSlot?: (key: string) => void
 }) {
   // Matriks dikunci ke satu metode. Penyaringan ini pengaman tambahan supaya
   // sinyal dari metode lain tidak pernah ikut membentuk slot di matriks ini.
@@ -40,11 +45,20 @@ export function TimeframeRadarMatrix({
 
   // Otomatis arahkan ke slot yang statusnya READY jika ada, atau slot pertama
   const initialKey = slots.find((s) => s.status === 'READY')?.key ?? slots[0]?.key ?? ''
-  const [activeKey, setActiveKey] = useState<string>(initialKey)
+  const [internalKey, setInternalKey] = useState<string>(initialKey)
   const [viewMode, setViewMode] = useState<'tab' | 'grid'>('tab')
 
-  // Pastikan activeKey valid di antara slots saat ini
-  const currentSlot = slots.find((s) => s.key === activeKey) ?? slots[0]
+  const pickSlot = (key: string) => {
+    setInternalKey(key)
+    onSelectSlot?.(key)
+  }
+
+  const targetKey = activeSlotKey || internalKey
+  // Pastikan slot valid di antara daftar slot metode saat ini
+  const currentSlot =
+    slots.find((s) => s.key === targetKey) ??
+    slots.find((s) => s.status === 'READY') ??
+    slots[0]
 
   return (
     <div className="space-y-4">
@@ -63,7 +77,7 @@ export function TimeframeRadarMatrix({
                 key={slot.key}
                 type="button"
                 onClick={() => {
-                  setActiveKey(slot.key)
+                  pickSlot(slot.key)
                   if (viewMode === 'grid') setViewMode('tab')
                 }}
                 className={cn(
@@ -171,7 +185,7 @@ export function TimeframeRadarMatrix({
               symbol={symbol}
               dipantau={timeframeSlotDipantau(aktif, slot)}
               onSelect={() => {
-                setActiveKey(slot.key)
+                pickSlot(slot.key)
                 setViewMode('tab')
               }}
             />
