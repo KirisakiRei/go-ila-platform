@@ -1,7 +1,21 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { BarChart3, Bot, Bug, CreditCard, FlaskConical, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
+import {
+  BarChart3,
+  Bot,
+  Bug,
+  CreditCard,
+  FlaskConical,
+  LayoutDashboard,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Radio,
+  Settings,
+  Sparkles,
+  Wallet,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
 import { Logo } from '@/components/brand/Logo'
@@ -85,8 +99,11 @@ const NAV_GROUPS: NavGroup[] = [
 type AppShellProps = { user: User; children: ReactNode }
 
 /**
- * Kerangka aplikasi: sidebar tetap di kiri, bilah judul di atas, konten
- * terpusat. Sidebar runtuh menjadi bilah atas pada layar sempit.
+ * Kerangka aplikasi pelanggan:
+ * - Sidebar desktop fixed di kiri (tidak terikut scroll halaman utama).
+ * - Mendukung mode collapse / expand dengan transisi mulus dan penyimpanan preferensi lokal.
+ * - Bilah judul desktop tetap sticky di atas.
+ * - Pada layar ponsel/tablet (< lg), beralih ke MobileTopBar & MobileBottomNav.
  */
 export function AppShell({ user, children }: AppShellProps) {
   const signOut = useSignOut()
@@ -95,6 +112,25 @@ export function AppShell({ user, children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const inviteOnly = useInviteOnly()
   const title = TITLES[pathname] ?? 'ILA Bot'
+
+  // State sidebar collapse / expand (tersimpan di localStorage)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('ila_user_sidebar_collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ila_user_sidebar_collapsed', String(isCollapsed))
+    } catch {
+      // Abaikan bila storage dicegah oleh izin peramban
+    }
+  }, [isCollapsed])
+
+  const toggleSidebar = () => setIsCollapsed((prev) => !prev)
 
   // Saat Service Worker menerima Web Push di latar belakang, segarkan data
   // sinyal dan posisi seketika tanpa menunggu jeda polling.
@@ -131,73 +167,141 @@ export function AppShell({ user, children }: AppShellProps) {
       {/* Top Bar khusus tampilan Mobile (< lg) */}
       <MobileTopBar user={user} onOpenMenu={() => setMobileMenuOpen(true)} />
 
-      {/* Sidebar tetap di kiri untuk layar Desktop (>= lg) */}
-      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-border">
-        <div className="flex h-14 items-center justify-between border-b border-border px-4">
-          <div className="flex items-center gap-2.5">
-            {/* Logo bersama memakai turunan 64/128px, bukan berkas 660 KB asli. */}
-            <Logo className="h-7 w-auto" />
-            <div className="flex items-baseline gap-1">
-              <span className="text-sm font-bold tracking-tight">ILA</span>
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Platform
-              </span>
-            </div>
-          </div>
-          <Badge variant="muted" className="inline-flex text-[10px]">
-            {TIER_LABEL[user.tier]}
-          </Badge>
+      {/* Sidebar tetap di kiri untuk layar Desktop (>= lg) — Fixed & tidak terikut scroll */}
+      <aside
+        className={cn(
+          'hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-border lg:bg-card transition-[width] duration-200 ease-in-out',
+          isCollapsed ? 'lg:w-[68px]' : 'lg:w-64',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-14 shrink-0 items-center border-b border-border px-3.5',
+            isCollapsed ? 'justify-center px-2' : 'justify-between',
+          )}
+        >
+          {isCollapsed ? (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="group relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/80 bg-background hover:bg-secondary text-muted-foreground hover:text-foreground transition-all shadow-xs"
+              title="Perluas bilah navigasi"
+              aria-label="Perluas bilah navigasi"
+            >
+              <Logo className="h-6 w-auto transition-all group-hover:opacity-20 group-hover:scale-90" />
+              <PanelLeftOpen className="absolute h-4 w-4 opacity-0 transition-all group-hover:opacity-100 text-foreground" />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <Logo className="h-7 w-auto shrink-0" />
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-bold tracking-tight">ILA</span>
+                  <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Platform
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="muted" className="inline-flex text-[10px]">
+                  {TIER_LABEL[user.tier]}
+                </Badge>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  title="Ciutkan bilah navigasi"
+                  aria-label="Ciutkan bilah navigasi"
+                >
+                  <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <nav
           aria-label="Navigasi utama"
-          className="flex flex-1 flex-col overflow-y-auto p-3 scrollbar-thin"
+          className="flex flex-1 flex-col overflow-y-auto p-2.5 scrollbar-thin"
         >
           {navGroups.map((group, groupIndex) => (
-            <div key={group.label} className={cn('flex flex-col', groupIndex > 0 && 'mt-3')}>
-              <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
-                {group.label}
-              </p>
-              {group.items.map(({ to, label, icon: Icon, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  aria-current={pathname === to ? 'page' : undefined}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors',
-                      isActive
-                        ? 'bg-secondary font-semibold text-foreground shadow-xs'
-                        : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span>{label}</span>
-                </NavLink>
-              ))}
+            <div
+              key={group.label}
+              className={cn('flex flex-col', groupIndex > 0 && (isCollapsed ? 'mt-2' : 'mt-3'))}
+            >
+              {isCollapsed ? (
+                groupIndex > 0 && <div className="my-1.5 border-t border-border/60 mx-1.5" />
+              ) : (
+                <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+                  {group.label}
+                </p>
+              )}
+              <div className="flex flex-col gap-1">
+                {group.items.map(({ to, label, icon: Icon, end }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    title={isCollapsed ? label : undefined}
+                    aria-current={pathname === to ? 'page' : undefined}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-2.5 rounded-lg text-[13px] transition-colors',
+                        isCollapsed ? 'justify-center p-2.5' : 'px-2.5 py-2',
+                        isActive
+                          ? 'bg-secondary font-semibold text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+                      )
+                    }
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className={cn('truncate', isCollapsed && 'hidden')}>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
             </div>
           ))}
         </nav>
 
-        <div className="flex flex-col gap-2.5 border-t border-border p-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-[12.5px] font-semibold">{user.name}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+        <div className="shrink-0 border-t border-border p-2.5">
+          {isCollapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={signOut}
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                title={`Keluar (${user.name || user.email})`}
+                aria-label="Keluar dari akun"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              </button>
             </div>
-            <Badge variant="muted">{TIER_LABEL[user.tier]}</Badge>
-          </div>
-          <Button variant="outline" size="sm" className="w-full text-xs" onClick={signOut}>
-            Keluar
-          </Button>
+          ) : (
+            <div className="flex flex-col gap-2.5 p-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[12.5px] font-semibold">{user.name}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+                </div>
+                <Badge variant="muted">{TIER_LABEL[user.tier]}</Badge>
+              </div>
+              <Button variant="outline" size="sm" className="w-full text-xs" onClick={signOut}>
+                Keluar
+              </Button>
+            </div>
+          )}
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Desktop Header Bar (>= lg) */}
-        <div className="hidden h-14 items-center justify-between gap-3 border-b border-border px-6 lg:flex">
+      {/* Konten Utama Desktop (Diberi padding kiri sesuai lebar sidebar fixed) */}
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-in-out',
+          isCollapsed ? 'lg:pl-[68px]' : 'lg:pl-64',
+        )}
+      >
+        {/* Desktop Header Bar (>= lg) — Sticky di puncak konten */}
+        <div className="sticky top-0 z-20 hidden h-14 items-center justify-between gap-3 border-b border-border bg-background/95 backdrop-blur-xs px-6 lg:flex">
           <h2 className="truncate text-[13px] font-semibold">{title}</h2>
           <div className="flex items-center gap-2">
             <span className="text-[12px] text-muted-foreground">{user.email}</span>

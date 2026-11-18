@@ -191,20 +191,36 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
     <div className="flex min-h-full flex-col lg:flex-row">
       <aside
         className={cn(
-          'shrink-0 border-b border-border transition-all duration-200 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r',
+          'shrink-0 border-b border-border transition-[width] duration-200 ease-in-out lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r lg:bg-card',
           isCollapsed ? 'lg:w-[68px]' : 'lg:w-64',
         )}
       >
         <div
           className={cn(
             'flex h-14 shrink-0 items-center border-b border-border px-3.5',
-            isCollapsed ? 'lg:justify-center lg:px-2' : 'justify-between',
+            isCollapsed ? 'justify-between lg:justify-center lg:px-2' : 'justify-between',
           )}
         >
-          {/* Logo bersama */}
-          <div className="flex items-center gap-2.5 overflow-hidden">
+          {/* Saat collapsed pada desktop: tampilkan tombol logo interaktif untuk expand */}
+          {isCollapsed ? (
+            <div className="hidden lg:flex w-full items-center justify-center">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="group relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/80 bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs"
+                title="Perluas bilah navigasi"
+                aria-label="Perluas bilah navigasi"
+              >
+                <Logo className="h-6 w-auto transition-all group-hover:opacity-20 group-hover:scale-90" />
+                <PanelLeftOpen className="absolute h-4 w-4 opacity-0 transition-all group-hover:opacity-100 text-foreground" />
+              </button>
+            </div>
+          ) : null}
+
+          {/* Logo bersama (selalu tampil di mobile, atau desktop saat expanded) */}
+          <div className={cn('flex items-center gap-2.5 overflow-hidden', isCollapsed && 'lg:hidden')}>
             <Logo className="h-7 w-auto shrink-0" />
-            <div className={cn('flex items-baseline gap-1', isCollapsed && 'lg:hidden')}>
+            <div className="flex items-baseline gap-1">
               <span className="text-sm font-bold tracking-tight">ILA</span>
               <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Admin
@@ -212,23 +228,18 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
             </div>
           </div>
 
-          {/* Tombol collapse / expand sidebar desktop */}
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className={cn(
-              'hidden h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex',
-              isCollapsed && 'mt-1',
-            )}
-            title={isCollapsed ? 'Perluas bilah navigasi' : 'Ciutkan bilah navigasi'}
-            aria-label={isCollapsed ? 'Perluas bilah navigasi' : 'Ciutkan bilah navigasi'}
-          >
-            {isCollapsed ? (
-              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-            ) : (
+          {/* Tombol collapse / expand sidebar desktop saat expanded */}
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="hidden h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
+              title="Ciutkan bilah navigasi"
+              aria-label="Ciutkan bilah navigasi"
+            >
               <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-            )}
-          </button>
+            </button>
+          )}
 
           {/* Pada layar sempit sidebar menjadi bilah atas; tombol keluar ikut pindah ke sini. */}
           <button
@@ -280,7 +291,7 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
 
                 {/* Garis pemisah halus saat sidebar mode mini (collapsed) */}
                 {isCollapsed && (
-                  <div className="hidden my-1.5 border-t border-border/60 lg:block first:hidden" />
+                  <div className="hidden my-1.5 border-t border-border/60 mx-1.5 lg:block first:hidden" />
                 )}
 
                 {/* Daftar item menu di dalam grup */}
@@ -298,8 +309,8 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
                       title={isCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         cn(
-                          'flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-1.5 text-[13px] transition-colors',
-                          isCollapsed && 'lg:justify-center lg:px-2.5 lg:py-2',
+                          'flex items-center gap-2 whitespace-nowrap rounded-md text-[13px] transition-colors',
+                          isCollapsed ? 'lg:justify-center lg:p-2.5' : 'px-3 py-1.5',
                           isActive
                             ? 'bg-muted font-medium text-foreground'
                             : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
@@ -354,9 +365,17 @@ export function AdminShell({ children, actorEmail }: { children: ReactNode; acto
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 sm:p-6">{children}</div>
-      </main>
+      {/* Konten Utama Admin (Offset padding sesuai lebar sidebar fixed) */}
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-in-out',
+          isCollapsed ? 'lg:pl-[68px]' : 'lg:pl-64',
+        )}
+      >
+        <main className="min-w-0 flex-1">
+          <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 sm:p-6">{children}</div>
+        </main>
+      </div>
     </div>
   )
 }
