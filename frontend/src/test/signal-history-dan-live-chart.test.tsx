@@ -125,14 +125,14 @@ describe('Deduplikasi Histori Setup & Badge TP/SL', () => {
     expect(badge.executedBadge).toBe(true)
   })
 
-  it('menampilkan Target TP, Stop Loss, dan Setup Berjalan untuk sinyal tidak dieksekusi', () => {
+  it('menampilkan Hit TP, Hit SL, dan Sedang Berjalan yang seragam untuk sinyal tidak dieksekusi', () => {
     const tpSig = makeSignal({ signal_id: 'tp-1', eval_status: 'TP', eval_r_lower: 2.5 })
     const slSig = makeSignal({ signal_id: 'sl-1', eval_status: 'SL', eval_r_lower: -1 })
     const runSig = makeSignal({ signal_id: 'run-1', eval_status: 'RUNNING' })
 
-    expect(describeSignalOutcome(tpSig).label).toBe('Target TP (+2.50R)')
-    expect(describeSignalOutcome(slSig).label).toBe('Stop Loss (-1.00R)')
-    expect(describeSignalOutcome(runSig).label).toBe('Setup Berjalan')
+    expect(describeSignalOutcome(tpSig).label).toBe('Hit TP (+2.50R)')
+    expect(describeSignalOutcome(slSig).label).toBe('Hit SL (-1.00R)')
+    expect(describeSignalOutcome(runSig).label).toBe('Sedang Berjalan')
   })
 })
 
@@ -231,7 +231,7 @@ describe('Sinkronisasi Timeframe Radar ↔ Chart & Live Stream SSE', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Buka Potongan Histori' }))
     expect(prevStream?.closed).toBe(true)
     expect(screen.getByText(/Potongan Histori · SELL H4\/M15/)).toBeInTheDocument()
-    expect(screen.getByText('Target TP (+2.00R)')).toBeInTheDocument()
+    expect(screen.getByText('Hit TP (+2.00R)')).toBeInTheDocument()
     expect(screen.getByText('Statis')).toBeInTheDocument()
   })
 })

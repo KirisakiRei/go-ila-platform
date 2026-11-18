@@ -69,7 +69,7 @@ export function describeSignalOutcome(signal: Signal): SignalOutcomeDescriptor {
 
     if (posStatus === 'OPEN') {
       return {
-        label: 'Posisi Aktif',
+        label: 'Sedang Berjalan',
         tone: 'active',
         executedBadge: true,
       }
@@ -115,7 +115,7 @@ export function describeSignalOutcome(signal: Signal): SignalOutcomeDescriptor {
           ? signal.eval_r_lower
           : signal.risk_reward
       return {
-        label: rVal > 0 ? `Target TP (${formatR(rVal)})` : 'Target TP',
+        label: rVal > 0 ? `Hit TP (${formatR(rVal)})` : 'Hit TP',
         tone: 'tp',
         resolvedAt: signal.eval_at,
       }
@@ -126,14 +126,14 @@ export function describeSignalOutcome(signal: Signal): SignalOutcomeDescriptor {
           ? signal.eval_r_lower
           : -1
       return {
-        label: `Stop Loss (${formatR(rVal)})`,
+        label: `Hit SL (${formatR(rVal)})`,
         tone: 'sl',
         resolvedAt: signal.eval_at,
       }
     }
     case 'RUNNING':
       return {
-        label: 'Setup Berjalan',
+        label: 'Sedang Berjalan',
         tone: 'active',
       }
     case 'NO_ENTRY':
@@ -165,7 +165,7 @@ export function describeSignalOutcome(signal: Signal): SignalOutcomeDescriptor {
   }
   if (signal.status === 'ILA3_TARGET_REACHED') {
     return {
-      label: 'Target Tercapai',
+      label: 'Hit TP',
       tone: 'tp',
     }
   }

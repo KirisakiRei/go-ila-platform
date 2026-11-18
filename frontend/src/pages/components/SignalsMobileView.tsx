@@ -381,25 +381,12 @@ export function SignalsMobileView({
 
                     <div className="min-w-0 text-right sm:text-left">
                       <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
-                        {outcome.subtext ? 'PnL' : 'R:R'}
+                        R:R
                       </span>
-                      <span
-                        className={cn(
-                          'block truncate font-mono text-xs font-bold tabular-nums',
-                          outcome.subtext
-                            ? outcome.tone === 'tp'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : outcome.tone === 'sl'
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-foreground'
-                            : 'text-foreground',
-                        )}
-                      >
-                        {outcome.subtext
-                          ? outcome.subtext
-                          : signal.risk_reward > 0
-                            ? `1:${formatNumber(signal.risk_reward, 2)}`
-                            : '—'}
+                      <span className="block truncate font-mono text-xs font-bold tabular-nums text-foreground">
+                        {signal.risk_reward > 0
+                          ? `1:${formatNumber(signal.risk_reward, 2)}`
+                          : '—'}
                       </span>
                     </div>
 
@@ -422,6 +409,24 @@ export function SignalsMobileView({
                           : '—'}
                       </span>
                     </div>
+                  </div>
+                )}
+
+                {outcome.executedBadge && outcome.subtext && (
+                  <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-1.5 text-xs">
+                    <span className="text-[11px] text-muted-foreground">PnL Eksekusi</span>
+                    <span
+                      className={cn(
+                        'font-mono text-xs font-bold tabular-nums',
+                        outcome.tone === 'tp'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : outcome.tone === 'sl'
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-foreground',
+                      )}
+                    >
+                      {outcome.subtext}
+                    </span>
                   </div>
                 )}
 

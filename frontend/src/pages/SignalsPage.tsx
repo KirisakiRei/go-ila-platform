@@ -444,24 +444,31 @@ export default function SignalsPage() {
                                 </p>
                               </div>
                               <div className="min-w-0 text-right">
-                                <p className="text-[10px] uppercase text-muted-foreground">
-                                  {outcome.subtext ? 'PnL' : 'R:R'}
-                                </p>
-                                <p
-                                  className={cn(
-                                    'truncate font-mono font-semibold tabular-nums',
-                                    outcome.subtext
-                                      ? outcome.tone === 'tp'
-                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                        : outcome.tone === 'sl'
-                                          ? 'text-rose-600 dark:text-rose-400'
-                                          : 'text-foreground'
-                                      : 'text-foreground',
-                                  )}
-                                >
-                                  {outcome.subtext ?? `1:${formatNumber(signal.risk_reward, 2)}`}
+                                <p className="text-[10px] uppercase text-muted-foreground">R:R</p>
+                                <p className="truncate font-mono font-semibold tabular-nums text-foreground">
+                                  {signal.risk_reward > 0
+                                    ? `1:${formatNumber(signal.risk_reward, 2)}`
+                                    : '—'}
                                 </p>
                               </div>
+                            </div>
+                          )}
+
+                          {outcome.executedBadge && outcome.subtext && (
+                            <div className="mt-2 flex items-center justify-between rounded-lg bg-secondary/50 px-2.5 py-1 text-[11px]">
+                              <span className="text-muted-foreground">PnL Eksekusi</span>
+                              <span
+                                className={cn(
+                                  'font-mono font-semibold tabular-nums',
+                                  outcome.tone === 'tp'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : outcome.tone === 'sl'
+                                      ? 'text-rose-600 dark:text-rose-400'
+                                      : 'text-foreground',
+                                )}
+                              >
+                                {outcome.subtext}
+                              </span>
                             </div>
                           )}
 
