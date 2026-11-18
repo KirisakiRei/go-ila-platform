@@ -238,7 +238,7 @@ export default function LaporkanBugPage() {
               rows={6}
               placeholder="Langkah yang Anda lakukan, yang seharusnya terjadi, dan yang benar-benar terjadi."
               onChange={(e) => setBody(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
               required
             />
           </div>
@@ -343,7 +343,7 @@ export default function LaporkanBugPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button type="submit" size="sm" isLoading={kirim.isPending}>
+            <Button type="submit" size="sm" className="w-full sm:w-auto" isLoading={kirim.isPending}>
               Kirim laporan
             </Button>
           </div>

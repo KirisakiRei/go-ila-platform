@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { Badge, Card, CardContent, Skeleton } from '@/components/ui'
 import { getCycleBadge, getIla3Mtf } from '@/features/signals/lib/status'
 import { useSetTimeframeSwitch, useTimeframeSwitchMatrix } from '@/lib/queries'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import type { StrategyVersion, TimeframeSwitchItem } from '@/types/api'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils'
 export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
   const { data, isLoading, isError } = useTimeframeSwitchMatrix(symbol)
   const ubah = useSetTimeframeSwitch(symbol)
+  const isMobile = useIsMobile()
 
   if (isLoading) return <Skeleton className="h-40 w-full rounded-xl" />
 
@@ -59,6 +61,101 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
           )
         }
 
+        if (isMobile) {
+          return (
+            <div key={group.strategy} className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {group.strategy}
+                </span>
+                {!data?.auto_allowed && (
+                  <Badge variant="muted" className="text-[9.5px]">
+                    Eksekusi otomatis tidak tersedia
+                  </Badge>
+                )}
+              </div>
+
+              {group.accounts.map((account) => {
+                const sibuk =
+                  ubah.isPending &&
+                  ubah.variables?.accountID === account.account_id &&
+                  ubah.variables?.strategy === group.strategy
+
+                return (
+                  <div
+                    key={account.account_id}
+                    className="overflow-hidden rounded-xl border border-border bg-card"
+                  >
+                    <div className="border-b border-border bg-secondary/40 px-3 py-2 text-xs font-semibold text-foreground">
+                      {account.label || 'Akun Broker'}
+                    </div>
+                    <div className="divide-y divide-border/70">
+                      {account.pairs.map((pair) => {
+                        const tfLabel =
+                          group.strategy === 'ila-3.0'
+                            ? `${pair.htf} · ${getIla3Mtf(pair.htf, pair.ltf)} · ${pair.ltf}`
+                            : `${pair.htf} · ${pair.ltf}`
+                        const cycle = getCycleBadge(group.strategy, pair.htf, pair.ltf)
+
+                        return (
+                          <div
+                            key={`${account.account_id}-${pair.htf}-${pair.ltf}`}
+                            className="flex flex-col gap-2 px-3 py-2.5 text-xs"
+                          >
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-mono text-[11.5px] font-semibold text-foreground">
+                                {tfLabel}
+                              </span>
+                              {cycle && (
+                                <span className="inline-flex items-center rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9.5px] font-medium text-primary">
+                                  {cycle}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-muted-foreground">Pantau</span>
+                                <Saklar
+                                  menyala={pair.watch}
+                                  sibuk={sibuk}
+                                  onToggle={(nilai) =>
+                                    kirim(ubah, account, group.strategy, pair, {
+                                      watch: nilai,
+                                      auto: nilai ? pair.auto : false,
+                                    })
+                                  }
+                                />
+                              </div>
+
+                              {data?.auto_allowed && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-muted-foreground">Eksekusi</span>
+                                  <Saklar
+                                    menyala={pair.auto}
+                                    sibuk={sibuk}
+                                    nonaktif={!pair.watch}
+                                    onToggle={(nilai) =>
+                                      kirim(ubah, account, group.strategy, pair, {
+                                        watch: nilai ? true : pair.watch,
+                                        auto: nilai,
+                                      })
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        }
+
         return (
           <div key={group.strategy} className="space-y-2">
             <div className="flex items-center gap-2">
@@ -78,8 +175,6 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                   <tr>
                     <th className="px-3.5 py-2.5 font-medium">Akun</th>
                     <th className="px-3.5 py-2.5 font-medium">Timeframe</th>
-                    {/* Lebar saklar dipatok: tanpa ini kolom Pantau dan Eksekusi
-                        bergeser antar grup karena isi tiap tabel berbeda panjang. */}
                     <th className="w-24 px-3.5 py-2.5 text-center font-medium">Pantau</th>
                     {data?.auto_allowed && (
                       <th className="w-24 px-3.5 py-2.5 text-center font-medium">Eksekusi</th>
@@ -104,7 +199,7 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                             </td>
                           )}
                           <td className="px-3.5 py-2.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <span className="font-mono text-[11.5px] font-medium text-foreground">
                                 {(() => {
                                   if (group.strategy === 'ila-3.0') {
@@ -118,7 +213,7 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                                 const cycle = getCycleBadge(group.strategy, pair.htf, pair.ltf)
                                 if (!cycle) return null
                                 return (
-                                  <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary border border-primary/20">
+                                  <span className="inline-flex items-center rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                                     {cycle}
                                   </span>
                                 )
@@ -132,8 +227,6 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                               onToggle={(nilai) =>
                                 kirim(ubah, account, group.strategy, pair, {
                                   watch: nilai,
-                                  // Mematikan pantau harus ikut mematikan auto:
-                                  // sinyal yang tidak diminta tak bisa dieksekusi.
                                   auto: nilai ? pair.auto : false,
                                 })
                               }
@@ -147,7 +240,6 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
                                 nonaktif={!pair.watch}
                                 onToggle={(nilai) =>
                                   kirim(ubah, account, group.strategy, pair, {
-                                    // Menyalakan auto otomatis menyalakan pantau.
                                     watch: nilai ? true : pair.watch,
                                     auto: nilai,
                                   })
@@ -169,12 +261,6 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
   )
 }
 
-/**
- * kirim menyusun ulang seluruh pasangan akun dengan satu nilai diubah.
- *
- * Server menimpa seluruh saklar akun untuk metode ini, jadi baris lain wajib
- * ikut dikirim agar tidak hilang.
- */
 function kirim(
   ubah: ReturnType<typeof useSetTimeframeSwitch>,
   account: { account_id: string; pairs: TimeframeSwitchItem[] },
@@ -189,8 +275,6 @@ function kirim(
   )
   ubah.mutate({ accountID: account.account_id, strategy, pairs })
 }
-
-
 
 function Saklar({
   menyala,
@@ -213,7 +297,7 @@ function Saklar({
       title={nonaktif ? 'Nyalakan Pantau lebih dulu' : undefined}
       onClick={() => onToggle(!menyala)}
       className={cn(
-        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 border transition-colors',
+        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors',
         menyala
           ? 'border-primary bg-primary'
           : 'border-border bg-secondary hover:bg-secondary/80',

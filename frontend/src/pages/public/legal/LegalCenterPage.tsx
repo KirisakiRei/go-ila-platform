@@ -232,12 +232,12 @@ function LegalHubPage() {
             sering muncul, pusat bantuan menjawab banyak hal lebih cepat.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              to="/bantuan"
+            <a
+              href="/bantuan"
               className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-zinc-800"
             >
               Pusat Bantuan
-            </Link>
+            </a>
             <a
               href="mailto:dukungan@rekavia.com"
               className="inline-flex items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-[13px] font-medium text-[#09090b] transition-colors hover:bg-zinc-100"
@@ -289,10 +289,18 @@ function LegalDocumentPage({ slug }: { slug: LegalSlug }) {
     outline.length > 0,
   )
 
+  const isAppPanel =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/app/')
+
   return (
     <div className="bg-[#f5f5f7] text-[#09090b]">
       {/* Sticky portal navigation: Breadcrumb dan Tab Dokumen Legal tetap nampak saat dokumen digulir */}
-      <div className="sticky top-14 z-20 border-b border-zinc-200/80 bg-[#f5f5f7]/95 backdrop-blur-md">
+      <div
+        className={cn(
+          'sticky z-20 border-b border-zinc-200/80 bg-[#f5f5f7]/95 backdrop-blur-md',
+          isAppPanel ? 'top-0' : 'top-14',
+        )}
+      >
         <div className="mx-auto w-full max-w-6xl px-4 pt-4 pb-0 sm:px-6">
           <Breadcrumb current={title} />
 

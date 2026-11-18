@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   BarChart3,
   CreditCard,
+  FlaskConical,
   Grid,
   Landmark,
   ListChecks,
@@ -113,20 +114,30 @@ export function DashboardQuickActions({ onOpenMore, onOpenOnboarding }: Dashboar
             <span className="text-[11px] font-medium text-foreground leading-tight">Checklist</span>
           </button>
 
-          {/* 6. Billing (dengan badge tier) — disembunyikan saat invite only
-              karena tidak ada paket yang bisa dibeli. */}
-          {!inviteOnly && (
+          {/* 6. Billing (dengan badge tier) — saat invite only diganti Backtest
+              agar kisi 4x2 tetap genap 8 item tanpa pintu mati. */}
+          {!inviteOnly ? (
             <Link
               to="/langganan"
-              className="flex flex-col items-center gap-1 text-center transition-transform active:scale-95 group"
+              className="group flex flex-col items-center gap-1 text-center transition-transform active:scale-95"
             >
               <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
                 <CreditCard className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 rounded-full bg-emerald-600 px-1 text-[8px] font-bold text-white ring-1 ring-card leading-tight">
+                <span className="absolute -top-1 -right-1 rounded-full bg-emerald-600 px-1 text-[8px] font-bold leading-tight text-white ring-1 ring-card">
                   {tierLabel}
                 </span>
               </div>
-              <span className="text-[11px] font-medium text-foreground leading-tight">Billing</span>
+              <span className="text-[11px] font-medium leading-tight text-foreground">Billing</span>
+            </Link>
+          ) : (
+            <Link
+              to="/backtest"
+              className="group flex flex-col items-center gap-1 text-center transition-transform active:scale-95"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-foreground transition-colors group-hover:bg-secondary/80">
+                <FlaskConical className="h-5 w-5" />
+              </div>
+              <span className="text-[11px] font-medium leading-tight text-foreground">Backtest</span>
             </Link>
           )}
 

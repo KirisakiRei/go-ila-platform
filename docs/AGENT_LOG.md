@@ -36,6 +36,44 @@ Lalu baca docs/AGENT_LOG.md (entri terbaru di paling atas).
 
 ## ⬆️ DARI CLAUDE KE HUMAN & HERMES
 
+### 2026-11-18 (3) — Perombakan UI/UX Mobile Panel Pelanggan (360px–430px) & Sistem PWA + Web Push Notification
+
+**Tanggal:** 2026-11-18
+**Pelaku:** Antigravity (Full-Stack UX & Notification Engineering)
+**Tipe:** Mobile UI/UX Overhaul + End-to-End PWA & Web Push Notification (`VAPID` + `aes128gcm`)
+**Status:** 🟢 SELESAI, teruji penuh & LIVE di VPS 2
+
+**Ringkasan:**
+1. **Perombakan Menyeluruh UI & UX Mobile Panel Pelanggan (`360px–430px`) Bebas Horizontal Scroll:**
+   - **Fondasi Global (`app.html`, `globals.css`, `AppShell.tsx`, `MobileBottomNav.tsx`, `MobileMoreDrawer.tsx`, `pagination.tsx`, `modal.tsx`, `input.tsx`, `select.tsx`, `stat.tsx`):**
+     - Menambahkan `viewport-fit=cover`, pengunci `overflow-x: hidden`, utilitas `.scrollbar-none`, safe-area bottom padding dinamis, ukuran teks input `16px` (`text-base sm:text-sm`) pencegah auto-zoom iOS Safari, bottom-sheet modal responsif (`max-h-[90dvh]`), mode ringkas `Pagination` (`Hal X / Y`), serta menyusun ulang `MobileMoreDrawer` ke pola menu grup 1 kolom ala `SettingsMobileView`.
+     - Mengecualikan rute darurat `/approve/*` dari auto-popup `OnboardingModal` agar konfirmasi sinyal live dari Telegram/Web Push tidak pernah tertutup modal.
+   - **Pola Menu Hub Drill-Down & Kartu Mobile Pengganti Tabel Lebar:**
+     - `AccountDetailPage.tsx` & `RiskSimulatorPanel.tsx`: Menerapkan menu hub mobile (`?sub=risiko | simulasi | pair | riwayat`), memisahkan `RiskSimulatorPanel` keluar dari `<form>` pengaturan risiko, serta mengganti tabel 8 kolom riwayat order menjadi kartu tiket order mobile.
+     - `SecuritySettingsPage.tsx`: Menerapkan menu hub mobile (`?sub=email | sandi | 2fa | sesi | idle`), memperbaiki overflow kunci rahasia TOTP 32 karakter (`break-all`), dan menambahkan tombol pembuka aplikasi Authenticator (`otpauth://`).
+     - `SignalsPage.tsx`, `SignalsMobileView.tsx`, `SaklarMetodeAkun.tsx`, `SaklarTimeframeAkun.tsx`, & `CallEntryAlertBanner.tsx`: Menghentikan *double-mounting* pohon desktop/mobile, merapikan chip pair tanpa geser horizontal, membagi detail pair mobile menjadi 3 segmen (`Radar | Sinyal & Order | Setelan Pair`), mengganti tabel saklar menjadi kartu per akun, serta memperbaiki grid harga `2x2` di layar sempit dengan presisi dinamis `priceDigits`.
+     - `PositionsPage.tsx` & `JournalSkippedList.tsx`: Melipat filter lanjutan ke tombol `Filter`, menyusun tab 3 kolom sejajar, memaginasi kartu posisi mobile (`2x2`), serta meringkas rincian evaluasi simulasi.
+     - `BacktestTradeTable.tsx`, `BacktestTradeChart.tsx`, `BacktestForm.tsx`, `BacktestDetailPage.tsx`, `BacktestEntryPage.tsx`, `ApprovePage.tsx`, `StrategiesPage.tsx`, `OnboardingChecklist.tsx`, `LaporkanBugPage.tsx`, `RiwayatLaporanBugPage.tsx`, `DetailLaporanBugPage.tsx`, `CheckoutMobileView.tsx`, & `LegalCenterPage.tsx`: Mengganti tabel 10 kolom backtest menjadi kartu mobile, menambahkan pemilih panel `[Eksekusi LTF | Acuan HTF]` pada chart backtest mobile agar bebas jebakan sentuh, serta merapikan seluruh batas teks/lampiran.
+
+2. **Sistem PWA & Web Push Notification End-to-End (`RFC 8030` + `RFC 8291 aes128gcm` + `RFC 8292 VAPID`):**
+   - **Backend Go Tanpa Dependency Baru (`backend/internal/webpush`, `model/web_push.go`, `repository/web_push_repository.go`, `service/web_push_service.go`, `handler/web_push_handler.go`, `runner/pushnotify`):**
+     - Implementasi murni enkripsi `aes128gcm` (ECDH P-256 + HKDF-SHA256 + AES-128-GCM), tanda tangan JWT `ES256` VAPID, auto-generasi kunci VAPID terenkripsi (`cryptox.Sealer`) di tabel `web_push_vapid` sehingga `backend-api` dan `runner` otomatis berbagi identitas VAPID yang sama, validasi anti-SSRF pada host endpoint push, dan penghapusan otomatis langganan kedaluwarsa (`HTTP 404/410`).
+     - Endpoint pengguna di bawah `/api/v1/me/push/*` (`status`, `subscriptions`, `PATCH :id`, `DELETE :id`, `unsubscribe`, `test`).
+   - **Filter Ketat Pemicu di Runner (`runner/service.go`, `cmd/runner/publisher.go`, `cmd/runner/main.go`):**
+     - Web Push berjalan paralel bersama Telegram tanpa mengganggu alur lama, menggunakan kunci dedup terpisah berawalan `wp:` pada `notification_log`, dan **HANYA** dikirim pada:
+       1. Sinyal siap konfirmasi entry manual (`READY_TO_ENTRY` / `OPPORTUNITY`, deep-link ke `/app/approve/<token>`),
+       2. Posisi baru dibuka (`PublishPositionOpened` — baik entry otomatis maupun manual, deep-link ke `/app/posisi`),
+       3. Posisi ditutup (`CLOSED_TP`, `CLOSED_SL`, **dan** `CLOSED_MANUAL`, deep-link ke `/app/posisi`).
+     - Seluruh tahap radar (`WAIT_*`), penahanan (`REJECTED`), pembatalan, maupun kedaluwarsa dijamin 0% memicu Web Push.
+   - **PWA, Service Worker, Nginx/Caddy, & UI Pengaturan (`manifest.webmanifest`, `sw.js`, `pwa-192.png`, `pwa-512.png`, `PushNotificationPanel.tsx`, `deploy/nginx.conf`, `deploy/Caddyfile`):**
+     - Service Worker khusus push (`sw.js` tanpa `fetch` interceptor) dengan penyegaran instan React Query (`ILA_PUSH_EVENT`) pada tab aktif, header `no-cache` di Nginx, izin `worker-src 'self'; manifest-src 'self'` di CSP Caddy, panduan interaktif *"Add to Home Screen"* untuk iOS Safari, saklar per-perangkat (Entry vs Tutup Posisi), dan tombol **Kirim Tes Notifikasi**.
+
+**File terdampak utama:**
+- Backend: `internal/webpush/*`, `internal/model/web_push.go`, `internal/dto/web_push_dto.go`, `internal/repository/web_push_repository.go`, `internal/service/web_push_service.go`, `internal/handler/web_push_handler.go`, `internal/runner/pushnotify/notifier.go`, `internal/runner/service.go`, `internal/router/router.go`, `internal/config/config.go`, `cmd/migrate/main.go`, `cmd/runner/main.go`, `cmd/runner/publisher.go`.
+- Frontend & Deploy: `public/manifest.webmanifest`, `public/sw.js`, `public/brand/pwa-192.png`, `public/brand/pwa-512.png`, `src/lib/use-mobile-viewport.ts`, `src/lib/push-notifications.ts`, `src/components/ui/mobile-hub.tsx`, `src/features/notifications/PushNotificationPanel.tsx`, seluruh halaman & komponen mobile pelanggan, `deploy/nginx.conf`, `deploy/Caddyfile`.
+
+---
+
 ### 2026-11-18 (2) — Perbaikan Presisi Kategori 4 Tanpa Mengubah Alur Eksekusi Live Utama
 
 **Tanggal:** 2026-11-18

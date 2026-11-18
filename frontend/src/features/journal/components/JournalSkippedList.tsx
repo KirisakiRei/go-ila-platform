@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/ui'
 import { SkippedEvidenceChart } from '@/features/charts/SkippedEvidenceChart'
 import { formatDateTime, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import type { JournalSkipped } from '@/types/api'
 
 /**
@@ -172,6 +173,7 @@ const TONE_CLASS: Record<'positif' | 'negatif' | 'netral', string> = {
  * melihat trade yang jadi dan tidak tahu berapa banyak setup yang terlewat.
  */
 export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
+  const isMobile = useIsMobile()
   // Hanya satu baris yang membuka chart, supaya membuka beberapa sekaligus
   // tidak memicu banyak permintaan candle dari feed yang sama.
   const [terbuka, setTerbuka] = useState<string | null>(null)
@@ -257,39 +259,48 @@ export function JournalSkippedList({ items }: { items: JournalSkipped[] }) {
                   </>
                 )}
               </p>
-              {item.eval_note && (
-                <p className="text-xs text-muted-foreground">Catatan simulasi: {item.eval_note}</p>
+              {(!isMobile || kunci === terbuka) && (
+                <>
+                  {item.eval_note && (
+                    <p className="text-xs text-muted-foreground">Catatan simulasi: {item.eval_note}</p>
+                  )}
+                  <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    <p className="tabular">Waktu sinyal: {formatDateTime(item.occurred_at)}</p>
+                    <p className="tabular">
+                      {teoritis ? 'Entry simulasi (teoritis)' : 'Entry simulasi'}:{' '}
+                      {formatDateTime(item.eval_entry_at)}
+                      {hargaEntry != null && hargaEntry > 0
+                        ? ` · Harga ${formatPrice(hargaEntry, digits)}`
+                        : ''}
+                    </p>
+                    {teoritis && (
+                      <p>
+                        Entry pada level sinyal saat publikasi, bukan fill broker atau waktu retest.
+                      </p>
+                    )}
+                    <p className="tabular">
+                      Exit simulasi: {selesai ? formatDateTime(item.eval_at) : '—'}
+                      {selesai && hargaExit != null && hargaExit > 0
+                        ? ` · Harga ${formatPrice(hargaExit, digits)}`
+                        : ''}
+                    </p>
+                    {item.eval_checked_at && (
+                      <p className="tabular">
+                        Terakhir dinilai: {formatDateTime(item.eval_checked_at)}
+                      </p>
+                    )}
+                    {item.eval_status === 'RUNNING' && (
+                      <p>Durasi berjalan: {durasi || '—'} · hingga penilaian terakhir, belum keluar</p>
+                    )}
+                    {selesai && durasi && <p>Durasi simulasi: {durasi}</p>}
+                  </div>
+                </>
               )}
-              <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                <p className="tabular">Waktu sinyal: {formatDateTime(item.occurred_at)}</p>
-                <p className="tabular">
-                  {teoritis ? 'Entry simulasi (teoritis)' : 'Entry simulasi'}:{' '}
-                  {formatDateTime(item.eval_entry_at)}
-                  {hargaEntry != null && hargaEntry > 0
-                    ? ` · Harga ${formatPrice(hargaEntry, digits)}`
-                    : ''}
+              {isMobile && !(item.entry_price > 0) && (
+                <p className="tabular text-[11px] text-muted-foreground">
+                  Waktu sinyal: {formatDateTime(item.occurred_at)}
                 </p>
-                {teoritis && (
-                  <p>
-                    Entry pada level sinyal saat publikasi, bukan fill broker atau waktu retest.
-                  </p>
-                )}
-                <p className="tabular">
-                  Exit simulasi: {selesai ? formatDateTime(item.eval_at) : '—'}
-                  {selesai && hargaExit != null && hargaExit > 0
-                    ? ` · Harga ${formatPrice(hargaExit, digits)}`
-                    : ''}
-                </p>
-                {item.eval_checked_at && (
-                  <p className="tabular">
-                    Terakhir dinilai: {formatDateTime(item.eval_checked_at)}
-                  </p>
-                )}
-                {item.eval_status === 'RUNNING' && (
-                  <p>Durasi berjalan: {durasi || '—'} · hingga penilaian terakhir, belum keluar</p>
-                )}
-                {selesai && durasi && <p>Durasi simulasi: {durasi}</p>}
-              </div>
+              )}
               {item.entry_price > 0 && (
                 <>
                   <button

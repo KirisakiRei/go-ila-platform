@@ -31,6 +31,8 @@ import (
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
 	"ila/backend/internal/runner/notify"
+	"ila/backend/internal/runner/pushnotify"
+	"ila/backend/internal/service"
 	"ila/backend/internal/settings"
 	"ila/backend/internal/telegram"
 	"ila/backend/pkg/cryptox"
@@ -104,9 +106,22 @@ func main() {
 		Timeout:  cfg.TelegramTimeout,
 	}, logger)
 
-	notifier := notify.New(store, repository.NewNotificationRepository(db), tgClient,
+	notifRepo := repository.NewNotificationRepository(db)
+	notifier := notify.New(store, notifRepo, tgClient,
 		repository.NewTelegramMessageRepository(db), logger, 2)
 	defer notifier.Close()
+
+	pushRepo := repository.NewWebPushRepository(db)
+	vapidSealer, _ := cryptox.NewSealer(cfg.MasterKeyVersion, cfg.MasterKey)
+	vapidSvc := service.NewWebPushService(service.WebPushServiceDeps{
+		Repo:          pushRepo,
+		Sealer:        vapidSealer,
+		EnvPublicKey:  cfg.VAPIDPublicKey,
+		EnvPrivateKey: cfg.VAPIDPrivateKey,
+		Subject:       cfg.VAPIDSubject,
+	})
+	pushNotifier := pushnotify.New(pushRepo, notifRepo, vapidSvc, nil, logger, 2)
+	defer pushNotifier.Close()
 
 	// Peringatan gangguan platform ke admin; anti-banjir 15 menit per pemicu.
 	alerts := alert.New(tgClient, cfg.TelegramAdminChatID, logger)
@@ -114,6 +129,7 @@ func main() {
 	publisher := &runnerPublisher{
 		store:    store,
 		notifier: notifier,
+		push:     pushNotifier,
 		baseURL:  cfg.PublicURL,
 		logger:   logger,
 		flags:    flags,

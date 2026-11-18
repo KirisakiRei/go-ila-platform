@@ -161,26 +161,26 @@ export function RiskSimulatorPanel({
 
       {hasil && (
         <div className="space-y-3" aria-live="polite">
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-card px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Lot</p>
-              <p className="text-sm font-bold tabular-nums text-foreground">{hasil.hasil.lots}</p>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-2">
+              <p className="truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Lot</p>
+              <p className="truncate text-sm font-bold tabular-nums text-foreground">{hasil.hasil.lots}</p>
             </div>
-            <div className="rounded-lg border border-border bg-card px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Nominal Risiko
+            <div className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-2">
+              <p className="truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Nominal
               </p>
-              <p className="text-sm font-bold tabular-nums text-foreground">
+              <p className="truncate text-sm font-bold tabular-nums text-foreground">
                 {formatMoney(hasil.hasil.risk_amount)}
               </p>
             </div>
-            <div className="rounded-lg border border-border bg-card px-3 py-2">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-2">
+              <p className="truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 % Ekuitas
               </p>
               <p
                 className={cn(
-                  'text-sm font-bold tabular-nums',
+                  'truncate text-sm font-bold tabular-nums',
                   hasil.hasil.warning ? 'text-amber-600' : 'text-foreground',
                 )}
               >
@@ -203,30 +203,30 @@ export function RiskSimulatorPanel({
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full text-left text-[11.5px]">
+            <table className="w-full text-left text-[11px] sm:text-[11.5px]">
               <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Risiko</th>
-                  <th className="px-3 py-2 font-medium text-right">Lot</th>
-                  <th className="px-3 py-2 font-medium text-right">Nominal</th>
-                  <th className="px-3 py-2 font-medium">Catatan</th>
+                  <th className="px-2.5 py-2 font-medium">Risiko</th>
+                  <th className="px-2.5 py-2 text-right font-medium">Lot</th>
+                  <th className="px-2.5 py-2 text-right font-medium">Nominal</th>
+                  <th className="px-2.5 py-2 font-medium">Catatan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {hasil.tabel.map((baris) => (
                   <tr key={baris.risk_percent}>
-                    <td className="px-3 py-1.5 font-semibold tabular-nums">
+                    <td className="px-2.5 py-1.5 font-semibold tabular-nums">
                       {formatNumber(baris.risk_percent, 0)}%
                     </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{baris.lots}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
+                    <td className="px-2.5 py-1.5 text-right tabular-nums">{baris.lots}</td>
+                    <td className="px-2.5 py-1.5 text-right tabular-nums">
                       {formatMoney(baris.risk_amount)}
                     </td>
-                    <td className="px-3 py-1.5">
+                    <td className="px-2.5 py-1.5">
                       {baris.warning ? (
-                        <span className="text-[11px] font-medium text-amber-600">Agresif</span>
+                        <span className="text-[10.5px] font-medium text-amber-600">Agresif</span>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">Aman</span>
+                        <span className="text-[10.5px] text-muted-foreground">Aman</span>
                       )}
                     </td>
                   </tr>
@@ -236,24 +236,24 @@ export function RiskSimulatorPanel({
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full text-left text-[11.5px]">
+            <table className="w-full text-left text-[11px] sm:text-[11.5px]">
               <thead className="border-b border-border bg-secondary/40 text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Lot</th>
-                  <th className="px-3 py-2 font-medium text-right">Nominal</th>
-                  <th className="px-3 py-2 font-medium text-right">% Ekuitas</th>
+                  <th className="px-2.5 py-2 font-medium">Lot</th>
+                  <th className="px-2.5 py-2 text-right font-medium">Nominal</th>
+                  <th className="px-2.5 py-2 text-right font-medium">% Ekuitas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {hasil.tabel_lot.map((baris) => (
                   <tr key={baris.lots}>
-                    <td className="px-3 py-1.5 font-semibold tabular-nums">{baris.lots}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
+                    <td className="px-2.5 py-1.5 font-semibold tabular-nums">{baris.lots}</td>
+                    <td className="px-2.5 py-1.5 text-right tabular-nums">
                       {formatMoney(baris.risk_amount)}
                     </td>
                     <td
                       className={cn(
-                        'px-3 py-1.5 text-right tabular-nums',
+                        'px-2.5 py-1.5 text-right tabular-nums',
                         baris.warning ? 'font-medium text-amber-600' : '',
                       )}
                     >

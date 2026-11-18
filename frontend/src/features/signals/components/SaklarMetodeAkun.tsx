@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { Badge, Card, CardContent, Skeleton } from '@/components/ui'
 import { useSetStrategySwitch, useStrategySwitchMatrix } from '@/lib/queries'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import type { StrategySwitchAccount } from '@/types/api'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +26,7 @@ const LABEL: Record<Metode, string> = {
 export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
   const { data, isLoading, isError } = useStrategySwitchMatrix(symbol)
   const ubah = useSetStrategySwitch(symbol)
+  const isMobile = useIsMobile()
 
   if (isLoading) {
     return <Skeleton className="h-40 w-full rounded-xl" />
@@ -51,13 +53,72 @@ export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
     )
   }
 
+  const metodeTampil = daftarMetode(accounts)
+
+  if (isMobile) {
+    return (
+      <div className="space-y-2.5">
+        {accounts.map((account) => {
+          const sibuk = ubah.isPending && ubah.variables?.accountID === account.account_id
+          return (
+            <div
+              key={account.account_id}
+              className="overflow-hidden rounded-xl border border-border bg-card"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-secondary/40 px-3 py-2">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-xs font-semibold text-foreground">
+                    {account.label || 'Akun Broker'}
+                  </span>
+                  {account.is_dry_run && (
+                    <Badge variant="muted" className="shrink-0 text-[9.5px]">
+                      Simulasi
+                    </Badge>
+                  )}
+                  {!account.is_active && (
+                    <Badge variant="outline" className="shrink-0 text-[9.5px]">
+                      Nonaktif
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-[10px] uppercase text-muted-foreground">
+                  {account.broker_type}
+                </span>
+              </div>
+              <div className="divide-y divide-border/70">
+                {metodeTampil.map((metode) => (
+                  <div
+                    key={metode}
+                    className="flex items-center justify-between gap-2 px-3 py-2.5 text-xs"
+                  >
+                    <span className="font-medium text-foreground">Metode {LABEL[metode]}</span>
+                    <Saklar
+                      menyala={account.strategies[metode] ?? false}
+                      sibuk={sibuk}
+                      onToggle={(nilai) =>
+                        ubah.mutate({
+                          accountID: account.account_id,
+                          strategies: { ...account.strategies, [metode]: nilai },
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
       <table className="w-full text-left text-xs">
         <thead className="border-b border-border bg-secondary/50 text-muted-foreground">
           <tr>
             <th className="px-3.5 py-2.5 font-medium">Akun</th>
-            {daftarMetode(accounts).map((metode) => (
+            {metodeTampil.map((metode) => (
               <th key={metode} className="px-3.5 py-2.5 text-center font-medium">
                 {LABEL[metode]}
               </th>
@@ -83,7 +144,7 @@ export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
                 </div>
                 <p className="text-[10.5px] uppercase text-muted-foreground">{account.broker_type}</p>
               </td>
-              {daftarMetode(accounts).map((metode) => (
+              {metodeTampil.map((metode) => (
                 <td key={metode} className="px-3.5 py-2.5 text-center">
                   <Saklar
                     menyala={account.strategies[metode] ?? false}
@@ -134,7 +195,7 @@ function Saklar({
       disabled={sibuk}
       onClick={() => onToggle(!menyala)}
       className={cn(
-        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 border transition-colors',
+        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors',
         menyala
           ? 'border-primary bg-primary'
           : 'border-border bg-secondary hover:bg-secondary/80',

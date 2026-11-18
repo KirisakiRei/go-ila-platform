@@ -232,14 +232,14 @@ export function KondisiHariIniRingkas({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <StatusDot
           state={pasar.state === 'OPEN' ? 'online' : pasar.state === 'ROLLOVER' ? 'pending' : 'offline'}
           label={pasar.label}
         />
-        <div className="leading-tight">
-          <p className="text-[12px] font-semibold text-foreground">{pasar.label}</p>
-          <p className="text-[10.5px] text-muted-foreground">
+        <div className="min-w-0 leading-tight">
+          <p className="truncate text-[12px] font-semibold text-foreground">{pasar.label}</p>
+          <p className="truncate text-[10.5px] text-muted-foreground">
             {daily.locked
               ? 'Batas harian tercapai'
               : `Sisa ${sisa} dari ${daily.max_trades} eksekusi`}
@@ -247,7 +247,7 @@ export function KondisiHariIniRingkas({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-[11px]">
+      <div className="flex shrink-0 items-center gap-3 text-[11px]">
         <div className="text-right leading-tight">
           <p className="font-mono font-semibold text-foreground">
             {daily.win_count}/{daily.loss_count}

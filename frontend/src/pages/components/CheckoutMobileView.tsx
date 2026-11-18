@@ -388,7 +388,7 @@ export function CheckoutMobileView({
           </div>
 
           {/* Bilah aksi tetap */}
-          <div className="sticky bottom-20 z-20 -mx-4 mt-1 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-xl">
+          <div className="sticky bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 -mx-4 mt-1 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-xl">
             <div className="flex items-center gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Total Bayar</p>
@@ -516,7 +516,7 @@ export function CheckoutMobileView({
           </div>
 
           {/* Aksi tetap */}
-          <div className="sticky bottom-20 z-20 -mx-4 mt-1 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-xl">
+          <div className="sticky bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 -mx-4 mt-1 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-xl">
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

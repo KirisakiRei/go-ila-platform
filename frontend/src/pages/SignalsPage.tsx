@@ -38,20 +38,31 @@ import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 import { SignalsMobileView } from './components/SignalsMobileView'
 
 function useIsDesktopViewport(): boolean {
-  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
-    const mql = window.matchMedia('(min-width: 1024px)')
-    // Di lingkungan uji (JSDOM) innerWidth bawaan 1024 walau matchMedia palsu.
-    if (!mql.matches && window.innerWidth >= 1024) return true
-    return mql.matches
-  })
+  const read = () => {
+    if (typeof window === 'undefined') return true
+    if (typeof window.matchMedia === 'function') {
+      const mql = window.matchMedia('(min-width: 1024px)')
+      // Di lingkungan uji (JSDOM) innerWidth bawaan 1024 walau matchMedia palsu.
+      if (!mql.matches && window.innerWidth >= 1024) return true
+      if (window.innerWidth < 1024) return false
+      return mql.matches
+    }
+    return window.innerWidth >= 1024
+  }
+
+  const [isDesktop, setIsDesktop] = useState<boolean>(read)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
-    const mql = window.matchMedia('(min-width: 1024px)')
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
-    mql.addEventListener?.('change', onChange)
-    return () => mql.removeEventListener?.('change', onChange)
+    if (typeof window === 'undefined') return
+    const update = () => setIsDesktop(read())
+    window.addEventListener('resize', update)
+    const mql =
+      typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 1024px)') : null
+    mql?.addEventListener?.('change', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      mql?.removeEventListener?.('change', update)
+    }
   }, [])
 
   return isDesktop
@@ -174,11 +185,8 @@ export default function SignalsPage() {
     }
   }
 
-  return (
-    <>
-      {/* ============================================================ */}
-      {/* 1. TAMPILAN KHUSUS MOBILE (< lg) — Persis signals_radar_mobile */}
-      {/* ============================================================ */}
+  if (!isDesktop) {
+    return (
       <SignalsMobileView
         signals={signals}
         allPairs={allPairs}
@@ -198,11 +206,11 @@ export default function SignalsPage() {
         filteredPositions={filteredPositions}
         timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
       />
+    )
+  }
 
-      {/* ============================================================ */}
-      {/* 2. TAMPILAN DESKTOP (>= lg) — Struktur lama, aman 100%       */}
-      {/* ============================================================ */}
-      <div className="hidden lg:block space-y-6">
+  return (
+    <div className="space-y-6">
         <PageHeader
           title={activePair ? `Signals — ${activePair}` : 'Signals & Radar'}
           description={
@@ -649,8 +657,7 @@ export default function SignalsPage() {
           )}
         </div>
       )}
-      </div>
-    </>
+    </div>
   )
 }
 

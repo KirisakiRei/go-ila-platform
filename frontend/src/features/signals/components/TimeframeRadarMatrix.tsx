@@ -222,9 +222,12 @@ function SemuaTimeframeMatiState({
  * pengguna merasa tombolnya tidak bekerja.
  */
 function gulirKePengaturan() {
-  const semua = document.querySelectorAll<HTMLElement>('#pengaturan-timeframe')
-  const terlihat = Array.from(semua).find((el) => el.offsetParent !== null) ?? semua[0]
-  terlihat?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  window.dispatchEvent(new CustomEvent('ila:open-timeframe-settings'))
+  window.requestAnimationFrame(() => {
+    const semua = document.querySelectorAll<HTMLElement>('#pengaturan-timeframe')
+    const terlihat = Array.from(semua).find((el) => el.offsetParent !== null) ?? semua[0]
+    terlihat?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
 }
 
 function SlotMatiState({ slot }: { slot?: TimeframeSlot; symbol: string }) {

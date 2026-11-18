@@ -112,8 +112,8 @@ export default function BacktestDetailPage() {
       )}
 
       {!selesai && data.status !== 'failed' && (
-        <div className="flex items-center gap-2 border border-border bg-secondary/30 p-4 text-[13px]">
-          <Clock className="h-4 w-4 animate-pulse" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-secondary/30 p-3.5 text-[13px] sm:p-4">
+          <Clock className="h-4 w-4 shrink-0 animate-pulse" aria-hidden="true" />
           <span>
             {data.status === 'queued'
               ? 'Menunggu antrean. Backtest lain sedang berjalan.'
@@ -170,9 +170,20 @@ function TitikAwal({ data }: { data: BacktestRunDetail }) {
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-3 lg:grid-cols-6">
       {baris.map((satu) => (
-        <div key={satu.label} className="flex min-w-0 flex-col gap-0.5">
+        <div
+          key={satu.label}
+          className={`flex min-w-0 flex-col gap-0.5 ${
+            satu.label === 'Rentang' ? 'col-span-2 sm:col-span-2 lg:col-span-1' : ''
+          }`}
+        >
           <dt className="truncate text-[11px] text-muted-foreground">{satu.label}</dt>
-          <dd className="tabular truncate text-[13px]">{satu.nilai}</dd>
+          <dd
+            className={`tabular text-[13px] ${
+              satu.label === 'Rentang' ? 'break-words lg:truncate' : 'truncate'
+            }`}
+          >
+            {satu.nilai}
+          </dd>
         </div>
       ))}
     </dl>

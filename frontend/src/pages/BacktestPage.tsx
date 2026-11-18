@@ -136,8 +136,8 @@ function StatusRun({
   }
 
   return (
-    <div className="flex items-center gap-2 border border-border bg-secondary/30 p-4 text-[13px]">
-      <Clock className="h-4 w-4 animate-pulse" aria-hidden="true" />
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-secondary/30 p-3.5 text-[13px] sm:p-4">
+      <Clock className="h-4 w-4 shrink-0 animate-pulse" aria-hidden="true" />
       <span>
         {status === 'queued'
           ? 'Menunggu antrean. Backtest lain sedang berjalan.'

@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { BarChart3, Bot, Bug, CreditCard, FlaskConical, LayoutDashboard, Radio, Settings, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge, Button } from '@/components/ui'
@@ -89,10 +90,28 @@ type AppShellProps = { user: User; children: ReactNode }
  */
 export function AppShell({ user, children }: AppShellProps) {
   const signOut = useSignOut()
+  const queryClient = useQueryClient()
   const { pathname } = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const inviteOnly = useInviteOnly()
   const title = TITLES[pathname] ?? 'ILA Bot'
+
+  // Saat Service Worker menerima Web Push di latar belakang, segarkan data
+  // sinyal dan posisi seketika tanpa menunggu jeda polling.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+    const onMessage = (event: MessageEvent) => {
+      if (event.data && typeof event.data === 'object' && event.data.type === 'ILA_PUSH_EVENT') {
+        void queryClient.invalidateQueries({ queryKey: ['signals'] })
+        void queryClient.invalidateQueries({ queryKey: ['positions'] })
+        void queryClient.invalidateQueries({ queryKey: ['journal'] })
+      }
+    }
+    navigator.serviceWorker.addEventListener?.('message', onMessage)
+    return () => {
+      navigator.serviceWorker.removeEventListener?.('message', onMessage)
+    }
+  }, [queryClient])
 
   // Menu billing hanya berguna bila ada yang bisa dibeli. Saat invite only,
   // kelompoknya hilang sama sekali supaya tidak ada pintu mati di sidebar.
@@ -105,9 +124,9 @@ export function AppShell({ user, children }: AppShellProps) {
     : NAV_GROUPS
 
   return (
-    <div className="flex min-h-full flex-col lg:flex-row">
+    <div className="flex min-h-full w-full flex-col overflow-x-hidden lg:flex-row">
       <LegalReconsentGate />
-      <OnboardingModal />
+      {!pathname.startsWith('/approve') && <OnboardingModal />}
 
       {/* Top Bar khusus tampilan Mobile (< lg) */}
       <MobileTopBar user={user} onOpenMenu={() => setMobileMenuOpen(true)} />
@@ -189,10 +208,10 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 px-4 py-4 pb-24 lg:px-6 lg:py-6 lg:pb-6">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+        <main className="min-w-0 flex-1 px-4 py-4 pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-6 lg:pb-6">
+          <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
             <UserBanners />
-            <div className="flex flex-col gap-6">{children}</div>
+            <div className="flex min-w-0 flex-col gap-6">{children}</div>
           </div>
         </main>
       </div>

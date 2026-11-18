@@ -33,3 +33,4 @@ func (m *TwoFactor) BeforeCreate(_ *gorm.DB) error          { return ensureID(&m
 func (m *RecoveryCode) BeforeCreate(_ *gorm.DB) error       { return ensureID(&m.ID) }
 func (m *TwoFactorChallenge) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }
 func (m *TelegramMessage) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *WebPushSubscription) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }

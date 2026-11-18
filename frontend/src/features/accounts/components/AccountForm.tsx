@@ -14,6 +14,7 @@ import { Alert, Button, Input, Label, Select } from '@/components/ui'
 import { accountApi, legalApi } from '@/lib/api'
 import { ApiError } from '@/lib/api-error'
 import { useCreateAccount } from '@/lib/queries'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import type { Tier } from '@/types/api'
 
 const matchTraderSchema = z.object({
@@ -32,10 +33,11 @@ type MatchTraderFormValues = z.input<typeof matchTraderSchema>
  * 2. Match-Trader (Access Token terenkripsi + Panduan)
  */
 export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void }) {
+  const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState<'ctrader' | 'matchtrader'>('ctrader')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [ctraderLoading, setCtraderLoading] = useState(false)
-  const [showGuide, setShowGuide] = useState(true)
+  const [showGuide, setShowGuide] = useState(() => !isMobile)
 
   // Status persetujuan dokumen legal (wajib Disclaimer Risiko sebelum akun broker terhubung)
   const queryClient = useQueryClient()
@@ -166,22 +168,22 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
   return (
     <div className="space-y-4">
       {/* Tab Selector Platform Broker */}
-      <div className="flex rounded-xl border border-border p-1 bg-secondary/30">
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-secondary/30 p-1">
         <button
           type="button"
           onClick={() => {
             setActiveTab('ctrader')
             setSubmitError(null)
           }}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all ${
+          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-all ${
             activeTab === 'ctrader'
               ? 'bg-foreground text-background shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>cTrader</span>
-          <span className="rounded-full bg-emerald-500/20 px-1.5 py-[1px] text-[10px] font-bold text-emerald-400">
+          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">cTrader</span>
+          <span className="shrink-0 rounded-full bg-emerald-500/20 px-1.5 py-[1px] text-[9.5px] font-bold text-emerald-400">
             OAuth
           </span>
         </button>
@@ -192,15 +194,15 @@ export function AccountForm({ tier, onDone }: { tier: Tier; onDone?: () => void 
             setActiveTab('matchtrader')
             setSubmitError(null)
           }}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all ${
+          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition-all ${
             activeTab === 'matchtrader'
               ? 'bg-foreground text-background shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <KeyRound className="h-3.5 w-3.5" />
-          <span>Match-Trader</span>
-          <span className="rounded-full bg-zinc-500/20 px-1.5 py-[1px] text-[10px] font-medium text-muted-foreground">
+          <KeyRound className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Match-Trader</span>
+          <span className="hidden shrink-0 rounded-full bg-zinc-500/20 px-1.5 py-[1px] text-[9.5px] font-medium text-muted-foreground sm:inline">
             Token
           </span>
         </button>

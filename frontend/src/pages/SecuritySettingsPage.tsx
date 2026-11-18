@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   ArrowLeft,
   Check,
+  Clock,
   Copy,
+  ExternalLink,
   KeyRound,
   Laptop,
   LogOut,
+  Mail,
   QrCode,
   ShieldAlert,
   ShieldCheck,
@@ -29,11 +32,15 @@ import {
   CardTitle,
   Input,
   Label,
+  MobileMenuGroup,
+  MobileMenuRow,
+  MobileSubpageHeader,
   Modal,
   PageHeader,
   Skeleton,
 } from '@/components/ui'
 import { formatDateTime } from '@/lib/format'
+import { useIsMobile, useIsTabletOrMobile } from '@/lib/use-mobile-viewport'
 import type { Session } from '@/types/api'
 
 type TwoFactorStatus = {
@@ -47,6 +54,15 @@ type TwoFactorSetup = {
   secret: string
   otpauth_url: string
   expires_at: string
+}
+
+type SecuritySub = 'email' | 'sandi' | '2fa' | 'sesi' | 'idle'
+
+function parseSecuritySub(raw: string | null): SecuritySub | null {
+  if (raw === 'email' || raw === 'sandi' || raw === '2fa' || raw === 'sesi' || raw === 'idle') {
+    return raw
+  }
+  return null
 }
 
 /**
@@ -91,6 +107,131 @@ const twoFactorApi = {
  * sekali, saat dibuat (plans/17 §6).
  */
 export default function SecuritySettingsPage() {
+  const isMobileHub = useIsTabletOrMobile()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sub = parseSecuritySub(searchParams.get('sub'))
+
+  const me = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: authApi.me,
+    enabled: isMobileHub,
+  })
+  const twoFactor = useQuery({
+    queryKey: ['2fa', 'status'],
+    queryFn: twoFactorApi.status,
+    enabled: isMobileHub,
+  })
+
+  const setSub = (next: SecuritySub | null) => {
+    const params = new URLSearchParams(searchParams)
+    if (next) params.set('sub', next)
+    else params.delete('sub')
+    setSearchParams(params)
+  }
+
+  if (isMobileHub) {
+    if (sub) {
+      const meta: Record<SecuritySub, { title: string; desc: string }> = {
+        email: {
+          title: 'Verifikasi Email',
+          desc: 'Status verifikasi email untuk membuka trial, akun broker, dan checkout.',
+        },
+        sandi: {
+          title: 'Kata Sandi',
+          desc: 'Ganti kata sandi login akun Anda secara berkala.',
+        },
+        '2fa': {
+          title: 'Autentikasi Dua Faktor (2FA)',
+          desc: 'Lapisan verifikasi TOTP 6-digit menggunakan aplikasi Authenticator.',
+        },
+        sesi: {
+          title: 'Perangkat yang Masuk',
+          desc: 'Daftar perangkat aktif dan opsi pencabutan sesi jarak jauh.',
+        },
+        idle: {
+          title: 'Keluar Otomatis (Auto Logout)',
+          desc: 'Pengaturan konfirmasi sebelum sesi tidak aktif diakhiri otomatis.',
+        },
+      }
+
+      return (
+        <div className="space-y-4">
+          <MobileSubpageHeader
+            backLabel="Kembali ke Menu Keamanan"
+            onBack={() => setSub(null)}
+            title={meta[sub].title}
+            description={meta[sub].desc}
+          />
+          {sub === 'email' && <EmailVerificationCard />}
+          {sub === 'sandi' && <PasswordCard />}
+          {sub === '2fa' && <TwoFactorCard />}
+          {sub === 'sesi' && <SessionsCard />}
+          {sub === 'idle' && <IdleWarningCard />}
+        </div>
+      )
+    }
+
+    const verified = Boolean(me.data?.email_verified_at)
+    const twoFactorEnabled = Boolean(twoFactor.data?.enabled)
+
+    return (
+      <div className="space-y-4">
+        <MobileSubpageHeader
+          backLabel="Kembali ke Pengaturan"
+          backTo="/pengaturan"
+          title="Keamanan Akun"
+          description="Pilih pengaturan kredensial, autentikasi 2FA, atau sesi perangkat."
+        />
+
+        <MobileMenuGroup title="Autentikasi & Kredensial">
+          <MobileMenuRow
+            icon={Mail}
+            label="Verifikasi Email"
+            description={me.data?.email ?? 'Status konfirmasi alamat email akun'}
+            badge={
+              <Badge variant={verified ? 'solid' : 'outline'} className="text-[10px]">
+                {verified ? 'Terverifikasi' : 'Belum'}
+              </Badge>
+            }
+            onClick={() => setSub('email')}
+          />
+          <MobileMenuRow
+            icon={KeyRound}
+            label="Ubah Kata Sandi"
+            description="Perbarui sandi masuk & amankan ulang seluruh sesi"
+            onClick={() => setSub('sandi')}
+          />
+          <MobileMenuRow
+            icon={ShieldCheck}
+            label="Autentikasi Dua Faktor (2FA)"
+            description="Kode 6 digit TOTP Google Authenticator"
+            badge={
+              <Badge variant={twoFactorEnabled ? 'solid' : 'outline'} className="text-[10px]">
+                {twoFactorEnabled ? 'Aktif' : 'Nonaktif'}
+              </Badge>
+            }
+            onClick={() => setSub('2fa')}
+          />
+        </MobileMenuGroup>
+
+        <MobileMenuGroup title="Sesi & Perangkat">
+          <MobileMenuRow
+            icon={Smartphone}
+            label="Perangkat yang Masuk"
+            description="Pantau dan cabut akses perangkat tidak dikenal"
+            onClick={() => setSub('sesi')}
+          />
+          <MobileMenuRow
+            icon={Clock}
+            label="Keluar Otomatis (Auto Logout)"
+            description="Peringatan konfirmasi saat tidak aktif"
+            onClick={() => setSub('idle')}
+          />
+        </MobileMenuGroup>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="mb-2">
@@ -128,17 +269,19 @@ function EmailVerificationCard() {
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <div>
+          <div className="min-w-0">
             <CardTitle className="text-sm">Email</CardTitle>
             <CardDescription className="text-xs">
               Verifikasi membuka trial, koneksi broker, dan pembayaran.
             </CardDescription>
           </div>
-          <Badge variant={verified ? 'solid' : 'outline'}>{verified ? 'Terverifikasi' : 'Belum'}</Badge>
+          <Badge variant={verified ? 'solid' : 'outline'} className="shrink-0">
+            {verified ? 'Terverifikasi' : 'Belum'}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-[13px]">{me.data?.email ?? '—'}</p>
+        <p className="break-all text-[13px] font-medium">{me.data?.email ?? '—'}</p>
         {!verified && (
           <>
             <p className="text-[12px] text-muted-foreground">
@@ -185,9 +328,9 @@ function PasswordCard() {
           Setelah diganti, semua perangkat diminta masuk kembali.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {notice && <Alert variant="destructive">{notice}</Alert>}
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <Label htmlFor="cur">Sandi saat ini</Label>
             <Input
@@ -223,7 +366,12 @@ function PasswordCard() {
             {mismatch && <p className="mt-1 text-[11px] text-muted-foreground">Belum sama.</p>}
           </div>
         </div>
-        <Button size="sm" disabled={!canSubmit || change.isPending} onClick={() => change.mutate()}>
+        <Button
+          size="sm"
+          className="w-full sm:w-auto"
+          disabled={!canSubmit || change.isPending}
+          onClick={() => change.mutate()}
+        >
           Ganti kata sandi
         </Button>
       </CardContent>
@@ -233,9 +381,10 @@ function PasswordCard() {
 
 function TwoFactorCard() {
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
   const [setup, setSetup] = useState<TwoFactorSetup | null>(() => readStoredSetup())
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [tab, setTab] = useState<'qr' | 'manual'>('qr')
+  const [tab, setTab] = useState<'qr' | 'manual'>(() => (isMobile ? 'manual' : 'qr'))
   const [copiedKey, setCopiedKey] = useState(false)
   const [code, setCode] = useState('')
   const [codes, setCodes] = useState<string[] | null>(null)
@@ -249,6 +398,7 @@ function TwoFactorCard() {
     onSuccess: (data) => {
       storeSetup(data)
       setSetup(data)
+      setTab(isMobile ? 'manual' : 'qr')
       setIsModalOpen(true)
       setNotice(null)
     },
@@ -265,7 +415,12 @@ function TwoFactorCard() {
       setCode('')
       void queryClient.invalidateQueries({ queryKey: ['2fa'] })
     },
-    onError: (error) => setNotice(error instanceof Error ? error.message : 'Kode verifikasi tidak sah. Pastikan waktu perangkat Anda sinkron.'),
+    onError: (error) =>
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : 'Kode verifikasi tidak sah. Pastikan waktu perangkat Anda sinkron.',
+      ),
   })
 
   const disable = useMutation({
@@ -306,13 +461,15 @@ function TwoFactorCard() {
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-sm font-semibold">Autentikasi Dua Faktor (2FA)</CardTitle>
               <CardDescription className="text-xs">
                 Mengamankan login menggunakan kode 6 digit berbasis TOTP (Google Authenticator).
               </CardDescription>
             </div>
-            <Badge variant={enabled ? 'solid' : 'outline'}>{enabled ? 'Aktif' : 'Nonaktif'}</Badge>
+            <Badge variant={enabled ? 'solid' : 'outline'} className="shrink-0">
+              {enabled ? 'Aktif' : 'Nonaktif'}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -324,7 +481,7 @@ function TwoFactorCard() {
             <Alert variant="warning" className="border-amber-500/30 bg-amber-500/10">
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
-                  <ShieldAlert className="h-4 w-4" />
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
                   <span>2FA Berhasil Diaktifkan! Simpan Kode Pemulihan Anda.</span>
                 </div>
                 <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
@@ -332,13 +489,13 @@ function TwoFactorCard() {
                 </p>
                 <div className="my-1 grid grid-cols-2 gap-2 rounded-lg border border-amber-500/20 bg-background/50 p-3 font-mono text-xs sm:grid-cols-4">
                   {codes.map((item) => (
-                    <span key={item} className="select-all font-semibold text-foreground">
+                    <span key={item} className="select-all break-all font-semibold text-foreground">
                       {item}
                     </span>
                   ))}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <Button size="sm" variant="outline" onClick={copyAllCodes}>
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center">
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={copyAllCodes}>
                     {copiedAllCodes ? (
                       <>
                         <Check className="mr-1 h-3.5 w-3.5 text-emerald-600" />
@@ -351,7 +508,7 @@ function TwoFactorCard() {
                       </>
                     )}
                   </Button>
-                  <Button size="sm" onClick={() => setCodes(null)}>
+                  <Button size="sm" className="w-full sm:w-auto" onClick={() => setCodes(null)}>
                     Saya Sudah Menyimpan Kode
                   </Button>
                 </div>
@@ -366,7 +523,7 @@ function TwoFactorCard() {
               </p>
               <Button
                 size="sm"
-                className="self-start"
+                className="w-full sm:w-auto sm:self-start"
                 disabled={begin.isPending}
                 isLoading={begin.isPending}
                 onClick={() => begin.mutate()}
@@ -379,8 +536,8 @@ function TwoFactorCard() {
           {enabled && (
             <div className="space-y-3">
               {status.data?.activated_at && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                   <span>
                     Aktif sejak {formatDateTime(status.data.activated_at)} · tersisa{' '}
                     <strong>{status.data.recovery_remaining}</strong> kode pemulihan
@@ -393,11 +550,12 @@ function TwoFactorCard() {
                   onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="Kode 6 digit untuk verifikasi"
                   inputMode="numeric"
-                  className="max-w-48 font-mono text-center tracking-widest"
+                  className="w-full text-center font-mono tracking-widest sm:max-w-48"
                 />
                 <Button
                   size="sm"
                   variant="outline"
+                  className="w-full sm:w-auto"
                   disabled={code.length !== 6 || disable.isPending}
                   isLoading={disable.isPending}
                   onClick={() => disable.mutate()}
@@ -421,56 +579,81 @@ function TwoFactorCard() {
         {setup && (
           <div className="space-y-4 pt-1">
             {/* Tab Navigasi: QR Code vs Manual Key */}
-            <div className="flex rounded-lg border border-border p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1">
               <button
                 type="button"
                 onClick={() => setTab('qr')}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md py-1.5 text-xs font-semibold transition-all ${
-                  tab === 'qr' ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition-all ${
+                  tab === 'qr'
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <QrCode className="h-3.5 w-3.5" />
-                Pindai Kode QR
+                <QrCode className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Kode QR</span>
               </button>
               <button
                 type="button"
                 onClick={() => setTab('manual')}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-md py-1.5 text-xs font-semibold transition-all ${
-                  tab === 'manual' ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition-all ${
+                  tab === 'manual'
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <KeyRound className="h-3.5 w-3.5" />
-                Input Kunci Manual
+                <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Kunci Manual</span>
               </button>
             </div>
 
             {/* Tab 1: Pindai QR Code */}
             {tab === 'qr' && (
               <div className="flex flex-col items-center gap-3 py-2 text-center">
-                <div className="flex h-52 w-52 items-center justify-center rounded-xl border border-zinc-200 bg-white p-3 shadow-inner">
-                  <QRCodeSVG value={setup.otpauth_url} size={184} level="M" />
+                <div className="flex h-48 w-48 items-center justify-center rounded-xl border border-zinc-200 bg-white p-3 shadow-inner sm:h-52 sm:w-52">
+                  <QRCodeSVG value={setup.otpauth_url} size={168} level="M" />
                 </div>
                 <div className="max-w-sm space-y-1 text-xs text-muted-foreground">
-                  <p className="font-semibold text-foreground">1. Buka aplikasi Google Authenticator di ponsel Anda.</p>
-                  <p>2. Ketuk tanda "+" lalu pilih <strong>"Pindai kode QR"</strong>.</p>
-                  <p>3. Arahkan kamera ponsel Anda ke barcode di atas.</p>
+                  <p className="font-semibold text-foreground">
+                    1. Buka aplikasi Google Authenticator di perangkat lain.
+                  </p>
+                  <p>
+                    2. Ketuk tanda "+" lalu pilih <strong>"Pindai kode QR"</strong>.
+                  </p>
+                  <p>3. Arahkan kamera ke barcode di atas.</p>
                 </div>
               </div>
             )}
 
             {/* Tab 2: Input Manual */}
             {tab === 'manual' && (
-              <div className="space-y-3 py-2 text-xs">
-                <p className="text-muted-foreground">
-                  Jika kamera Anda bermasalah, masukkan kunci rahasia berikut secara manual pada aplikasi Google Authenticator (pilih opsi <strong>"Masukkan kunci penyiapan"</strong>):
+              <div className="space-y-3 py-1 text-xs">
+                <p className="leading-relaxed text-muted-foreground">
+                  Salin kunci rahasia berikut pada aplikasi Authenticator Anda (pilih{' '}
+                  <strong>"Masukkan kunci penyiapan"</strong>), atau buka langsung di perangkat ini:
                 </p>
-                <div>
+
+                {setup.otpauth_url && (
+                  <a
+                    href={setup.otpauth_url}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/80 sm:w-auto"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    Buka Aplikasi Authenticator
+                  </a>
+                )}
+
+                <div className="min-w-0">
                   <Label className="text-[11px] text-muted-foreground">Kunci Rahasia (Secret Key)</Label>
-                  <div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/50 p-2.5">
-                    <span className="select-all font-mono text-sm font-semibold tracking-wider text-foreground">
+                  <div className="mt-1 flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-secondary/50 p-2.5">
+                    <span className="min-w-0 flex-1 select-all break-all font-mono text-xs font-semibold tracking-wider text-foreground sm:text-sm">
                       {setup.secret}
                     </span>
-                    <Button size="sm" variant="ghost" onClick={copySecret} className="h-8 gap-1 px-2.5 text-xs">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={copySecret}
+                      className="h-8 shrink-0 gap-1 px-2.5 text-xs"
+                    >
                       {copiedKey ? (
                         <>
                           <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -492,7 +675,7 @@ function TwoFactorCard() {
             )}
 
             {/* Verifikasi 6 Digit Input */}
-            <div className="rounded-xl border border-border bg-secondary/20 p-4">
+            <div className="rounded-xl border border-border bg-secondary/20 p-3.5 sm:p-4">
               <Label className="text-xs font-semibold text-foreground">
                 Langkah Terakhir: Masukkan Kode 6-Digit dari Authenticator
               </Label>
@@ -502,14 +685,15 @@ function TwoFactorCard() {
                   onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
                   inputMode="numeric"
-                  className="max-w-40 text-center font-mono text-base font-semibold tracking-widest"
+                  className="w-full text-center font-mono text-base font-semibold tracking-widest sm:max-w-40"
                 />
                 <div className="flex flex-1 justify-end gap-2">
-                  <Button variant="outline" size="sm" onClick={cancelSetup}>
+                  <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" onClick={cancelSetup}>
                     Batal
                   </Button>
                   <Button
                     size="sm"
+                    className="flex-1 sm:flex-initial"
                     disabled={code.length !== 6 || activate.isPending}
                     isLoading={activate.isPending}
                     onClick={() => activate.mutate()}
@@ -566,30 +750,33 @@ export function SessionsCard() {
         <CardContent className="space-y-3">
           {notice && <Alert>{notice}</Alert>}
           {sessions.isLoading && <Skeleton className="h-20 w-full" />}
-          
+
           <div className="divide-y divide-border rounded-lg border border-border">
             {rows.map((row) => {
-              const isMobile = /mobile|android|iphone|ipad/i.test(row.device_label || '')
-              const DeviceIcon = isMobile ? Smartphone : Laptop
+              const isMobileDevice = /mobile|android|iphone|ipad/i.test(row.device_label || '')
+              const DeviceIcon = isMobileDevice ? Smartphone : Laptop
 
               return (
                 <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-foreground">
                       <DeviceIcon className="h-4 w-4" />
                     </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-foreground">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="break-words font-semibold text-foreground">
                           {row.device_label || 'Perangkat tidak dikenal'}
                         </p>
                         {row.current && (
-                          <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          >
                             Perangkat Ini
                           </Badge>
                         )}
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
                         Terakhir aktif {formatDateTime(row.last_seen_at)}
                       </p>
                     </div>
@@ -599,7 +786,7 @@ export function SessionsCard() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="gap-1 text-xs hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+                      className="shrink-0 gap-1 text-xs hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
                       onClick={() => setRevokeTarget(row)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -637,7 +824,9 @@ export function SessionsCard() {
       >
         <div className="space-y-4 pt-1">
           <p className="text-xs text-muted-foreground">
-            Apakah Anda yakin ingin mencabut sesi untuk <strong>{revokeTarget?.device_label || 'Perangkat ini'}</strong>? Sesi Anda pada browser saat ini tidak akan terpengaruh.
+            Apakah Anda yakin ingin mencabut sesi untuk{' '}
+            <strong>{revokeTarget?.device_label || 'Perangkat ini'}</strong>? Sesi Anda pada browser
+            saat ini tidak akan terpengaruh.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setRevokeTarget(null)}>
@@ -718,7 +907,7 @@ export function IdleWarningCard() {
         <label className="flex items-start gap-2.5 text-xs text-foreground">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 rounded border-border text-foreground accent-foreground"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-foreground accent-foreground"
             checked={value}
             disabled={toggle.isPending}
             onChange={(event) => toggle.mutate(event.target.checked)}

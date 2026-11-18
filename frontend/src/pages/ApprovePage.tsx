@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/components/ui'
@@ -6,6 +6,7 @@ import { approvalApi } from '@/lib/api'
 import { queryKeys } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { priceDigits } from '@/lib/pricePrecision'
 
 /**
  * pesanTautanGagal menerjemahkan kegagalan token menjadi kalimat yang bisa
@@ -45,11 +46,17 @@ function pesanTautanGagal(err: unknown): { judul: string; isi: string } {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="tabular text-[15px] font-semibold">{value}</dd>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="truncate tabular text-[15px] font-semibold">{value}</dd>
     </div>
   )
+}
+
+function formatSisaDetik(detik: number): string {
+  const menit = Math.floor(detik / 60)
+  const sisa = detik % 60
+  return `${menit}m ${String(sisa).padStart(2, '0')}s`
 }
 
 /**
@@ -61,6 +68,12 @@ export default function ApprovePage() {
   const qc = useQueryClient()
   const [hasil, setHasil] = useState<string | null>(null)
   const [galat, setGalat] = useState<string | null>(null)
+  const [sekarang, setSekarang] = useState(() => Date.now())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSekarang(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['approve', token],
@@ -136,6 +149,11 @@ export default function ApprovePage() {
 
   if (!data) return null
 
+  const digits = priceDigits(data.symbol, data.entry_price)
+  const expMs = new Date(data.expires_at).getTime()
+  const sisaDetik = Number.isFinite(expMs) ? Math.max(0, Math.floor((expMs - sekarang) / 1000)) : null
+  const sudahHabis = sisaDetik !== null && sisaDetik <= 0
+
   return (
     <>
       <PageHeader
@@ -150,28 +168,35 @@ export default function ApprovePage() {
       />
 
       <Section title="Rincian posisi">
-        <div className="flex flex-col gap-4 border border-border p-4">
+        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs sm:rounded-xl">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
             <Field label="Simbol" value={data.symbol} />
-            <Field label="Harga entry" value={formatNumber(data.entry_price, 5)} />
-            <Field label="Stop loss" value={formatNumber(data.stop_loss, 5)} />
-            <Field label="Take profit" value={formatNumber(data.take_profit, 5)} />
+            <Field label="Harga entry" value={formatNumber(data.entry_price, digits)} />
+            <Field label="Stop loss" value={formatNumber(data.stop_loss, digits)} />
+            <Field label="Take profit" value={formatNumber(data.take_profit, digits)} />
           </dl>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-[12px] text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border pt-3 text-[12px] text-muted-foreground">
             <span>Rasio 1 : {formatNumber(data.risk_reward, 2)}</span>
-            <span>Berlaku sampai {formatDateTime(data.expires_at)}</span>
+            <span>
+              Berlaku sampai {formatDateTime(data.expires_at)}
+              {sisaDetik !== null && sisaDetik > 0 ? ` (${formatSisaDetik(sisaDetik)})` : ''}
+            </span>
           </div>
 
           {!data.can_confirm && data.blocked_reason && (
             <Alert variant="warning">{data.blocked_reason}</Alert>
+          )}
+          {data.can_confirm && sudahHabis && (
+            <Alert variant="warning">Masa berlaku konfirmasi untuk sinyal ini sudah habis.</Alert>
           )}
           {galat && <Alert variant="destructive">{galat}</Alert>}
 
           {data.can_confirm && (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
-                className="flex-1"
+                className="h-11 flex-1 sm:h-10"
+                disabled={sudahHabis}
                 isLoading={confirm.isPending}
                 onClick={() => {
                   setGalat(null)
@@ -182,7 +207,8 @@ export default function ApprovePage() {
               </Button>
               <Button
                 variant="outline"
-                className="flex-1"
+                className="h-11 flex-1 sm:h-10"
+                disabled={sudahHabis}
                 isLoading={decline.isPending}
                 onClick={() => {
                   setGalat(null)

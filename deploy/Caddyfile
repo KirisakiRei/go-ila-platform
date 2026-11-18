@@ -137,7 +137,7 @@
 		# lightweight-charts menulis atribut style langsung ke elemen.
 		# connect-src 'self' mengizinkan API (satu origin) sekaligus menutup
 		# pengiriman data ke host lain bila ada skrip yang berhasil disuntikkan.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; worker-src 'self'; manifest-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
 		# Versi server tidak perlu dibocorkan.
 		-Server
 	}

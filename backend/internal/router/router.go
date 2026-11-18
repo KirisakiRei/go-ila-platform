@@ -385,6 +385,16 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		Logger:   logger,
 	})
 	backtestHandler := handler.NewBacktestHandler(backtestService)
+
+	webPushRepo := repository.NewWebPushRepository(db)
+	webPushService := service.NewWebPushService(service.WebPushServiceDeps{
+		Repo:          webPushRepo,
+		Sealer:        sealer,
+		EnvPublicKey:  cfg.VAPIDPublicKey,
+		EnvPrivateKey: cfg.VAPIDPrivateKey,
+		Subject:       cfg.VAPIDSubject,
+	})
+	webPushHandler := handler.NewWebPushHandler(webPushService)
 	backgroundWorkers = append(backgroundWorkers, func(ctx context.Context) {
 		service.RunBacktestWorker(ctx, backtestService)
 	}, func(ctx context.Context) {
@@ -615,6 +625,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 
 		// Backtest ILA 2.0 atas data historis.
 		backtestHandler.Register(me)
+
+		// Notifikasi Web Push (VAPID + aes128gcm) per perangkat.
+		webPushHandler.Register(me)
 
 		// Penghubungan Telegram.
 		me.POST("/telegram/link", telegramHandler.CreateLink)

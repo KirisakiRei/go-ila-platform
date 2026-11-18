@@ -13,6 +13,8 @@ import (
 	"ila/backend/internal/repository"
 	"ila/backend/internal/runner"
 	"ila/backend/internal/runner/notify"
+	"ila/backend/internal/runner/pushnotify"
+	"ila/backend/internal/service"
 	"ila/backend/internal/settings"
 	"ila/backend/internal/telegram"
 	"ila/backend/internal/timezone"
@@ -25,6 +27,7 @@ import (
 type runnerPublisher struct {
 	store    repository.RunnerRepository
 	notifier *notify.Notifier
+	push     *pushnotify.Notifier
 	baseURL  string
 	logger   *slog.Logger
 	// flags memberi angka kuota harian yang berlaku saat ini. Tanpa ini
@@ -86,7 +89,8 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 		signal.Symbol, signal.Htf, signal.Ltf, signal.Direction, userID,
 		p.kejadianSlot(ctx, userID, signal))
 
-	p.notifier.EnqueueSignal(userID, messageKey, signalID, func(chatID string) telegram.Message {
+	if p.notifier != nil {
+		p.notifier.EnqueueSignal(userID, messageKey, signalID, func(chatID string) telegram.Message {
 		_ = chatID
 
 		switch status {
@@ -242,6 +246,16 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 			})
 		}
 	})
+	}
+
+	// Web Push HANYA dikirim saat sinyal siap konfirmasi entry manual
+	// (READY_TO_ENTRY / OPPORTUNITY), bukan untuk tahap radar (WAIT_*),
+	// penahanan (REJECTED), pembatalan, atau user tanpa hak eksekusi.
+	if p.push != nil &&
+		(status == model.SignalStatusReadyToEntry || status == model.SignalStatusOpportunity) &&
+		reason != string(runner.RejectEntitlement) {
+		p.enqueueReadyWebPush(userID, signal, messageKey)
+	}
 }
 
 // radarHTFParams menyusun parameter radar tahap 1 dan 2 dari baris sinyal.
@@ -384,27 +398,207 @@ func (p *runnerPublisher) PublishPositionClosed(ctx context.Context, pos *model.
 
 	dailyNote := p.dailyNote(daily)
 
-	p.notifier.Enqueue(pos.UserID, messageKey, func(chatID string) telegram.Message {
-		_ = chatID
-		posisiLink := telegram.AppURL(p.baseURL, "/posisi")
-		// Timeframe diambil dari sinyal asal agar user tahu setup mana yang
-		// menghasilkan posisi ini. Gagal membaca bukan alasan menahan kabar.
-		htf, ltf := p.timeframePosisi(ctx, pos)
-		return telegram.FormatClosedMessage(telegram.ClosedParams{
-			Symbol:      pos.Symbol,
-			Direction:   pos.Direction,
-			Htf:         htf,
-			Ltf:         ltf,
-			Result:      positionResultLabel(pos.Status),
-			EntryPrice:  pos.OpenPrice,
-			ExitPrice:   pos.ExitPrice,
-			ProfitLoss:  pos.ProfitLoss,
-			OutcomeR:    pos.OutcomeR,
-			Duration:    durasiPosisi(pos.OpenedAt, pos.ClosedAt),
-			DailyNote:   dailyNote,
-			RiwayatLink: posisiLink,
+	if p.notifier != nil {
+		p.notifier.Enqueue(pos.UserID, messageKey, func(chatID string) telegram.Message {
+			_ = chatID
+			posisiLink := telegram.AppURL(p.baseURL, "/posisi")
+			// Timeframe diambil dari sinyal asal agar user tahu setup mana yang
+			// menghasilkan posisi ini. Gagal membaca bukan alasan menahan kabar.
+			htf, ltf := p.timeframePosisi(ctx, pos)
+			return telegram.FormatClosedMessage(telegram.ClosedParams{
+				Symbol:      pos.Symbol,
+				Direction:   pos.Direction,
+				Htf:         htf,
+				Ltf:         ltf,
+				Result:      positionResultLabel(pos.Status),
+				EntryPrice:  pos.OpenPrice,
+				ExitPrice:   pos.ExitPrice,
+				ProfitLoss:  pos.ProfitLoss,
+				OutcomeR:    pos.OutcomeR,
+				Duration:    durasiPosisi(pos.OpenedAt, pos.ClosedAt),
+				DailyNote:   dailyNote,
+				RiwayatLink: posisiLink,
+			})
 		})
+	}
+
+	// Web Push penutupan posisi dikirim untuk TP, SL, dan tutup manual.
+	if p.push != nil &&
+		(pos.Status == model.PositionStatusClosedTP ||
+			pos.Status == model.PositionStatusClosedSL ||
+			pos.Status == model.PositionStatusClosedManual) {
+		p.enqueueClosedWebPush(pos)
+	}
+}
+
+// PublishPositionOpened mengirim notifikasi Web Push ketika posisi entry baru
+// berhasil dibuka di broker (baik entry otomatis maupun konfirmasi manual).
+func (p *runnerPublisher) PublishPositionOpened(_ context.Context, pos *model.Position, _ *model.Signal, isAuto bool) {
+	if p.push == nil || pos == nil {
+		return
+	}
+
+	posCopy := *pos
+	p.push.Enqueue(pushnotify.Job{
+		UserID:     posCopy.UserID,
+		MessageKey: "wp:open:" + posCopy.ID,
+		Kind:       pushnotify.KindEntry,
+		TTLSeconds: 86400,
+		Topic:      "pos-open-" + posCopy.Symbol,
+		Build: func(_ context.Context) service.WebPushPayload {
+			title := fmt.Sprintf("✅ %s · %s %.2f lot Tereksekusi", posCopy.Symbol, posCopy.Direction, posCopy.LotSize)
+			if isAuto {
+				title = fmt.Sprintf("⚡ %s · %s %.2f lot Dibuka (Otomatis)", posCopy.Symbol, posCopy.Direction, posCopy.LotSize)
+			}
+			body := fmt.Sprintf(
+				"Open %s · SL %s · TP %s",
+				formatPushPrice(posCopy.Symbol, posCopy.OpenPrice),
+				formatPushPrice(posCopy.Symbol, posCopy.StopLoss),
+				formatPushPrice(posCopy.Symbol, posCopy.TakeProfit),
+			)
+			return service.WebPushPayload{
+				Title: title,
+				Body:  body,
+				URL:   "/app/posisi",
+				Tag:   "ila-pos-open-" + posCopy.ID,
+				Kind:  "entry",
+			}
+		},
 	})
+}
+
+func (p *runnerPublisher) enqueueReadyWebPush(userID string, signal *model.Signal, slotKey string) {
+	if signal == nil {
+		return
+	}
+	sigCopy := *signal
+	ttl := 300
+	if !sigCopy.ExpiresAt.IsZero() {
+		rem := int(time.Until(sigCopy.ExpiresAt).Seconds())
+		if rem < 60 {
+			ttl = 60
+		} else if rem > 900 {
+			ttl = 900
+		} else {
+			ttl = rem
+		}
+	}
+
+	p.push.Enqueue(pushnotify.Job{
+		UserID:     userID,
+		MessageKey: "wp:ready:" + slotKey,
+		Kind:       pushnotify.KindEntry,
+		TTLSeconds: ttl,
+		Topic:      "ready-" + sigCopy.Symbol,
+		Build: func(bctx context.Context) service.WebPushPayload {
+			rawToken, _ := p.approveLink(bctx, userID, sigCopy.SignalID)
+			targetURL := "/app/sinyal?pair=" + sigCopy.Symbol
+			if rawToken != "" {
+				targetURL = "/app/approve/" + rawToken
+			}
+
+			ikon := "🟢"
+			if sigCopy.Direction == "SELL" {
+				ikon = "🔴"
+			}
+			tfLabel := strings.TrimSpace(sigCopy.Htf)
+			if sigCopy.Ltf != "" {
+				if tfLabel != "" {
+					tfLabel += " ➔ " + sigCopy.Ltf
+				} else {
+					tfLabel = sigCopy.Ltf
+				}
+			}
+
+			title := fmt.Sprintf("%s %s · %s — Siap Entry (%s)", ikon, sigCopy.Symbol, tfLabel, sigCopy.Direction)
+			if tfLabel == "" {
+				title = fmt.Sprintf("%s %s — Siap Entry (%s)", ikon, sigCopy.Symbol, sigCopy.Direction)
+			}
+
+			body := fmt.Sprintf(
+				"Entry %s · SL %s · TP %s (RR 1:%.2f). Ketuk untuk konfirmasi.",
+				formatPushPrice(sigCopy.Symbol, sigCopy.EntryPrice),
+				formatPushPrice(sigCopy.Symbol, sigCopy.StopLoss),
+				formatPushPrice(sigCopy.Symbol, sigCopy.TakeProfit),
+				sigCopy.RiskReward,
+			)
+
+			return service.WebPushPayload{
+				Title:              title,
+				Body:               body,
+				URL:                targetURL,
+				Tag:                "ila-ready-" + sigCopy.SignalID,
+				Kind:               "entry",
+				RequireInteraction: true,
+			}
+		},
+	})
+}
+
+func (p *runnerPublisher) enqueueClosedWebPush(pos *model.Position) {
+	posCopy := *pos
+	p.push.Enqueue(pushnotify.Job{
+		UserID:     posCopy.UserID,
+		MessageKey: "wp:close:" + posCopy.ID,
+		Kind:       pushnotify.KindExit,
+		TTLSeconds: 86400,
+		Topic:      "pos-close-" + posCopy.Symbol,
+		Build: func(_ context.Context) service.WebPushPayload {
+			var title string
+			switch posCopy.Status {
+			case model.PositionStatusClosedTP:
+				title = fmt.Sprintf("🎯 %s · Target Tercapai (%+.2fR)", posCopy.Symbol, posCopy.OutcomeR)
+			case model.PositionStatusClosedSL:
+				title = fmt.Sprintf("🛑 %s · Stop Loss (%+.2fR)", posCopy.Symbol, posCopy.OutcomeR)
+			default:
+				title = fmt.Sprintf("⏹️ %s · Posisi Ditutup Manual", posCopy.Symbol)
+			}
+
+			var body string
+			if posCopy.ProfitLoss != 0 || posCopy.OutcomeR != 0 {
+				sign := ""
+				if posCopy.ProfitLoss > 0 {
+					sign = "+"
+				}
+				body = fmt.Sprintf(
+					"Hasil %s$%.2f · Exit %s",
+					sign,
+					posCopy.ProfitLoss,
+					formatPushPrice(posCopy.Symbol, posCopy.ExitPrice),
+				)
+			} else {
+				body = fmt.Sprintf(
+					"Exit %s · Ketuk untuk melihat jurnal eksekusi.",
+					formatPushPrice(posCopy.Symbol, posCopy.ExitPrice),
+				)
+			}
+
+			return service.WebPushPayload{
+				Title: title,
+				Body:  body,
+				URL:   "/app/posisi",
+				Tag:   "ila-pos-close-" + posCopy.ID,
+				Kind:  "exit",
+			}
+		},
+	})
+}
+
+func formatPushPrice(symbol string, price float64) string {
+	if price <= 0 {
+		return "—"
+	}
+	upper := strings.ToUpper(symbol)
+	switch {
+	case strings.Contains(upper, "XAU"), strings.Contains(upper, "XAG"),
+		strings.Contains(upper, "JPY"), strings.Contains(upper, "US30"),
+		strings.Contains(upper, "USTEC"), strings.Contains(upper, "NAS"),
+		strings.Contains(upper, "SPX"), strings.Contains(upper, "BTC"),
+		strings.Contains(upper, "ETH"):
+		return fmt.Sprintf("%.2f", price)
+	default:
+		return fmt.Sprintf("%.5f", price)
+	}
 }
 
 // kejadianSlot mengembalikan nomor peralihan status terakhir untuk satu slot

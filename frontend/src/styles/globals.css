@@ -73,6 +73,11 @@
   }
 
   html,
+  body {
+    overflow-x: hidden;
+  }
+
+  html,
   body,
   #root {
     height: 100%;
@@ -101,6 +106,16 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     border-radius: 9999px;
     background-color: hsl(var(--border));
+  }
+
+  /* Sembunyikan bilah gulir bawaan pada strip horizontal mobile. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 
   /* Fokus selalu terlihat: navigasi keyboard harus jelas walau tanpa warna. */

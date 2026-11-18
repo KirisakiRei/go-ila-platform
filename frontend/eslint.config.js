@@ -44,6 +44,10 @@ export default [
     languageOptions: { globals: globals.node },
   },
   {
+    files: ['public/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     // Primitif shadcn mengekspor varian cva bersama komponennya.
     files: ['src/components/ui/**/*.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },

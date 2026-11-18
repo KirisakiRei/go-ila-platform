@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { Badge, Button, Card, CardContent } from '@/components/ui'
 import { formatDualDateTime, formatNumber } from '@/lib/format'
+import { priceDigits } from '@/lib/pricePrecision'
 import { useConfirmApproval, useDeclineApproval, useIssueApproval } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
@@ -111,6 +112,7 @@ function SingleCallEntryCard({
   const isILA3 = signal.strategy_version === 'ila-3.0'
   const mtf = isILA3 ? getIla3Mtf(signal.htf, signal.ltf) : undefined
   const cycle = isILA3 ? getCycleBadge(signal.strategy_version, signal.htf, signal.ltf) : null
+  const digits = priceDigits(signal.symbol, signal.entry_price)
 
   // Hitung selisih pip perkiraan
   const pipsMultiplier = signal.symbol.toUpperCase().includes('XAU') ? 10 : 10000
@@ -199,69 +201,73 @@ function SingleCallEntryCard({
         </div>
       </div>
 
-      <CardContent className="p-4 sm:p-5 space-y-4">
+      <CardContent className="space-y-4 p-3.5 sm:p-5">
         {/* Parameter Order Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+          <div className="min-w-0 rounded-lg border border-border bg-muted/20 p-2.5 sm:p-3">
+            <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-[10.5px]">
               Entry Price
             </span>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
-              {formatNumber(signal.entry_price, 5)}
+            <p className="mt-1 truncate font-mono text-base font-bold tabular-nums text-foreground sm:text-lg">
+              {formatNumber(signal.entry_price, digits)}
             </p>
-            <p className="text-[11px] text-muted-foreground">Harga Pembuka Sinyal</p>
+            <p className="truncate text-[10.5px] text-muted-foreground sm:text-[11px]">
+              Harga Pembuka Sinyal
+            </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="min-w-0 rounded-lg border border-border bg-muted/20 p-2.5 sm:p-3">
+            <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-[10.5px]">
               Stop Loss
             </span>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
-              {formatNumber(signal.stop_loss, 5)}
+            <p className="mt-1 truncate font-mono text-base font-bold tabular-nums text-foreground sm:text-lg">
+              {formatNumber(signal.stop_loss, digits)}
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="truncate text-[10.5px] text-muted-foreground sm:text-[11px]">
               -{formatNumber(slPips, 1)} pips batas risiko
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="min-w-0 rounded-lg border border-border bg-muted/20 p-2.5 sm:p-3">
+            <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-[10.5px]">
               Take Profit (DOL)
             </span>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
-              {formatNumber(signal.take_profit, 5)}
+            <p className="mt-1 truncate font-mono text-base font-bold tabular-nums text-foreground sm:text-lg">
+              {formatNumber(signal.take_profit, digits)}
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="truncate text-[10.5px] text-muted-foreground sm:text-[11px]">
               +{formatNumber(tpPips, 1)} pips target likuiditas
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="min-w-0 rounded-lg border border-border bg-muted/20 p-2.5 sm:p-3">
+            <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-[10.5px]">
               Risk : Reward
             </span>
-            <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
+            <p className="mt-1 truncate font-mono text-base font-bold tabular-nums text-foreground sm:text-lg">
               1 : {formatNumber(signal.risk_reward, 2)}
             </p>
-            <p className="text-[11px] text-muted-foreground">Rasio Keuntungan</p>
+            <p className="truncate text-[10.5px] text-muted-foreground sm:text-[11px]">
+              Rasio Keuntungan
+            </p>
           </div>
         </div>
 
         {/* Action Controls & Info Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3.5">
-          <div className="text-[11.5px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+        <div className="flex flex-col gap-3 border-t border-border pt-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground sm:text-[11.5px]">
             <span>Terbit: {formatDualDateTime(signal.published_at)}</span>
             <span>·</span>
             <span>Konfirmasi: LTF CISD Valid</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Button
               size="sm"
               variant="outline"
               disabled={sisa.habis || sibuk}
               onClick={() => void lewati()}
-              className="h-8 gap-1.5 text-xs font-medium"
+              className="h-10 w-full gap-1.5 text-xs font-medium sm:h-8 sm:w-auto"
             >
               <X className="h-3.5 w-3.5" />
               Lewati
@@ -272,7 +278,7 @@ function SingleCallEntryCard({
               variant="default"
               disabled={!bisaDieksekusi || sibuk}
               onClick={() => void eksekusi()}
-              className="h-8 gap-1.5 text-xs font-semibold px-4 shadow-sm"
+              className="h-10 w-full gap-1.5 px-4 text-xs font-semibold shadow-sm sm:h-8 sm:w-auto"
             >
               {konfirmasi.isPending || issue.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -141,6 +141,13 @@ type Config struct {
 	CTraderClientID     string
 	CTraderClientSecret string
 	CTraderRedirectURI  string
+
+	// Web Push (VAPID RFC 8292). Bila kosong, pasangan kunci dibangkitkan
+	// otomatis dan disimpan terenkripsi di database agar backend-api dan runner
+	// berbagi kunci yang sama tanpa konfigurasi manual.
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string
 }
 
 // Load membaca env lalu memvalidasi nilai wajib.
@@ -218,6 +225,9 @@ func Load(service string) (*Config, error) {
 		CTraderClientID:       env("CTRADER_CLIENT_ID", ""),
 		CTraderClientSecret:   env("CTRADER_CLIENT_SECRET", ""),
 		CTraderRedirectURI:    env("CTRADER_REDIRECT_URI", ""),
+		VAPIDPublicKey:        env("VAPID_PUBLIC_KEY", ""),
+		VAPIDPrivateKey:       env("VAPID_PRIVATE_KEY", ""),
+		VAPIDSubject:          env("VAPID_SUBJECT", "mailto:notifikasi@rekavia.com"),
 	}
 
 	if err := cfg.validate(); err != nil {

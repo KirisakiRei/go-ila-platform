@@ -150,12 +150,12 @@ export function OnboardingChecklist({ data, onNavigate }: OnboardingChecklistPro
               </div>
 
               {!isDone && (
-                <div className="flex shrink-0 items-center gap-2 pl-10 sm:pl-0">
+                <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
                   {stepKey === 'verifikasi_email' ? (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="gap-1.5 text-xs font-medium"
+                      className="w-full gap-1.5 text-xs font-medium sm:w-auto"
                       disabled={resend.isPending}
                       onClick={() => resend.mutate()}
                     >
@@ -166,7 +166,7 @@ export function OnboardingChecklist({ data, onNavigate }: OnboardingChecklistPro
                     <Button
                       size="sm"
                       variant="default"
-                      className="gap-1.5 text-xs font-semibold"
+                      className="w-full gap-1.5 text-xs font-semibold sm:w-auto"
                       onClick={() => handleGo(meta.href)}
                     >
                       {meta.actionLabel}

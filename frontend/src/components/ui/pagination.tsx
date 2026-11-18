@@ -1,5 +1,6 @@
 import { Button } from './button'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import { PILIHAN_UKURAN } from './use-paginasi-lokal'
 
 type PaginationProps = {
@@ -44,6 +45,7 @@ export function Pagination({
   className,
 }: PaginationProps) {
   const adaPemilihUkuran = Boolean(pageSize && onPageSizeChange)
+  const isMobile = useIsMobile()
 
   // Pemilih ukuran tetap ditampilkan walau hanya ada satu halaman: pengguna
   // yang ingin melihat 50 baris sekali jalan perlu memilihnya sebelum daftar
@@ -77,6 +79,57 @@ export function Pagination({
   const nomor = halamanSekitar(page, totalPages)
   const bisaMundur = page > 1 && !disabled
   const bisaMaju = page < totalPages && !disabled
+
+  if (isMobile) {
+    return (
+      <nav
+        className={cn(
+          'flex flex-col gap-2 border-t border-border pt-2.5',
+          className,
+        )}
+        aria-label="Navigasi halaman"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-muted-foreground">
+            {shown} dari {total} {unit}
+          </p>
+          {adaPemilihUkuran && (
+            <PemilihUkuran
+              value={pageSize as number}
+              options={pageSizeOptions}
+              disabled={disabled}
+              onChange={onPageSizeChange as (size: number) => void}
+            />
+          )}
+        </div>
+        <div className="flex w-full items-center justify-between gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!bisaMundur}
+            onClick={() => onPageChange(page - 1)}
+            aria-label="Halaman sebelumnya"
+            className="px-3 text-xs"
+          >
+            Sebelumnya
+          </Button>
+          <span className="text-xs font-medium tabular text-foreground">
+            Hal {page} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!bisaMaju}
+            onClick={() => onPageChange(page + 1)}
+            aria-label="Halaman berikutnya"
+            className="px-3 text-xs"
+          >
+            Berikutnya
+          </Button>
+        </div>
+      </nav>
+    )
+  }
 
   return (
     <nav

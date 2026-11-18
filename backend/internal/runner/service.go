@@ -39,6 +39,12 @@ type Publisher interface {
 	PublishPositionClosed(ctx context.Context, pos *model.Position, daily *DailyOutcome)
 }
 
+// PositionOpenedPublisher adalah perluasan opsional Publisher untuk memberi tahu
+// kanal notifikasi begitu posisi baru tercatat terbuka (otomatis maupun manual).
+type PositionOpenedPublisher interface {
+	PublishPositionOpened(ctx context.Context, pos *model.Position, signal *model.Signal, isAuto bool)
+}
+
 // DailyOutcome menjelaskan sisa kuota setelah sebuah posisi ditutup.
 type DailyOutcome struct {
 	TotalTrades int
@@ -957,7 +963,7 @@ func (s *Service) processSignalForAccount(ctx context.Context, user *model.User,
 	}
 
 	if otomatis {
-		return s.execute(ctx, user, account, signal)
+		return s.execute(ctx, user, account, signal, true)
 	}
 
 	// Peluang: pasangan timeframe ini tidak diizinkan auto, tetapi user tetap
@@ -1046,7 +1052,7 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 		// "order" itu tetap dicatat sebagai posisi simulasi sehingga aturan
 		// harian dan riwayat tetap berjalan persis seperti akun nyata.
 		if account.Mode == "auto" && s.autoExecute(ctx) {
-			return s.execute(ctx, user, &account, signal)
+			return s.execute(ctx, user, &account, signal, true)
 		}
 
 		// Mode manual: tampilkan sebagai siap, tunggu konfirmasi user.
@@ -1345,7 +1351,7 @@ func (s *Service) quoteForSlippage(ctx context.Context, client broker.Client, sy
 // ---------------------------------------------------------------------------
 
 // execute membuka posisi nyata (atau simulasi) untuk satu sinyal dan satu akun.
-func (s *Service) execute(ctx context.Context, user *model.User, account *model.BrokerAccount, signal *model.Signal) error {
+func (s *Service) execute(ctx context.Context, user *model.User, account *model.BrokerAccount, signal *model.Signal, isAuto bool) error {
 	key := IdempotencyKey(signal.SignalID, account.ID)
 
 	record := &model.ExecutionRecord{
@@ -1500,6 +1506,9 @@ func (s *Service) execute(ctx context.Context, user *model.User, account *model.
 		"dry_run", dryRun)
 
 	s.pub.PublishSignal(ctx, user.ID, signal.SignalID, SignalConsumed, "")
+	if op, ok := s.pub.(PositionOpenedPublisher); ok {
+		op.PublishPositionOpened(ctx, position, signal, isAuto)
+	}
 	s.pub.PublishTelemetry(ctx, account.ID)
 	return nil
 }
@@ -1776,7 +1785,7 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 			"user_id", userID, "signal_id", signal.SignalID,
 			"account_id", account.ID, "alasan", string(reason))
 	}
-	return RejectNone, s.execute(ctx, user, account, signal)
+	return RejectNone, s.execute(ctx, user, account, signal, false)
 }
 
 // Skip menandai sinyal dilewati user. Kuota harian tidak terpakai.

@@ -273,7 +273,7 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
           <Button
             variant="ghost"
             size="sm"
@@ -286,7 +286,12 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
             />
             Periksa ulang data
           </Button>
-          <Button onClick={() => void kirim()} isLoading={buat.isPending} disabled={!bisaJalan}>
+          <Button
+            className="w-full sm:w-auto"
+            onClick={() => void kirim()}
+            isLoading={buat.isPending}
+            disabled={!bisaJalan}
+          >
             <Play className="h-4 w-4" aria-hidden="true" />
             {buat.isPending ? 'Menyiapkan…' : 'Jalankan backtest'}
           </Button>

@@ -43,7 +43,7 @@ function labelUkuran(bytes: number): string {
 function DaftarLampiran({ judul, items, reportID }: { judul: string; items: BugAttachmentItem[]; reportID: string }) {
   if (items.length === 0) return null
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <p className="text-[11.5px] font-semibold text-foreground">{judul}</p>
       {items.map((att) => (
         <a
@@ -51,11 +51,11 @@ function DaftarLampiran({ judul, items, reportID }: { judul: string; items: BugA
           href={bugApi.attachmentUrl(reportID, att.id)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11.5px] text-foreground transition-colors duration-150 hover:bg-secondary"
+          className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-lg border border-border px-2.5 py-1.5 text-[11.5px] text-foreground transition-colors duration-150 hover:bg-secondary"
         >
           <Paperclip className="h-3.5 w-3.5 shrink-0" />
-          <span className="max-w-[220px] truncate">{att.file_name}</span>
-          <span className="text-muted-foreground">({labelUkuran(att.size_bytes)})</span>
+          <span className="min-w-0 flex-1 truncate">{att.file_name}</span>
+          <span className="shrink-0 text-muted-foreground">({labelUkuran(att.size_bytes)})</span>
         </a>
       ))}
     </div>
@@ -92,15 +92,15 @@ export default function DetailLaporanBugPage() {
           Riwayat laporan
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h1 className="overflow-wrap break-words text-lg font-bold tracking-tight text-foreground">
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-lg font-bold tracking-tight text-foreground">
               {data.title}
             </h1>
             <p className="mt-0.5 text-[11.5px] text-muted-foreground">
               {data.category} · dikirim {formatDateTime(data.created_at)}
             </p>
           </div>
-          <span className="rounded-md border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-foreground">
+          <span className="shrink-0 rounded-md border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-foreground">
             {LABEL_STATUS[data.status]}
           </span>
         </div>
@@ -164,22 +164,24 @@ export default function DetailLaporanBugPage() {
         </ol>
       </Card>
 
-      <Card className="flex flex-col gap-2.5 p-4">
+      <Card className="flex min-w-0 flex-col gap-2.5 p-4">
         <p className="text-[11.5px] font-semibold text-foreground">Yang Anda laporkan</p>
-        <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground">{data.body}</p>
+        <p className="whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground">
+          {data.body}
+        </p>
         {data.page_url && (
-          <p className="truncate text-[10.5px] text-muted-foreground">Halaman: {data.page_url}</p>
+          <p className="break-all text-[10.5px] text-muted-foreground">Halaman: {data.page_url}</p>
         )}
         <DaftarLampiran judul="Lampiran Anda" items={lampiranPelapor} reportID={data.id} />
       </Card>
 
       {data.admin_note && (
-        <Card className="flex flex-col gap-2.5 border-foreground/20 p-4">
+        <Card className="flex min-w-0 flex-col gap-2.5 border-foreground/20 p-4">
           <div className="flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5 text-muted-foreground" />
             <p className="text-[11.5px] font-semibold text-foreground">Tanggapan tim</p>
           </div>
-          <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground">
+          <p className="whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground">
             {data.admin_note}
           </p>
           <DaftarLampiran judul="Lampiran tim" items={lampiranTim} reportID={data.id} />

@@ -15,10 +15,11 @@
  * timeframe asalnya. Sweep pada HTF yang dipaksakan ke panel LTF akan muncul
  * di lilin LTF yang salah dan membuat urutan kejadian terbaca terbalik.
  */
-import { useMemo, type ReactNode } from 'react'
-import { Skeleton } from '@/components/ui'
+import { useMemo, useState, type ReactNode } from 'react'
+import { MobileSegmentedTabs, Skeleton } from '@/components/ui'
 import { useBacktestTrade } from '@/lib/queries'
 import { priceDigits } from '@/lib/pricePrecision'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import {
   PriceChart,
   type ChartMarkerSpec,
@@ -88,6 +89,8 @@ export function BacktestTradeChart({
 }
 
 function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: string }) {
+  const isMobile = useIsMobile()
+  const [mobilePanel, setMobilePanel] = useState<'htf' | 'ltf'>('ltf')
   const theme = chartTheme()
   const digits = priceDigits(symbol, detail.entry)
   const isBuy = detail.arah === 'BUY'
@@ -224,65 +227,81 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
     detail.hasil === 'TP' ? theme.profit : detail.hasil === 'SL' ? theme.loss : theme.neutral
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6">
+    <div className="flex w-full min-w-0 flex-col gap-5 sm:gap-6">
       <RingkasanEntry detail={detail} digits={digits} warnaHasil={warnaHasil} />
 
-      <PanelChart
-        judul={
-          <JudulChart
-            timeframe={detail.htf}
-            peran={PERAN_TIMEFRAME[detail.htf] ?? 'timeframe acuan'}
-            keterangan="Zona imbalance dan sapuan likuiditas terbaca dari sini."
-          />
-        }
-        keterangan={
-          <>
-            {detail.candle_htf.length} candle tersimpan, dari sebelum masuk sampai sesudah
-            ditutup. Garis entry, batas rugi, dan target di panel ini menandai harga yang sama
-            dengan panel {detail.ltf}.
-          </>
-        }
-      >
-        <PanelIsi
-          candle={detail.candle_htf}
-          lines={bersama.lines}
-          markers={[...bersama.marks, ...penandaAcuan]}
-          segments={bersama.segments}
-          zones={zonaAcuan}
-          focusTime={detail.waktu_masuk}
-          digits={digits}
-          tinggi={TINGGI_PANEL_ACUAN}
-          pesanKosong={`Candle ${detail.htf} tidak tersedia untuk entry ini.`}
+      {isMobile && (
+        <MobileSegmentedTabs<'htf' | 'ltf'>
+          ariaLabel="Pilih panel timeframe chart"
+          value={mobilePanel}
+          onChange={setMobilePanel}
+          options={[
+            { id: 'ltf', label: `Eksekusi (${detail.ltf})` },
+            { id: 'htf', label: `Acuan (${detail.htf})` },
+          ]}
         />
-      </PanelChart>
+      )}
 
-      <PanelChart
-        judul={
-          <JudulChart
-            timeframe={detail.ltf}
-            peran={PERAN_TIMEFRAME[detail.ltf] ?? 'timeframe eksekusi'}
-            keterangan="Titik masuk, CISD, dan perjalanan posisi sampai ditutup."
+      {(!isMobile || mobilePanel === 'htf') && (
+        <PanelChart
+          judul={
+            <JudulChart
+              timeframe={detail.htf}
+              peran={PERAN_TIMEFRAME[detail.htf] ?? 'timeframe acuan'}
+              keterangan="Zona imbalance dan sapuan likuiditas terbaca dari sini."
+            />
+          }
+          keterangan={
+            <>
+              {detail.candle_htf.length} candle tersimpan, dari sebelum masuk sampai sesudah
+              ditutup. Garis entry, batas rugi, dan target di panel ini menandai harga yang sama
+              dengan panel {detail.ltf}.
+            </>
+          }
+        >
+          <PanelIsi
+            candle={detail.candle_htf}
+            lines={bersama.lines}
+            markers={[...bersama.marks, ...penandaAcuan]}
+            segments={bersama.segments}
+            zones={zonaAcuan}
+            focusTime={detail.waktu_masuk}
+            digits={digits}
+            tinggi={isMobile ? 270 : TINGGI_PANEL_ACUAN}
+            pesanKosong={`Candle ${detail.htf} tidak tersedia untuk entry ini.`}
           />
-        }
-        keterangan={
-          <>
-            {detail.candle_ltf.length} candle tersimpan. Garis putus-putus menandai harga entry,
-            garis tebal adalah batas rugi dan target.
-          </>
-        }
-      >
-        <PanelIsi
-          candle={detail.candle_ltf}
-          lines={bersama.lines}
-          markers={[...bersama.marks, ...penandaEksekusi]}
-          segments={bersama.segments}
-          zones={[]}
-          focusTime={detail.waktu_masuk}
-          digits={digits}
-          tinggi={TINGGI_PANEL_EKSEKUSI}
-          pesanKosong={`Candle ${detail.ltf} tidak tersedia untuk entry ini.`}
-        />
-      </PanelChart>
+        </PanelChart>
+      )}
+
+      {(!isMobile || mobilePanel === 'ltf') && (
+        <PanelChart
+          judul={
+            <JudulChart
+              timeframe={detail.ltf}
+              peran={PERAN_TIMEFRAME[detail.ltf] ?? 'timeframe eksekusi'}
+              keterangan="Titik masuk, CISD, dan perjalanan posisi sampai ditutup."
+            />
+          }
+          keterangan={
+            <>
+              {detail.candle_ltf.length} candle tersimpan. Garis putus-putus menandai harga entry,
+              garis tebal adalah batas rugi dan target.
+            </>
+          }
+        >
+          <PanelIsi
+            candle={detail.candle_ltf}
+            lines={bersama.lines}
+            markers={[...bersama.marks, ...penandaEksekusi]}
+            segments={bersama.segments}
+            zones={[]}
+            focusTime={detail.waktu_masuk}
+            digits={digits}
+            tinggi={isMobile ? 300 : TINGGI_PANEL_EKSEKUSI}
+            pesanKosong={`Candle ${detail.ltf} tidak tersedia untuk entry ini.`}
+          />
+        </PanelChart>
+      )}
 
       {(detail.ringkasan || detail.langkah_berikut) && (
         <div className="flex flex-col gap-2 border border-border bg-secondary/30 p-3 text-[12px] leading-relaxed">

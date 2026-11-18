@@ -1,7 +1,8 @@
 import { useState, useMemo, type FormEvent } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
+  Calculator,
   Check,
   Laptop,
   RotateCcw,
@@ -23,6 +24,9 @@ import {
   EmptyState,
   Input,
   Label,
+  MobileMenuGroup,
+  MobileMenuRow,
+  MobileSubpageHeader,
   Modal,
   Pagination,
   Select,
@@ -47,13 +51,25 @@ import {
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { ApiError } from '@/lib/api-error'
+import { useIsTabletOrMobile } from '@/lib/use-mobile-viewport'
 import { RiskSimulatorPanel } from '@/features/accounts/components/RiskSimulatorPanel'
 import type { BrokerAccount, PairItem, RiskMode } from '@/types/api'
+
+type MobileAccountSub = 'risiko' | 'simulasi' | 'pair' | 'riwayat'
+
+function parseMobileSub(raw: string | null): MobileAccountSub | null {
+  if (raw === 'risiko' || raw === 'simulasi' || raw === 'pair' || raw === 'riwayat') {
+    return raw
+  }
+  return null
+}
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuthContext()
+  const isMobileHub = useIsTabletOrMobile()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const { data: accounts, isLoading: accountsLoading } = useAccounts()
   const account = accounts?.find((a) => a.id === id)
@@ -62,6 +78,14 @@ export default function AccountDetailPage() {
   const [konfirmasiHapus, setKonfirmasiHapus] = useState(false)
 
   const remove = useDeleteAccount()
+  const mobileSub = parseMobileSub(searchParams.get('sub'))
+
+  const setMobileSub = (next: MobileAccountSub | null) => {
+    const params = new URLSearchParams(searchParams)
+    if (next) params.set('sub', next)
+    else params.delete('sub')
+    setSearchParams(params)
+  }
 
   if (accountsLoading) {
     return (
@@ -100,10 +124,240 @@ export default function AccountDetailPage() {
       ? 'Bermasalah'
       : 'Belum Tersambung'
 
+  const riskLabel =
+    account.risk_mode === 'lot'
+      ? `${formatNumber(account.lot_size ?? 0.01, 2)} lot`
+      : `${formatNumber(account.risk_percent, 2)}%`
+
+  const deleteModal = (
+    <Modal
+      open={konfirmasiHapus}
+      onClose={() => setKonfirmasiHapus(false)}
+      title="Hapus Akun Broker?"
+      description={`Anda akan menghapus akun ${account.label} (${account.external_account_id || account.broker_type}) secara permanen.`}
+    >
+      <div className="space-y-4 pt-1">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Seluruh kredensial token broker yang tersimpan di sistem akan langsung dihapus. Sinyal trading
+          tidak lagi dapat diteruskan ke akun ini.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setKonfirmasiHapus(false)}>
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            isLoading={remove.isPending}
+            onClick={() => {
+              remove.mutate(account.id, {
+                onSuccess: () => {
+                  setKonfirmasiHapus(false)
+                  navigate('/akun')
+                },
+              })
+            }}
+          >
+            Hapus Permanen
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+
+  if (isMobileHub) {
+    if (mobileSub) {
+      const subMeta: Record<MobileAccountSub, { title: string; desc: string }> = {
+        risiko: {
+          title: 'Manajemen Risiko & Mode',
+          desc: `Atur mode eksekusi dan batas risiko untuk ${account.label}.`,
+        },
+        simulasi: {
+          title: 'Kalkulator Simulasi Risiko',
+          desc: 'Pratinjau ukuran lot dan nominal risiko berdasarkan jarak Stop Loss.',
+        },
+        pair: {
+          title: 'Filter Pair Eksekusi',
+          desc: 'Pilih instrumen yang diizinkan dieksekusi pada akun broker ini.',
+        },
+        riwayat: {
+          title: 'Riwayat Order Akun',
+          desc: 'Daftar tiket transaksi dan hasil eksekusi terbaru.',
+        },
+      }
+
+      return (
+        <div className="space-y-4">
+          <MobileSubpageHeader
+            backLabel={`Kembali ke ${account.label}`}
+            onBack={() => setMobileSub(null)}
+            title={subMeta[mobileSub].title}
+            description={subMeta[mobileSub].desc}
+          />
+
+          {mobileSub === 'risiko' && (
+            <TabRiskSettings account={account} tier={user?.tier ?? 'free'} hideSimulator />
+          )}
+          {mobileSub === 'simulasi' && (
+            <Card>
+              <CardContent className="p-3.5">
+                <RiskSimulatorPanel
+                  accountId={account.id}
+                  defaultEquity={account.equity}
+                  riskMode={account.risk_mode ?? 'percent'}
+                  riskPercent={account.risk_percent}
+                  lotSize={account.lot_size ?? 0.01}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {mobileSub === 'pair' && <TabPairFilter accountId={account.id} />}
+          {mobileSub === 'riwayat' && <TabOrderHistory accountId={account.id} compactMobile />}
+
+          {deleteModal}
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <Link
+          to="/akun"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Kembali ke Daftar Akun</span>
+        </Link>
+
+        {/* Kartu Ringkasan Akun Mobile */}
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <StatusDot state={status} label={statusText} />
+                <h1 className="truncate text-base font-bold text-foreground">{account.label}</h1>
+              </div>
+              <Badge variant={account.broker_type === 'ctrader' ? 'solid' : 'outline'} className="shrink-0 text-[10px]">
+                {account.broker_type === 'ctrader' ? 'cTrader OAuth' : 'Match-Trader'}
+              </Badge>
+            </div>
+
+            <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+              Login: <strong className="text-foreground">{account.external_account_id || 'Belum terbaca'}</strong> ·{' '}
+              {statusText}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <Badge variant={account.is_dry_run ? 'muted' : 'solid'} className="text-[10px]">
+                {account.is_dry_run ? 'Demo' : 'Live'}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {account.mode === 'auto' ? 'Auto' : 'Manual'}
+              </Badge>
+              {!account.is_active && (
+                <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-[10px] text-red-600">
+                  Nonaktif
+                </Badge>
+              )}
+              <span className="ml-auto text-[10.5px] text-muted-foreground">
+                Sinkron {formatDateTime(account.last_synced_at)}
+              </span>
+            </div>
+          </div>
+
+          {account.last_error && (
+            <Alert variant="destructive" className="mt-3 text-xs">
+              {account.last_error}
+            </Alert>
+          )}
+
+          <div className="mt-3.5 grid grid-cols-2 gap-2.5 border-t border-border pt-3.5">
+            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Balance
+              </p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+                {formatMoney(account.balance)}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Equity
+              </p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+                {formatMoney(account.equity)}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Free Margin
+              </p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+                {formatMoney(account.free_margin)}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Risiko / Trade
+              </p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+                {riskLabel}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <MobileMenuGroup title="Pengaturan & Operasional">
+          <MobileMenuRow
+            icon={Sliders}
+            label="Manajemen Risiko & Mode"
+            description="Mode manual/otomatis, batas risiko, & status aktif"
+            badge={
+              <Badge variant="outline" className="text-[10px]">
+                {riskLabel}
+              </Badge>
+            }
+            onClick={() => setMobileSub('risiko')}
+          />
+          <MobileMenuRow
+            icon={Calculator}
+            label="Kalkulator Simulasi Risiko"
+            description="Hitung estimasi lot & nominal risiko per pair"
+            onClick={() => setMobileSub('simulasi')}
+          />
+          <MobileMenuRow
+            icon={Settings}
+            label="Filter Pair Eksekusi"
+            description="Pilih instrumen trading yang diizinkan akun ini"
+            onClick={() => setMobileSub('pair')}
+          />
+          <MobileMenuRow
+            icon={Laptop}
+            label="Riwayat Order Akun"
+            description="Tiket transaksi & hasil eksekusi terbaru"
+            onClick={() => setMobileSub('riwayat')}
+          />
+        </MobileMenuGroup>
+
+        <MobileMenuGroup title="Manajemen Koneksi">
+          <MobileMenuRow
+            icon={Trash2}
+            tone="danger"
+            label="Hapus Akun Broker"
+            description="Cabut kredensial dan hentikan eksekusi sinyal"
+            onClick={() => setKonfirmasiHapus(true)}
+          />
+        </MobileMenuGroup>
+
+        {deleteModal}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Navigasi Kembali */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <Link
           to="/akun"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -129,10 +383,10 @@ export default function AccountDetailPage() {
       <Card>
         <CardContent className="p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2.5">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <StatusDot state={status} label={statusText} />
-                <h1 className="text-lg font-bold text-foreground">{account.label}</h1>
+                <h1 className="truncate text-lg font-bold text-foreground">{account.label}</h1>
                 <Badge variant={account.broker_type === 'ctrader' ? 'solid' : 'outline'}>
                   {account.broker_type === 'ctrader' ? 'cTrader OAuth' : 'Match-Trader'}
                 </Badge>
@@ -163,39 +417,39 @@ export default function AccountDetailPage() {
 
           {/* 4 Kolom Metrik Finansial */}
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
-            <div className="rounded-lg border border-border bg-secondary/20 p-3">
+            <div className="min-w-0 rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Balance
               </p>
-              <p className="mt-1 text-base font-bold tabular-nums text-foreground">
+              <p className="mt-1 truncate text-base font-bold tabular-nums text-foreground">
                 {formatMoney(account.balance)}
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-secondary/20 p-3">
+            <div className="min-w-0 rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Equity
               </p>
-              <p className="mt-1 text-base font-bold tabular-nums text-foreground">
+              <p className="mt-1 truncate text-base font-bold tabular-nums text-foreground">
                 {formatMoney(account.equity)}
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-secondary/20 p-3">
+            <div className="min-w-0 rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Free Margin
               </p>
-              <p className="mt-1 text-base font-bold tabular-nums text-foreground">
+              <p className="mt-1 truncate text-base font-bold tabular-nums text-foreground">
                 {formatMoney(account.free_margin)}
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-secondary/20 p-3">
+            <div className="min-w-0 rounded-lg border border-border bg-secondary/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Risk / Trade
               </p>
-              <p className="mt-1 text-base font-bold tabular-nums text-foreground">
-                {formatNumber(account.risk_percent, 2)}%
+              <p className="mt-1 truncate text-base font-bold tabular-nums text-foreground">
+                {riskLabel}
               </p>
             </div>
           </div>
@@ -203,7 +457,7 @@ export default function AccountDetailPage() {
       </Card>
 
       {/* Tab Navigasi Halaman Detail */}
-      <div className="flex border-b border-border">
+      <div className="flex flex-wrap border-b border-border">
         <button
           type="button"
           onClick={() => setActiveTab('risk')}
@@ -213,7 +467,7 @@ export default function AccountDetailPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Sliders className="h-3.5 w-3.5" />
+          <Sliders className="h-3.5 w-3.5 shrink-0" />
           <span>1. Risk Management & Settings</span>
         </button>
 
@@ -226,7 +480,7 @@ export default function AccountDetailPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Settings className="h-3.5 w-3.5" />
+          <Settings className="h-3.5 w-3.5 shrink-0" />
           <span>2. Filter Pair Eksekusi</span>
         </button>
 
@@ -239,7 +493,7 @@ export default function AccountDetailPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Laptop className="h-3.5 w-3.5" />
+          <Laptop className="h-3.5 w-3.5 shrink-0" />
           <span>3. Riwayat Order</span>
         </button>
       </div>
@@ -249,46 +503,21 @@ export default function AccountDetailPage() {
       {activeTab === 'pairs' && <TabPairFilter accountId={account.id} />}
       {activeTab === 'history' && <TabOrderHistory accountId={account.id} />}
 
-      {/* Modal Konfirmasi Hapus Akun */}
-      <Modal
-        open={konfirmasiHapus}
-        onClose={() => setKonfirmasiHapus(false)}
-        title="Hapus Akun Broker?"
-        description={`Anda akan menghapus akun ${account.label} (${account.external_account_id || account.broker_type}) secara permanen.`}
-      >
-        <div className="space-y-4 pt-1">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Seluruh kredensial token broker yang tersimpan di sistem akan langsung dihapus. Sinyal trading
-            tidak lagi dapat diteruskan ke akun ini.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setKonfirmasiHapus(false)}>
-              Batal
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              isLoading={remove.isPending}
-              onClick={() => {
-                remove.mutate(account.id, {
-                  onSuccess: () => {
-                    setKonfirmasiHapus(false)
-                    navigate('/akun')
-                  },
-                })
-              }}
-            >
-              Hapus Permanen
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {deleteModal}
     </div>
   )
 }
 
 /** TAB 1: MANAJEMEN RISIKO & PENGATURAN */
-function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: string }) {
+function TabRiskSettings({
+  account,
+  tier,
+  hideSimulator = false,
+}: {
+  account: BrokerAccount
+  tier: string
+  hideSimulator?: boolean
+}) {
   const update = useUpdateAccount()
   const [label, setLabel] = useState(account.label)
   const [mode, setMode] = useState(account.mode)
@@ -364,14 +593,14 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
             variant="outline"
             size="sm"
             onClick={handleResetToDefault}
-            className="gap-1.5 text-xs self-start sm:self-auto"
+            className="gap-1.5 self-start text-xs sm:self-auto"
           >
             <RotateCcw className="h-3 w-3" />
             Terapkan Default Template
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-5">
         <form onSubmit={handleSave} className="space-y-4">
           {notice && (
             <Alert variant={notice.includes('Gagal') ? 'destructive' : 'success'} className="text-xs">
@@ -386,7 +615,6 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                 id="account-label"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                className="text-xs"
               />
             </div>
 
@@ -410,7 +638,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label>Metode Risiko</Label>
-              <div className="flex items-center gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5 sm:flex sm:items-center">
                 <Button
                   type="button"
                   size="sm"
@@ -448,7 +676,6 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   max="5"
                   value={riskPercent}
                   onChange={(e) => setRiskPercent(Number(e.target.value))}
-                  className="text-xs"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   Sah 0,10% sampai 5,00%. Di atas 1% akan ada peringatan sebelum disimpan.
@@ -465,7 +692,6 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
                   max="10"
                   value={lotSize}
                   onChange={(e) => setLotSize(Number(e.target.value))}
-                  className="text-xs"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   {lotTidakSah
@@ -476,32 +702,24 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
             )}
           </div>
 
-          <RiskSimulatorPanel
-            accountId={account.id}
-            defaultEquity={account.equity}
-            riskMode={riskMode}
-            riskPercent={Number(riskPercent)}
-            lotSize={Number(lotSize)}
-          />
-
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-3 justify-center">
-              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+            <div className="flex flex-col justify-center gap-3">
+              <label className="flex cursor-pointer items-start gap-2.5 text-xs font-medium">
                 <input
                   type="checkbox"
                   checked={isDryRun}
                   onChange={(e) => setIsDryRun(e.target.checked)}
-                  className="h-4 w-4 rounded accent-foreground"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded accent-foreground"
                 />
                 <span>Mode Demo / Dry Run (Order simulasi tanpa dana riil)</span>
               </label>
 
-              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+              <label className="flex cursor-pointer items-start gap-2.5 text-xs font-medium">
                 <input
                   type="checkbox"
                   checked={isActive}
                   onChange={(e) => setIsActive(e.target.checked)}
-                  className="h-4 w-4 rounded accent-foreground"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded accent-foreground"
                 />
                 <span>Akun Aktif (Menerima dan memproses sinyal)</span>
               </label>
@@ -509,12 +727,24 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
           </div>
 
           <div className="pt-2">
-            <Button type="submit" size="sm" isLoading={update.isPending} className="gap-1.5">
+            <Button type="submit" size="sm" isLoading={update.isPending} className="w-full gap-1.5 sm:w-auto">
               <Save className="h-3.5 w-3.5" />
               Simpan Pengaturan
             </Button>
           </div>
         </form>
+
+        {/* Kalkulator dipisah di luar <form> agar tombol Enter pada input simulasi
+            tidak memicu penyimpanan pengaturan akun tanpa sengaja. */}
+        {!hideSimulator && (
+          <RiskSimulatorPanel
+            accountId={account.id}
+            defaultEquity={account.equity}
+            riskMode={riskMode}
+            riskPercent={Number(riskPercent)}
+            lotSize={Number(lotSize)}
+          />
+        )}
       </CardContent>
 
       {/* Konfirmasi risiko agresif: disimpan hanya setelah user menyetujui. */}
@@ -548,7 +778,7 @@ function TabRiskSettings({ account, tier }: { account: BrokerAccount; tier: stri
             <strong className="text-foreground">{formatNumber(Math.min(riskPercent * 10, 100), 0)}%</strong>{' '}
             ekuitas.
           </p>
-          <p>Gunakan simulasi di atas untuk melihat padanan lot dan nominal risikonya.</p>
+          <p>Gunakan simulasi risiko untuk melihat padanan lot dan nominal risikonya.</p>
         </div>
       </Modal>
     </Card>
@@ -564,12 +794,9 @@ function TabPairFilter({ accountId }: { accountId: string }) {
   const [search, setSearch] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
-  // Pilihan diambil langsung dari server sampai user mengubahnya sendiri,
-  // sehingga tidak perlu sinkronisasi lewat effect (yang memicu render ganda).
   const selectedSymbols = pilihanLokal ?? data?.selected ?? []
   const setSelectedSymbols = setPilihanLokal
 
-  // Kumpulkan seluruh item pair dari katalog
   const allPairs = useMemo(() => {
     const categories = data?.catalog?.categories
     if (!categories) return []
@@ -597,7 +824,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 
   const toggleSymbol = (symbol: string) => {
     setSelectedSymbols((prev) => {
-      const current = prev ?? []
+      const current = prev ?? data?.selected ?? []
       return current.includes(symbol)
         ? current.filter((s) => s !== symbol)
         : [...current, symbol]
@@ -635,7 +862,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
               Hanya simbol pair yang Anda centang yang akan dieksekusi oleh akun ini.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={selectAll} className="text-xs">
               Pilih Semua
             </Button>
@@ -658,12 +885,12 @@ function TabPairFilter({ accountId }: { accountId: string }) {
         {!isLoading && (
           <>
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Cari simbol pair (misal: XAUUSD, EURUSD)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 text-xs"
+                className="pl-9"
               />
             </div>
 
@@ -675,19 +902,19 @@ function TabPairFilter({ accountId }: { accountId: string }) {
                     key={pair.symbol}
                     type="button"
                     onClick={() => toggleSymbol(pair.symbol)}
-                    className={`flex items-center justify-between rounded-xl border p-3 text-left transition-all ${
+                    className={`flex min-w-0 items-center justify-between gap-2 rounded-xl border p-3 text-left transition-all ${
                       isSelected
                         ? 'border-foreground bg-secondary/60 shadow-sm'
                         : 'border-border bg-card hover:border-zinc-300'
                     }`}
                   >
-                    <div>
-                      <p className="text-xs font-bold text-foreground">{pair.symbol}</p>
-                      <p className="text-[11px] text-muted-foreground">{pair.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold text-foreground">{pair.symbol}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{pair.name}</p>
                     </div>
 
                     <div
-                      className={`flex h-4 w-4 items-center justify-center rounded border ${
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                         isSelected
                           ? 'border-foreground bg-foreground text-background'
                           : 'border-zinc-300'
@@ -706,7 +933,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
               </p>
             )}
 
-            <div className="flex items-center justify-between border-t border-border pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
               <span className="text-xs text-muted-foreground">
                 Terpilih: <strong>{selectedSymbols.length}</strong> dari {allPairs.length} pair
               </span>
@@ -714,7 +941,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
                 size="sm"
                 isLoading={updatePairs.isPending}
                 onClick={handleSavePairs}
-                className="gap-1.5"
+                className="w-full gap-1.5 sm:w-auto"
               >
                 <Save className="h-3.5 w-3.5" />
                 Simpan Pemilihan Pair
@@ -728,17 +955,22 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 }
 
 /** TAB 3: RIWAYAT ORDER AKUN */
-function TabOrderHistory({ accountId }: { accountId: string }) {
+function TabOrderHistory({
+  accountId,
+  compactMobile = false,
+}: {
+  accountId: string
+  compactMobile?: boolean
+}) {
   const { data: positions, isLoading } = usePositions(100)
+  const isSmallScreen = useIsTabletOrMobile()
+  const renderCards = compactMobile || isSmallScreen
 
   const rows = (positions ?? []).filter((pos) =>
     pos.broker_account_id ? pos.broker_account_id === accountId : true,
   )
 
-  // Endpoint posisi membatasi 100 baris terbaru, jadi ukuran halaman dibatasi
-  // ke angka yang benar-benar tersedia. Menawarkan 200 di sini akan menjanjikan
-  // baris yang tidak pernah dikirim server.
-  const paginasi = usePaginasiLokal(rows, 20)
+  const paginasi = usePaginasiLokal(rows, renderCards ? 10 : 20)
 
   return (
     <Card>
@@ -748,7 +980,7 @@ function TabOrderHistory({ accountId }: { accountId: string }) {
           Daftar tiket transaksi dan eksekusi sinyal trading terbaru.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         {isLoading && <Skeleton className="h-32 w-full" />}
 
         {!isLoading && rows.length === 0 && (
@@ -757,7 +989,74 @@ function TabOrderHistory({ accountId }: { accountId: string }) {
           </p>
         )}
 
-        {!isLoading && rows.length > 0 && (
+        {!isLoading && rows.length > 0 && renderCards && (
+          <ul className="space-y-2.5">
+            {paginasi.baris.map((pos) => {
+              const isProfit = pos.pnl_known && pos.profit_loss > 0
+              const isLoss = pos.pnl_known && pos.profit_loss < 0
+              const pnlLabel = pos.pnl_known
+                ? `${pos.profit_loss >= 0 ? '+' : ''}${formatMoney(pos.profit_loss)}`
+                : '—'
+
+              return (
+                <li
+                  key={pos.id}
+                  className="space-y-2 rounded-xl border border-border bg-secondary/15 p-3 text-xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="font-bold text-foreground">{pos.symbol}</span>
+                      <Badge variant={pos.direction === 'BUY' ? 'solid' : 'outline'} className="text-[10px]">
+                        {pos.direction}
+                      </Badge>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {pos.lot_size} lot
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      {pos.status}
+                    </Badge>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-card p-2.5 text-[11px]">
+                    <div className="min-w-0">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Harga Open</dt>
+                      <dd className="truncate font-mono font-semibold tabular-nums">{pos.open_price}</dd>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <dt className="text-[10px] uppercase text-muted-foreground">PnL</dt>
+                      <dd
+                        className={`truncate font-mono font-bold tabular-nums ${
+                          isProfit ? 'text-emerald-600' : isLoss ? 'text-red-500' : 'text-foreground'
+                        }`}
+                      >
+                        {pnlLabel}
+                      </dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Stop Loss</dt>
+                      <dd className="truncate font-mono tabular-nums text-muted-foreground">
+                        {pos.stop_loss ?? '—'}
+                      </dd>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Take Profit</dt>
+                      <dd className="truncate font-mono tabular-nums text-muted-foreground">
+                        {pos.take_profit ?? '—'}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <p className="text-[11px] text-muted-foreground">
+                    Dibuka {formatDateTime(pos.opened_at)}
+                  </p>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {!isLoading && rows.length > 0 && !renderCards && (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -779,7 +1078,7 @@ function TabOrderHistory({ accountId }: { accountId: string }) {
 
                   return (
                     <TableRow key={pos.id} className="text-xs">
-                      <TableCell className="text-muted-foreground whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {formatDateTime(pos.opened_at)}
                       </TableCell>
                       <TableCell className="font-bold">{pos.symbol}</TableCell>
@@ -788,13 +1087,13 @@ function TabOrderHistory({ accountId }: { accountId: string }) {
                           {pos.direction}
                         </Badge>
                       </TableCell>
-                      <TableCell className="tabular-nums font-mono">{pos.lot_size}</TableCell>
-                      <TableCell className="tabular-nums font-mono">{pos.open_price}</TableCell>
-                      <TableCell className="tabular-nums font-mono text-[11px] text-muted-foreground">
+                      <TableCell className="font-mono tabular-nums">{pos.lot_size}</TableCell>
+                      <TableCell className="font-mono tabular-nums">{pos.open_price}</TableCell>
+                      <TableCell className="font-mono text-[11px] tabular-nums text-muted-foreground">
                         {pos.take_profit ?? '—'} / {pos.stop_loss ?? '—'}
                       </TableCell>
                       <TableCell
-                        className={`tabular-nums font-bold ${
+                        className={`font-bold tabular-nums ${
                           isProfit ? 'text-emerald-600' : isLoss ? 'text-red-500' : ''
                         }`}
                       >
@@ -814,8 +1113,9 @@ function TabOrderHistory({ accountId }: { accountId: string }) {
             </Table>
           </div>
         )}
+
         {!isLoading && rows.length > 0 && (
-          <div className="border-t border-border px-3 py-2">
+          <div className="pt-1">
             <Pagination
               page={paginasi.page}
               totalPages={paginasi.totalPages}

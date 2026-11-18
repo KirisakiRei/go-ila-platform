@@ -50,15 +50,17 @@ export default function RiwayatLaporanBugPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {rows.map((row) => (
-            <Card key={row.id} className="p-0">
+            <Card key={row.id} className="overflow-hidden rounded-2xl p-0">
               <Link
                 to={`/laporkan-bug/riwayat/${row.id}`}
                 className="flex flex-col gap-1.5 rounded-2xl p-3.5 transition-colors duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[13px] font-semibold text-foreground">{row.title}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 flex-1 break-words text-[13px] font-semibold text-foreground">
+                    {row.title}
+                  </p>
                   <span
-                    className={`rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
+                    className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider ${GAYA_STATUS[row.status]}`}
                   >
                     {LABEL_STATUS[row.status]}
                   </span>
@@ -67,7 +69,7 @@ export default function RiwayatLaporanBugPage() {
                   {row.category} · {formatDate(row.created_at)}
                 </p>
                 {row.admin_note && (
-                  <p className="rounded-lg border border-border bg-secondary/40 p-2 text-[11.5px] text-foreground">
+                  <p className="line-clamp-2 break-words rounded-lg border border-border bg-secondary/40 p-2 text-[11.5px] text-foreground">
                     Catatan tim: {row.admin_note}
                   </p>
                 )}

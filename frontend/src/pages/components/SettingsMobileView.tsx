@@ -12,11 +12,14 @@ import {
   Mail,
   Monitor,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   User as UserIcon,
   Wallet,
 } from 'lucide-react'
 import { Alert, Badge, Button, Modal } from '@/components/ui'
+import { PushNotificationPanel, PUSH_STATUS_QUERY_KEY } from '@/features/notifications/PushNotificationPanel'
+import { pushApi } from '@/lib/push-notifications'
 import { useSignOut, useAuthContext } from '@/features/auth/hooks/use-auth'
 import { useTelegramLink, useTelegramUnlink } from '@/lib/queries'
 import { accountFlowApi } from '@/lib/auth-api'
@@ -54,7 +57,7 @@ function MenuRow({ icon: Icon, label, description, to, href, onClick, trailing, 
         <span
           className={cn(
             'shrink-0 rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide',
-            trailing === 'Terverifikasi' || trailing === 'Terhubung'
+            trailing === 'Terverifikasi' || trailing === 'Terhubung' || trailing === 'Aktif'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'border-border bg-secondary text-muted-foreground',
           )}
@@ -114,12 +117,18 @@ export function SettingsMobileView() {
   const [telegramNotice, setTelegramNotice] = useState<string | null>(null)
   const [telegramSuccess, setTelegramSuccess] = useState<string | null>(null)
   const [showTelegramModal, setShowTelegramModal] = useState(false)
+  const [showPushModal, setShowPushModal] = useState(false)
 
   const { data: onboarding } = useQuery({
     queryKey: ['me', 'onboarding'],
     queryFn: accountFlowApi.onboarding,
   })
+  const { data: pushStatus } = useQuery({
+    queryKey: PUSH_STATUS_QUERY_KEY,
+    queryFn: pushApi.status,
+  })
   const isTelegramConnected = Boolean(onboarding?.telegram_linked)
+  const pushDeviceCount = pushStatus?.subscriptions?.length ?? 0
 
   const profile: User | null = user ?? null
   const initial = (profile?.name || profile?.email || 'I').trim().charAt(0).toUpperCase()
@@ -234,6 +243,17 @@ export function SettingsMobileView() {
       {/* Grup Notifikasi */}
       <Group title="Notifikasi">
         <MenuRow
+          icon={Smartphone}
+          label="Notifikasi Web Push"
+          description={
+            pushDeviceCount > 0
+              ? `${pushDeviceCount} perangkat aktif — entry & tutup posisi`
+              : 'Notifikasi langsung di browser / layar utama ponsel'
+          }
+          trailing={pushDeviceCount > 0 ? 'Aktif' : 'Belum'}
+          onClick={() => setShowPushModal(true)}
+        />
+        <MenuRow
           icon={Bell}
           label="Bot Telegram"
           description={
@@ -262,7 +282,7 @@ export function SettingsMobileView() {
           icon={Mail}
           label="Verifikasi Email"
           description="Wajib untuk simulasi dan pembayaran"
-          to="/pengaturan/keamanan"
+          to="/pengaturan/keamanan?sub=email"
           trailing={isVerified ? 'Terverifikasi' : 'Belum'}
         />
         <MenuRow
@@ -302,6 +322,16 @@ export function SettingsMobileView() {
       <p className="pb-1 text-center text-[10px] text-muted-foreground">
         ILA Trading Platform · Sinyal, radar, dan eksekusi terpandu
       </p>
+
+      {/* Modal Pengaturan Web Push Mobile */}
+      <Modal
+        open={showPushModal}
+        onClose={() => setShowPushModal(false)}
+        title="Notifikasi Web Push"
+        description="Peringatan instan di perangkat Anda tanpa membuka tab."
+      >
+        <PushNotificationPanel />
+      </Modal>
 
       {/* Modal Pengaturan Telegram Mobile */}
       <Modal

@@ -6,9 +6,9 @@ import { Alert, Badge, Button, PageHeader, Section, Skeleton } from '@/component
 import { useTelegramLink, useTelegramUnlink } from '@/lib/queries'
 import { accountFlowApi } from '@/lib/auth-api'
 import { ApiError } from '@/lib/api-error'
+import { useIsTabletOrMobile } from '@/lib/use-mobile-viewport'
+import { PushNotificationPanel } from '@/features/notifications/PushNotificationPanel'
 import { SettingsMobileView } from '@/pages/components/SettingsMobileView'
-
-
 
 function TelegramSection() {
   const queryClient = useQueryClient()
@@ -27,7 +27,6 @@ function TelegramSection() {
     setGalat(null)
     try {
       const hasil = await link.mutateAsync()
-      // Dibuka di tab baru agar sesi dashboard tidak hilang.
       window.open(hasil.url, '_blank', 'noopener,noreferrer')
     } catch (err) {
       setGalat(err instanceof ApiError ? err.message : 'Gagal membuat tautan Telegram.')
@@ -118,41 +117,55 @@ function TelegramSection() {
 }
 
 export default function SettingsPage() {
+  const isTabletOrMobile = useIsTabletOrMobile()
+
   return (
     <>
       {/* Tampilan Mobile (< lg) */}
       <SettingsMobileView />
 
       {/* Tampilan Desktop (>= lg) */}
-      <div className="hidden flex-col gap-6 lg:flex">
-        <PageHeader
-          title="Pengaturan"
-          description="Akun, saluran notifikasi, dan keamanan."
-        />
-        <TelegramSection />
+      {!isTabletOrMobile && (
+        <div className="hidden flex-col gap-6 lg:flex">
+          <PageHeader
+            title="Pengaturan"
+            description="Akun, saluran notifikasi, dan keamanan."
+          />
 
-        <Section title="Akun & Keamanan" description="Pilih bagian yang ingin diatur.">
-          <div className="divide-y divide-border border border-border">
-            {[
-              { to: '/pengaturan/profil', judul: 'Profil & Akun', isi: 'Data diri dan informasi kontak' },
-              { to: '/pengaturan/keamanan', judul: 'Kata Sandi & Email', isi: 'Kata sandi, verifikasi email, dan 2FA' },
-              { to: '/pengaturan/perangkat', judul: 'Perangkat & Sesi', isi: 'Perangkat yang masuk dan keluar otomatis' },
-            ].map((menu) => (
-              <Link
-                key={menu.to}
-                to={menu.to}
-                className="flex items-center justify-between gap-4 px-4 py-3 transition-colors duration-150 hover:bg-secondary"
-              >
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-medium text-foreground">{menu.judul}</span>
-                  <span className="block text-[12px] text-muted-foreground">{menu.isi}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Link>
-            ))}
-          </div>
-        </Section>
-      </div>
+          <Section
+            title="Notifikasi Web Push (Browser & Aplikasi)"
+            description="Terima peringatan instan di browser desktop atau ponsel hanya untuk sinyal siap entry, posisi dibuka, dan posisi ditutup."
+          >
+            <div className="border border-border p-4">
+              <PushNotificationPanel />
+            </div>
+          </Section>
+
+          <TelegramSection />
+
+          <Section title="Akun & Keamanan" description="Pilih bagian yang ingin diatur.">
+            <div className="divide-y divide-border border border-border">
+              {[
+                { to: '/pengaturan/profil', judul: 'Profil & Akun', isi: 'Data diri dan informasi kontak' },
+                { to: '/pengaturan/keamanan', judul: 'Kata Sandi & Email', isi: 'Kata sandi, verifikasi email, dan 2FA' },
+                { to: '/pengaturan/perangkat', judul: 'Perangkat & Sesi', isi: 'Perangkat yang masuk dan keluar otomatis' },
+              ].map((menu) => (
+                <Link
+                  key={menu.to}
+                  to={menu.to}
+                  className="flex items-center justify-between gap-4 px-4 py-3 transition-colors duration-150 hover:bg-secondary"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium text-foreground">{menu.judul}</span>
+                    <span className="block text-[12px] text-muted-foreground">{menu.isi}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          </Section>
+        </div>
+      )}
     </>
   )
 }

@@ -17,11 +17,11 @@ export function Stat({
   const showHint = hint && hint !== value
 
   return (
-    <div className={cn('flex flex-col gap-1 border border-border p-4', className)}>
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className={cn('flex min-w-0 flex-col gap-1 border border-border p-3.5 sm:p-4', className)}>
+      <dt className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="text-xl font-semibold tabular leading-none">{value}</dd>
+      <dd className="truncate text-lg font-semibold tabular leading-none sm:text-xl">{value}</dd>
       {showHint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   )

@@ -99,6 +99,7 @@ func main() {
 		&model.AccountPairStrategy{},
 		&model.AccountPairTimeframe{},
 		&model.BacktestRun{}, &model.BacktestTrade{}, &model.BacktestQuota{},
+		&model.WebPushVAPID{}, &model.WebPushSubscription{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

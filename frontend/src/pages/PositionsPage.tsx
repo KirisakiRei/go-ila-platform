@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, LineChart } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, LineChart, SlidersHorizontal } from 'lucide-react'
 import {
   Alert,
   Badge,
@@ -8,6 +8,7 @@ import {
   EmptyState,
   Input,
   Label,
+  MobileSegmentedTabs,
   PageHeader,
   Pagination,
   Select,
@@ -19,11 +20,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  usePaginasiLokal,
 } from '@/components/ui'
 import { useJournal } from '@/lib/queries'
 import { downloadFile } from '@/lib/http'
 import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
+import { useIsMobile, useIsTabletOrMobile } from '@/lib/use-mobile-viewport'
 import { cn } from '@/lib/utils'
 import type { JournalEvalStatus, JournalResponse, Position, PositionStatus } from '@/types/api'
 import { PositionExecutionChart } from '@/features/charts/PositionExecutionChart'
@@ -113,6 +116,9 @@ export default function PositionsPage() {
   const [downloading, setDownloading] = useState(false)
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const isMobile = useIsMobile()
+  const isTabletOrMobile = useIsTabletOrMobile()
   const theme = chartTheme()
 
   // positions di-memo agar identitasnya stabil: tanpa itu, setiap render
@@ -186,6 +192,7 @@ export default function PositionsPage() {
   const pnlColor = (position: Position) => (position.profit_loss >= 0 ? theme.profit : theme.loss)
 
   const tampil = tab === 'aktif' ? aktif : riwayat
+  const paginasiMobile = usePaginasiLokal(tampil, 10)
   const kosong = data && positions.length === 0
 
   return (
@@ -208,150 +215,320 @@ export default function PositionsPage() {
           pengguna mengira daftar sudah tersaring padahal hanya berkas CSV
           yang berubah. */}
       <Card className="p-3">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="jurnal-periode">Periode</Label>
-            <Select
-              id="jurnal-periode"
-              value={from || to ? 'custom' : String(hari)}
-              onChange={(event) => {
-                const nilai = event.target.value
-                if (nilai === 'custom') return
-                // Memilih periode membatalkan rentang tanggal agar tidak ada
-                // dua sumber rentang yang saling bertentangan.
-                setFrom('')
-                setTo('')
-                setHari(Number(nilai))
-                setPeluang({ page: 1, limit: peluang.limit })
-              }}
-            >
-              {PERIODE.map((item) => (
-                <option key={item.hari} value={item.hari}>
-                  {item.label}
-                </option>
-              ))}
-              {(from || to) && <option value="custom">Rentang tanggal</option>}
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="jurnal-metode">Metode</Label>
-            <Select
-              id="jurnal-metode"
-              value={strategi}
-              onChange={(event) => {
-                setStrategi(event.target.value)
-                // Filter berubah berarti kumpulan datanya berubah; halaman 3
-                // dari hasil sebelumnya tidak lagi bermakna.
-                setPeluang({ page: 1, limit: peluang.limit })
-              }}
-            >
-              <option value="">Semua metode</option>
-              <option value="ila-2.0">ILA 2.0</option>
-              <option value="ila-3.0">ILA 3.0</option>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="jurnal-pair">Pair</Label>
-            <Select
-              id="jurnal-pair"
-              value={symbol}
-              onChange={(event) => {
-                setSymbol(event.target.value)
-                setPeluang({ page: 1, limit: peluang.limit })
-              }}
-            >
-              <option value="">Semua pair</option>
-              {daftarSimbol.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="jurnal-dari">Dari tanggal</Label>
-            <Input
-              id="jurnal-dari"
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(event) => {
-                setFrom(event.target.value)
-                setPeluang({ page: 1, limit: peluang.limit })
-              }}
-            />
-          </div>
-        </div>
+        {isMobile ? (
+          <div className="space-y-2.5">
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="jurnal-periode" className="text-[11px]">
+                  Periode
+                </Label>
+                <Select
+                  id="jurnal-periode"
+                  className="mt-1 h-9 text-xs"
+                  value={from || to ? 'custom' : String(hari)}
+                  onChange={(event) => {
+                    const nilai = event.target.value
+                    if (nilai === 'custom') return
+                    setFrom('')
+                    setTo('')
+                    setHari(Number(nilai))
+                    setPeluang({ page: 1, limit: peluang.limit })
+                    paginasiMobile.setPage(1)
+                  }}
+                >
+                  {PERIODE.map((item) => (
+                    <option key={item.hari} value={item.hari}>
+                      {item.label}
+                    </option>
+                  ))}
+                  {(from || to) && <option value="custom">Rentang tanggal</option>}
+                </Select>
+              </div>
 
-        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="jurnal-sampai">Sampai tanggal</Label>
-            <Input
-              id="jurnal-sampai"
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(event) => {
-                setTo(event.target.value)
-                setPeluang({ page: 1, limit: peluang.limit })
-              }}
-            />
-          </div>
-          <div className="flex items-end gap-2 lg:col-span-2">
-            <Button variant="outline" size="sm" disabled={filterAktif === 0} onClick={resetFilter}>
-              Reset filter{filterAktif > 0 ? ` (${filterAktif})` : ''}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={downloading}
-              onClick={() => void download()}
-            >
-              {downloading ? 'Menyiapkan…' : 'Export CSV'}
-            </Button>
-          </div>
-        </div>
+              <Button
+                type="button"
+                variant={mobileFilterOpen || filterAktif > 0 ? 'default' : 'outline'}
+                size="sm"
+                className="h-9 shrink-0 gap-1.5 px-2.5 text-xs"
+                onClick={() => setMobileFilterOpen((v) => !v)}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span>Filter{filterAktif > 0 ? ` (${filterAktif})` : ''}</span>
+              </Button>
 
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          {from || to
-            ? 'Daftar dan ekspor mengikuti rentang tanggal yang dipilih.'
-            : 'Daftar dan ekspor mengikuti periode di atas. Isi tanggal untuk memilih rentang sendiri.'}
-        </p>
-        {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 shrink-0 gap-1 px-2.5 text-xs"
+                disabled={downloading}
+                onClick={() => void download()}
+                aria-label="Export CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>{downloading ? '…' : 'CSV'}</span>
+              </Button>
+            </div>
+
+            {mobileFilterOpen && (
+              <div className="space-y-2.5 border-t border-border pt-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="jurnal-metode" className="text-[11px]">
+                      Metode
+                    </Label>
+                    <Select
+                      id="jurnal-metode"
+                      className="h-9 text-xs"
+                      value={strategi}
+                      onChange={(event) => {
+                        setStrategi(event.target.value)
+                        setPeluang({ page: 1, limit: peluang.limit })
+                        paginasiMobile.setPage(1)
+                      }}
+                    >
+                      <option value="">Semua metode</option>
+                      <option value="ila-2.0">ILA 2.0</option>
+                      <option value="ila-3.0">ILA 3.0</option>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="jurnal-pair" className="text-[11px]">
+                      Pair
+                    </Label>
+                    <Select
+                      id="jurnal-pair"
+                      className="h-9 text-xs"
+                      value={symbol}
+                      onChange={(event) => {
+                        setSymbol(event.target.value)
+                        setPeluang({ page: 1, limit: peluang.limit })
+                        paginasiMobile.setPage(1)
+                      }}
+                    >
+                      <option value="">Semua pair</option>
+                      {daftarSimbol.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="jurnal-dari" className="text-[11px]">
+                      Dari tanggal
+                    </Label>
+                    <Input
+                      id="jurnal-dari"
+                      type="date"
+                      className="h-9 text-xs"
+                      value={from}
+                      max={to || undefined}
+                      onChange={(event) => {
+                        setFrom(event.target.value)
+                        setPeluang({ page: 1, limit: peluang.limit })
+                        paginasiMobile.setPage(1)
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="jurnal-sampai" className="text-[11px]">
+                      Sampai tanggal
+                    </Label>
+                    <Input
+                      id="jurnal-sampai"
+                      type="date"
+                      className="h-9 text-xs"
+                      value={to}
+                      min={from || undefined}
+                      onChange={(event) => {
+                        setTo(event.target.value)
+                        setPeluang({ page: 1, limit: peluang.limit })
+                        paginasiMobile.setPage(1)
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {filterAktif > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                      resetFilter()
+                      paginasiMobile.setPage(1)
+                    }}
+                  >
+                    Reset filter ({filterAktif})
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {downloadNotice && <Alert className="mt-1">{downloadNotice}</Alert>}
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="jurnal-periode">Periode</Label>
+                <Select
+                  id="jurnal-periode"
+                  value={from || to ? 'custom' : String(hari)}
+                  onChange={(event) => {
+                    const nilai = event.target.value
+                    if (nilai === 'custom') return
+                    setFrom('')
+                    setTo('')
+                    setHari(Number(nilai))
+                    setPeluang({ page: 1, limit: peluang.limit })
+                  }}
+                >
+                  {PERIODE.map((item) => (
+                    <option key={item.hari} value={item.hari}>
+                      {item.label}
+                    </option>
+                  ))}
+                  {(from || to) && <option value="custom">Rentang tanggal</option>}
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="jurnal-metode">Metode</Label>
+                <Select
+                  id="jurnal-metode"
+                  value={strategi}
+                  onChange={(event) => {
+                    setStrategi(event.target.value)
+                    setPeluang({ page: 1, limit: peluang.limit })
+                  }}
+                >
+                  <option value="">Semua metode</option>
+                  <option value="ila-2.0">ILA 2.0</option>
+                  <option value="ila-3.0">ILA 3.0</option>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="jurnal-pair">Pair</Label>
+                <Select
+                  id="jurnal-pair"
+                  value={symbol}
+                  onChange={(event) => {
+                    setSymbol(event.target.value)
+                    setPeluang({ page: 1, limit: peluang.limit })
+                  }}
+                >
+                  <option value="">Semua pair</option>
+                  {daftarSimbol.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="jurnal-dari">Dari tanggal</Label>
+                <Input
+                  id="jurnal-dari"
+                  type="date"
+                  value={from}
+                  max={to || undefined}
+                  onChange={(event) => {
+                    setFrom(event.target.value)
+                    setPeluang({ page: 1, limit: peluang.limit })
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="jurnal-sampai">Sampai tanggal</Label>
+                <Input
+                  id="jurnal-sampai"
+                  type="date"
+                  value={to}
+                  min={from || undefined}
+                  onChange={(event) => {
+                    setTo(event.target.value)
+                    setPeluang({ page: 1, limit: peluang.limit })
+                  }}
+                />
+              </div>
+              <div className="flex items-end gap-2 lg:col-span-2">
+                <Button variant="outline" size="sm" disabled={filterAktif === 0} onClick={resetFilter}>
+                  Reset filter{filterAktif > 0 ? ` (${filterAktif})` : ''}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={downloading}
+                  onClick={() => void download()}
+                >
+                  {downloading ? 'Menyiapkan…' : 'Export CSV'}
+                </Button>
+              </div>
+            </div>
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {from || to
+                ? 'Daftar dan ekspor mengikuti rentang tanggal yang dipilih.'
+                : 'Daftar dan ekspor mengikuti periode di atas. Isi tanggal untuk memilih rentang sendiri.'}
+            </p>
+            {downloadNotice && <Alert className="mt-2">{downloadNotice}</Alert>}
+          </>
+        )}
       </Card>
 
       {/* --- Tab ----------------------------------------------------------- */}
-      <div className="flex flex-wrap gap-1 border-b border-border">
-        {TABS.map((item) => {
-          const jumlah =
-            item.id === 'aktif'
-              ? aktif.length
-              : item.id === 'riwayat'
-                ? riwayat.length
-                : // Daftar terlewat dipotong per halaman, jadi angkanya diambil dari
-                  // total server agar tab tidak menampilkan jumlah satu halaman saja.
-                  (skipped_meta?.total ?? skipped.length)
+      {isMobile ? (
+        <MobileSegmentedTabs<Tab>
+          ariaLabel="Kategori jurnal eksekusi"
+          value={tab}
+          onChange={(next) => {
+            setTab(next)
+            paginasiMobile.setPage(1)
+          }}
+          options={[
+            { id: 'aktif', label: 'Aktif', count: aktif.length },
+            { id: 'riwayat', label: 'Riwayat', count: riwayat.length },
+            { id: 'terlewat', label: 'Terlewat', count: skipped_meta?.total ?? skipped.length },
+          ]}
+        />
+      ) : (
+        <div className="flex flex-wrap gap-1 border-b border-border">
+          {TABS.map((item) => {
+            const jumlah =
+              item.id === 'aktif'
+                ? aktif.length
+                : item.id === 'riwayat'
+                  ? riwayat.length
+                  : (skipped_meta?.total ?? skipped.length)
 
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              aria-selected={tab === item.id}
-              role="tab"
-              className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-[12.5px] font-medium transition-colors',
-                tab === item.id
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {item.label}
-              <span className="ml-1.5 tabular text-[11px] text-muted-foreground">{jumlah}</span>
-            </button>
-          )
-        })}
-      </div>
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                aria-selected={tab === item.id}
+                role="tab"
+                className={cn(
+                  '-mb-px border-b-2 px-3 py-2 text-[12.5px] font-medium transition-colors',
+                  tab === item.id
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {item.label}
+                <span className="ml-1.5 tabular text-[11px] text-muted-foreground">{jumlah}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <p className="text-[11px] text-muted-foreground">
         {TABS.find((item) => item.id === tab)?.keterangan}
@@ -418,7 +595,7 @@ export default function PositionsPage() {
       )}
 
       {/* --- Desktop: tabel dengan accordion chart ------------------------- */}
-      {tab !== 'terlewat' && tampil.length > 0 && (
+      {tab !== 'terlewat' && tampil.length > 0 && !isTabletOrMobile && (
         <div className="hidden lg:block">
           <Table>
             <TableHeader>
@@ -540,29 +717,33 @@ export default function PositionsPage() {
 
       {/* --- Mobile: kartu dengan accordion chart -------------------------- */}
       {tab !== 'terlewat' && tampil.length > 0 && (
-        <div className="space-y-2 lg:hidden">
-          {tampil.map((position) => {
+        <div className="space-y-2.5 lg:hidden">
+          {paginasiMobile.baris.map((position) => {
             const expanded = expandedId === position.id
+            const digits = priceDigits(position.symbol, position.open_price)
             return (
               <div
                 key={position.id}
-                className="overflow-hidden rounded-xl border border-border bg-card"
+                className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs"
               >
                 <button
                   type="button"
                   onClick={() => toggle(position.id)}
                   aria-expanded={expanded}
-                  className="flex w-full flex-col gap-2 p-3 text-left"
+                  className="flex w-full flex-col gap-2.5 p-3.5 text-left"
                 >
                   <div className="flex w-full items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold">{position.symbol}</span>
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span className="font-semibold text-foreground">{position.symbol}</span>
                       <Badge variant="outline" className="text-[10px]">
                         {position.direction}
                       </Badge>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {formatNumber(position.lot_size, 2)} lot
+                      </span>
                       {position.is_dry_run && <SimulasiBadge />}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <StatusPill tone={TONE[position.status]}>{LABEL[position.status]}</StatusPill>
                       {expanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
@@ -575,39 +756,34 @@ export default function PositionsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[11px]">
-                    <div>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-secondary/25 p-2.5 text-[11px]">
+                    <div className="min-w-0">
                       <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
-                      <p className="tabular font-semibold">
-                        {formatPrice(
-                          position.open_price,
-                          priceDigits(position.symbol, position.open_price),
-                        )}
+                      <p className="truncate font-mono font-semibold tabular">
+                        {formatPrice(position.open_price, digits)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase text-muted-foreground">SL / TP</p>
-                      <p className="tabular text-muted-foreground">
-                        {formatPrice(
-                          position.stop_loss,
-                          priceDigits(position.symbol, position.open_price),
-                        )}{' '}
-                        /{' '}
-                        {formatPrice(
-                          position.take_profit,
-                          priceDigits(position.symbol, position.open_price),
-                        )}
-                      </p>
-                    </div>
-                    <div className="text-right">
+                    <div className="min-w-0 text-right">
                       <p className="text-[10px] uppercase text-muted-foreground">Hasil</p>
                       {position.pnl_known ? (
-                        <p className="tabular font-semibold" style={{ color: pnlColor(position) }}>
+                        <p className="truncate font-mono font-semibold tabular" style={{ color: pnlColor(position) }}>
                           {formatMoney(position.profit_loss)} ({formatR(position.outcome_r)})
                         </p>
                       ) : (
                         <p className="text-muted-foreground">—</p>
                       )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase text-muted-foreground">Stop Loss</p>
+                      <p className="truncate font-mono tabular text-muted-foreground">
+                        {formatPrice(position.stop_loss, digits)}
+                      </p>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <p className="text-[10px] uppercase text-muted-foreground">Take Profit</p>
+                      <p className="truncate font-mono tabular text-muted-foreground">
+                        {formatPrice(position.take_profit, digits)}
+                      </p>
                     </div>
                   </div>
 
@@ -619,12 +795,23 @@ export default function PositionsPage() {
 
                 {expanded && (
                   <div className="border-t border-border p-3">
-                    <PositionExecutionChart position={position} enabled={expanded} height={280} />
+                    <PositionExecutionChart position={position} enabled={expanded} height={260} />
                   </div>
                 )}
               </div>
             )
           })}
+
+          {paginasiMobile.totalPages > 1 && (
+            <Pagination
+              page={paginasiMobile.page}
+              totalPages={paginasiMobile.totalPages}
+              shown={paginasiMobile.baris.length}
+              total={paginasiMobile.total}
+              unit="posisi"
+              onPageChange={paginasiMobile.setPage}
+            />
+          )}
         </div>
       )}
 

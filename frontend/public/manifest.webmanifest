@@ -1,0 +1,26 @@
+{
+  "name": "ILA Platform — Trading & Radar",
+  "short_name": "ILA Platform",
+  "description": "Radar pasar, sinyal terpandu, dan eksekusi order di atas akun broker Anda.",
+  "lang": "id",
+  "start_url": "/app/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#171717",
+  "icons": [
+    {
+      "src": "/brand/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

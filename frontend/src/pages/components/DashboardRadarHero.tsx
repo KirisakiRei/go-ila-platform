@@ -85,10 +85,10 @@ export function DashboardRadarHero() {
         </Link>
       </div>
 
-      {/* 2. Horizontal Chip Scroller: Pair Filter + Timeframe Tag */}
+      {/* 2. Pair Chip Filter + Timeframe Tag */}
       {activePairs.length > 0 && (
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-          <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {activePairs.map((pair) => {
               const isActive = pair === currentPair
               return (
@@ -97,7 +97,7 @@ export function DashboardRadarHero() {
                   type="button"
                   onClick={() => setSelectedPair(pair)}
                   className={cn(
-                    'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-all active:scale-95 shrink-0',
+                    'flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-all active:scale-95',
                     isActive
                       ? 'border border-border bg-secondary font-semibold text-foreground shadow-xs'
                       : 'border border-transparent bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -111,13 +111,11 @@ export function DashboardRadarHero() {
             })}
           </div>
 
-          <div className="h-4 w-px bg-border shrink-0" />
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="rounded bg-foreground px-2 py-0.5 text-[10px] font-bold text-background uppercase tracking-wider">
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="rounded bg-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-background">
               {ltfTimeframe}
             </span>
-            <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
+            <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
               {htfTimeframe}
             </span>
           </div>
@@ -144,12 +142,12 @@ export function DashboardRadarHero() {
           className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-xs transition-all hover:border-zinc-400 hover:shadow-sm active:scale-[0.99] cursor-pointer"
         >
           {/* Top Row: Ticker Box + Pair + Direction + Subtitle + Status Pill */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary font-bold text-xs text-foreground tracking-tight shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-bold tracking-tight text-foreground">
                 {currentPair?.slice(0, 3)}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold tracking-tight text-foreground">{currentPair}</span>
                   <span
@@ -176,7 +174,7 @@ export function DashboardRadarHero() {
               </div>
             </div>
 
-            <span className="rounded-md bg-foreground px-2.5 py-1 text-[10.5px] font-bold tracking-wide uppercase text-background shadow-xs shrink-0">
+            <span className="shrink-0 rounded-md bg-foreground px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-background shadow-xs">
               {latestSignal.status === 'READY_TO_ENTRY'
                 ? 'SIAP ENTRY'
                 : latestSignal.status === 'WAIT_LTF_CISD'
@@ -187,38 +185,38 @@ export function DashboardRadarHero() {
             </span>
           </div>
 
-          {/* 4-Box Key Metrics Grid (Entry, SL, TP, R:R) */}
-          <div className="grid grid-cols-4 divide-x divide-border/60 rounded-lg border border-border/60 bg-secondary/35 p-2 text-center">
-            <div>
+          {/* Key Metrics Grid (2x2 di layar sempit, 4 kolom di >= sm) */}
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/60 bg-secondary/35 p-2.5 sm:grid-cols-4 sm:gap-0 sm:divide-x sm:divide-border/60 sm:p-2 sm:text-center">
+            <div className="min-w-0">
               <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Entry
               </span>
-              <span className="mt-0.5 block font-mono text-[12px] font-bold text-foreground">
+              <span className="mt-0.5 block truncate font-mono text-[12px] font-bold tabular-nums text-foreground">
                 {latestSignal.entry_price > 0 ? formatNumber(latestSignal.entry_price, decimals) : '—'}
               </span>
             </div>
-            <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                SL
-              </span>
-              <span className="mt-0.5 block font-mono text-[12px] font-bold text-rose-600 dark:text-rose-400">
-                {latestSignal.stop_loss > 0 ? formatNumber(latestSignal.stop_loss, decimals) : '—'}
-              </span>
-            </div>
-            <div>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                TP
-              </span>
-              <span className="mt-0.5 block font-mono text-[12px] font-bold text-emerald-600 dark:text-emerald-400">
-                {latestSignal.take_profit > 0 ? formatNumber(latestSignal.take_profit, decimals) : '—'}
-              </span>
-            </div>
-            <div>
+            <div className="min-w-0 text-right sm:text-center">
               <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 R:R
               </span>
-              <span className="mt-0.5 block font-mono text-[12px] font-bold text-foreground">
+              <span className="mt-0.5 block truncate font-mono text-[12px] font-bold tabular-nums text-foreground">
                 {latestSignal.risk_reward > 0 ? `1:${formatNumber(latestSignal.risk_reward, 2)}` : '—'}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                SL
+              </span>
+              <span className="mt-0.5 block truncate font-mono text-[12px] font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                {latestSignal.stop_loss > 0 ? formatNumber(latestSignal.stop_loss, decimals) : '—'}
+              </span>
+            </div>
+            <div className="min-w-0 text-right sm:text-center">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                TP
+              </span>
+              <span className="mt-0.5 block truncate font-mono text-[12px] font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {latestSignal.take_profit > 0 ? formatNumber(latestSignal.take_profit, decimals) : '—'}
               </span>
             </div>
           </div>

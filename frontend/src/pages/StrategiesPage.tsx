@@ -19,6 +19,7 @@ import {
   useSubscriptions,
 } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
+import { useIsMobile } from '@/lib/use-mobile-viewport'
 import { cn } from '@/lib/utils'
 import type { PairCatalogResponse, StrategyVersion } from '@/types/api'
 
@@ -73,6 +74,7 @@ function ModalPilihPair({
   onDone?: () => void
   onClose: () => void
 }) {
+  const isMobile = useIsMobile()
   const { data: catalog, isLoading: loadingCatalog } = usePairCatalog()
   const { data: subs } = useSubscriptions()
   const create = useCreateSubscription()
@@ -156,7 +158,7 @@ function ModalPilihPair({
           onChange={(event) => setCari(event.target.value)}
           placeholder="Cari simbol, nama, atau alias (mis. gold, EURUSD)"
           className="pl-9"
-          autoFocus
+          autoFocus={!isMobile}
           aria-label="Cari pair"
         />
       </div>
@@ -220,7 +222,7 @@ function ModalPilihPair({
       )}
 
       {/* Daftar pair */}
-      <div className="max-h-[22rem] overflow-y-auto rounded-xl border border-border">
+      <div className="max-h-[45dvh] overflow-y-auto rounded-xl border border-border sm:max-h-[22rem]">
         {loadingCatalog && (
           <div className="space-y-2 p-3">
             <Skeleton className="h-10 w-full" />
@@ -496,12 +498,12 @@ export default function StrategiesPage() {
                 return (
                   <li
                     key={sub.id}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px] hover:bg-secondary/30 transition-colors"
+                    className="flex items-center justify-between gap-3 px-4 py-3 text-[13px] transition-colors hover:bg-secondary/30"
                   >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-foreground text-sm">{sub.symbol}</span>
-                        <span className="text-[11px] text-muted-foreground">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
+                      <div className="min-w-0">
+                        <span className="block text-sm font-bold text-foreground">{sub.symbol}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
                           {nama ?? 'Nama belum tersedia'}
                         </span>
                       </div>
@@ -513,7 +515,7 @@ export default function StrategiesPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-xs text-destructive hover:bg-destructive/10"
+                      className="shrink-0 text-xs text-destructive hover:bg-destructive/10"
                       onClick={() => setDeletingSub({ id: sub.id, symbol: sub.symbol })}
                     >
                       Hapus
