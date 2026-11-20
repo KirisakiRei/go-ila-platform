@@ -175,7 +175,7 @@ func dataSkenario(t *testing.T) ([]indicators.Candle, []indicators.Candle, Param
 		{Timestamp: awal.Add(-12 * time.Hour), Open: 4150, High: 4190, Low: 4140, Close: 4180, IsClosed: true},
 		{Timestamp: awal.Add(-8 * time.Hour), Open: 4180, High: 4230, Low: 4170, Close: 4210, IsClosed: true},
 		{Timestamp: awal.Add(-4 * time.Hour), Open: 4210, High: 4250, Low: 4200, Close: 4230, IsClosed: true},
-		{Timestamp: awal, Open: 4230, High: 4260, Low: 4240, Close: 4250, IsClosed: true},                      // C1 FVG
+		{Timestamp: awal, Open: 4230, High: 4260, Low: 4240, Close: 4250, IsClosed: true},                     // C1 FVG
 		{Timestamp: awal.Add(4 * time.Hour), Open: 4250, High: 4245, Low: 4150, Close: 4155, IsClosed: true},  // C2 FVG
 		{Timestamp: awal.Add(8 * time.Hour), Open: 4155, High: 4212, Low: 4150, Close: 4160, IsClosed: true},  // C3 FVG
 		{Timestamp: awal.Add(12 * time.Hour), Open: 4160, High: 4230, Low: 4155, Close: 4180, IsClosed: true}, // Candle 4 (sweep)
@@ -186,19 +186,25 @@ func dataSkenario(t *testing.T) ([]indicators.Candle, []indicators.Candle, Param
 		{Timestamp: awal.Add(32 * time.Hour), Open: 4090, High: 4100, Low: 4040, Close: 4050, IsClosed: true},
 	}
 
-	// M15 mengisi seluruh rentang H4 di atas. Bagian eksekusi dirancang supaya
-	// di dalam FVG bearish terbentuk deretan bullish yang kemudian ditembus.
-	// Candle 4 (sweep) tutup di +16 jam; Candle 5 dimulai tepat di situ. M15
-	// diberi sedikit ruang sebelumnya agar indikator punya konteks.
+	// M15 dimulai 1 jam sebelum C3 (awal+16h) agar terbentuk Swing High ERL LTF
+	// (4215 di idx 1) sebelum rangkaian bullish di dalam C3 menyapunya dengan wick
+	// (Kondisi 1 New ILA 2.0) lalu ditembus close body (-CISD).
 	mulaiLTF := awal.Add(15 * time.Hour)
 	daftar := make([][4]float64, 0, 96)
-	// Fase naik: deretan bullish yang membentuk CISD sell. Puncaknya (4215)
-	// dijaga di bawah High Candle 4 (4230) supaya setup tidak dibatalkan aturan
-	// invalidation "High Candle 5 menembus ekor sweep".
-	for i := 0; i < 6; i++ {
-		basis := 4182.0 + float64(i)*6
-		daftar = append(daftar, [4]float64{basis, basis + 4, basis - 2, basis + 3})
-	}
+	// Pembentukan Swing High ERL LTF = 4215 (candle kiri, tengah, kanan di idx 0..2).
+	daftar = append(daftar,
+		[4]float64{4195, 4200, 4190, 4192},
+		[4]float64{4192, 4215, 4191, 4210},
+		[4]float64{4210, 4212, 4190, 4192},
+		[4]float64{4192, 4195, 4180, 4182},
+	)
+	// Fase naik di dalam C3: rangkaian bullish mulai 4182, wick 4218 menyentuh
+	// Swing High 4215 tanpa close di atasnya (Kondisi 1).
+	daftar = append(daftar,
+		[4]float64{4182, 4196, 4180, 4195},
+		[4]float64{4195, 4210, 4193, 4208},
+		[4]float64{4208, 4218, 4205, 4213},
+	)
 	// Fase turun: close menembus body deretan bullish (level 4182), memicu
 	// konfirmasi CISD sell.
 	for i := 0; i < 24; i++ {

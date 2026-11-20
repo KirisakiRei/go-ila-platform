@@ -6,10 +6,10 @@ Folder ini adalah **salinan** aturan trading ILA 2.0. Sumbernya:
 |---|---|
 | Repo asal | `go-trade` (engine live, VPS 1) |
 | Path asal | `pkg/ila` dan `pkg/indicators` |
-| Commit SHA | `6908a411504a257983edc6ecfedc5469abcfb9fe` |
-| Tanggal commit | 2026-11-14 21:27:03 +0700 |
-| Judul commit | merge: perbaikan jam pasar pada test penyaringan pasangan timeframe |
-| Disalin pada | 2026-11-14 |
+| Commit SHA | `8064a2ff6a6b3f4b69e9cd3e2543f482a7e48aa4` |
+| Tanggal commit | 2026-11-21 |
+| Judul commit | feat(ila): upgrade engine ke New ILA 2.0 dan tambah feed makro MN1/Q1 |
+| Disalin pada | 2026-11-21 |
 
 ## Mengapa disalin, bukan diimpor
 
