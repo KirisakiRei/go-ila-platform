@@ -220,6 +220,7 @@ var DefaultTimeframeCatalog = map[string][]dto.TimeframePair{
 		{Htf: "D1", Ltf: "H1", Label: "D1 · H1"},
 		{Htf: "H4", Ltf: "M15", Label: "H4 · M15"},
 		{Htf: "H1", Ltf: "M5", Label: "H1 · M5"},
+		{Htf: "M15", Ltf: "M1", Label: "M15 · M1"},
 	},
 	"ila-3.0": {
 		{Htf: "4H", Ltf: "5M", Label: "4H · 1H · 5M"},
@@ -241,6 +242,8 @@ func normPair(htf, ltf string) string {
 			return "15M"
 		case "M5", "5M":
 			return "5M"
+		case "M1", "1M":
+			return "1M"
 		case "D1", "1D", "D":
 			return "D"
 		case "W1", "1W", "W":

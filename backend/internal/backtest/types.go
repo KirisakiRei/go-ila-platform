@@ -39,7 +39,8 @@ const (
 // Params adalah masukan satu kali backtest.
 //
 // Tidak ada parameter RR di sini dengan sengaja. Target ditentukan oleh aturan
-// ILA 2.0 sendiri (Draw on Liquidity dengan lantai 1:2), dan menawarkan RR
+// New ILA 2.0 memakai target tetap RR 1:2, sehingga angka ini hanya mencatat
+// target yang dipakai strategi; tidak ada override dari parameter backtest.
 // sebagai angka bebas hanya akan menghasilkan nol trade karena semua setup
 // gagal saringan PassedMinRR.
 type Params struct {

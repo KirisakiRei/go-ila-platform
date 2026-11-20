@@ -111,7 +111,7 @@ function SingleCallEntryCard({
 
   const isILA3 = signal.strategy_version === 'ila-3.0'
   const mtf = isILA3 ? getIla3Mtf(signal.htf, signal.ltf) : undefined
-  const cycle = isILA3 ? getCycleBadge(signal.strategy_version, signal.htf, signal.ltf) : null
+  const cycle = getCycleBadge(signal.strategy_version, signal.htf, signal.ltf)
   const digits = priceDigits(signal.symbol, signal.entry_price)
 
   // Hitung selisih pip perkiraan
@@ -230,13 +230,13 @@ function SingleCallEntryCard({
 
           <div className="min-w-0 rounded-lg border border-border bg-muted/20 p-2.5 sm:p-3">
             <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-[10.5px]">
-              Take Profit (DOL)
+              Take Profit
             </span>
             <p className="mt-1 truncate font-mono text-base font-bold tabular-nums text-foreground sm:text-lg">
               {formatNumber(signal.take_profit, digits)}
             </p>
             <p className="truncate text-[10.5px] text-muted-foreground sm:text-[11px]">
-              +{formatNumber(tpPips, 1)} pips target likuiditas
+              +{formatNumber(tpPips, 1)} pips target RR
             </p>
           </div>
 

@@ -331,6 +331,7 @@ const PERAN_TIMEFRAME: Record<string, string> = {
   H1: 'acuan per jam',
   M15: 'eksekusi lima belas menit',
   M5: 'eksekusi lima menit',
+  M1: 'eksekusi satu menit',
 }
 
 /**

@@ -143,6 +143,10 @@ func MapResolution(timeframe string) string {
 		return "1D"
 	case "1W", "W1", "W":
 		return "1W"
+	case "MN", "MN1", "MONTHLY", "1MO":
+		return "1M"
+	case "Q", "Q1", "QUARTERLY", "3MO":
+		return "3M"
 	default:
 		return ""
 	}

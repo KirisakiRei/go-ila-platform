@@ -39,10 +39,11 @@ function sinyal(over: Partial<Signal> & Pick<Signal, 'signal_id'>): Signal {
 }
 
 describe('mapSignalsToSlots', () => {
-  it('ILA 2.0 menghasilkan 4 slot pasangan timeframe', () => {
+  it('ILA 2.0 menghasilkan 5 slot pasangan timeframe (Monthly s.d. Micro)', () => {
     const slots = mapSignalsToSlots([], 'ila-2.0')
-    expect(slots).toHaveLength(4)
+    expect(slots).toHaveLength(5)
     expect(slots.every((s) => s.mtf === undefined)).toBe(true)
+    expect(slots.some((s) => s.htf === 'M15' && s.ltf === 'M1')).toBe(true)
   })
 
   it('ILA 3.0 menghasilkan 4 siklus dengan MTF terisi', () => {

@@ -89,17 +89,14 @@ func TestInvarianUrutanEntry(t *testing.T) {
 			}
 		}
 
-		// 4b. Entry tidak boleh memakai sweep yang sudah lewat jendela
-		//     eksekusinya. Aturan ILA memberi Candle 5 dan Candle 6 setelah
-		//     candle sweep; lewat dari itu setup sudah hangus dan memakainya
-		//     lagi berarti menandatangani trade dengan struktur yang mati.
+		// 4b. Entry wajib terjadi selama C3 berjalan (open sampai close C3).
+		//     Aturan New ILA 2.0 tidak memperpanjang jendela ke C4.
 		if posisi.Levels.Sweep != nil {
 			waktuSweep := time.Unix(posisi.Levels.Sweep.Time, 0).UTC()
-			// Satu candle H4 = 4 jam. Candle 6 selesai 12 jam setelah candle
-			// sweep tutup; ditambah toleransi satu candle.
-			batasJendela := waktuSweep.Add(4*time.Hour + 12*time.Hour + 4*time.Hour)
+			// Satu candle H4 = 4 jam: C2 berakhir +4j, C3 berakhir +8j.
+			batasJendela := waktuSweep.Add(8 * time.Hour)
 			if posisi.EntryTime.After(batasJendela) {
-				t.Errorf("%s: entry %v di luar jendela sweep %v (batas %v)",
+				t.Errorf("%s: entry %v di luar jendela C3 dari C2 %v (batas %v)",
 					nama, posisi.EntryTime, waktuSweep, batasJendela)
 			}
 		}
@@ -178,9 +175,9 @@ func dataSkenario(t *testing.T) ([]indicators.Candle, []indicators.Candle, Param
 		{Timestamp: awal, Open: 4230, High: 4260, Low: 4240, Close: 4250, IsClosed: true},                     // C1 FVG
 		{Timestamp: awal.Add(4 * time.Hour), Open: 4250, High: 4245, Low: 4150, Close: 4155, IsClosed: true},  // C2 FVG
 		{Timestamp: awal.Add(8 * time.Hour), Open: 4155, High: 4212, Low: 4150, Close: 4160, IsClosed: true},  // C3 FVG
-		{Timestamp: awal.Add(12 * time.Hour), Open: 4160, High: 4230, Low: 4155, Close: 4180, IsClosed: true}, // Candle 4 (sweep)
-		{Timestamp: awal.Add(16 * time.Hour), Open: 4180, High: 4210, Low: 4160, Close: 4190, IsClosed: true}, // Candle 5
-		{Timestamp: awal.Add(20 * time.Hour), Open: 4190, High: 4205, Low: 4150, Close: 4165, IsClosed: true}, // Candle 6
+		{Timestamp: awal.Add(12 * time.Hour), Open: 4160, High: 4230, Low: 4155, Close: 4180, IsClosed: true}, // C2 closure
+		{Timestamp: awal.Add(16 * time.Hour), Open: 4180, High: 4210, Low: 4160, Close: 4190, IsClosed: true}, // C3
+		{Timestamp: awal.Add(20 * time.Hour), Open: 4190, High: 4205, Low: 4150, Close: 4165, IsClosed: true}, // C4
 		{Timestamp: awal.Add(24 * time.Hour), Open: 4165, High: 4180, Low: 4120, Close: 4130, IsClosed: true},
 		{Timestamp: awal.Add(28 * time.Hour), Open: 4130, High: 4140, Low: 4080, Close: 4090, IsClosed: true},
 		{Timestamp: awal.Add(32 * time.Hour), Open: 4090, High: 4100, Low: 4040, Close: 4050, IsClosed: true},

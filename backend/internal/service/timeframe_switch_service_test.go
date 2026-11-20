@@ -142,8 +142,8 @@ func TestTimeframeMatrix_MenampilkanPasanganKatalogDanSinyal(t *testing.T) {
 	}
 
 	daftar := matrix.Tersedia["ila-2.0"]
-	if len(daftar) != 4 {
-		t.Fatalf("pasangan tersedia = %d, ingin 4", len(daftar))
+	if len(daftar) != 5 {
+		t.Fatalf("pasangan tersedia = %d, ingin 5", len(daftar))
 	}
 	if daftar[0].Label != "W · H4" {
 		t.Fatalf("label = %q, ingin \"W · H4\"", daftar[0].Label)
@@ -164,7 +164,7 @@ func TestTimeframeMatrix_MemakaiKatalogBakuBilaEngineBelumKirim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Matrix: %v", err)
 	}
-	if len(matrix.Tersedia["ila-2.0"]) != 4 || len(matrix.Tersedia["ila-3.0"]) != 4 {
+	if len(matrix.Tersedia["ila-2.0"]) != 5 || len(matrix.Tersedia["ila-3.0"]) != 4 {
 		t.Fatalf("pasangan katalog baku harus tetap tampil saat belum ada sinyal, dapat: %v", matrix.Tersedia)
 	}
 }

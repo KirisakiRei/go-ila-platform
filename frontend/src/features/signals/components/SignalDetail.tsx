@@ -80,7 +80,7 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
       } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
         points.push({
           id: `target-${i}`,
-          title: 'Target & DOL (Draw on Liquidity)',
+          title: 'Target & Risk-Reward',
           detail: cleanDetail,
           iconType: 'target',
         })
@@ -93,10 +93,10 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
         })
       }
     } else {
-      if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl|htf/i.test(cleanDetail)) {
+      if (/sweep|fvg|sibi|bisi|c2|masuk ke|menyapu|liquidity|erl|irl|htf/i.test(cleanDetail)) {
         points.push({
           id: `sweep-${i}`,
-          title: 'HTF Liquidity Sweep',
+          title: 'HTF Key Level (C2 Closure)',
           detail: cleanDetail,
           iconType: 'sweep',
         })
@@ -107,10 +107,10 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
           detail: cleanDetail,
           iconType: 'trigger',
         })
-      } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+      } else if (/stdev|target|tp\s*1|dol|rr|proyeksi|fibo/i.test(cleanDetail)) {
         points.push({
           id: `target-${i}`,
-          title: 'Target & DOL (Draw on Liquidity)',
+          title: 'Target & Risk-Reward',
           detail: cleanDetail,
           iconType: 'target',
         })
@@ -143,7 +143,7 @@ function Field({ label, value }: { label: string; value: string }) {
 export function SignalDetail({ signal }: { signal: Signal }) {
   const isILA3 = signal.strategy_version === 'ila-3.0'
   const ila3Mtf = isILA3 ? getIla3Mtf(signal.htf, signal.ltf) : undefined
-  const cycleName = isILA3 ? getCycleBadge(signal.strategy_version, signal.htf, signal.ltf) : null
+  const cycleName = getCycleBadge(signal.strategy_version, signal.htf, signal.ltf)
   const ila3Prog = isILA3 ? getIla3Progress(signal.status) : null
 
   const isReady = signal.status === 'READY_TO_ENTRY' || signal.status === 'OPPORTUNITY'
@@ -382,8 +382,8 @@ export function SignalDetail({ signal }: { signal: Signal }) {
                 </div>
                 <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
                   {isHtfSweepDone
-                    ? 'HTF liquidity sweep terkonfirmasi valid (Candle Closed).'
-                    : 'Menunggu HTF candle sweep & close pada liquidity level / FVG.'}
+                    ? 'C2 closure HTF valid di dalam cycle; mencari CISD selama C3 berjalan.'
+                    : 'Menunggu C2 closure pada key level HTF (ERL / IRL) di dalam cycle.'}
                 </p>
                 {signal.htf_sweep && signal.htf_sweep.target_dol > 0 && (
                   <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] font-mono">

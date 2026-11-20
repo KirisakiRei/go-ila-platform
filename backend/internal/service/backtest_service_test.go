@@ -37,8 +37,8 @@ func TestIrisanCakupanKosongBilaAdaTimeframeTanpaData(t *testing.T) {
 	}
 }
 
-func TestPasanganBacktestHanyaEmpatYangDidukung(t *testing.T) {
-	sah := [][2]string{{"W", "H4"}, {"D1", "H1"}, {"H4", "M15"}, {"H1", "M5"}}
+func TestPasanganBacktestYangDidukung(t *testing.T) {
+	sah := [][2]string{{"W", "H4"}, {"D1", "H1"}, {"H4", "M15"}, {"H1", "M5"}, {"M15", "M1"}}
 	for _, pasangan := range sah {
 		if _, ok := CariPasanganBacktest(pasangan[0], pasangan[1]); !ok {
 			t.Fatalf("pasangan %s-%s seharusnya sah", pasangan[0], pasangan[1])

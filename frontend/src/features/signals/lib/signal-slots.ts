@@ -14,12 +14,13 @@ export type TimeframeSlot = {
   statusTone: 'solid' | 'outline' | 'neutral' | 'muted'
 }
 
-/** 4 Pasangan Timeframe Baku untuk ILA 2.0 */
+/** 5 Pasangan Timeframe Baku untuk New ILA 2.0 (Monthly s.d. Micro) */
 export const ILA2_SLOTS: Array<{ htf: string; ltf: string; label: string }> = [
   { htf: 'W', ltf: 'H4', label: 'W · H4' },
   { htf: 'D1', ltf: 'H1', label: 'D1 · H1' },
   { htf: 'H4', ltf: 'M15', label: 'H4 · M15' },
   { htf: 'H1', ltf: 'M5', label: 'H1 · M5' },
+  { htf: 'M15', ltf: 'M1', label: 'M15 · M1' },
 ]
 
 /** 4 Siklus Quarterly Baku untuk ILA 3.0 */
@@ -65,6 +66,9 @@ function kanonTF(s: string): string {
     case '5M':
     case 'M5':
       return 'M5'
+    case '1M':
+    case 'M1':
+      return 'M1'
     default:
       return n
   }
@@ -81,6 +85,7 @@ function matchTF(a: string, b: string): boolean {
   if ((na === '1H' || na === 'H1') && (nb === '1H' || nb === 'H1')) return true
   if ((na === '15M' || na === 'M15') && (nb === '15M' || nb === 'M15')) return true
   if ((na === '5M' || na === 'M5') && (nb === '5M' || nb === 'M5')) return true
+  if ((na === '1M' || na === 'M1') && (nb === '1M' || nb === 'M1')) return true
   return false
 }
 

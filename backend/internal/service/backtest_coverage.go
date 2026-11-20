@@ -28,13 +28,12 @@ var rentangTersediaMenurutResolusi = map[string]time.Duration{
 	"H1":  320 * 24 * time.Hour,
 	"M15": 95 * 24 * time.Hour,
 	"M5":  30 * 24 * time.Hour,
+	"M1":  7 * 24 * time.Hour,
 }
 
 // PasanganTimeframeBacktest adalah satu kombinasi timeframe yang boleh diuji.
 //
-// Empat pasangan ini yang memang punya aturan di ILA 2.0. Menambah kombinasi
-// lain tanpa aturan hanya akan menghasilkan nol sinyal, jadi daftarnya sengaja
-// ditutup.
+// Lima pasangan (Monthly s.d. Micro) sesuai tabel time cycle New ILA 2.0.
 type PasanganTimeframeBacktest struct {
 	HTF string
 	LTF string
@@ -46,6 +45,7 @@ var DaftarPasanganBacktest = []PasanganTimeframeBacktest{
 	{HTF: "D1", LTF: "H1"},
 	{HTF: "H4", LTF: "M15"},
 	{HTF: "H1", LTF: "M5"},
+	{HTF: "M15", LTF: "M1"},
 }
 
 // CariPasanganBacktest memeriksa apakah kombinasi timeframe termasuk yang

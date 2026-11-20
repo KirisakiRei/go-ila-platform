@@ -292,7 +292,7 @@ export function TradingRadarChart({
           to: sweep.fvg.bottom,
           color: theme.fvg,
           borderColor: theme.fvgBorder,
-          label: `FVG ${formatPrice(sweep.fvg.bottom, digits)} - ${formatPrice(sweep.fvg.top, digits)}`,
+          label: `${sweep.fvg.type || 'FVG'} ${formatPrice(sweep.fvg.bottom, digits)} - ${formatPrice(sweep.fvg.top, digits)}`,
           timeFrom: start,
         })
       }
@@ -534,7 +534,7 @@ export function TradingRadarChart({
               <LegendItem color={theme.cisd} label="CISD" />
               <LegendItem color={theme.entry} label="Entry" />
               <LegendItem color={theme.stopLoss} label="SL" />
-              <LegendItem color={theme.takeProfit} label="TP / DOL" />
+              <LegendItem color={theme.takeProfit} label="TP" />
               <span className="ml-auto tabular">
                 {symbol} · {activeTab?.timeframe ?? '-'}
               </span>

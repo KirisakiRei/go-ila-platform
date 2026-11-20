@@ -63,11 +63,21 @@ export function isFinal(status: SignalStatus): boolean {
   return ['EXPIRED', 'CANCELLED', 'SUPERSEDED', 'SKIPPED', 'CONSUMED', 'INVALIDATED'].includes(status)
 }
 
-/** Mengembalikan nama siklus ILA 3.0 berdasarkan pasangan HTF & LTF */
+/** Mengembalikan nama time cycle berdasarkan strategi dan pasangan HTF & LTF */
 export function getCycleBadge(strategy: string, htf: string, ltf: string): string | null {
-  if (strategy !== 'ila-3.0') return null
   const h = (htf || '').toUpperCase().replace(/\s+/g, '')
   const l = (ltf || '').toUpperCase().replace(/\s+/g, '')
+  if (strategy === 'ila-2.0') {
+    if ((h === 'Q' || h === 'Q1') && (l === 'W' || l === 'W1' || l === '1W')) return 'Yearly Cycle'
+    if ((h === 'MN' || h === 'MN1') && (l === 'D' || l === 'D1' || l === '1D')) return 'Quarterly Cycle'
+    if ((h === 'W' || h === 'W1' || h === '1W') && (l === '4H' || l === 'H4')) return 'Monthly Cycle'
+    if ((h === 'D' || h === 'D1' || h === '1D') && (l === '1H' || l === 'H1')) return 'Weekly Cycle'
+    if ((h === '4H' || h === 'H4') && (l === '15M' || l === 'M15')) return 'Daily Cycle'
+    if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M · 6 Jam'
+    if ((h === '15M' || h === 'M15') && (l === '1M' || l === 'M1')) return 'Micro · 90 Menit'
+    return null
+  }
+  if (strategy !== 'ila-3.0') return null
   if ((h === '4H' || h === 'H4') && (l === '5M' || l === 'M5')) return 'Daily · New Day'
   if ((h === 'D' || h === 'D1' || h === '1D') && (l === '15M' || l === 'M15')) return 'Weekly · New Week'
   if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M · Intraday'

@@ -1033,10 +1033,16 @@ func CanonTimeframe(s string) string {
 		return "15M"
 	case "M5", "5M":
 		return "5M"
+	case "M1", "1M":
+		return "1M"
 	case "D1", "1D", "D":
 		return "D"
 	case "W1", "1W", "W":
 		return "W"
+	case "MN", "MN1", "MONTHLY", "1MO":
+		return "MN"
+	case "Q", "Q1", "QUARTERLY", "3MO":
+		return "Q"
 	default:
 		return clean
 	}

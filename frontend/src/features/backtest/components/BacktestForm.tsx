@@ -159,7 +159,7 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
         {isLoading ? (
           <Skeleton className="h-12 w-full" />
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {opsi.map((item) => (
               <TombolPasangan
                 key={`${item.htf}-${item.ltf}`}

@@ -357,7 +357,7 @@ function SlotGridCard({
   const isSell = signal.direction === 'SELL'
   const isILA3 = signal.strategy_version === 'ila-3.0'
   const mtf = isILA3 ? getIla3Mtf(signal.htf, signal.ltf) : undefined
-  const cycle = isILA3 ? getCycleBadge(signal.strategy_version, signal.htf, signal.ltf) : null
+  const cycle = getCycleBadge(signal.strategy_version, signal.htf, signal.ltf)
   const ila3Prog = isILA3 ? getIla3Progress(signal.status) : null
 
   const isReady = signal.status === 'READY_TO_ENTRY' || signal.status === 'OPPORTUNITY'

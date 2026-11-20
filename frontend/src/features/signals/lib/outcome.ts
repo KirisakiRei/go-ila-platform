@@ -202,6 +202,9 @@ function canonClientTF(tf: string): string {
     case '5M':
     case 'M5':
       return 'M5'
+    case '1M':
+    case 'M1':
+      return 'M1'
     default:
       return n
   }

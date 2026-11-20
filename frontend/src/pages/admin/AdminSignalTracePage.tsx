@@ -80,7 +80,7 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
       } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
         points.push({
           id: `target-${i}`,
-          title: 'Target & DOL (Draw on Liquidity)',
+          title: 'Target & Risk-Reward',
           detail: cleanDetail,
           iconType: 'target',
         })
@@ -93,10 +93,10 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
         })
       }
     } else {
-      if (/sweep|fvg|masuk ke|menyapu|liquidity|erl|irl|htf/i.test(cleanDetail)) {
+      if (/sweep|fvg|sibi|bisi|c2|masuk ke|menyapu|liquidity|erl|irl|htf/i.test(cleanDetail)) {
         points.push({
           id: `sweep-${i}`,
-          title: 'HTF Liquidity Sweep',
+          title: 'HTF Key Level (C2 Closure)',
           detail: cleanDetail,
           iconType: 'sweep',
         })
@@ -107,10 +107,10 @@ function parseAnalysisSummary(rawSummary: string, strategyVersion?: string): Ana
           detail: cleanDetail,
           iconType: 'trigger',
         })
-      } else if (/stdev|target|tp\s*1|dol|proyeksi|fibo/i.test(cleanDetail)) {
+      } else if (/stdev|target|tp\s*1|dol|rr|proyeksi|fibo/i.test(cleanDetail)) {
         points.push({
           id: `target-${i}`,
-          title: 'Target & DOL (Draw on Liquidity)',
+          title: 'Target & Risk-Reward',
           detail: cleanDetail,
           iconType: 'target',
         })
