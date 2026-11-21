@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import {
   CandlestickSeries,
   createChart,
@@ -18,7 +18,7 @@ import {
 import { Skeleton } from '@/components/ui'
 import type { MarketCandle } from '@/types/api'
 import { cn } from '@/lib/utils'
-import { chartTheme, isDarkMode } from './lib/theme'
+import { useChartTheme } from './lib/theme'
 import { ZonePrimitive, type ZoneSpec } from './lib/zonePrimitive'
 import { priceStep } from '@/lib/pricePrecision'
 
@@ -175,9 +175,8 @@ export function PriceChart({
   const prevSeriesKeyRef = useRef<string | undefined>(seriesKey)
   /** focusTime yang sudah diterapkan; mencegah view ter-reset setiap polling. */
   const focusAppliedRef = useRef<number | null>(null)
-  const [dark, setDark] = useState(isDarkMode)
 
-  const theme = useMemo(() => chartTheme(dark), [dark])
+  const theme = useChartTheme()
   const barTimes = useMemo(() => sortedBarTimes(candles), [candles])
 
   // Marker dan garis penghubung diselaraskan ke lilin nyata sebelum digambar.
@@ -201,13 +200,6 @@ export function PriceChart({
     }
     return out
   }, [segments, barTimes])
-
-  // Ikuti perubahan tema aplikasi tanpa memuat ulang halaman.
-  useEffect(() => {
-    const observer = new MutationObserver(() => setDark(isDarkMode()))
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
-  }, [])
 
   // Chart dibuat sekali; data dan overlay diperbarui lewat effect terpisah.
   useEffect(() => {

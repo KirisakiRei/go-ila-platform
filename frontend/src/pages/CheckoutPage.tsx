@@ -246,7 +246,7 @@ export default function CheckoutPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                       <CardTitle className="text-base font-bold">Tagihan Berhasil Dibuat</CardTitle>
                     </div>
                     <CardDescription className="mt-1 text-xs">
@@ -358,7 +358,7 @@ export default function CheckoutPage() {
                         <ul className="grid gap-1.5 sm:grid-cols-2 text-xs">
                           {benefits.map((b) => (
                             <li key={b.label} className="flex items-center gap-1.5 text-foreground">
-                              <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+                              <Check className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
                               <span className="truncate">{b.label}</span>
                             </li>
                           ))}
@@ -394,7 +394,7 @@ export default function CheckoutPage() {
                           'flex w-full items-center justify-between rounded-xl border p-3.5 text-left transition-all',
                           isSelected
                             ? 'border-foreground bg-secondary/60 shadow-sm'
-                            : 'border-border bg-card hover:border-zinc-300',
+                            : 'border-border bg-card hover:border-foreground/30',
                         )}
                       >
                         <div className="flex items-center gap-3">
@@ -415,7 +415,7 @@ export default function CheckoutPage() {
                         <div
                           className={cn(
                             'flex h-4 w-4 items-center justify-center rounded-full border',
-                            isSelected ? 'border-foreground bg-foreground' : 'border-zinc-300',
+                            isSelected ? 'border-foreground bg-foreground' : 'border-input',
                           )}
                         >
                           {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-background" />}
@@ -479,7 +479,7 @@ export default function CheckoutPage() {
                       type="checkbox"
                       checked={useCredit}
                       onChange={(e) => setUseCredit(e.target.checked)}
-                      className="rounded border-zinc-300"
+                      className="rounded border-input accent-foreground"
                     />
                     <span>Gunakan saldo kredit akun saya jika tersedia</span>
                   </label>
@@ -503,7 +503,7 @@ export default function CheckoutPage() {
                     </div>
 
                     {couponDiscount > 0 && (
-                      <div className="flex justify-between text-emerald-600 font-medium">
+                      <div className="flex justify-between font-medium text-emerald-600 dark:text-emerald-400">
                         <span>Potongan Voucher Promo</span>
                         <span className="tabular-nums">- {formatIDR(couponDiscount)}</span>
                       </div>
@@ -548,7 +548,7 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="flex items-center justify-center gap-2 border-t border-border pt-3 text-[11px] text-muted-foreground">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>Enkripsi 256-bit aman &amp; terpercaya</span>
                   </div>
                 </CardContent>

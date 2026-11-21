@@ -186,7 +186,7 @@ export function RiskSimulatorPanel({
               <p
                 className={cn(
                   'truncate text-sm font-bold tabular-nums',
-                  hasil.hasil.warning ? 'text-amber-600' : 'text-foreground',
+                  hasil.hasil.warning ? 'text-amber-600 dark:text-amber-400' : 'text-foreground',
                 )}
               >
                 {formatNumber(hasil.hasil.risk_percent, 2)}%
@@ -229,7 +229,7 @@ export function RiskSimulatorPanel({
                     </td>
                     <td className="px-2.5 py-1.5">
                       {baris.warning ? (
-                        <span className="text-[10.5px] font-medium text-amber-600">Agresif</span>
+                        <span className="text-[10.5px] font-medium text-amber-600 dark:text-amber-400">Agresif</span>
                       ) : (
                         <span className="text-[10.5px] text-muted-foreground">Aman</span>
                       )}
@@ -259,7 +259,7 @@ export function RiskSimulatorPanel({
                     <td
                       className={cn(
                         'px-2.5 py-1.5 text-right tabular-nums',
-                        baris.warning ? 'font-medium text-amber-600' : '',
+                        baris.warning ? 'font-medium text-amber-600 dark:text-amber-400' : '',
                       )}
                     >
                       {formatNumber(baris.risk_percent, 2)}%

@@ -50,7 +50,7 @@ function Candle({ x, w = 22, open, close, high, low, muted = false }: CandleProp
         y1={high}
         x2={cx}
         y2={low}
-        className="stroke-foreground"
+        className="stroke-foreground dark:stroke-zinc-400"
         strokeWidth="1.25"
       />
       <rect
@@ -59,7 +59,11 @@ function Candle({ x, w = 22, open, close, high, low, muted = false }: CandleProp
         width={w}
         height={bodyH}
         rx="1"
-        className={bearish ? 'fill-foreground stroke-foreground' : 'fill-card stroke-foreground'}
+        className={
+          bearish
+            ? 'fill-foreground stroke-foreground dark:fill-zinc-800 dark:stroke-zinc-400'
+            : 'fill-card stroke-foreground dark:fill-zinc-100 dark:stroke-zinc-100'
+        }
         strokeWidth="1.25"
       />
     </g>

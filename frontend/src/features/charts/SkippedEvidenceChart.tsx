@@ -5,7 +5,7 @@ import { formatNumber, formatPrice } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import type { JournalSkipped } from '@/types/api'
 import { PriceChart, type ChartMarkerSpec, type PriceLineSpec } from './PriceChart'
-import { chartTheme } from './lib/theme'
+import { useChartTheme } from './lib/theme'
 
 type SkippedEvidenceChartProps = {
   item: JournalSkipped
@@ -52,7 +52,7 @@ export function SkippedEvidenceChart({
   enabled = true,
   height = 320,
 }: SkippedEvidenceChartProps) {
-  const theme = chartTheme()
+  const theme = useChartTheme()
   // Presisi mengikuti pair agar level dan label tidak tampil membulat.
   const digits = priceDigits(item.symbol, item.entry_price)
   const mulai = toUnix(item.occurred_at)

@@ -26,7 +26,7 @@ import {
   type PriceLineSpec,
   type SegmentSpec,
 } from '@/features/charts/PriceChart'
-import { chartTheme } from '@/features/charts/lib/theme'
+import { useChartTheme } from '@/features/charts/lib/theme'
 import type { ZoneSpec } from '@/features/charts/lib/zonePrimitive'
 import { JudulChart, PanelChart } from '@/features/charts/JudulChart'
 import type { BacktestTradeDetail } from '@/types/api'
@@ -91,7 +91,7 @@ export function BacktestTradeChart({
 function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: string }) {
   const isMobile = useIsMobile()
   const [mobilePanel, setMobilePanel] = useState<'htf' | 'ltf'>('ltf')
-  const theme = chartTheme()
+  const theme = useChartTheme()
   const digits = priceDigits(symbol, detail.entry)
   const isBuy = detail.arah === 'BUY'
 

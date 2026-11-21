@@ -233,7 +233,7 @@ function PemilihUkuran({
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
         aria-label="Jumlah baris per halaman"
-        className="h-7 rounded-md border border-input bg-transparent px-1.5 text-[12px] tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+        className="h-7 rounded-md border border-input bg-background px-1.5 text-[12px] text-foreground tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       >
         {options.map((ukuran) => (
           <option key={ukuran} value={ukuran}>

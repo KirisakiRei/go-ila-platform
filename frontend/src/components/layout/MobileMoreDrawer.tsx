@@ -168,7 +168,7 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
             <Button
               variant="outline"
               size="sm"
-              className="w-full gap-2 text-xs text-rose-600 hover:text-rose-700"
+              className="w-full gap-2 text-xs text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
               onClick={() => {
                 onClose()
                 signOut()

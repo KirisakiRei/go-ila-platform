@@ -256,7 +256,10 @@ export default function AccountDetailPage() {
                 {account.mode === 'auto' ? 'Auto' : 'Manual'}
               </Badge>
               {!account.is_active && (
-                <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-[10px] text-red-600">
+                <Badge
+                  variant="outline"
+                  className="border-red-500/30 bg-red-500/10 text-[10px] text-red-600 dark:text-red-400"
+                >
                   Nonaktif
                 </Badge>
               )}
@@ -403,7 +406,10 @@ export default function AccountDetailPage() {
               </Badge>
               <Badge variant="outline">{account.mode === 'auto' ? 'Auto' : 'Manual'}</Badge>
               {!account.is_active && (
-                <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-600">
+                <Badge
+                  variant="outline"
+                  className="border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+                >
                   Nonaktif
                 </Badge>
               )}
@@ -962,7 +968,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
                     className={`flex min-w-0 items-center justify-between gap-2 rounded-xl border p-3 text-left transition-all ${
                       isSelected
                         ? 'border-foreground bg-secondary/60 shadow-sm'
-                        : 'border-border bg-card hover:border-zinc-300'
+                        : 'border-border bg-card hover:border-foreground/30'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
@@ -973,7 +979,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                         isSelected
                           ? 'border-foreground bg-foreground text-background'
-                          : 'border-zinc-300'
+                          : 'border-input'
                       }`}
                     >
                       {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
@@ -1083,7 +1089,11 @@ function TabOrderHistory({
                       <dt className="text-[10px] uppercase text-muted-foreground">PnL</dt>
                       <dd
                         className={`truncate font-mono font-bold tabular-nums ${
-                          isProfit ? 'text-emerald-600' : isLoss ? 'text-red-500' : 'text-foreground'
+                          isProfit
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : isLoss
+                              ? 'text-red-500 dark:text-red-400'
+                              : 'text-foreground'
                         }`}
                       >
                         {pnlLabel}
@@ -1150,7 +1160,11 @@ function TabOrderHistory({
                       </TableCell>
                       <TableCell
                         className={`font-bold tabular-nums ${
-                          isProfit ? 'text-emerald-600' : isLoss ? 'text-red-500' : ''
+                          isProfit
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : isLoss
+                              ? 'text-red-500 dark:text-red-400'
+                              : ''
                         }`}
                       >
                         {pos.pnl_known

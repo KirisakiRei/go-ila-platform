@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Bell, Menu, User as UserIcon } from 'lucide-react'
+import { ThemeIconButton } from '@/components/layout/ThemeToggle'
 import type { Tier, User } from '@/types/api'
 
 const TIER_LABEL: Record<Tier, string> = { free: 'Free', basic: 'Basic', plus: 'Plus' }
@@ -33,8 +34,10 @@ export function MobileTopBar({ user, onOpenMenu }: MobileTopBarProps) {
         </Link>
       </div>
 
-      {/* Kanan: Notifikasi (menuju Sinyal) + Avatar Profil (menuju Pengaturan) */}
-      <div className="flex items-center gap-2">
+      {/* Kanan: Tema + Notifikasi (menuju Sinyal) + Avatar Profil (menuju Pengaturan) */}
+      <div className="flex items-center gap-1.5">
+        <ThemeIconButton className="h-9 w-9" />
+
         <Link
           to="/sinyal"
           aria-label="Sinyal & Radar"

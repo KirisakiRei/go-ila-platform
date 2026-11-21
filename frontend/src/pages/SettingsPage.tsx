@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { PageHeader, Section } from '@/components/ui'
+import { ThemeSegmentedControl } from '@/components/layout/ThemeToggle'
 import { useIsTabletOrMobile } from '@/lib/use-mobile-viewport'
 import { SettingsMobileView } from '@/pages/components/SettingsMobileView'
 
@@ -24,8 +25,20 @@ export default function SettingsPage() {
         <div className="hidden flex-col gap-6 lg:flex">
           <PageHeader
             title="Pengaturan"
-            description="Notifikasi, profil akun, dan keamanan."
+            description="Notifikasi, profil akun, tampilan, dan keamanan."
           />
+
+          <Section title="Tampilan">
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3.5">
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-foreground">Tema Dashboard</p>
+                <p className="text-[12px] text-muted-foreground">
+                  Sesuaikan warna dashboard dan chart sesuai kenyamanan mata Anda.
+                </p>
+              </div>
+              <ThemeSegmentedControl className="w-[260px] shrink-0" />
+            </div>
+          </Section>
 
           <Section title="Menu Pengaturan">
             <div className="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">

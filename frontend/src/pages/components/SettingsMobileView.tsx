@@ -17,6 +17,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { PUSH_STATUS_QUERY_KEY } from '@/features/notifications/PushNotificationPanel'
+import { ThemeSegmentedControl } from '@/components/layout/ThemeToggle'
 import { pushApi } from '@/lib/push-notifications'
 import { useSignOut, useAuthContext } from '@/features/auth/hooks/use-auth'
 import { accountFlowApi } from '@/lib/auth-api'
@@ -163,6 +164,17 @@ export function SettingsMobileView() {
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </Link>
+
+      {/* Grup Tampilan */}
+      <Group title="Tampilan">
+        <div className="flex flex-col gap-2 px-3.5 py-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[12.5px] font-semibold text-foreground">Tema Dashboard</p>
+            <p className="text-[10.5px] text-muted-foreground">Termasuk chart</p>
+          </div>
+          <ThemeSegmentedControl />
+        </div>
+      </Group>
 
       {/* Grup Umum */}
       <Group title="Umum">

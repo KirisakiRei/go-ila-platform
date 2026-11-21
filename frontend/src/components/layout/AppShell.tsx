@@ -26,6 +26,8 @@ import { OnboardingModal } from '@/features/onboarding'
 import { MobileTopBar } from '@/components/layout/MobileTopBar'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
+import { ThemeIconButton } from '@/components/layout/ThemeToggle'
+import { useApplyUserDashboardTheme } from '@/lib/theme'
 import { useInviteOnly } from '@/lib/use-invite-only'
 import type { Tier, User } from '@/types/api'
 
@@ -106,6 +108,7 @@ type AppShellProps = { user: User; children: ReactNode }
  * - Pada layar ponsel/tablet (< lg), beralih ke MobileTopBar & MobileBottomNav.
  */
 export function AppShell({ user, children }: AppShellProps) {
+  useApplyUserDashboardTheme()
   const signOut = useSignOut()
   const queryClient = useQueryClient()
   const { pathname } = useLocation()
@@ -306,6 +309,7 @@ export function AppShell({ user, children }: AppShellProps) {
           <div className="flex items-center gap-2">
             <span className="text-[12px] text-muted-foreground">{user.email}</span>
             <Badge variant="muted">{TIER_LABEL[user.tier]}</Badge>
+            <ThemeIconButton className="border border-border/80 bg-card/60" />
             <Button variant="ghost" size="sm" onClick={signOut}>
               Keluar
             </Button>

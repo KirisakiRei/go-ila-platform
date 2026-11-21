@@ -106,7 +106,7 @@ export function OnboardingChecklist({ data, onNavigate }: OnboardingChecklistPro
                 'flex flex-col gap-3 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between',
                 isDone
                   ? 'border-emerald-500/30 bg-emerald-500/[0.03]'
-                  : 'border-border bg-card hover:border-zinc-300',
+                  : 'border-border bg-card hover:border-foreground/30',
               )}
             >
               <div className="flex items-start gap-3.5">
@@ -115,7 +115,7 @@ export function OnboardingChecklist({ data, onNavigate }: OnboardingChecklistPro
                     'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-transform',
                     isDone
                       ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
-                      : 'border-zinc-300 bg-secondary/80 text-foreground',
+                      : 'border-input bg-secondary/80 text-foreground',
                   )}
                   aria-label={isDone ? 'Selesai' : `Langkah ${index + 1}`}
                 >
@@ -138,7 +138,7 @@ export function OnboardingChecklist({ data, onNavigate }: OnboardingChecklistPro
                         Selesai
                       </span>
                     ) : (
-                      <span className="rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                         Belum selesai
                       </span>
                     )}

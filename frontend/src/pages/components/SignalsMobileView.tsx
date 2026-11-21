@@ -769,7 +769,9 @@ export function SignalsMobileView({
                             <span
                               className={cn(
                                 'text-[10px] font-bold',
-                                pos.direction === 'BUY' ? 'text-emerald-600' : 'text-rose-600',
+                                pos.direction === 'BUY'
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400',
                               )}
                             >
                               {pos.direction}

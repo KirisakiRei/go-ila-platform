@@ -485,7 +485,7 @@ export default function SignalsPage() {
                             'w-full rounded-xl border bg-card p-3.5 text-left transition-all',
                             isSelected
                               ? 'border-foreground ring-1 ring-foreground/20'
-                              : 'border-border hover:border-zinc-400',
+                              : 'border-border hover:border-foreground/30',
                           )}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -581,7 +581,7 @@ export default function SignalsPage() {
                             {outcome.resolvedAt ? (
                               <span>Selesai: {formatDateTime(outcome.resolvedAt)}</span>
                             ) : signal.delayed ? (
-                              <span className="font-semibold uppercase text-amber-600">Delayed 15m</span>
+                              <span className="font-semibold uppercase text-amber-600 dark:text-amber-400">Delayed 15m</span>
                             ) : (
                               <span className="text-[10px] font-medium text-foreground/70">
                                 {isSelected ? 'Sedang tampil di chart' : 'Lihat chart'}
@@ -718,7 +718,9 @@ export default function SignalsPage() {
                               <p
                                 className={cn(
                                   'text-[11px] font-semibold tabular-nums',
-                                  pos.profit_loss >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                                  pos.profit_loss >= 0
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-rose-600 dark:text-rose-400',
                                 )}
                               >
                                 {formatMoney(pos.profit_loss)} ({formatR(pos.outcome_r)})

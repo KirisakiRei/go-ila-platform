@@ -121,7 +121,9 @@ export function TombolEksekusi({
         <p
           className={cn(
             'text-[11px]',
-            konfirmasi.isError || tolak.isError ? 'text-rose-600' : 'text-emerald-600',
+            konfirmasi.isError || tolak.isError
+              ? 'text-rose-600 dark:text-rose-400'
+              : 'text-emerald-600 dark:text-emerald-400',
           )}
         >
           {pesan}

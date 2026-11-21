@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react'
+
 /**
  * Palet chart.
  *
@@ -78,5 +80,37 @@ export function isDarkMode(): boolean {
 }
 
 export function chartTheme(dark = isDarkMode()): ChartTheme {
+  return dark ? DARK : LIGHT
+}
+
+let darkObserver: MutationObserver | null = null
+const darkListeners = new Set<() => void>()
+
+function subscribeDarkMode(listener: () => void) {
+  darkListeners.add(listener)
+  if (!darkObserver && typeof document !== 'undefined' && typeof MutationObserver !== 'undefined') {
+    darkObserver = new MutationObserver(() => {
+      for (const cb of darkListeners) cb()
+    })
+    darkObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+  }
+  return () => {
+    darkListeners.delete(listener)
+    if (darkListeners.size === 0 && darkObserver) {
+      darkObserver.disconnect()
+      darkObserver = null
+    }
+  }
+}
+
+/**
+ * Hook reaktif untuk palet chart agar seluruh garis overlay (Entry/SL/TP/FVG),
+ * marker, dan legend ikut berubah seketika saat pengguna mengganti tema.
+ */
+export function useChartTheme(): ChartTheme {
+  const dark = useSyncExternalStore(subscribeDarkMode, isDarkMode, () => false)
   return dark ? DARK : LIGHT
 }

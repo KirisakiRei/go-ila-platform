@@ -468,7 +468,7 @@ function TwoFactorCard() {
                   <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={copyAllCodes}>
                     {copiedAllCodes ? (
                       <>
-                        <Check className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                        <Check className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         Tersalin ke Clipboard
                       </>
                     ) : (
@@ -507,7 +507,7 @@ function TwoFactorCard() {
             <div className="space-y-3">
               {status.data?.activated_at && (
                 <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span>
                     Aktif sejak {formatDateTime(status.data.activated_at)} · tersisa{' '}
                     <strong>{status.data.recovery_remaining}</strong> kode pemulihan
@@ -626,7 +626,7 @@ function TwoFactorCard() {
                     >
                       {copiedKey ? (
                         <>
-                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                           <span>Tersalin</span>
                         </>
                       ) : (
@@ -756,7 +756,7 @@ export function SessionsCard() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="shrink-0 gap-1 text-xs hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+                      className="shrink-0 gap-1 text-xs hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
                       onClick={() => setRevokeTarget(row)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -773,7 +773,7 @@ export function SessionsCard() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="gap-1.5 text-xs text-muted-foreground hover:text-red-600"
+                className="gap-1.5 text-xs text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
                 onClick={() => setConfirmLogoutAll(true)}
               >
                 <LogOut className="h-3.5 w-3.5" />

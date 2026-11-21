@@ -187,7 +187,7 @@ export default function BillingPage() {
                     className={
                       isPlus
                         ? 'relative flex flex-col justify-between rounded-2xl border-2 border-foreground bg-card p-6 shadow-sm'
-                        : 'relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 transition-colors hover:border-zinc-300'
+                        : 'relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 transition-colors hover:border-foreground/30'
                     }
                   >
                     <div className="space-y-4">

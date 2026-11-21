@@ -291,7 +291,7 @@ export function CheckoutMobileView({
                     <span
                       className={cn(
                         'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-                        isSelected ? 'border-foreground bg-foreground' : 'border-zinc-300',
+                        isSelected ? 'border-foreground bg-foreground' : 'border-input',
                       )}
                     >
                       {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-background" />}
@@ -342,7 +342,7 @@ export function CheckoutMobileView({
                   type="checkbox"
                   checked={useCredit}
                   onChange={(event) => onUseCreditChange(event.target.checked)}
-                  className="mt-0.5 rounded border-zinc-300"
+                  className="mt-0.5 rounded border-input accent-foreground"
                 />
                 <span className="leading-snug">Gunakan saldo kredit akun saya jika tersedia</span>
               </label>

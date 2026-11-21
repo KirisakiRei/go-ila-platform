@@ -12,7 +12,7 @@ import { mapSignalsToSlots } from '@/features/signals/lib/signal-slots'
 import { OUTCOME_BADGE_CLASS, describeSignalOutcome } from '@/features/signals/lib/outcome'
 import { PriceChart, type ChartMarkerSpec, type PriceLineSpec } from './PriceChart'
 import { arahBearish } from './lib/direction'
-import { chartTheme } from './lib/theme'
+import { useChartTheme } from './lib/theme'
 import type { ZoneSpec } from './lib/zonePrimitive'
 
 type StrategyFilter = 'ila-2.0' | 'ila-3.0'
@@ -222,7 +222,7 @@ export function TradingRadarChart({
     },
   )
 
-  const theme = chartTheme()
+  const theme = useChartTheme()
   const candles = query.data?.candles ?? []
   const feed = query.data?.feed ?? ''
 

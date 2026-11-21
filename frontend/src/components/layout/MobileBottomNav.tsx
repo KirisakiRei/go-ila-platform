@@ -23,7 +23,7 @@ export function MobileBottomNav({ inviteOnly = false }: MobileBottomNavProps) {
   return (
     <nav
       aria-label="Navigasi bawah mobile"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden shadow-[0_-2px_12px_rgba(0,0,0,0.04)]"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_16px_rgba(0,0,0,0.45)]"
     >
       <div className="flex h-[3.75rem] items-center justify-around px-1 py-1">
         {items.map(({ to, label, icon: Icon, end }) => (

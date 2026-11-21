@@ -5,7 +5,7 @@ import { formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import type { Position } from '@/types/api'
 import { PriceChart, type ChartMarkerSpec, type PriceLineSpec, type SegmentSpec } from './PriceChart'
-import { chartTheme } from './lib/theme'
+import { useChartTheme } from './lib/theme'
 
 type PositionExecutionChartProps = {
   position: Position
@@ -59,7 +59,7 @@ export function PositionExecutionChart({
   timeframe,
   height = 320,
 }: PositionExecutionChartProps) {
-  const theme = chartTheme()
+  const theme = useChartTheme()
 
   // Presisi mengikuti pair: EURUSD 5 desimal, XAUUSD 2, JPY 3. Tanpa ini
   // level entry/SL/TP tampil membulat dan terlihat tidak sesuai broker.

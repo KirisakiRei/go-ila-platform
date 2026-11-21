@@ -6,6 +6,20 @@
     <!-- Panel pelanggan tidak boleh diindeks mesin pencari. -->
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#171717" />
+    <script>
+      (function () {
+        try {
+          if (!/^\/(dashboard|mulai|sinyal|posisi|akun|strategi|backtest|pengaturan|laporkan-bug|langganan)(\/|$)/.test(location.pathname)) return;
+          var p = localStorage.getItem('ila_user_theme');
+          var dark = p === 'dark' || (p === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', '#0e0e11');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

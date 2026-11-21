@@ -139,7 +139,7 @@ export function DashboardRadarHero() {
       ) : latestSignal ? (
         <div
           onClick={() => navigate(`/sinyal?pair=${currentPair}`)}
-          className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-xs transition-all hover:border-zinc-400 hover:shadow-sm active:scale-[0.99] cursor-pointer"
+          className="flex cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-xs transition-colors hover:border-foreground/30 hover:shadow-sm active:scale-[0.99]"
         >
           {/* Top Row: Ticker Box + Pair + Direction + Subtitle + Status Pill */}
           <div className="flex items-center justify-between gap-2">
@@ -233,7 +233,7 @@ export function DashboardRadarHero() {
       ) : (
         <div
           onClick={() => navigate(`/sinyal?pair=${currentPair}`)}
-          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-zinc-400 cursor-pointer"
+          className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
