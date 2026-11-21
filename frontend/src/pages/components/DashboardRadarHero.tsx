@@ -97,7 +97,7 @@ export function DashboardRadarHero() {
                   type="button"
                   onClick={() => setSelectedPair(pair)}
                   className={cn(
-                    'flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-all active:scale-95',
+                    'flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors duration-150 active:scale-[0.97]',
                     isActive
                       ? 'border border-border bg-secondary font-semibold text-foreground shadow-xs'
                       : 'border border-transparent bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -225,7 +225,7 @@ export function DashboardRadarHero() {
           <div className="flex items-center justify-between border-t border-border/60 pt-1.5 text-xs text-muted-foreground">
             <span className="truncate text-[11px]">
               {latestSignal.summary ||
-                `Tahap 1 HTF (${latestSignal.htf}) Valid · Tahap 2 LTF (${latestSignal.ltf}) Konfirmasi Siap`}
+                `HTF (${latestSignal.htf}) C2 Closure Valid · LTF (${latestSignal.ltf}) CISD Siap Entry`}
             </span>
             <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground ml-1" />
           </div>
@@ -250,7 +250,7 @@ export function DashboardRadarHero() {
             </span>
           </div>
           <p className="text-[11.5px] text-muted-foreground">
-            Belum ada setup sinyal aktif untuk {currentPair}. Radar engine terus memindai pembentukan struktur FVG & Sweep.
+            Belum ada setup sinyal aktif untuk {currentPair}. Radar engine memantau Time Cycle, HTF C2 Closure &amp; LTF CISD.
           </p>
           <div className="flex items-center justify-end text-xs font-medium text-foreground">
             <span>Buka Radar Detail</span>
