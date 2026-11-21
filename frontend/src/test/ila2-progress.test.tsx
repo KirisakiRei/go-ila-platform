@@ -392,4 +392,18 @@ describe('Ila2FlowGuide', () => {
     expect(screen.getByRole('img', { name: /Ilustrasi Entry/i })).toBeInTheDocument()
     expect(screen.getByText(/Target tetap RR 1 : 2/i)).toBeInTheDocument()
   })
+
+  it('mode bullish menampilkan +CISD dan Kondisi 3 memakai high bearish pertama', () => {
+    render(<Ila2FlowGuide />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Bullish · Buy \(\+CISD\)/i }))
+    expect(screen.getByRole('img', { name: /Ilustrasi Time Cycle/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: /LTF \(CISD\)/i }))
+    expect(screen.getByRole('button', { name: /Kondisi 3 · FTM \+ SWH/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Kondisi 3/i }))
+    expect(screen.getByRole('img', { name: /LTF \+CISD Kondisi 3/i })).toBeInTheDocument()
+    expect(screen.getByText(/high candle bearish pertama/i)).toBeInTheDocument()
+    expect(screen.queryByText(/low candle bullish pertama/i)).not.toBeInTheDocument()
+  })
 })
