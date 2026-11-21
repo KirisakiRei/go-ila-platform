@@ -11,7 +11,7 @@ import { Badge, Button, Card, CardContent, CardDescription, CardHeader, StatusPi
 import { formatDualDateTime, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Signal } from '@/types/api'
-import { mapSignalsToSlots, semuaTimeframeMati, timeframeSlotDipantau, type TimeframeSlot } from '../lib/signal-slots'
+import { mapSignalsToSlots, pilihSlotAwal, semuaTimeframeMati, timeframeSlotDipantau, type TimeframeSlot } from '../lib/signal-slots'
 import { SIGNAL_LABEL, SIGNAL_TONE, getCycleBadge, getIla3Mtf, getIla3Progress } from '../lib/status'
 import { SignalDetail } from './SignalDetail'
 import { TimeframeBadge } from './TimeframeBadge'
@@ -23,6 +23,7 @@ export function TimeframeRadarMatrix({
   timeframeAktif,
   activeSlotKey,
   onSelectSlot,
+  hideSlotTabs = false,
 }: {
   signals: Signal[]
   strategy: 'ila-2.0' | 'ila-3.0'
@@ -35,6 +36,8 @@ export function TimeframeRadarMatrix({
   /** Kunci slot aktif bila disinkronkan dengan komponen luar (mis. Chart Setup). */
   activeSlotKey?: string | null
   onSelectSlot?: (key: string) => void
+  /** Sembunyikan deretan pil slot internal bila pemilih sudah ditampilkan di luar. */
+  hideSlotTabs?: boolean
 }) {
   // Matriks dikunci ke satu metode. Penyaringan ini pengaman tambahan supaya
   // sinyal dari metode lain tidak pernah ikut membentuk slot di matriks ini.
@@ -43,8 +46,8 @@ export function TimeframeRadarMatrix({
   const aktif = timeframeAktif ?? null
   const matiSemua = semuaTimeframeMati(aktif)
 
-  // Otomatis arahkan ke slot yang statusnya READY jika ada, atau slot pertama
-  const initialKey = slots.find((s) => s.status === 'READY')?.key ?? slots[0]?.key ?? ''
+  // Otomatis arahkan ke slot dipantau yang paling relevan (READY → WAIT_CISD → WAIT_SWEEP → aktif pertama)
+  const initialKey = pilihSlotAwal(slots, aktif)
   const [internalKey, setInternalKey] = useState<string>(initialKey)
   const [viewMode, setViewMode] = useState<'tab' | 'grid'>('tab')
 
@@ -57,20 +60,41 @@ export function TimeframeRadarMatrix({
   // Pastikan slot valid di antara daftar slot metode saat ini
   const currentSlot =
     slots.find((s) => s.key === targetKey) ??
-    slots.find((s) => s.status === 'READY') ??
+    slots.find((s) => s.key === initialKey) ??
     slots[0]
 
   return (
     <div className="space-y-4">
       {/* Header Matrix Controls */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-3">
-        {/* Slot Tabs */}
+        {hideSlotTabs ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {viewMode === 'tab' && currentSlot ? (
+              <>
+                <span className="font-semibold text-foreground">
+                  {currentSlot.cycle ?? currentSlot.label}
+                </span>
+                {currentSlot.cycle && (
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    ({currentSlot.label})
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="font-semibold text-foreground">
+                Semua {strategy === 'ila-2.0' ? 'Time Cycle' : 'Timeframe'} ({slots.length})
+              </span>
+            )}
+          </div>
+        ) : (
+        /* Slot Tabs */
         <div className="flex flex-wrap items-center gap-1.5">
           {slots.map((slot) => {
+            const dipantau = timeframeSlotDipantau(aktif, slot)
             const isActive = slot.key === currentSlot?.key && viewMode === 'tab'
-            const isReady = slot.status === 'READY'
-            const isWaitCisd = slot.status === 'WAIT_CISD'
-            const isWaitSweep = slot.status === 'WAIT_SWEEP'
+            const isReady = dipantau && slot.status === 'READY'
+            const isWaitCisd = dipantau && slot.status === 'WAIT_CISD'
+            const isWaitSweep = dipantau && slot.status === 'WAIT_SWEEP'
 
             return (
               <button
@@ -104,7 +128,16 @@ export function TimeframeRadarMatrix({
                 )}
 
                 {/* Status Dot / Pill */}
-                {isReady ? (
+                {!dipantau ? (
+                  <span
+                    className={cn(
+                      'text-[9.5px] font-mono',
+                      isActive ? 'text-background/70' : 'text-muted-foreground',
+                    )}
+                  >
+                    OFF
+                  </span>
+                ) : isReady ? (
                   <span
                     className={cn(
                       'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-bold font-mono',
@@ -129,7 +162,7 @@ export function TimeframeRadarMatrix({
                       isActive ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground',
                     )}
                   >
-                    WAIT SWEEP
+                    {strategy === 'ila-2.0' ? 'WAIT C2' : 'WAIT SWEEP'}
                   </span>
                 ) : (
                   <span
@@ -145,6 +178,7 @@ export function TimeframeRadarMatrix({
             )
           })}
         </div>
+        )}
 
         {/* View Switcher: Tab Focus vs Grid 2x2 */}
         <div className="flex items-center gap-1 self-end sm:self-auto shrink-0">

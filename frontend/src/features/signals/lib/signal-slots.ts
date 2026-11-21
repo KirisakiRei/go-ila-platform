@@ -333,6 +333,25 @@ export function semuaTimeframeMati(aktif: Set<string> | null): boolean {
 }
 
 /**
+ * pilihSlotAwal memilih slot default yang paling relevan dan sedang dipantau:
+ * prioritas READY → WAIT_CISD → WAIT_SWEEP → slot dipantau pertama → slot[0].
+ */
+export function pilihSlotAwal(
+  slots: TimeframeSlot[],
+  aktif: Set<string> | null,
+): string {
+  const dipantau = slots.filter((s) => timeframeSlotDipantau(aktif, s))
+  const pool = dipantau.length > 0 ? dipantau : slots
+  return (
+    pool.find((s) => s.status === 'READY')?.key ??
+    pool.find((s) => s.status === 'WAIT_CISD')?.key ??
+    pool.find((s) => s.status === 'WAIT_SWEEP')?.key ??
+    pool[0]?.key ??
+    ''
+  )
+}
+
+/**
  * ringkasanSlot merangkum keadaan slot satu metode untuk header kartu.
  *
  * `ready` menghitung slot yang benar-benar siap dieksekusi. Angka ini dipakai

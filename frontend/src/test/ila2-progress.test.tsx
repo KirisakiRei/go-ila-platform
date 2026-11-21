@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { buildIla2Timeline } from '@/features/signals/lib/ila2-progress'
+import { mapSignalsToSlots, pilihSlotAwal } from '@/features/signals/lib/signal-slots'
+import { CycleSelectorStrip } from '@/features/signals/components/CycleSelectorStrip'
+import { PengaturanPairModal } from '@/features/signals/components/PengaturanPairModal'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
+import { strategySwitchApi, timeframeSwitchApi } from '@/lib/api'
 import type { Signal } from '@/types/api'
 
 function makeIla2Signal(over: Partial<Signal> = {}): Signal {
@@ -222,5 +227,139 @@ describe('SignalDetail & TimeframeRadarMatrix — New ILA 2.0 Time Cycle', () =>
     expect(screen.getByRole('button', { name: /90M Cycle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Micro Cycle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Semua Cycle/i })).toBeInTheDocument()
+  })
+
+  it('CycleSelectorStrip menampilkan overview tiap cycle, menandai OFF, dan memilih slot dipantau', () => {
+    const dailySig = makeIla2Signal({
+      htf: 'H4',
+      ltf: 'M15',
+      status: 'WAIT_LTF_CISD',
+      htf_sweep: {
+        detected: true,
+        sweep_in_progress: false,
+        direction: 'SELL',
+        stop_loss: 0,
+        target_dol: 0,
+        details: 'SIBI H4: C2 closure aktif pada SIBI di candle 18 Nov 08:00 NY (acuan 2654.00)',
+      },
+      cisd: {
+        detected: false,
+        direction: 'SELL',
+        cisd_level: 2650.0,
+        extreme_sl: 2658.0,
+        entry_price: 0,
+        details:
+          '-CISD belum terkonfirmasi: level CISD 2650.00 (...), SL 2658.00. swing high 2655.00 valid tapi belum terkena wick',
+      },
+    })
+    const aktif = new Set(['H4|M15', 'H1|M5'])
+    const slots = mapSignalsToSlots([dailySig], 'ila-2.0')
+    expect(pilihSlotAwal(slots, aktif)).toBe('H4-M15')
+
+    const onSelect = vi.fn()
+    render(
+      <CycleSelectorStrip
+        signals={[dailySig]}
+        strategy="ila-2.0"
+        timeframeAktif={aktif}
+        activeSlotKey="H4-M15"
+        onSelectSlot={onSelect}
+      />,
+    )
+
+    const monthlyBtn = screen.getByRole('button', { name: /Monthly Cycle/i })
+    expect(monthlyBtn).toHaveTextContent('OFF')
+    expect(monthlyBtn).toHaveTextContent('Tidak dipantau')
+
+    const dailyBtn = screen.getByRole('button', { name: /Daily Cycle/i })
+    expect(dailyBtn).toHaveAttribute('aria-pressed', 'true')
+    expect(dailyBtn).toHaveTextContent('WAIT CISD')
+
+    fireEvent.click(screen.getByRole('button', { name: /90M Cycle/i }))
+    expect(onSelect).toHaveBeenCalledWith('H1-M5')
+  })
+})
+
+describe('PengaturanPairModal', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('menampilkan tab ILA 2.0/3.0, toggle aktif metode, dan toggle pantau/eksekusi per time cycle', async () => {
+    vi.spyOn(strategySwitchApi, 'matrix').mockResolvedValue({
+      symbol: 'XAUUSD',
+      accounts: [
+        {
+          account_id: 'acc-1',
+          label: 'Akun Utama',
+          broker_type: 'matchtrader',
+          is_active: true,
+          is_dry_run: false,
+          strategies: { 'ila-2.0': true, 'ila-3.0': false },
+          allowed: { 'ila-2.0': true, 'ila-3.0': true },
+        },
+      ],
+    })
+    vi.spyOn(timeframeSwitchApi, 'matrix').mockResolvedValue({
+      symbol: 'XAUUSD',
+      tersedia: {
+        'ila-2.0': [
+          { htf: 'H4', ltf: 'M15', label: 'H4 · M15' },
+          { htf: 'H1', ltf: 'M5', label: 'H1 · M5' },
+        ],
+      },
+      auto_allowed: true,
+      groups: [
+        {
+          strategy: 'ila-2.0',
+          accounts: [
+            {
+              account_id: 'acc-1',
+              label: 'Akun Utama',
+              pairs: [
+                { htf: 'H4', ltf: 'M15', watch: true, auto: true },
+                { htf: 'H1', ltf: 'M5', watch: false, auto: false },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const setTfSpy = vi.spyOn(timeframeSwitchApi, 'set').mockResolvedValue({
+      symbol: 'XAUUSD',
+      tersedia: {},
+      auto_allowed: true,
+      groups: [],
+    })
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <PengaturanPairModal
+          open
+          onClose={() => {}}
+          symbol="XAUUSD"
+          initialStrategy="ila-2.0"
+          adaIla3
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('Daily Cycle')).toBeInTheDocument()
+    expect(screen.getByText('90M Cycle')).toBeInTheDocument()
+
+    // Mematikan Pantau pada Daily Cycle juga wajib mematikan Eksekusi.
+    const pantauDaily = screen.getByRole('switch', { name: /Pantau Daily Cycle untuk Akun Utama/i })
+    fireEvent.click(pantauDaily)
+    await waitFor(() => {
+      expect(setTfSpy).toHaveBeenCalledWith('acc-1', 'XAUUSD', 'ila-2.0', [
+        { htf: 'H4', ltf: 'M15', watch: false, auto: false },
+        { htf: 'H1', ltf: 'M5', watch: false, auto: false },
+      ])
+    })
+
+    // Pindah ke tab ILA 3.0 -> karena nonaktif, muncul ajakan mengaktifkan metode.
+    fireEvent.click(screen.getByRole('tab', { name: 'ILA 3.0' }))
+    expect(screen.getByText(/ILA 3\.0 Nonaktif/i)).toBeInTheDocument()
   })
 })

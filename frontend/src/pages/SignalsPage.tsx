@@ -6,6 +6,9 @@ import {
   BarChart3,
   Bot,
   ChevronDown,
+  PanelRightClose,
+  PanelRightOpen,
+  Settings,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
@@ -33,13 +36,13 @@ import {
   isRadarProgressSignal,
 } from '@/features/signals/lib/outcome'
 import type { Signal } from '@/types/api'
-import { setTimeframeDipantau, mapSignalsToSlots, ringkasanSlot } from '@/features/signals/lib/signal-slots'
+import { setTimeframeDipantau, mapSignalsToSlots, pilihSlotAwal, ringkasanSlot } from '@/features/signals/lib/signal-slots'
 import { slotPalingDekat, stageOf, type SlotStage } from '@/features/signals/lib/slot-stage'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
+import { CycleSelectorStrip } from '@/features/signals/components/CycleSelectorStrip'
+import { PengaturanPairModal } from '@/features/signals/components/PengaturanPairModal'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
 import { TradingRadarChart } from '@/features/charts/TradingRadarChart'
-import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
-import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 import { SignalsMobileView } from './components/SignalsMobileView'
 
@@ -96,6 +99,8 @@ export default function SignalsPage() {
   const [activeStrategyFilter, setActiveStrategyFilter] = useState<'ila-2.0' | 'ila-3.0'>('ila-2.0')
   const [selectedSlotKey, setSelectedSlotKey] = useState<string | null>(null)
   const [snapshotSignal, setSnapshotSignal] = useState<Signal | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const cleanSignals = useMemo(() => dedupeSetupSignals(signals ?? []), [signals])
 
@@ -143,6 +148,23 @@ export default function SignalsPage() {
   const filteredSignals = useMemo(() => {
     return pairSignals.filter((s) => s.strategy_version === activeStrategyFilter)
   }, [pairSignals, activeStrategyFilter])
+
+  const timeframeAktif = useMemo(
+    () => setTimeframeDipantau(timeframeMatrix, activeStrategyFilter),
+    [timeframeMatrix, activeStrategyFilter],
+  )
+
+  const slotsMetode = useMemo(
+    () => mapSignalsToSlots(filteredSignals, activeStrategyFilter),
+    [filteredSignals, activeStrategyFilter],
+  )
+
+  const effectiveSlotKey = useMemo(() => {
+    if (selectedSlotKey && slotsMetode.some((s) => s.key === selectedSlotKey)) {
+      return selectedSlotKey
+    }
+    return pilihSlotAwal(slotsMetode, timeframeAktif)
+  }, [selectedSlotKey, slotsMetode, timeframeAktif])
 
   // Daftar riwayat hanya berisi setup sungguhan yang memiliki harga entry,
   // bukan baris pantauan radar (`status-*` / `WAIT_*` berharga 0).
@@ -195,36 +217,56 @@ export default function SignalsPage() {
     }
   }
 
+  // Buka modal pengaturan saat tombol "Aktifkan pemantauan" di radar diklik.
+  useEffect(() => {
+    if (!activePair) return
+    const onOpenSettings = () => setSettingsOpen(true)
+    window.addEventListener('ila:open-timeframe-settings', onOpenSettings)
+    return () => window.removeEventListener('ila:open-timeframe-settings', onOpenSettings)
+  }, [activePair])
+
   if (!isDesktop) {
     return (
-      <SignalsMobileView
-        signals={cleanSignals}
-        allPairs={allPairs}
-        activePair={activePair}
-        onSelectPair={handleSelectPair}
-        onBackToPairs={handleBackToPairs}
-        isLoading={isLoading}
-        isFetching={isFetching}
-        refetch={refetch}
-        adaIla3={adaIla3}
-        activeStrategyFilter={activeStrategyFilter}
-        onSelectStrategy={(strat) => {
-          setActiveStrategyFilter(strat)
-          setSelectedSlotKey(null)
-          setSnapshotSignal(null)
-          setHistoryPage(1)
-        }}
-        filteredSignals={filteredSignals}
-        filteredPositions={filteredPositions}
-        timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
-        selectedSlotKey={selectedSlotKey}
-        onSelectSlot={(key) => {
-          setSelectedSlotKey(key)
-          setSnapshotSignal(null)
-        }}
-        snapshotSignal={snapshotSignal}
-        onSelectSnapshot={setSnapshotSignal}
-      />
+      <>
+        <SignalsMobileView
+          signals={cleanSignals}
+          allPairs={allPairs}
+          activePair={activePair}
+          onSelectPair={handleSelectPair}
+          onBackToPairs={handleBackToPairs}
+          isLoading={isLoading}
+          isFetching={isFetching}
+          refetch={refetch}
+          adaIla3={adaIla3}
+          activeStrategyFilter={activeStrategyFilter}
+          onSelectStrategy={(strat) => {
+            setActiveStrategyFilter(strat)
+            setSelectedSlotKey(null)
+            setSnapshotSignal(null)
+            setHistoryPage(1)
+          }}
+          filteredSignals={filteredSignals}
+          filteredPositions={filteredPositions}
+          timeframeAktif={timeframeAktif}
+          selectedSlotKey={effectiveSlotKey}
+          onSelectSlot={(key) => {
+            setSelectedSlotKey(key)
+            setSnapshotSignal(null)
+          }}
+          snapshotSignal={snapshotSignal}
+          onSelectSnapshot={setSnapshotSignal}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        {activePair && (
+          <PengaturanPairModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            symbol={activePair}
+            initialStrategy={activeStrategyFilter}
+            adaIla3={adaIla3}
+          />
+        )}
+      </>
     )
   }
 
@@ -254,6 +296,17 @@ export default function SignalsPage() {
               >
                 Muat Ulang
               </Button>
+              {activePair && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSettingsOpen(true)}
+                  className="gap-1.5 text-xs"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Pengaturan
+                </Button>
+              )}
             </div>
           }
         />
@@ -311,9 +364,21 @@ export default function SignalsPage() {
           {/* Call Entry Alert Banner (Pinned di Paling Atas saat Ada Sinyal Siap Eksekusi) */}
           <CallEntryAlertBanner signals={filteredSignals} />
 
-          {/* Sinyal Aktif / Terakhir & Histori Setup Langsung di Atas */}
+          {/* Kartu Pemilih Time Cycle dengan Status Overview */}
+          <CycleSelectorStrip
+            signals={filteredSignals}
+            strategy={activeStrategyFilter}
+            timeframeAktif={timeframeAktif}
+            activeSlotKey={effectiveSlotKey}
+            onSelectSlot={(key) => {
+              setSelectedSlotKey(key)
+              setSnapshotSignal(null)
+            }}
+          />
+
+          {/* Sinyal Aktif / Terakhir & Histori Setup (Histori bisa collapse/expand) */}
           <div className="grid gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-8 space-y-6">
+            <div className={historyOpen ? 'lg:col-span-8' : 'lg:col-span-12'}>
               <Section
                 title={
                   activeStrategyFilter === 'ila-2.0'
@@ -325,45 +390,54 @@ export default function SignalsPage() {
                     ? `Pantauan progres time cycle New ILA 2.0 untuk ${activePair} (HTF C2 → LTF CISD → Entry).`
                     : `Pemantauan matriks timeframe multi-tier untuk ${activePair}.`
                 }
+                actions={
+                  !historyOpen ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHistoryOpen(true)}
+                      className="h-7 gap-1.5 px-2.5 text-xs"
+                    >
+                      <PanelRightOpen className="h-3.5 w-3.5" />
+                      Tampilkan Histori ({signalsRiwayat.length})
+                    </Button>
+                  ) : undefined
+                }
               >
                 <TimeframeRadarMatrix
                   signals={filteredSignals}
                   strategy={activeStrategyFilter}
                   symbol={activePair}
-                  timeframeAktif={setTimeframeDipantau(timeframeMatrix, activeStrategyFilter)}
-                  activeSlotKey={selectedSlotKey}
+                  timeframeAktif={timeframeAktif}
+                  activeSlotKey={effectiveSlotKey}
+                  hideSlotTabs
                   onSelectSlot={(key) => {
                     setSelectedSlotKey(key)
                     setSnapshotSignal(null)
                   }}
                 />
               </Section>
-
-              {/* Chart setup: hanya di-mount pada layar desktop agar ponsel
-                  tidak menembak polling candle tersembunyi di latar belakang. */}
-              {isDesktop && (
-                <Section
-                  title="Chart Setup"
-                  description={`Lilin ${activePair} dari feed yang sama dengan evaluasi engine.`}
-                >
-                  <TradingRadarChart
-                    symbol={activePair}
-                    signals={filteredSignals}
-                    strategy={activeStrategyFilter}
-                    selectedSlotKey={selectedSlotKey}
-                    snapshotSignal={snapshotSignal}
-                    onClearSnapshot={() => setSnapshotSignal(null)}
-                  />
-                </Section>
-              )}
             </div>
 
-            {/* Riwayat Setup Sinyal Pair Ini dengan Pagination */}
-            <div className="lg:col-span-4">
-              <Section
-                title="Histori Setup Sinyal"
-                description={`${signalsRiwayat.length} setup unik pada ${activePair} · klik untuk pratinjau chart`}
-              >
+            {/* Riwayat Setup Sinyal Pair Ini dengan Pagination (Collapsible) */}
+            {historyOpen && (
+              <div className="lg:col-span-4">
+                <Section
+                  title="Histori Setup Sinyal"
+                  description={`${signalsRiwayat.length} setup unik pada ${activePair} · klik untuk pratinjau chart`}
+                  actions={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setHistoryOpen(false)}
+                      className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                      title="Sembunyikan Histori Setup Sinyal"
+                    >
+                      <PanelRightClose className="h-3.5 w-3.5" />
+                      Sembunyikan
+                    </Button>
+                  }
+                >
                 {signalsRiwayat.length === 0 ? (
                   <Card>
                     <CardContent className="py-6 text-center text-xs text-muted-foreground">
@@ -535,8 +609,26 @@ export default function SignalsPage() {
                   </div>
                 )}
               </Section>
-            </div>
+              </div>
+            )}
           </div>
+
+          {/* Chart Setup Full-Width (sejajar penuh seperti tabel Riwayat Eksekusi Order) */}
+          {isDesktop && (
+            <Section
+              title="Chart Setup"
+              description={`Lilin ${activePair} dari feed yang sama dengan evaluasi engine.`}
+            >
+              <TradingRadarChart
+                symbol={activePair}
+                signals={filteredSignals}
+                strategy={activeStrategyFilter}
+                selectedSlotKey={effectiveSlotKey}
+                snapshotSignal={snapshotSignal}
+                onClearSnapshot={() => setSnapshotSignal(null)}
+              />
+            </Section>
+          )}
 
           {/* Riwayat Posisi / Eksekusi Order */}
           <Section
@@ -628,38 +720,14 @@ export default function SignalsPage() {
             )}
           </Section>
 
-          {/* Konfigurasi Akun untuk Pair Ini */}
-          <div className="space-y-6 border-t border-border/80 pt-6">
-            <div className="flex flex-col gap-1">
-              <h3 className="text-base font-semibold tracking-tight text-foreground">
-                Pengaturan Akun ({activePair})
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Konfigurasi metode dan pasangan timeframe yang diizinkan untuk akun trading Anda.
-              </p>
-            </div>
-
-            <Section
-              title="Metode per Akun"
-              description={`Tentukan metode analisis yang dijalankan tiap akun pada ${activePair}. Watchlist tetap memantau seluruh metode.`}
-            >
-              <SaklarMetodeAkun symbol={activePair} />
-            </Section>
-
-            <Section
-              title={
-                activeStrategyFilter === 'ila-2.0'
-                  ? 'Time Cycle per Akun (ILA 2.0)'
-                  : 'Timeframe per Akun (ILA 3.0)'
-              }
-              description={`Pilih pasangan ${activeStrategyFilter === 'ila-2.0' ? 'time cycle' : 'timeframe'} yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}.`}
-            >
-              {/* Penanda gulir: tombol "Aktifkan pemantauan" di radar menuju ke sini. */}
-              <div id="pengaturan-timeframe" className="scroll-mt-20">
-                <SaklarTimeframeAkun symbol={activePair} strategy={activeStrategyFilter} />
-              </div>
-            </Section>
-          </div>
+          {/* Modal Pengaturan Metode & Time Cycle per Akun */}
+          <PengaturanPairModal
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            symbol={activePair}
+            initialStrategy={activeStrategyFilter}
+            adaIla3={adaIla3}
+          />
         </div>
       ) : (
         /* OVERVIEW GRID VIEW PER PAIR */

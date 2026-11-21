@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
   ArrowLeft,
   BarChart3,
@@ -7,6 +7,7 @@ import {
   Layers,
   Radio,
   RotateCw,
+  Settings,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -31,15 +32,14 @@ import {
   isRadarProgressSignal,
 } from '@/features/signals/lib/outcome'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
+import { CycleSelectorStrip } from '@/features/signals/components/CycleSelectorStrip'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
-import { SaklarMetodeAkun } from '@/features/signals/components/SaklarMetodeAkun'
-import { SaklarTimeframeAkun } from '@/features/signals/components/SaklarTimeframeAkun'
 import { TimeframeBadge } from '@/features/signals/components/TimeframeBadge'
 import { TradingRadarChart } from '@/features/charts/TradingRadarChart'
 import type { Position, Signal } from '@/types/api'
 
 type TabFilter = 'all' | 'ready' | 'monitoring' | 'history'
-type PairSection = 'radar' | 'sinyal' | 'setelan'
+type PairSection = 'radar' | 'sinyal'
 
 type SignalsMobileViewProps = {
   signals?: Signal[]
@@ -63,6 +63,7 @@ type SignalsMobileViewProps = {
   onSelectSlot?: (key: string) => void
   snapshotSignal?: Signal | null
   onSelectSnapshot?: (signal: Signal | null) => void
+  onOpenSettings?: () => void
 }
 
 export function SignalsMobileView({
@@ -84,6 +85,7 @@ export function SignalsMobileView({
   onSelectSlot,
   snapshotSignal = null,
   onSelectSnapshot,
+  onOpenSettings,
 }: SignalsMobileViewProps) {
   const [activeTab, setActiveTab] = useState<TabFilter>('all')
   const [pairSection, setPairSection] = useState<PairSection>('radar')
@@ -97,14 +99,6 @@ export function SignalsMobileView({
     (posisiHalaman - 1) * POSISI_PER_HALAMAN,
     posisiHalaman * POSISI_PER_HALAMAN,
   )
-
-  // Saat tombol "Aktifkan pemantauan" di TimeframeRadarMatrix ditekan,
-  // pindah otomatis ke segmen Setelan agar elemen #pengaturan-timeframe tampil.
-  useEffect(() => {
-    const onOpenSettings = () => setPairSection('setelan')
-    window.addEventListener('ila:open-timeframe-settings', onOpenSettings)
-    return () => window.removeEventListener('ila:open-timeframe-settings', onOpenSettings)
-  }, [])
 
   const baseSignals = useMemo(() => {
     const source = activePair
@@ -536,6 +530,17 @@ export function SignalsMobileView({
           >
             <RotateCw className={cn('h-4 w-4', isFetching && 'animate-spin text-foreground')} />
           </Button>
+          {activePair && onOpenSettings && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSettings}
+              className="h-8 w-8 p-0"
+              aria-label={`Pengaturan ${activePair}`}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -644,9 +649,20 @@ export function SignalsMobileView({
       {/* 4. Call Entry Alert Banner (Pinned jika ada sinyal siap eksekusi) */}
       <CallEntryAlertBanner signals={baseSignals} />
 
-      {/* 5. Jika Pair Terpilih: Segmented Control 3 Bagian (Radar | Sinyal & Order | Setelan) */}
+      {/* 5. Jika Pair Terpilih: Kartu Pemilih Cycle + Segmented Control 3 Bagian */}
       {activePair ? (
         <div className="space-y-3.5">
+          <CycleSelectorStrip
+            signals={filteredSignals}
+            strategy={activeStrategyFilter}
+            timeframeAktif={timeframeAktif}
+            activeSlotKey={selectedSlotKey ?? ''}
+            onSelectSlot={(key) => {
+              onSelectSlot?.(key)
+              onSelectSnapshot?.(null)
+              setPairSection('radar')
+            }}
+          />
           <MobileSegmentedTabs<PairSection>
             ariaLabel={`Bagian detail pair ${activePair}`}
             value={pairSection}
@@ -654,7 +670,6 @@ export function SignalsMobileView({
             options={[
               { id: 'radar', label: 'Radar' },
               { id: 'sinyal', label: 'Sinyal & Order', count: tabCounts.all },
-              { id: 'setelan', label: 'Setelan Pair' },
             ]}
           />
 
@@ -711,6 +726,7 @@ export function SignalsMobileView({
                   symbol={activePair}
                   timeframeAktif={timeframeAktif}
                   activeSlotKey={selectedSlotKey}
+                  hideSlotTabs
                   onSelectSlot={(key) => {
                     onSelectSlot?.(key)
                     onSelectSnapshot?.(null)
@@ -815,24 +831,6 @@ export function SignalsMobileView({
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {pairSection === 'setelan' && (
-            <div
-              id="pengaturan-timeframe"
-              className="scroll-mt-20 space-y-3.5 rounded-2xl border border-border bg-card p-3.5 shadow-xs"
-            >
-              <div>
-                <h4 className="text-xs font-bold text-foreground">
-                  Pengaturan Akun ({activePair})
-                </h4>
-                <p className="text-[11px] text-muted-foreground">
-                  Aktifkan metode analisis dan pasangan timeframe yang dipantau serta diizinkan eksekusi otomatis.
-                </p>
-              </div>
-              <SaklarMetodeAkun symbol={activePair} />
-              <SaklarTimeframeAkun symbol={activePair} strategy={activeStrategyFilter} />
             </div>
           )}
         </div>
