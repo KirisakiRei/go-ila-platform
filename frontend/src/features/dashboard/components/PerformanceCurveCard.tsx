@@ -12,6 +12,7 @@ import {
   type CurvePeriod,
   EASE_OUT,
   buildEquityCurve,
+  buildSmoothCurvePath,
 } from '../lib/dashboard-metrics'
 
 const PERIODS: Array<{ id: CurvePeriod; label: string }> = [
@@ -30,7 +31,8 @@ const SVG_H = 190
 const PAD = { top: 18, right: 16, bottom: 24, left: 46 }
 
 export function PerformanceCurveCard() {
-  const gradId = useId()
+  const areaGradId = useId()
+  const strokeGradId = useId()
   const reduceMotion = useReducedMotion()
   const [period, setPeriod] = useState<CurvePeriod>('30d')
   const [metric, setMetric] = useState<CurveMetric>('r')
@@ -58,23 +60,29 @@ export function PerformanceCurveCard() {
     const toY = (v: number) => PAD.top + ((hi - v) / range) * plotH
 
     const coords = rawValues.map((v, i) => ({ x: toX(i), y: toY(v), value: v }))
-    const linePath = coords
-      .map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`)
-      .join(' ')
+    const linePath = buildSmoothCurvePath(coords)
 
     const zeroY = toY(0)
+    const zeroPct = Math.max(0, Math.min(100, ((zeroY - PAD.top) / plotH) * 100))
     const first = coords[0]!
     const last = coords[coords.length - 1]!
     const areaPath = `${linePath} L ${last.x.toFixed(1)} ${zeroY.toFixed(1)} L ${first.x.toFixed(1)} ${zeroY.toFixed(1)} Z`
 
-    return { coords, linePath, areaPath, zeroY, hi, lo }
+    return { coords, linePath, areaPath, zeroY, zeroPct, hi, lo, minVal, maxVal }
   }, [summary.points, metric])
 
   const headlineVal = metric === 'r' ? summary.totalR : summary.totalPnL
   const isPositive = headlineVal > 0
   const isNegative = headlineVal < 0
 
-  const strokeColor = isNegative ? '#f43f5e' : isPositive ? '#10b981' : '#71717a'
+  const pointColor = (v: number) => (v > 0 ? '#10b981' : v < 0 ? '#f43f5e' : '#71717a')
+  const zeroPct = series.zeroPct
+  const strokeSoftUp =
+    series.minVal >= 0 ? zeroPct : Math.max(0, zeroPct - 3.5)
+  const strokeSoftDown =
+    series.maxVal <= 0 ? zeroPct : Math.min(100, zeroPct + 3.5)
+  const areaSoftUp = Math.max(0, zeroPct - 2)
+  const areaSoftDown = Math.min(100, zeroPct + 2)
   const activePoint =
     hoverIdx !== null && hoverIdx > 0 ? summary.points[hoverIdx - 1] ?? null : null
   const activeCoord = hoverIdx !== null ? series.coords[hoverIdx] ?? null : null
@@ -205,9 +213,36 @@ export function PerformanceCurveCard() {
               onPointerLeave={() => setHoverIdx(null)}
             >
               <defs>
-                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={strokeColor} stopOpacity="0.24" />
-                  <stop offset="100%" stopColor={strokeColor} stopOpacity="0.01" />
+                {/* Gradasi stroke vertikal: hijau di atas 0, transisi lembut di garis 0, merah di bawah 0 */}
+                <linearGradient
+                  id={strokeGradId}
+                  gradientUnits="userSpaceOnUse"
+                  x1="0"
+                  y1={PAD.top}
+                  x2="0"
+                  y2={SVG_H - PAD.bottom}
+                >
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset={`${strokeSoftUp.toFixed(2)}%`} stopColor="#10b981" />
+                  <stop offset={`${strokeSoftDown.toFixed(2)}%`} stopColor="#f43f5e" />
+                  <stop offset="100%" stopColor="#f43f5e" />
+                </linearGradient>
+
+                {/* Gradasi area vertikal: memudar ke bening tepat di garis 0 agar split warna seamless */}
+                <linearGradient
+                  id={areaGradId}
+                  gradientUnits="userSpaceOnUse"
+                  x1="0"
+                  y1={PAD.top}
+                  x2="0"
+                  y2={SVG_H - PAD.bottom}
+                >
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
+                  <stop offset={`${areaSoftUp.toFixed(2)}%`} stopColor="#10b981" stopOpacity="0.05" />
+                  <stop offset={`${zeroPct.toFixed(2)}%`} stopColor="#10b981" stopOpacity="0.01" />
+                  <stop offset={`${zeroPct.toFixed(2)}%`} stopColor="#f43f5e" stopOpacity="0.01" />
+                  <stop offset={`${areaSoftDown.toFixed(2)}%`} stopColor="#f43f5e" stopOpacity="0.05" />
+                  <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.26" />
                 </linearGradient>
               </defs>
 
@@ -250,7 +285,7 @@ export function PerformanceCurveCard() {
               <motion.path
                 key={`area-${period}-${metric}-${summary.count}`}
                 d={series.areaPath}
-                fill={`url(#${gradId})`}
+                fill={`url(#${areaGradId})`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: reduceMotion ? 0.12 : 0.35, ease: EASE_OUT }}
@@ -261,8 +296,8 @@ export function PerformanceCurveCard() {
                 key={`line-${period}-${metric}-${summary.count}`}
                 d={series.linePath}
                 fill="none"
-                stroke={strokeColor}
-                strokeWidth="2.25"
+                stroke={`url(#${strokeGradId})`}
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 initial={reduceMotion ? { opacity: 0 } : { pathLength: 0, opacity: 0.4 }}
@@ -291,13 +326,14 @@ export function PerformanceCurveCard() {
                 const coordIndex = idx + 1
                 const isLast = coordIndex === series.coords.length - 1
                 const isHovered = hoverIdx === coordIndex
+                const dotFill = pointColor(c.value)
                 return (
                   <g key={coordIndex}>
                     <circle
                       cx={c.x}
                       cy={c.y}
-                      r={isHovered ? 5 : isLast ? 3.8 : 2.4}
-                      fill={strokeColor}
+                      r={isHovered ? 5 : isLast ? 3.8 : 2.5}
+                      fill={dotFill}
                       className="stroke-background"
                       strokeWidth={isHovered || isLast ? 2 : 1}
                     />

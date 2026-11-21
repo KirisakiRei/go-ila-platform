@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import {
   buildEquityCurve,
   buildRadarHighlights,
+  buildSmoothCurvePath,
   findActionableSignals,
   labelTahapDashboard,
 } from '@/features/dashboard/lib/dashboard-metrics'
@@ -108,6 +109,16 @@ describe('dashboard-metrics', () => {
     expect(highlights[1]?.cycleName).toBe('Daily Cycle')
 
     expect(findActionableSignals(signals).map((s) => s.symbol)).toEqual(['USTEC'])
+  })
+
+  it('buildSmoothCurvePath menghasilkan kurva cubic Bezier halus untuk >= 3 titik', () => {
+    const path = buildSmoothCurvePath([
+      { x: 0, y: 100 },
+      { x: 50, y: 40 },
+      { x: 100, y: 130 },
+    ])
+    expect(path.startsWith('M 0.0 100.0 C ')).toBe(true)
+    expect(path).toContain('100.0 130.0')
   })
 })
 

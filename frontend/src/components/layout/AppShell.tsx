@@ -160,7 +160,7 @@ export function AppShell({ user, children }: AppShellProps) {
     : NAV_GROUPS
 
   return (
-    <div className="flex min-h-full w-full flex-col overflow-x-hidden lg:flex-row">
+    <div className="flex min-h-screen w-full flex-col overflow-x-clip lg:flex-row">
       <LegalReconsentGate />
       {!pathname.startsWith('/approve') && <OnboardingModal />}
 

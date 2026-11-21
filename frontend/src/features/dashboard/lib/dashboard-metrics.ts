@@ -46,6 +46,70 @@ export type RadarHighlight = {
 
 export const EASE_OUT = [0.23, 1, 0.32, 1] as const
 
+/**
+ * buildSmoothCurvePath mengubah urutan titik (x terurut naik) menjadi path SVG
+ * kurva halus menggunakan monotone cubic Hermite spline (Fritsch-Carlson),
+ * sehingga melengkung lembut tanpa overshoot melewati puncak/lembah data nyata.
+ */
+export function buildSmoothCurvePath(points: Array<{ x: number; y: number }>): string {
+  const n = points.length
+  if (n === 0) return ''
+  const p0 = points[0]!
+  if (n === 1) return `M ${p0.x.toFixed(1)} ${p0.y.toFixed(1)}`
+  if (n === 2) {
+    const p1 = points[1]!
+    return `M ${p0.x.toFixed(1)} ${p0.y.toFixed(1)} L ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`
+  }
+
+  const dx: number[] = []
+  const slopes: number[] = []
+  for (let i = 0; i < n - 1; i++) {
+    const stepX = points[i + 1]!.x - points[i]!.x || 1
+    dx.push(stepX)
+    slopes.push((points[i + 1]!.y - points[i]!.y) / stepX)
+  }
+
+  const tangents = new Array<number>(n).fill(0)
+  tangents[0] = slopes[0]!
+  tangents[n - 1] = slopes[n - 2]!
+  for (let i = 1; i < n - 1; i++) {
+    const prev = slopes[i - 1]!
+    const next = slopes[i]!
+    tangents[i] = prev * next <= 0 ? 0 : (prev + next) / 2
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    const d = slopes[i]!
+    if (Math.abs(d) < 1e-9) {
+      tangents[i] = 0
+      tangents[i + 1] = 0
+      continue
+    }
+    const a = tangents[i]! / d
+    const b = tangents[i + 1]! / d
+    const h = Math.hypot(a, b)
+    if (h > 3) {
+      const scale = 3 / h
+      tangents[i] = scale * a * d
+      tangents[i + 1] = scale * b * d
+    }
+  }
+
+  let path = `M ${p0.x.toFixed(1)} ${p0.y.toFixed(1)}`
+  for (let i = 0; i < n - 1; i++) {
+    const curr = points[i]!
+    const next = points[i + 1]!
+    const seg = dx[i]! / 3
+    const cp1x = curr.x + seg
+    const cp1y = curr.y + tangents[i]! * seg
+    const cp2x = next.x - seg
+    const cp2y = next.y - tangents[i + 1]! * seg
+    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`
+  }
+
+  return path
+}
+
 function normTF(s: string): string {
   const n = (s || '').toUpperCase().replace(/[\s\-_]+/g, '')
   switch (n) {
