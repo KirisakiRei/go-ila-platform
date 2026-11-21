@@ -45,6 +45,7 @@ import {
   useAccountPairs,
   useDeleteAccount,
   usePositions,
+  useSubscriptions,
   useUpdateAccount,
   useUpdateAccountPairs,
 } from '@/lib/queries'
@@ -528,6 +529,7 @@ function TabRiskSettings({
   const [isActive, setIsActive] = useState(account.is_active)
   const [notice, setNotice] = useState<string | null>(null)
   const [konfirmasiRisiko, setKonfirmasiRisiko] = useState(false)
+  const [simulasiOpen, setSimulasiOpen] = useState(false)
 
   // Risiko di atas 1% tetap disimpan, tetapi wajib dikonfirmasi lebih dulu.
   const risikoAgresif = riskMode === 'percent' && riskPercent > 1
@@ -726,26 +728,46 @@ function TabRiskSettings({
             </div>
           </div>
 
-          <div className="pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-2">
             <Button type="submit" size="sm" isLoading={update.isPending} className="w-full gap-1.5 sm:w-auto">
               <Save className="h-3.5 w-3.5" />
               Simpan Pengaturan
             </Button>
+            {!hideSimulator && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSimulasiOpen(true)}
+                className="w-full gap-1.5 sm:w-auto"
+              >
+                <Calculator className="h-3.5 w-3.5" />
+                Simulasi Risiko
+              </Button>
+            )}
           </div>
         </form>
+      </CardContent>
 
-        {/* Kalkulator dipisah di luar <form> agar tombol Enter pada input simulasi
-            tidak memicu penyimpanan pengaturan akun tanpa sengaja. */}
-        {!hideSimulator && (
+      {/* Modal Simulasi Risiko */}
+      {!hideSimulator && (
+        <Modal
+          open={simulasiOpen}
+          onClose={() => setSimulasiOpen(false)}
+          size="xl"
+          title="Simulasi Risiko"
+          description="Pratinjau ukuran lot dan nominal risiko berdasarkan jarak Stop Loss."
+        >
           <RiskSimulatorPanel
             accountId={account.id}
             defaultEquity={account.equity}
             riskMode={riskMode}
             riskPercent={Number(riskPercent)}
             lotSize={Number(lotSize)}
+            frameless
           />
-        )}
-      </CardContent>
+        </Modal>
+      )}
 
       {/* Konfirmasi risiko agresif: disimpan hanya setelah user menyetujui. */}
       <Modal
@@ -788,28 +810,41 @@ function TabRiskSettings({
 /** TAB 2: FILTER PAIR EKSEKUSI */
 function TabPairFilter({ accountId }: { accountId: string }) {
   const { data, isLoading, isError, error } = useAccountPairs(accountId)
+  const { data: subscriptions, isLoading: loadingSubs } = useSubscriptions()
   const updatePairs = useUpdateAccountPairs()
-
   const [pilihanLokal, setPilihanLokal] = useState<string[] | null>(null)
   const [search, setSearch] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
-  const selectedSymbols = pilihanLokal ?? data?.selected ?? []
-  const setSelectedSymbols = setPilihanLokal
+  const watchlistSymbols = useMemo(() => {
+    const set = new Set<string>()
+    for (const sub of subscriptions ?? []) {
+      if (sub.symbol && sub.is_active) set.add(sub.symbol.toUpperCase())
+    }
+    return set
+  }, [subscriptions])
 
+  // Hanya tampilkan pair yang sudah terdaftar aktif di Watchlist Pair.
   const allPairs = useMemo(() => {
-    const categories = data?.catalog?.categories
-    if (!categories) return []
-    const pairs: PairItem[] = []
-    for (const cat of categories) {
+    const katalogBySymbol = new Map<string, PairItem>()
+    for (const cat of data?.catalog?.categories ?? []) {
       for (const grp of cat.groups) {
         for (const p of grp.pairs) {
-          pairs.push(p)
+          katalogBySymbol.set(p.symbol.toUpperCase(), p)
         }
       }
     }
-    return pairs
-  }, [data?.catalog?.categories])
+
+    return Array.from(watchlistSymbols)
+      .sort()
+      .map((sym) => katalogBySymbol.get(sym) ?? { symbol: sym, name: sym })
+  }, [data?.catalog?.categories, watchlistSymbols])
+
+  const selectedSymbols = useMemo(() => {
+    const raw = pilihanLokal ?? data?.selected ?? []
+    return raw.filter((s) => watchlistSymbols.has(s.toUpperCase()))
+  }, [pilihanLokal, data?.selected, watchlistSymbols])
+  const setSelectedSymbols = setPilihanLokal
 
   const filteredPairs = useMemo(() => {
     if (!search.trim()) return allPairs
@@ -824,7 +859,9 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 
   const toggleSymbol = (symbol: string) => {
     setSelectedSymbols((prev) => {
-      const current = prev ?? data?.selected ?? []
+      const current = (prev ?? data?.selected ?? []).filter((s) =>
+        watchlistSymbols.has(s.toUpperCase()),
+      )
       return current.includes(symbol)
         ? current.filter((s) => s !== symbol)
         : [...current, symbol]
@@ -852,6 +889,8 @@ function TabPairFilter({ accountId }: { accountId: string }) {
     }
   }
 
+  const loadingAll = isLoading || loadingSubs
+
   return (
     <Card>
       <CardHeader>
@@ -859,17 +898,19 @@ function TabPairFilter({ accountId }: { accountId: string }) {
           <div>
             <CardTitle className="text-sm font-semibold">Filter Pair Eksekusi untuk Akun Ini</CardTitle>
             <CardDescription className="text-xs">
-              Hanya simbol pair yang Anda centang yang akan dieksekusi oleh akun ini.
+              Menampilkan pair yang terdaftar di Watchlist Pair. Centang pair yang boleh dimainkan oleh akun ini.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={selectAll} className="text-xs">
-              Pilih Semua
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={deselectAll} className="text-xs">
-              Batal Pilih
-            </Button>
-          </div>
+          {allPairs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={selectAll} className="text-xs">
+                Pilih Semua
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={deselectAll} className="text-xs">
+                Batal Pilih
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -879,20 +920,36 @@ function TabPairFilter({ accountId }: { accountId: string }) {
           </Alert>
         )}
 
-        {isLoading && <Skeleton className="h-48 w-full" />}
+        {loadingAll && <Skeleton className="h-48 w-full" />}
         {isError && <Alert variant="destructive">{(error as Error).message}</Alert>}
 
-        {!isLoading && (
-          <>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Cari simbol pair (misal: XAUUSD, EURUSD)..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
+        {!loadingAll && allPairs.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border bg-secondary/20 px-4 py-8 text-center">
+            <p className="text-xs font-medium text-foreground">Belum ada pair di Watchlist Pair.</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Tambahkan pair yang ingin dipantau terlebih dahulu agar dapat dipilih untuk akun ini.
+            </p>
+            <div className="mt-3">
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/strategi">Buka Watchlist Pair</Link>
+              </Button>
             </div>
+          </div>
+        )}
+
+        {!loadingAll && allPairs.length > 0 && (
+          <>
+            {allPairs.length > 6 && (
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Cari simbol pair (misal: XAUUSD, EURUSD)..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
               {filteredPairs.map((pair) => {
@@ -912,7 +969,6 @@ function TabPairFilter({ accountId }: { accountId: string }) {
                       <p className="truncate text-xs font-bold text-foreground">{pair.symbol}</p>
                       <p className="truncate text-[11px] text-muted-foreground">{pair.name}</p>
                     </div>
-
                     <div
                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                         isSelected
@@ -935,7 +991,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
               <span className="text-xs text-muted-foreground">
-                Terpilih: <strong>{selectedSymbols.length}</strong> dari {allPairs.length} pair
+                Terpilih: <strong>{selectedSymbols.length}</strong> dari {allPairs.length} pair watchlist
               </span>
               <Button
                 size="sm"

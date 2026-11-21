@@ -7,6 +7,7 @@ import { CycleSelectorStrip } from '@/features/signals/components/CycleSelectorS
 import { PengaturanPairModal } from '@/features/signals/components/PengaturanPairModal'
 import { SignalDetail } from '@/features/signals/components/SignalDetail'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
+import { Ila2FlowGuide } from '@/features/strategies/components/Ila2FlowGuide'
 import { strategySwitchApi, timeframeSwitchApi } from '@/lib/api'
 import type { Signal } from '@/types/api'
 
@@ -226,7 +227,7 @@ describe('SignalDetail & TimeframeRadarMatrix — New ILA 2.0 Time Cycle', () =>
     expect(screen.getByRole('button', { name: /Daily Cycle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /90M Cycle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Micro Cycle/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Semua Cycle/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Semua Cycle|Fokus/i })).not.toBeInTheDocument()
   })
 
   it('CycleSelectorStrip menampilkan overview tiap cycle, menandai OFF, dan memilih slot dipantau', () => {
@@ -361,5 +362,34 @@ describe('PengaturanPairModal', () => {
     // Pindah ke tab ILA 3.0 -> karena nonaktif, muncul ajakan mengaktifkan metode.
     fireEvent.click(screen.getByRole('tab', { name: 'ILA 3.0' }))
     expect(screen.getByText(/ILA 3\.0 Nonaktif/i)).toBeInTheDocument()
+  })
+})
+
+describe('Ila2FlowGuide', () => {
+  it('berpindah antar 4 tahap ilustrasi SVG (Time Cycle -> HTF -> LTF -> Entry)', () => {
+    render(<Ila2FlowGuide />)
+
+    // Step 1: Time Cycle
+    expect(screen.getByRole('img', { name: /Ilustrasi Time Cycle/i })).toBeInTheDocument()
+    expect(screen.getByText('Daily Cycle')).toBeInTheDocument()
+
+    // Step 2: HTF IRL & ERL
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/i }))
+    expect(screen.getByRole('img', { name: /Ilustrasi HTF C2 Closure pada IRL SIBI/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /ERL \(Swing High \/ Low\)/i }))
+    expect(screen.getByRole('img', { name: /Ilustrasi HTF C2 Closure pada ERL Swing High/i })).toBeInTheDocument()
+
+    // Step 3: LTF CISD Kondisi 1, 2, 3
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/i }))
+    expect(screen.getByRole('img', { name: /Kondisi 1/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Kondisi 2/i }))
+    expect(screen.getByRole('img', { name: /Kondisi 2/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Kondisi 3/i }))
+    expect(screen.getByRole('img', { name: /Kondisi 3/i })).toBeInTheDocument()
+
+    // Step 4: Entry, SL, TP 1:2
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/i }))
+    expect(screen.getByRole('img', { name: /Ilustrasi Entry/i })).toBeInTheDocument()
+    expect(screen.getByText(/Target tetap RR 1 : 2/i)).toBeInTheDocument()
   })
 })

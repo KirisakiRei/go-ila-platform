@@ -207,12 +207,8 @@ export function PushNotificationPanel() {
         )}
       </div>
 
-      <p className="leading-relaxed text-muted-foreground">
-        Notifikasi push browser/aplikasi dikirim secara hemat <strong>hanya</strong> saat{' '}
-        <strong className="text-foreground">sinyal siap entry manual</strong>,{' '}
-        <strong className="text-foreground">posisi entry baru dibuka</strong>, atau{' '}
-        <strong className="text-foreground">posisi ditutup (Take Profit, Stop Loss, / Manual)</strong>.
-        Tahap pantauan radar awal tidak pernah membunyikan push.
+      <p className="text-muted-foreground">
+        Alert instan untuk sinyal siap entry, posisi dibuka, dan posisi ditutup.
       </p>
 
       {/* Panduan khusus iPhone / iPad Safari yang belum dipasang sebagai PWA */}

@@ -28,6 +28,7 @@ import RiwayatLaporanBugPage from '@/pages/RiwayatLaporanBugPage'
 import DetailLaporanBugPage from '@/pages/DetailLaporanBugPage'
 import ProfilPage from '@/pages/ProfilPage'
 import PerangkatPage from '@/pages/PerangkatPage'
+import NotifikasiPage from '@/pages/NotifikasiPage'
 import { FullPageLoading } from './FullPageLoading'
 import { NotFoundPage } from './NotFoundPage'
 import { ScrollToTop } from './ScrollToTop'
@@ -335,6 +336,16 @@ export function AppRoutes() {
           }
         />
 
+        <Route
+          path="/pengaturan/notifikasi"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <NotifikasiPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
         <Route
           path="/pengaturan/keamanan"
           element={

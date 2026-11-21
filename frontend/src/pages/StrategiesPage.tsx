@@ -19,6 +19,7 @@ import {
   useSubscriptions,
 } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
+import { Ila2FlowGuide } from '@/features/strategies/components/Ila2FlowGuide'
 import { useIsMobile } from '@/lib/use-mobile-viewport'
 import { cn } from '@/lib/utils'
 import type { PairCatalogResponse, StrategyVersion } from '@/types/api'
@@ -348,13 +349,12 @@ const METODE_INFO: Record<StrategyVersion, {
 }> = {
   'ila-2.0': {
     judul: 'ILA 2.0',
-    tagline: 'Fokus eksternal & internal',
+    tagline: 'Time Cycle · HTF C2 → LTF CISD → Entry RR 1:2',
     poin: [
-      'Membaca struktur harga eksternal pada chart.',
-      'Mengonfirmasi dorongan momentum internal pasar.',
-      'Sinyal terbit saat struktur eksternal dan konfirmasi internal selaras.',
+      'Menyaring setup berbasis Time Cycle baku (Monthly s.d. Micro) dengan konfirmasi C2 HTF dan trigger CISD di LTF.',
+      'Entry pada close konfirmasi CISD, SL di puncak/dasar rangkaian, dan target tetap RR 1:2.',
     ],
-    cocok: 'Pasar trending · Timeframe M15–H1 · Pemula sampai menengah',
+    cocok: 'Monthly s.d. Micro Cycle · Pemula sampai menengah',
   },
   'ila-3.0': {
     judul: 'ILA 3.0',
@@ -457,7 +457,7 @@ export default function StrategiesPage() {
                     <h3 className="text-[14px] font-semibold">{info?.judul ?? s.name}</h3>
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                       <Info className="h-3.5 w-3.5" aria-hidden="true" />
-                      Ringkasan
+                      {s.version === 'ila-2.0' ? 'Alur Entry' : 'Ringkasan'}
                     </span>
                   </div>
                   <p className="text-[12px] font-medium text-foreground">{info?.tagline}</p>
@@ -542,15 +542,23 @@ export default function StrategiesPage() {
         />
       </Modal>
 
-      {/* Modal Ringkasan Metode */}
+      {/* Modal Ringkasan / Alur Metode */}
       <Modal
         open={Boolean(infoMetode)}
         onClose={() => setInfoMetode(null)}
-        size="lg"
-        title={infoMetode ? METODE_INFO[infoMetode].judul : undefined}
+        size={infoMetode === 'ila-2.0' ? '2xl' : 'lg'}
+        title={
+          infoMetode === 'ila-2.0'
+            ? 'ILA 2.0 — Alur Entry'
+            : infoMetode
+              ? METODE_INFO[infoMetode].judul
+              : undefined
+        }
         description={infoMetode ? METODE_INFO[infoMetode].tagline : undefined}
       >
-        {infoMetode && (
+        {infoMetode === 'ila-2.0' ? (
+          <Ila2FlowGuide />
+        ) : infoMetode ? (
           <div className="space-y-4">
             <ul className="space-y-2.5">
               {METODE_INFO[infoMetode].poin.map((poin) => (
@@ -563,7 +571,6 @@ export default function StrategiesPage() {
                 </li>
               ))}
             </ul>
-
             <div className="rounded-lg border border-border bg-secondary/40 px-3.5 py-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Cocok untuk
@@ -572,19 +579,17 @@ export default function StrategiesPage() {
                 {METODE_INFO[infoMetode].cocok}
               </p>
             </div>
-
             <div className="flex items-start gap-2 text-[11.5px] leading-relaxed text-muted-foreground">
               <Bot className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>Detail cara kerja internal tidak dipublikasikan.</span>
             </div>
-
             <div className="flex justify-end border-t border-border pt-3">
               <Button size="sm" onClick={() => setInfoMetode(null)}>
                 Mengerti
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </Modal>
 
       {/* Modal Konfirmasi Hapus Pantauan */}

@@ -28,9 +28,8 @@ import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from 
 import { priceDigits } from '@/lib/pricePrecision'
 import { useIsMobile, useIsTabletOrMobile } from '@/lib/use-mobile-viewport'
 import { cn } from '@/lib/utils'
-import type { JournalEvalStatus, JournalResponse, Position, PositionStatus } from '@/types/api'
+import type { JournalEvalStatus, JournalResponse, PositionStatus } from '@/types/api'
 import { PositionExecutionChart } from '@/features/charts/PositionExecutionChart'
-import { chartTheme } from '@/features/charts/lib/theme'
 import { JournalSummary } from '@/features/journal/components/JournalSummary'
 import { JournalSkippedList } from '@/features/journal/components/JournalSkippedList'
 import { SimulasiBadge } from '@/features/journal/components/SimulasiBadge'
@@ -119,7 +118,6 @@ export default function PositionsPage() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const isMobile = useIsMobile()
   const isTabletOrMobile = useIsTabletOrMobile()
-  const theme = chartTheme()
 
   // positions di-memo agar identitasnya stabil: tanpa itu, setiap render
   // menghasilkan array baru dan seluruh useMemo di bawahnya dihitung ulang.
@@ -189,7 +187,12 @@ export default function PositionsPage() {
 
   const toggle = (id: string) => setExpandedId((current) => (current === id ? null : id))
 
-  const pnlColor = (position: Position) => (position.profit_loss >= 0 ? theme.profit : theme.loss)
+  const pnlToneClass = (value: number) =>
+    value > 0
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : value < 0
+        ? 'text-rose-600 dark:text-rose-400'
+        : 'text-foreground'
 
   const tampil = tab === 'aktif' ? aktif : riwayat
   const paginasiMobile = usePaginasiLokal(tampil, 10)
@@ -669,14 +672,12 @@ export default function PositionsPage() {
                           priceDigits(position.symbol, position.open_price),
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right font-medium">
+                      <TableCell className="whitespace-nowrap text-right font-semibold">
                         {position.pnl_known ? (
-                          <>
+                          <span className={pnlToneClass(position.profit_loss)}>
                             <span className="tabular">{formatMoney(position.profit_loss)}</span>
-                            <span className="ml-1 tabular text-muted-foreground">
-                              ({formatR(position.outcome_r)})
-                            </span>
-                          </>
+                            <span className="ml-1 tabular">({formatR(position.outcome_r)})</span>
+                          </span>
                         ) : (
                           <span
                             className="text-muted-foreground"
@@ -766,7 +767,12 @@ export default function PositionsPage() {
                     <div className="min-w-0 text-right">
                       <p className="text-[10px] uppercase text-muted-foreground">Hasil</p>
                       {position.pnl_known ? (
-                        <p className="truncate font-mono font-semibold tabular" style={{ color: pnlColor(position) }}>
+                        <p
+                          className={cn(
+                            'truncate font-mono font-semibold tabular',
+                            pnlToneClass(position.profit_loss),
+                          )}
+                        >
                           {formatMoney(position.profit_loss)} ({formatR(position.outcome_r)})
                         </p>
                       ) : (

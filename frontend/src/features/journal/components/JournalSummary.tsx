@@ -2,6 +2,12 @@ import { Stat, StatGrid } from '@/components/ui'
 import { formatMoney, formatNumber, formatR } from '@/lib/format'
 import type { JournalStats } from '@/types/api'
 
+function pnlToneClass(value: number): string {
+  if (value > 0) return 'text-emerald-600 dark:text-emerald-400'
+  if (value < 0) return 'text-rose-600 dark:text-rose-400'
+  return ''
+}
+
 /**
  * JournalSummary merangkum performa eksekusi.
  *
@@ -31,12 +37,26 @@ export function JournalSummary({ stats }: { stats: JournalStats }) {
         />
         <Stat
           label="Total R"
-          value={belumSelesai ? '—' : formatR(stats.total_r)}
+          value={
+            belumSelesai ? (
+              '—'
+            ) : (
+              <span className={pnlToneClass(stats.total_r)}>{formatR(stats.total_r)}</span>
+            )
+          }
           hint={belumSelesai ? undefined : `Rata-rata ${formatR(stats.average_r)} per trade`}
         />
         <Stat
           label="Total P/L"
-          value={belumSelesai ? '—' : formatMoney(stats.total_profit)}
+          value={
+            belumSelesai ? (
+              '—'
+            ) : (
+              <span className={pnlToneClass(stats.total_profit)}>
+                {formatMoney(stats.total_profit)}
+              </span>
+            )
+          }
           hint={belumSelesai ? undefined : 'Dari posisi yang sudah ditutup'}
         />
         <Stat

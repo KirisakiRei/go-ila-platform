@@ -5,7 +5,6 @@ import { QRCodeSVG } from 'qrcode.react'
 import {
   ArrowLeft,
   Check,
-  Clock,
   Copy,
   ExternalLink,
   KeyRound,
@@ -56,10 +55,10 @@ type TwoFactorSetup = {
   expires_at: string
 }
 
-type SecuritySub = 'email' | 'sandi' | '2fa' | 'sesi' | 'idle'
+type SecuritySub = 'email' | 'sandi' | '2fa'
 
 function parseSecuritySub(raw: string | null): SecuritySub | null {
-  if (raw === 'email' || raw === 'sandi' || raw === '2fa' || raw === 'sesi' || raw === 'idle') {
+  if (raw === 'email' || raw === 'sandi' || raw === '2fa') {
     return raw
   }
   return null
@@ -144,16 +143,7 @@ export default function SecuritySettingsPage() {
           title: 'Autentikasi Dua Faktor (2FA)',
           desc: 'Lapisan verifikasi TOTP 6-digit menggunakan aplikasi Authenticator.',
         },
-        sesi: {
-          title: 'Perangkat yang Masuk',
-          desc: 'Daftar perangkat aktif dan opsi pencabutan sesi jarak jauh.',
-        },
-        idle: {
-          title: 'Keluar Otomatis (Auto Logout)',
-          desc: 'Pengaturan konfirmasi sebelum sesi tidak aktif diakhiri otomatis.',
-        },
       }
-
       return (
         <div className="space-y-4">
           <MobileSubpageHeader
@@ -165,8 +155,6 @@ export default function SecuritySettingsPage() {
           {sub === 'email' && <EmailVerificationCard />}
           {sub === 'sandi' && <PasswordCard />}
           {sub === '2fa' && <TwoFactorCard />}
-          {sub === 'sesi' && <SessionsCard />}
-          {sub === 'idle' && <IdleWarningCard />}
         </div>
       )
     }
@@ -180,7 +168,7 @@ export default function SecuritySettingsPage() {
           backLabel="Kembali ke Pengaturan"
           backTo="/pengaturan"
           title="Keamanan Akun"
-          description="Pilih pengaturan kredensial, autentikasi 2FA, atau sesi perangkat."
+          description="Kata sandi, verifikasi email, dan autentikasi dua faktor (2FA)."
         />
 
         <MobileMenuGroup title="Autentikasi & Kredensial">
@@ -213,21 +201,6 @@ export default function SecuritySettingsPage() {
             onClick={() => setSub('2fa')}
           />
         </MobileMenuGroup>
-
-        <MobileMenuGroup title="Sesi & Perangkat">
-          <MobileMenuRow
-            icon={Smartphone}
-            label="Perangkat yang Masuk"
-            description="Pantau dan cabut akses perangkat tidak dikenal"
-            onClick={() => setSub('sesi')}
-          />
-          <MobileMenuRow
-            icon={Clock}
-            label="Keluar Otomatis (Auto Logout)"
-            description="Peringatan konfirmasi saat tidak aktif"
-            onClick={() => setSub('idle')}
-          />
-        </MobileMenuGroup>
       </div>
     )
   }
@@ -243,17 +216,14 @@ export default function SecuritySettingsPage() {
           Kembali ke Pengaturan
         </Link>
       </div>
-
       <PageHeader
-        title="Keamanan"
-        description="Kata sandi, verifikasi email, autentikasi dua faktor, dan perangkat yang sedang masuk."
+        title="Kata Sandi & Email"
+        description="Kata sandi, verifikasi email, dan autentikasi dua faktor (2FA)."
       />
       <div className="flex flex-col gap-4">
         <EmailVerificationCard />
         <PasswordCard />
         <TwoFactorCard />
-        <SessionsCard />
-        <IdleWarningCard />
       </div>
     </>
   )

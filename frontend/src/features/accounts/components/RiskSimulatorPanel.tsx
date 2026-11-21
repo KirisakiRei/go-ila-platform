@@ -19,12 +19,15 @@ export function RiskSimulatorPanel({
   riskMode,
   riskPercent,
   lotSize,
+  frameless = false,
 }: {
   accountId: string
   defaultEquity: number
   riskMode: RiskMode
   riskPercent: number
   lotSize: number
+  /** Tanpa bingkai & judul tambahan saat dirender di dalam Modal. */
+  frameless?: boolean
 }) {
   const { data: catalog } = usePairCatalog()
   const simulasi = useRiskSimulation()
@@ -66,11 +69,13 @@ export function RiskSimulatorPanel({
   const siap = Boolean(symbol) && Number(entry) > 0 && Number(stop) > 0
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-secondary/20 p-3.5">
-      <div className="flex items-center gap-2">
-        <Calculator className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-        <p className="text-[12.5px] font-semibold text-foreground">Simulasi Risiko</p>
-      </div>
+    <div className={frameless ? 'space-y-3' : 'space-y-3 rounded-xl border border-border bg-secondary/20 p-3.5'}>
+      {!frameless && (
+        <div className="flex items-center gap-2">
+          <Calculator className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <p className="text-[12.5px] font-semibold text-foreground">Simulasi Risiko</p>
+        </div>
+      )}
 
       <p className="text-[11.5px] leading-relaxed text-muted-foreground">
         Masukkan rencana entry dan stop loss. Hasilnya menunjukkan lot yang dipakai, nominal yang

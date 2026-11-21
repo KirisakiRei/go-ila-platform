@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   BarChart3,
   Bot,
-  ChevronDown,
   PanelRightClose,
   PanelRightOpen,
   Settings,
@@ -24,7 +23,14 @@ import {
   Section,
   Skeleton,
 } from '@/components/ui'
-import { usePositions, useSignals, useStrategies, useSubscriptions, useTimeframeSwitchMatrix } from '@/lib/queries'
+import {
+  usePositions,
+  useSignals,
+  useStrategies,
+  useStrategySwitchMatrix,
+  useSubscriptions,
+  useTimeframeSwitchMatrix,
+} from '@/lib/queries'
 import { formatDateTime, formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import { cn } from '@/lib/utils'
@@ -36,7 +42,14 @@ import {
   isRadarProgressSignal,
 } from '@/features/signals/lib/outcome'
 import type { Signal } from '@/types/api'
-import { setTimeframeDipantau, mapSignalsToSlots, pilihSlotAwal, ringkasanSlot } from '@/features/signals/lib/signal-slots'
+import {
+  setTimeframeDipantau,
+  mapSignalsToSlots,
+  pilihSlotAwal,
+  ringkasanSlot,
+  timeframeSlotDipantau,
+  type TimeframeSlot,
+} from '@/features/signals/lib/signal-slots'
 import { slotPalingDekat, stageOf, type SlotStage } from '@/features/signals/lib/slot-stage'
 import { CallEntryAlertBanner } from '@/features/signals/components/CallEntryAlertBanner'
 import { CycleSelectorStrip } from '@/features/signals/components/CycleSelectorStrip'
@@ -188,7 +201,8 @@ export default function SignalsPage() {
     return signalsRiwayat.slice(start, start + historyPerPage)
   }, [signalsRiwayat, historyPage])
 
-  const handleSelectPair = (symbol: string) => {
+  const handleSelectPair = (symbol: string, strategy?: 'ila-2.0' | 'ila-3.0') => {
+    if (strategy) setActiveStrategyFilter(strategy)
     setSelectedSlotKey(null)
     setSnapshotSignal(null)
     setHistoryPage(1)
@@ -749,85 +763,26 @@ export default function SignalsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {allPairs.map((symbol) => {
                 const pairSigs = cleanSignals.filter((s) => s.symbol.toUpperCase() === symbol)
                 const pairSetupCount = pairSigs.filter((s) => !isRadarProgressSignal(s)).length
                 const pairPos = (positions ?? []).filter((p) => p.symbol.toUpperCase() === symbol)
-
-                // Slot per metode menggantikan `find()` yang dulu mengambil satu
-                // baris acak: tiap pasangan timeframe bergerak sendiri-sendiri,
-                // jadi semuanya harus terlihat, bukan diwakili satu saja.
-                const slotIla2 = mapSignalsToSlots(
-                  pairSigs.filter((s) => s.strategy_version === 'ila-2.0'),
-                  'ila-2.0',
-                )
-                const ringkasIla2 = ringkasanSlot(slotIla2)
-                const slotIla3 = mapSignalsToSlots(
-                  pairSigs.filter((s) => s.strategy_version === 'ila-3.0'),
-                  'ila-3.0',
-                )
-                const ringkasIla3 = ringkasanSlot(slotIla3)
-
                 const hasActiveSub = (subscriptions ?? []).some(
                   (sub) => sub.symbol.toUpperCase() === symbol && sub.is_active,
                 )
 
                 return (
-                  <Card
+                  <PairOverviewCard
                     key={symbol}
-                    className="flex flex-col justify-between overflow-hidden border-border bg-card transition-all hover:border-zinc-400 hover:shadow-sm"
-                  >
-                    <CardHeader className="border-b border-border/80 pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs">
-                            {symbol.slice(0, 3)}
-                          </span>
-                          <div>
-                            <CardTitle className="text-base font-bold tracking-tight">{symbol}</CardTitle>
-                            <p className="text-[11px] text-muted-foreground">
-                              {hasActiveSub ? 'Dipantau aktif' : 'Riwayat arsip'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {hasActiveSub && (
-                            <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Aktif dipantau" />
-                          )}
-                          <Badge variant="outline" className="text-[10px]">
-                            {pairSetupCount} Setup
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="space-y-3 pt-3.5">
-                      {/* Slot per metode: semua pasangan timeframe tampil sekaligus. */}
-                      <MetodeSlotGrid strategy="ila-2.0" slots={slotIla2} ringkas={ringkasIla2} />
-
-                      {adaIla3 && (
-                        <MetodeSlotGrid strategy="ila-3.0" slots={slotIla3} ringkas={ringkasIla3} />
-                      )}
-
-                      <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <BarChart3 className="h-3.5 w-3.5" />
-                          {pairPos.length} Eksekusi Order
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-xs font-semibold hover:text-foreground"
-                          onClick={() => handleSelectPair(symbol)}
-                        >
-                          Rincian
-                          <ArrowUpRight className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    symbol={symbol}
+                    pairSignals={pairSigs}
+                    setupCount={pairSetupCount}
+                    orderCount={pairPos.length}
+                    hasActiveSub={hasActiveSub}
+                    adaIla3={adaIla3}
+                    onOpenDetail={(strat) => handleSelectPair(symbol, strat)}
+                  />
                 )
               })}
             </div>
@@ -838,19 +793,197 @@ export default function SignalsPage() {
   )
 }
 
-/**
- * SlotCell menampilkan satu pasangan timeframe pada kartu overview.
- *
- * Angka Entry/SL/TP sengaja HANYA muncul saat slot benar-benar siap entry.
- * Baris radar selalu membawa harga 0 sebelum setup terbentuk, dan menampilkan
- * "BUY @ 0,0000" membuat pengguna membaca angka yang tidak nyata.
- */
-function SlotCell({
+type OverviewMethodTab = {
+  strategy: 'ila-2.0' | 'ila-3.0'
+  slots: TimeframeSlot[]
+  ringkas: ReturnType<typeof ringkasanSlot>
+}
+
+function PairOverviewCard({
+  symbol,
+  pairSignals,
+  setupCount,
+  orderCount,
+  hasActiveSub,
+  adaIla3,
+  onOpenDetail,
+}: {
+  symbol: string
+  pairSignals: Signal[]
+  setupCount: number
+  orderCount: number
+  hasActiveSub: boolean
+  adaIla3: boolean
+  onOpenDetail: (strategy?: 'ila-2.0' | 'ila-3.0') => void
+}) {
+  const { data: stratMatrix, isLoading: loadingStrat } = useStrategySwitchMatrix(symbol)
+  const { data: tfMatrix, isLoading: loadingTf } = useTimeframeSwitchMatrix(symbol)
+
+  const metodeTampil = useMemo<OverviewMethodTab[]>(() => {
+    const kandidat: Array<'ila-2.0' | 'ila-3.0'> = adaIla3 ? ['ila-2.0', 'ila-3.0'] : ['ila-2.0']
+    const hasAccountConfig = Boolean(stratMatrix && stratMatrix.accounts.length > 0)
+    const hasil: OverviewMethodTab[] = []
+
+    for (const strategy of kandidat) {
+      // Bila akun sudah terkonfigurasi, metode hanya tampil jika aktif di minimal 1 akun.
+      if (hasAccountConfig) {
+        const nyala = stratMatrix!.accounts.some((a) => Boolean(a.strategies[strategy]))
+        if (!nyala) continue
+      }
+
+      const semuaSlot = mapSignalsToSlots(
+        pairSignals.filter((s) => s.strategy_version === strategy),
+        strategy,
+      )
+      const aktifSet = setTimeframeDipantau(tfMatrix, strategy)
+      const slotDipantau =
+        aktifSet !== null
+          ? semuaSlot.filter((slot) => timeframeSlotDipantau(aktifSet, slot))
+          : semuaSlot
+
+      // Jika semua cycle metode ini dimatikan, sembunyikan metode dari kartu.
+      if (slotDipantau.length === 0) continue
+
+      hasil.push({
+        strategy,
+        slots: slotDipantau,
+        ringkas: ringkasanSlot(slotDipantau),
+      })
+    }
+
+    return hasil
+  }, [adaIla3, pairSignals, stratMatrix, tfMatrix])
+
+  const [tabPilihan, setTabPilihan] = useState<'ila-2.0' | 'ila-3.0'>('ila-2.0')
+  const tabAktif =
+    metodeTampil.find((m) => m.strategy === tabPilihan) ?? metodeTampil[0] ?? null
+  const terdekat = tabAktif ? slotPalingDekat(tabAktif.slots, tabAktif.strategy) : null
+
+  return (
+    <Card className="flex flex-col overflow-hidden border-border bg-card transition-all hover:border-zinc-400 hover:shadow-sm">
+      <CardHeader className="border-b border-border/80 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background font-bold text-xs">
+              {symbol.slice(0, 3)}
+            </span>
+            <div>
+              <CardTitle className="text-base font-bold tracking-tight">{symbol}</CardTitle>
+              <p className="text-[11px] text-muted-foreground">
+                {hasActiveSub ? 'Dipantau aktif' : 'Riwayat arsip'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {hasActiveSub && (
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Aktif dipantau" />
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              {setupCount} Setup
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-3 pt-3.5">
+        {loadingStrat || loadingTf ? (
+          <Skeleton className="h-24 w-full rounded-lg" />
+        ) : !tabAktif ? (
+          <div className="rounded-lg border border-dashed border-border/80 bg-secondary/20 px-3 py-5 text-center text-xs text-muted-foreground">
+            Belum ada metode atau time cycle yang dipantau.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {/* Mini-tab di dalam kartu (hanya muncul bila kedua metode aktif & punya cycle dipantau) */}
+            {metodeTampil.length > 1 ? (
+              <div
+                role="tablist"
+                aria-label={`Metode aktif ${symbol}`}
+                className="grid grid-cols-2 gap-1 rounded-lg bg-secondary/60 p-1"
+              >
+                {metodeTampil.map((m) => {
+                  const selected = m.strategy === tabAktif.strategy
+                  return (
+                    <button
+                      key={m.strategy}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setTabPilihan(m.strategy)}
+                      className={cn(
+                        'flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold transition-all',
+                        selected
+                          ? 'bg-card text-foreground shadow-xs'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <span>{m.strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}</span>
+                      {m.ringkas.siap > 0 ? (
+                        <span className="rounded bg-emerald-600 px-1 py-0.5 font-mono text-[9px] font-bold leading-none text-white">
+                          {m.ringkas.siap}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {m.slots.length}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-foreground">
+                  {tabAktif.strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
+                </span>
+                <span className="text-[10.5px] tabular-nums text-muted-foreground">
+                  {tabAktif.ringkas.siap > 0
+                    ? `${tabAktif.ringkas.siap} ready`
+                    : `${tabAktif.slots.length} cycle dipantau`}
+                </span>
+              </div>
+            )}
+
+            {/* Daftar baris khusus cycle yang diaktifkan pantauannya */}
+            <div className="space-y-1.5">
+              {tabAktif.slots.map((slot) => (
+                <CycleOverviewRow
+                  key={slot.key}
+                  slot={slot}
+                  stage={stageOf(tabAktif.strategy, slot.latestSignal?.status ?? '')}
+                  tersorot={slot.key === terdekat}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-border/50 pt-2.5 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <BarChart3 className="h-3.5 w-3.5" />
+            {orderCount} Eksekusi Order
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs font-semibold hover:text-foreground"
+            onClick={() => onOpenDetail(tabAktif?.strategy)}
+          >
+            Rincian
+            <ArrowUpRight className="h-3 w-3" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CycleOverviewRow({
   slot,
   stage,
   tersorot,
 }: {
-  slot: ReturnType<typeof mapSignalsToSlots>[number]
+  slot: TimeframeSlot
   stage: SlotStage
   tersorot: boolean
 }) {
@@ -861,113 +994,57 @@ function SlotCell({
   return (
     <div
       className={cn(
-        'flex flex-col gap-0.5 rounded-md border px-2 py-1.5',
-        // Aksen dipakai HANYA untuk menandai slot yang paling dekat entry.
-        // Tidak ada simbol panah atau teks tambahan: cukup bobot garis.
-        tersorot ? 'border-foreground/60 bg-secondary' : 'border-border/60 bg-secondary/30',
-        stage.ready && 'border-foreground bg-secondary',
+        'flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-xs',
+        stage.ready
+          ? 'border-emerald-500/60 bg-emerald-500/[0.04]'
+          : tersorot
+            ? 'border-foreground/40 bg-secondary/60'
+            : 'border-border/60 bg-secondary/25',
       )}
     >
-      <span className="font-mono text-[10px] font-semibold leading-tight text-muted-foreground">
-        {slot.label}
-      </span>
-
-      <span
-        className={cn(
-          'inline-flex items-center gap-0.5 text-[11px] font-bold leading-tight',
-          punyaArah ? (arah === 'BUY' ? 'text-emerald-600' : 'text-rose-600') : 'text-muted-foreground',
-        )}
-      >
-        {arah === 'BUY' && <TrendingUp className="h-2.5 w-2.5 shrink-0" />}
-        {arah === 'SELL' && <TrendingDown className="h-2.5 w-2.5 shrink-0" />}
-        {punyaArah ? arah : '—'}
-      </span>
-
-      <span
-        className={cn(
-          'truncate text-[10px] leading-tight',
-          stage.ready ? 'font-semibold text-foreground' : 'text-muted-foreground',
-        )}
-        title={stage.label}
-      >
-        {stage.label}
-      </span>
-
-      {stage.ready && signal && (
-        <span className="truncate text-[10px] tabular-nums text-muted-foreground" title="Entry">
-          @ {formatPrice(signal.entry_price, priceDigits(signal.symbol, signal.entry_price))}
-        </span>
-      )}
-    </div>
-  )
-}
-
-/**
- * MetodeSlotGrid menampilkan seluruh slot satu metode sebagai grid.
- *
- * Semua slot tampil sekaligus, bukan bergantian: tiap pasangan timeframe
- * bergerak sendiri-sendiri, jadi menyembunyikan sebagian hanya menghilangkan
- * informasi yang memang tidak saling menggantikan.
- */
-function MetodeSlotGrid({
-  strategy,
-  slots,
-  ringkas,
-}: {
-  strategy: 'ila-2.0' | 'ila-3.0'
-  slots: ReturnType<typeof mapSignalsToSlots>
-  ringkas: { total: number; siap: number; terisi: number }
-}) {
-  const terdekat = slotPalingDekat(slots, strategy)
-  // ILA 3.0 dilipat bawaan: delapan slot sekaligus membuat kartu overview
-  // terlalu tinggi dan mendorong pair lain keluar layar.
-  const [terbuka, setTerbuka] = useState(strategy === 'ila-2.0')
-
-  return (
-    <div className="rounded-lg border border-border/70 bg-secondary/40 p-2.5">
-      <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="font-semibold text-foreground">
-            {strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
-          </span>
-          {strategy === 'ila-3.0' && (
-            <Badge variant="muted" className="text-[9px]">
-              Plus
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10.5px] tabular-nums text-muted-foreground">
-            {ringkas.siap > 0 ? `${ringkas.siap} ready` : `${ringkas.terisi} slot`}
-          </span>
-          {strategy === 'ila-3.0' && (
-            <button
-              type="button"
-              onClick={() => setTerbuka((v) => !v)}
-              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              aria-expanded={terbuka}
-              aria-label={terbuka ? 'Tutup slot ILA 3.0' : 'Buka slot ILA 3.0'}
-            >
-              {terbuka ? 'Tutup' : 'Buka'}
-              <ChevronDown className={cn('h-3 w-3 transition-transform', terbuka && 'rotate-180')} />
-            </button>
-          )}
-        </div>
+      <div className="min-w-0">
+        <p className="truncate text-[11.5px] font-semibold text-foreground leading-tight">
+          {slot.cycle ?? slot.label}
+        </p>
+        <p className="font-mono text-[10px] text-muted-foreground leading-tight mt-0.5">
+          {slot.label}
+        </p>
       </div>
 
-      {terbuka && (
-        <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-          {slots.map((slot) => (
-            <SlotCell
-              key={slot.key}
-              slot={slot}
-              stage={stageOf(strategy, slot.latestSignal?.status ?? '')}
-              tersorot={slot.key === terdekat}
-            />
-          ))}
+      <div className="shrink-0 text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          {punyaArah && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-0.5 font-mono text-[10.5px] font-bold',
+                arah === 'BUY'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-rose-600 dark:text-rose-400',
+              )}
+            >
+              {arah === 'BUY' ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : (
+                <TrendingDown className="h-3 w-3" />
+              )}
+              {arah}
+            </span>
+          )}
+          <span
+            className={cn(
+              'text-[10.5px]',
+              stage.ready ? 'font-bold text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {stage.label}
+          </span>
         </div>
-      )}
+        {stage.ready && signal && signal.entry_price > 0 && (
+          <p className="font-mono text-[10px] tabular-nums text-muted-foreground mt-0.5">
+            @ {formatPrice(signal.entry_price, priceDigits(signal.symbol, signal.entry_price))}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
