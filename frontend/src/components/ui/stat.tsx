@@ -17,12 +17,21 @@ export function Stat({
   const showHint = hint && hint !== value
 
   return (
-    <div className={cn('flex min-w-0 flex-col gap-1 border border-border p-3.5 sm:p-4', className)}>
-      <dt className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-0.5 rounded-xl border border-border bg-card p-3 sm:gap-1 sm:p-4',
+        className,
+      )}
+    >
+      <dt className="truncate text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[11px]">
         {label}
       </dt>
-      <dd className="truncate text-lg font-semibold tabular leading-none sm:text-xl">{value}</dd>
-      {showHint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      <dd className="truncate font-mono text-base font-semibold tabular leading-tight sm:text-xl">
+        {value}
+      </dd>
+      {showHint && (
+        <p className="line-clamp-1 text-[10.5px] text-muted-foreground sm:text-[11px]">{hint}</p>
+      )}
     </div>
   )
 }
@@ -35,5 +44,5 @@ export function StatGrid({
   children: React.ReactNode
   className?: string
 }) {
-  return <dl className={cn('grid grid-cols-2 gap-3 lg:grid-cols-4', className)}>{children}</dl>
+  return <dl className={cn('grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4', className)}>{children}</dl>
 }

@@ -312,10 +312,10 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 px-4 py-4 pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-6 lg:pb-6">
-          <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-4">
+        <main className="min-w-0 flex-1 px-3.5 py-3.5 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:px-6 lg:py-6 lg:pb-6">
+          <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-3.5 lg:gap-4">
             <UserBanners />
-            <div className="flex min-w-0 flex-col gap-6">{children}</div>
+            <div className="flex min-w-0 flex-col gap-4 lg:gap-6">{children}</div>
           </div>
         </main>
       </div>

@@ -451,7 +451,7 @@ export default function StrategiesPage() {
                   type="button"
                   onClick={() => setInfoMetode(s.version)}
                   aria-haspopup="dialog"
-                  className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-zinc-400 hover:shadow-sm"
+                  className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-3.5 text-left transition-colors duration-150 hover:border-foreground/30 active:scale-[0.98] sm:gap-2 sm:p-4"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-[14px] font-semibold">{info?.judul ?? s.name}</h3>
@@ -498,7 +498,7 @@ export default function StrategiesPage() {
                 return (
                   <li
                     key={sub.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3 text-[13px] transition-colors hover:bg-secondary/30"
+                    className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 text-[13px] transition-colors hover:bg-secondary/30 sm:gap-3 sm:px-4 sm:py-3"
                   >
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
                       <div className="min-w-0">

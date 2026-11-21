@@ -231,19 +231,19 @@ export default function AccountDetailPage() {
         </Link>
 
         {/* Kartu Ringkasan Akun Mobile */}
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
-          <div className="space-y-2">
+        <div className="rounded-xl border border-border bg-card p-3.5">
+          <div className="space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <StatusDot state={status} label={statusText} />
-                <h1 className="truncate text-base font-bold text-foreground">{account.label}</h1>
+                <h1 className="truncate text-[15px] font-bold text-foreground">{account.label}</h1>
               </div>
               <Badge variant={account.broker_type === 'ctrader' ? 'solid' : 'outline'} className="shrink-0 text-[10px]">
                 {account.broker_type === 'ctrader' ? 'cTrader OAuth' : 'Match-Trader'}
               </Badge>
             </div>
 
-            <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               Login: <strong className="text-foreground">{account.external_account_id || 'Belum terbaca'}</strong> ·{' '}
               {statusText}
             </p>
@@ -267,45 +267,45 @@ export default function AccountDetailPage() {
           </div>
 
           {account.last_error && (
-            <Alert variant="destructive" className="mt-3 text-xs">
+            <Alert variant="destructive" className="mt-2.5 text-xs">
               {account.last_error}
             </Alert>
           )}
 
-          <div className="mt-3.5 grid grid-cols-2 gap-2.5 border-t border-border pt-3.5">
-            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border pt-3">
+            <div className="min-w-0">
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Balance
-              </p>
-              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+              </dt>
+              <dd className="mt-0.5 truncate font-mono text-[13px] font-bold tabular-nums text-foreground">
                 {formatMoney(account.balance)}
-              </p>
+              </dd>
             </div>
-            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="min-w-0">
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Equity
-              </p>
-              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+              </dt>
+              <dd className="mt-0.5 truncate font-mono text-[13px] font-bold tabular-nums text-foreground">
                 {formatMoney(account.equity)}
-              </p>
+              </dd>
             </div>
-            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="min-w-0">
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Free Margin
-              </p>
-              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+              </dt>
+              <dd className="mt-0.5 truncate font-mono text-[13px] font-bold tabular-nums text-foreground">
                 {formatMoney(account.free_margin)}
-              </p>
+              </dd>
             </div>
-            <div className="min-w-0 rounded-xl border border-border bg-secondary/20 p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="min-w-0">
+              <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Risiko / Trade
-              </p>
-              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-foreground">
+              </dt>
+              <dd className="mt-0.5 truncate font-mono text-[13px] font-bold tabular-nums text-foreground">
                 {riskLabel}
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
 
         <MobileMenuGroup title="Pengaturan & Operasional">

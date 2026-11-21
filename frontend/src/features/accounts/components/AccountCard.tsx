@@ -45,14 +45,14 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
       : 'Belum tersambung'
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs sm:rounded-xl">
-      <header className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-4 py-3">
+    <article className="overflow-hidden rounded-xl border border-border bg-card">
+      <header className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-3.5 py-2.5 sm:px-4 sm:py-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
             <StatusDot state={status} label={statusText} />
-            <h3 className="truncate text-[14px] font-semibold">{account.label}</h3>
+            <h3 className="truncate text-[13.5px] font-semibold sm:text-[14px]">{account.label}</h3>
           </div>
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-[11.5px] text-muted-foreground sm:text-[12px]">
             {account.broker_type} · {account.external_account_id || 'nomor belum terbaca'} ·{' '}
             {statusText}
           </p>
@@ -66,8 +66,8 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 px-4 py-3">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:max-w-xl sm:grid-cols-4 sm:gap-x-6">
+      <div className="flex flex-col gap-2.5 px-3.5 py-3 sm:gap-3 sm:px-4">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:max-w-xl sm:grid-cols-4 sm:gap-x-6 sm:gap-y-3">
           <Field label="Balance" value={formatMoney(account.balance)} />
           <Field label="Equity" value={formatMoney(account.equity)} />
           <Field label="Free Margin" value={formatMoney(account.free_margin)} />
@@ -87,19 +87,19 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
           </p>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5 sm:pt-3">
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:gap-2">
             <Link
               to={`/akun/${account.id}`}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-foreground px-3 py-2 text-xs font-semibold text-background transition-colors hover:bg-foreground/90 sm:w-auto sm:py-1.5"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-colors duration-150 hover:bg-foreground/90 active:scale-[0.98] sm:w-auto"
             >
               <Settings className="h-3.5 w-3.5" />
-              <span>Detail & Pengaturan</span>
+              <span>Detail &amp; Pengaturan</span>
               <ArrowRight className="h-3 w-3" />
             </Link>
 
             {account.broker_type === 'matchtrader' && (
-              <Button size="sm" variant="outline" onClick={() => setGantiToken(true)}>
+              <Button size="sm" variant="outline" className="h-8 flex-1 text-xs sm:flex-none" onClick={() => setGantiToken(true)}>
                 Ganti token
               </Button>
             )}
@@ -107,6 +107,7 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
             <Button
               size="sm"
               variant="outline"
+              className="h-8 flex-1 text-xs sm:flex-none"
               isLoading={update.isPending}
               onClick={() =>
                 update.mutate({ id: account.id, payload: { is_active: !account.is_active } })
@@ -114,12 +115,21 @@ export function AccountCard({ account }: { account: BrokerAccount }) {
             >
               {account.is_active ? 'Nonaktifkan' : 'Aktifkan'}
             </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 sm:hidden"
+              onClick={() => setKonfirmasiHapus(true)}
+            >
+              Hapus
+            </Button>
           </div>
 
           <Button
             size="sm"
             variant="ghost"
-            className="text-destructive hover:bg-destructive/10"
+            className="hidden text-destructive hover:bg-destructive/10 sm:inline-flex"
             onClick={() => setKonfirmasiHapus(true)}
           >
             Hapus Akun

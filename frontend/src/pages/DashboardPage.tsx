@@ -6,18 +6,12 @@ import { Button, Card, CardContent, EmptyState, PageHeader, Skeleton } from '@/c
 import { usePositions, useSignals, useSystemStatus } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { useAuthContext } from '@/features/auth/hooks/use-auth'
 import { PageHeaderActions } from './components/PageHeaderActions'
 import { OnboardingCard, OnboardingModal } from '@/features/onboarding'
 import { AccountStatusCard } from './components/AccountStatusCard'
 import { DashboardGreetingBar } from './components/DashboardGreetingBar'
-import { DashboardRadarHero } from './components/DashboardRadarHero'
-import { DashboardQuickActions } from './components/DashboardQuickActions'
-import { KondisiHariIniRingkas } from './components/KondisiHariIni'
 import { DashboardOnboardingWidget } from './components/DashboardOnboardingWidget'
-import { MobileMoreDrawer } from '@/components/layout/MobileMoreDrawer'
 import { POSISI_LIMIT_DASHBOARD } from '@/features/signals/lib/kondisi-pasar'
-import { useInviteOnly } from '@/lib/use-invite-only'
 import {
   DashboardEngineStatusPills,
   DashboardKpiStrip,
@@ -81,31 +75,31 @@ function ActionableSignalBanner() {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.22, ease: EASE_OUT }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400">
-            <BellRing className="h-4 w-4" />
+      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/[0.08] px-3.5 py-2.5 sm:px-4 sm:py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 sm:h-8 sm:w-8">
+            <BellRing className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-bold text-foreground">
-              Setup Siap Entry: {top.symbol} {top.direction} ·{' '}
+            <p className="truncate text-xs font-bold text-foreground">
+              Siap Entry: {top.symbol} {top.direction} ·{' '}
               <span className="font-mono">
                 {top.strategy_version === 'ila-2.0'
                   ? `${cycle} (${isSell ? '-CISD' : '+CISD'})`
                   : `ILA 3.0 (${top.htf} → ${top.ltf})`}
               </span>
             </p>
-            <p className="truncate text-[11.5px] text-muted-foreground">
+            <p className="truncate text-[11px] text-muted-foreground sm:text-[11.5px]">
               {actionable.length > 1
-                ? `${actionable.length} sinyal siap entry aktif sekarang. Buka halaman Signals untuk detail & konfirmasi.`
+                ? `${actionable.length} sinyal siap entry aktif sekarang.`
                 : top.summary || 'Konfirmasi LTF CISD terpenuhi dalam Time Cycle aktif.'}
             </p>
           </div>
         </div>
-        <Button asChild size="sm" className="h-8 shrink-0 gap-1.5 text-xs active:scale-[0.97]">
+        <Button asChild size="sm" className="h-7 shrink-0 gap-1 px-2.5 text-[11px] active:scale-[0.97] sm:h-8 sm:px-3 sm:text-xs">
           <Link to={`/sinyal?pair=${encodeURIComponent(top.symbol)}`}>
-            Buka Sinyal
-            <ArrowRight className="h-3.5 w-3.5" />
+            Buka
+            <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           </Link>
         </Button>
       </div>
@@ -121,32 +115,32 @@ function RecentPositionsCard() {
 
   return (
     <Card className="flex h-full flex-col border-border/80 bg-card/95">
-      <CardContent className="flex flex-1 flex-col gap-3.5 p-5">
+      <CardContent className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-3.5 sm:p-5">
         <div className="flex items-center justify-between gap-2">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-bold tracking-tight text-foreground">Posisi Terkini</h2>
-            <p className="text-[11.5px] text-muted-foreground">
+            <p className="truncate text-[11px] text-muted-foreground sm:text-[11.5px]">
               {status
-                ? `Waktu server ${formatDateTime(status.server_time)}`
+                ? `Server ${formatDateTime(status.server_time)}`
                 : 'Memuat waktu server…'}
             </p>
           </div>
           <Link
             to="/posisi"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-foreground transition-colors hover:text-muted-foreground"
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-foreground transition-colors hover:text-muted-foreground"
           >
-            Semua Posisi
+            Semua
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
         {isLoading ? (
-          <Skeleton className="h-44 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
         ) : recent.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               title="Belum ada posisi trading"
-              description="Posisi akan muncul otomatis setelah sinyal dieksekusi pada akun broker Anda."
+              description="Posisi muncul otomatis setelah sinyal dieksekusi di akun broker."
               action={
                 <Button asChild variant="outline" size="sm" className="active:scale-[0.97]">
                   <Link to="/sinyal">Buka Signals</Link>
@@ -172,13 +166,13 @@ function RecentPositionsCard() {
                 <li key={position.id}>
                   <Link
                     to="/posisi"
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5 text-[12.5px] transition-colors duration-150 hover:bg-secondary/35"
+                    className="flex items-center justify-between gap-2 px-3 py-2.5 text-xs transition-colors duration-150 hover:bg-secondary/35 sm:gap-3 sm:px-3.5 sm:text-[12.5px]"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
                       <span className="font-semibold text-foreground">{position.symbol}</span>
                       <span
                         className={cn(
-                          'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold',
+                          'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-mono text-[9.5px] font-bold sm:text-[10px]',
                           position.direction === 'BUY'
                             ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400'
                             : 'bg-rose-500/12 text-rose-700 dark:text-rose-400',
@@ -191,34 +185,34 @@ function RecentPositionsCard() {
                         )}
                         {position.direction}
                       </span>
-                      <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+                      <span className="hidden rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-block">
                         {position.strategy_version === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
                       </span>
                       <span
                         className={cn(
-                          'rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold',
+                          'rounded px-1.5 py-0.5 font-mono text-[9.5px] font-semibold sm:text-[10px]',
                           badge.className,
                         )}
                       >
                         {badge.label}
                       </span>
                       {position.is_dry_run && (
-                        <span className="rounded border border-border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <span className="rounded border border-border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Demo
                         </span>
                       )}
                     </div>
 
-                    <span className="ml-auto flex items-center gap-2 font-mono tabular-nums">
+                    <span className="shrink-0 text-right font-mono tabular-nums">
                       {position.pnl_known ? (
-                        <>
-                          <span className={cn('font-semibold', pnlTone)}>
+                        <span className="flex flex-col items-end leading-tight sm:flex-row sm:items-center sm:gap-1.5">
+                          <span className={cn('text-xs font-semibold', pnlTone)}>
                             {formatMoney(position.profit_loss)}
                           </span>
-                          <span className={cn('text-[11.5px] font-semibold', pnlTone)}>
+                          <span className={cn('text-[10.5px] font-semibold sm:text-[11.5px]', pnlTone)}>
                             ({formatR(position.outcome_r)})
                           </span>
-                        </>
+                        </span>
                       ) : (
                         <span
                           className="text-muted-foreground"
@@ -240,98 +234,71 @@ function RecentPositionsCard() {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuthContext()
-  const inviteOnly = useInviteOnly()
   const [onboardingOpen, setOnboardingOpen] = useState(false)
-  const [moreDrawerOpen, setMoreDrawerOpen] = useState(false)
 
   return (
     <>
-      {/* ============================================================ */}
-      {/* 1. TAMPILAN MOBILE (< md) & TABLET PORTRAIT (md..lg)         */}
-      {/* ============================================================ */}
-      <div className="flex flex-col gap-4 lg:hidden">
-        <DashboardGreetingBar />
-        <ActionableSignalBanner />
-        <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start">
-          <DashboardRadarHero />
-          <div className="flex flex-col gap-4">
-            <DashboardQuickActions
-              onOpenMore={() => setMoreDrawerOpen(true)}
-              onOpenOnboarding={() => setOnboardingOpen(true)}
-            />
-            <KondisiHariIniRingkas />
-          </div>
+      <div className="flex flex-col gap-3.5 sm:gap-4 lg:gap-5">
+        {/* Header adaptif: greeting ringkas di mobile/tablet, PageHeader lengkap di desktop */}
+        <div className="lg:hidden">
+          <DashboardGreetingBar />
         </div>
-        <PerformanceCurveCard />
-        <div className="hidden md:grid md:grid-cols-2 md:gap-4">
-          <RecentPositionsCard />
-          <BrokerStatusCard />
+        <div className="hidden lg:block">
+          <PageHeader
+            title="Dashboard"
+            description="Ringkasan performa trading, radar Time Cycle terdekat entry, posisi terkini, dan status broker."
+            actions={
+              <div className="flex flex-wrap items-center gap-2.5">
+                <DashboardEngineStatusPills />
+                <PageHeaderActions />
+              </div>
+            }
+          />
         </div>
-        <DashboardOnboardingWidget onOpenOnboarding={() => setOnboardingOpen(true)} />
-      </div>
 
-      {/* ============================================================ */}
-      {/* 2. TAMPILAN DESKTOP & TABLET LANDSCAPE (>= lg) — Bento       */}
-      {/* ============================================================ */}
-      <div className="hidden lg:flex lg:flex-col lg:gap-5">
-        <PageHeader
-          title="Dashboard"
-          description="Ringkasan performa trading, radar Time Cycle terdekat entry, posisi terkini, dan status broker."
-          actions={
-            <div className="flex flex-wrap items-center gap-2.5">
-              <DashboardEngineStatusPills />
-              <PageHeaderActions />
-            </div>
-          }
-        />
-
-        <AccountStatusCard />
-
-        <OnboardingCard />
+        {/* Status Akun & Onboarding (widget tipis di mobile, kartu penuh di desktop) */}
+        <div className="hidden lg:block">
+          <AccountStatusCard />
+        </div>
+        <div className="lg:hidden">
+          <DashboardOnboardingWidget onOpenOnboarding={() => setOnboardingOpen(true)} />
+        </div>
+        <div className="hidden lg:block">
+          <OnboardingCard />
+        </div>
 
         {/* Banner Aksi Cepat — hanya muncul bila ada sinyal READY_TO_ENTRY */}
         <ActionableSignalBanner />
 
-        {/* Baris 1: 4 Kartu KPI */}
+        {/* Baris 1: 4 Kartu KPI (2x2 kompak di HP/tablet, 4x1 di xl) */}
         <DashboardKpiStrip />
 
         {/* Baris 2: Kurva Performa (7) + Radar Terpanas (5) */}
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="lg:col-span-7">
+        <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-12 lg:gap-5">
+          <div className="min-w-0 lg:col-span-7">
             <PerformanceCurveCard />
           </div>
-          <div className="lg:col-span-5">
+          <div className="min-w-0 lg:col-span-5">
             <RadarPriorityCard />
           </div>
         </div>
 
         {/* Baris 3: Posisi Terkini (7) + Akun Broker Aktif (5) */}
-        <div className="grid gap-5 lg:grid-cols-12">
-          <div className="lg:col-span-7">
+        <div className="grid gap-3.5 sm:gap-4 lg:grid-cols-12 lg:gap-5">
+          <div className="min-w-0 lg:col-span-7">
             <RecentPositionsCard />
           </div>
-          <div className="lg:col-span-5">
+          <div className="min-w-0 lg:col-span-5">
             <BrokerStatusCard />
           </div>
         </div>
       </div>
 
-      {/* Modal Onboarding */}
+      {/* Modal Onboarding jika dibuka dari widget mobile */}
       <OnboardingModal
         forceOpen={onboardingOpen}
         onCloseForce={() => setOnboardingOpen(false)}
       />
-
-      {/* Bottom Sheet Drawer */}
-      {user && (
-        <MobileMoreDrawer
-          open={moreDrawerOpen}
-          onClose={() => setMoreDrawerOpen(false)}
-          user={user}
-          inviteOnly={inviteOnly}
-        />
-      )}
     </>
   )
 }

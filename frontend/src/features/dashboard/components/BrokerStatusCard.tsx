@@ -13,7 +13,7 @@ export function BrokerStatusCard() {
 
   return (
     <Card className="flex h-full flex-col border-border/80 bg-card/95">
-      <CardContent className="flex flex-1 flex-col gap-3.5 p-5">
+      <CardContent className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-3.5 sm:p-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold tracking-tight text-foreground">Akun Broker</h2>
@@ -67,7 +67,7 @@ export function BrokerStatusCard() {
                 <Link
                   key={acc.id}
                   to={`/akun/${acc.id}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-secondary/20 p-3 transition-colors duration-150 hover:border-foreground/30 hover:bg-secondary/40 active:scale-[0.98]"
+                  className="flex items-center justify-between gap-2.5 rounded-xl border border-border/80 bg-secondary/20 p-2.5 transition-colors duration-150 hover:border-foreground/30 hover:bg-secondary/40 active:scale-[0.98] sm:gap-3 sm:p-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">

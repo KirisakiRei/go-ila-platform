@@ -185,7 +185,7 @@ export function SignalsMobileView({
             signalPaginasi.setPage(1)
           }}
           className={cn(
-            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-all',
+            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-colors duration-150 active:scale-[0.97]',
             activeTab === 'all'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
@@ -202,7 +202,7 @@ export function SignalsMobileView({
             signalPaginasi.setPage(1)
           }}
           className={cn(
-            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-all',
+            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-colors duration-150 active:scale-[0.97]',
             activeTab === 'ready'
               ? 'bg-card text-emerald-700 shadow-xs dark:text-emerald-400'
               : 'text-muted-foreground hover:text-foreground',
@@ -222,7 +222,7 @@ export function SignalsMobileView({
             signalPaginasi.setPage(1)
           }}
           className={cn(
-            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-all',
+            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-colors duration-150 active:scale-[0.97]',
             activeTab === 'monitoring'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
@@ -239,7 +239,7 @@ export function SignalsMobileView({
             signalPaginasi.setPage(1)
           }}
           className={cn(
-            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-all',
+            'flex min-w-0 flex-col items-center justify-center rounded-lg px-1 py-1.5 text-[10.5px] font-semibold transition-colors duration-150 active:scale-[0.97]',
             activeTab === 'history'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-muted-foreground hover:text-foreground',
@@ -286,18 +286,18 @@ export function SignalsMobileView({
             return (
               <div
                 key={signal.signal_id}
-                className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition-colors hover:border-zinc-400"
+                className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 transition-colors duration-150 hover:border-foreground/30"
               >
                 {/* Header Kartu */}
-                <div className="flex items-start justify-between gap-2 border-b border-border/70 pb-3">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-foreground text-xs font-bold text-background">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-[11px] font-bold text-background">
                       {signal.symbol.slice(0, 3)}
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-sm font-bold tracking-tight text-foreground">
+                        <span className="text-[13px] font-bold tracking-tight text-foreground">
                           {signal.symbol}
                         </span>
                         <TimeframeBadge
@@ -310,9 +310,9 @@ export function SignalsMobileView({
                           ltf={signal.ltf}
                         />
                       </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-muted-foreground">
                         <Badge variant="outline" className="px-1.5 py-0 text-[9.5px]">
-                          {signal.strategy_version}
+                          {signal.strategy_version === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
                         </Badge>
                         {outcome.executedBadge && (
                           <Badge variant="outline" className="px-1.5 py-0 text-[9.5px]">
@@ -332,7 +332,7 @@ export function SignalsMobileView({
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <div
                       className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold',
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold',
                         isBuy
                           ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                           : isSell
@@ -341,16 +341,16 @@ export function SignalsMobileView({
                       )}
                     >
                       {isBuy ? (
-                        <TrendingUp className="h-3.5 w-3.5" />
+                        <TrendingUp className="h-3 w-3" />
                       ) : isSell ? (
-                        <TrendingDown className="h-3.5 w-3.5" />
+                        <TrendingDown className="h-3 w-3" />
                       ) : null}
                       <span>{signal.direction}</span>
                     </div>
 
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold',
+                        'inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9.5px] font-semibold',
                         OUTCOME_BADGE_CLASS[outcome.tone],
                       )}
                     >
@@ -359,11 +359,11 @@ export function SignalsMobileView({
                   </div>
                 </div>
 
-                {/* 2x2 Grid Metric di layar sempit (4 kolom di >= sm) bebas tabrakan */}
+                {/* Metrik harga kompak tanpa nested card */}
                 {!isRadarRow && (
-                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/80 bg-secondary/40 p-2.5 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border/60 pt-2 sm:grid-cols-4">
                     <div className="min-w-0">
-                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span className="block text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Entry
                       </span>
                       <span className="block truncate font-mono text-xs font-bold tabular-nums text-foreground">
@@ -374,7 +374,7 @@ export function SignalsMobileView({
                     </div>
 
                     <div className="min-w-0 text-right sm:text-left">
-                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span className="block text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
                         R:R
                       </span>
                       <span className="block truncate font-mono text-xs font-bold tabular-nums text-foreground">
@@ -385,7 +385,7 @@ export function SignalsMobileView({
                     </div>
 
                     <div className="min-w-0">
-                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span className="block text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Stop Loss
                       </span>
                       <span className="block truncate font-mono text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-400">
@@ -394,7 +394,7 @@ export function SignalsMobileView({
                     </div>
 
                     <div className="min-w-0 text-right">
-                      <span className="block text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span className="block text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Take Profit
                       </span>
                       <span className="block truncate font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -407,7 +407,7 @@ export function SignalsMobileView({
                 )}
 
                 {outcome.executedBadge && outcome.subtext && (
-                  <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-1.5 text-xs">
+                  <div className="flex items-center justify-between border-t border-border/60 pt-1.5 text-xs">
                     <span className="text-[11px] text-muted-foreground">PnL Eksekusi</span>
                     <span
                       className={cn(
@@ -551,7 +551,7 @@ export function SignalsMobileView({
             type="button"
             onClick={onBackToPairs}
             className={cn(
-              'flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95',
+              'flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 active:scale-[0.97]',
               !activePair
                 ? 'bg-foreground text-background shadow-xs'
                 : 'border border-border bg-card text-muted-foreground hover:text-foreground',
@@ -585,7 +585,7 @@ export function SignalsMobileView({
                   onSelectPair(pair)
                 }}
                 className={cn(
-                  'flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95',
+                  'flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 active:scale-[0.97]',
                   isPairActive
                     ? 'bg-foreground text-background shadow-xs'
                     : 'border border-border bg-card text-muted-foreground hover:text-foreground',
@@ -785,16 +785,26 @@ export function SignalsMobileView({
 
                         <div className="shrink-0 text-right">
                           <Badge
-                            variant={pos.status.startsWith('CLOSED_TP') ? 'solid' : 'outline'}
+                            variant={pos.status === 'CLOSED_TP' ? 'solid' : 'outline'}
                             className="text-[9.5px]"
                           >
-                            {pos.status}
+                            {pos.status === 'CLOSED_TP'
+                              ? 'TP'
+                              : pos.status === 'CLOSED_SL'
+                                ? 'SL'
+                                : pos.status === 'CLOSED_MANUAL'
+                                  ? 'MANUAL'
+                                  : pos.status}
                           </Badge>
                           {pos.pnl_known && (
                             <p
                               className={cn(
-                                'font-mono text-[11px] font-bold tabular-nums',
-                                pos.profit_loss >= 0 ? 'text-emerald-600' : 'text-rose-600',
+                                'mt-0.5 font-mono text-[11px] font-bold tabular-nums',
+                                pos.profit_loss > 0
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : pos.profit_loss < 0
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-foreground',
                               )}
                             >
                               {formatMoney(pos.profit_loss)}

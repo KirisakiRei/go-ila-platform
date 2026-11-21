@@ -81,10 +81,8 @@ export function CycleSelectorStrip({
       role="group"
       aria-label={strategy === 'ila-2.0' ? 'Pilih Time Cycle' : 'Pilih Siklus Timeframe'}
       className={cn(
-        'grid gap-2.5',
-        strategy === 'ila-2.0'
-          ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
-          : 'grid-cols-2 sm:grid-cols-4',
+        'flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none sm:grid sm:gap-2.5 sm:overflow-visible sm:pb-0',
+        strategy === 'ila-2.0' ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4',
       )}
     >
       {slots.map((slot) => {
@@ -102,7 +100,7 @@ export function CycleSelectorStrip({
             aria-pressed={isActive}
             onClick={() => onSelectSlot(slot.key)}
             className={cn(
-              'group relative flex flex-col justify-between gap-2 rounded-xl border p-3 text-left transition-all',
+              'group relative flex min-w-[146px] shrink-0 snap-start flex-col justify-between gap-1.5 rounded-xl border p-2.5 text-left transition-colors duration-150 active:scale-[0.97] sm:min-w-0 sm:gap-2 sm:p-3',
               isActive
                 ? 'border-foreground bg-card ring-1 ring-foreground shadow-sm'
                 : dipantau

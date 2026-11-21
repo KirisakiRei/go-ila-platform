@@ -89,20 +89,20 @@ export function PerformanceCurveCard() {
 
   return (
     <Card className="flex h-full flex-col border-border/80 bg-card/95">
-      <CardContent className="flex flex-1 flex-col gap-3.5 p-4 sm:gap-4 sm:p-5">
+      <CardContent className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-4 sm:p-5">
         {/* Header & Controls */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-3">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold tracking-tight text-foreground">Kurva Performa</h2>
               <span className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-muted-foreground">
                 {summary.count} trade
               </span>
             </div>
-            <div className="mt-1 flex flex-wrap items-baseline gap-2.5">
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span
                 className={cn(
-                  'font-mono text-2xl font-bold tabular-nums tracking-tight',
+                  'font-mono text-xl font-bold tabular-nums tracking-tight sm:text-2xl',
                   summary.count === 0
                     ? 'text-muted-foreground'
                     : isPositive

@@ -27,7 +27,7 @@ export function RadarPriorityCard() {
 
   return (
     <Card className="flex h-full flex-col border-border/80 bg-card/95">
-      <CardContent className="flex flex-1 flex-col gap-3.5 p-5">
+      <CardContent className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-3.5 sm:p-5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-bold tracking-tight text-foreground">Radar Terpanas</h2>
@@ -90,7 +90,7 @@ export function RadarPriorityCard() {
                   <Link
                     to={`/sinyal?pair=${encodeURIComponent(item.symbol)}`}
                     className={cn(
-                      'group flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors duration-150 active:scale-[0.98]',
+                      'group flex items-center justify-between gap-2.5 rounded-xl border p-2.5 transition-colors duration-150 active:scale-[0.98] sm:gap-3 sm:p-3',
                       item.ready
                         ? 'border-emerald-500/40 bg-emerald-500/[0.06] hover:border-emerald-500/70'
                         : 'border-border/80 bg-secondary/20 hover:border-foreground/30 hover:bg-secondary/40',

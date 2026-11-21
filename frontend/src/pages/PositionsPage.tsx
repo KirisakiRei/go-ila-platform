@@ -725,18 +725,18 @@ export default function PositionsPage() {
             return (
               <div
                 key={position.id}
-                className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs"
+                className="overflow-hidden rounded-xl border border-border bg-card"
               >
                 <button
                   type="button"
                   onClick={() => toggle(position.id)}
                   aria-expanded={expanded}
-                  className="flex w-full flex-col gap-2.5 p-3.5 text-left"
+                  className="flex w-full flex-col gap-2 p-3 text-left transition-transform duration-150 active:scale-[0.99]"
                 >
                   <div className="flex w-full items-center justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                      <span className="font-semibold text-foreground">{position.symbol}</span>
-                      <Badge variant="outline" className="text-[10px]">
+                      <span className="text-[13px] font-semibold text-foreground">{position.symbol}</span>
+                      <Badge variant="outline" className="px-1.5 py-0 text-[9.5px]">
                         {position.direction}
                       </Badge>
                       <span className="font-mono text-[11px] text-muted-foreground">
@@ -757,15 +757,15 @@ export default function PositionsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-secondary/25 p-2.5 text-[11px]">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border/60 pt-2 text-[11px]">
                     <div className="min-w-0">
-                      <p className="text-[10px] uppercase text-muted-foreground">Entry</p>
+                      <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground">Entry</p>
                       <p className="truncate font-mono font-semibold tabular">
                         {formatPrice(position.open_price, digits)}
                       </p>
                     </div>
                     <div className="min-w-0 text-right">
-                      <p className="text-[10px] uppercase text-muted-foreground">Hasil</p>
+                      <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground">Hasil</p>
                       {position.pnl_known ? (
                         <p
                           className={cn(
@@ -780,13 +780,13 @@ export default function PositionsPage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] uppercase text-muted-foreground">Stop Loss</p>
+                      <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground">Stop Loss</p>
                       <p className="truncate font-mono tabular text-muted-foreground">
                         {formatPrice(position.stop_loss, digits)}
                       </p>
                     </div>
                     <div className="min-w-0 text-right">
-                      <p className="text-[10px] uppercase text-muted-foreground">Take Profit</p>
+                      <p className="text-[9.5px] uppercase tracking-wide text-muted-foreground">Take Profit</p>
                       <p className="truncate font-mono tabular text-muted-foreground">
                         {formatPrice(position.take_profit, digits)}
                       </p>

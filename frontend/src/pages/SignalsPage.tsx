@@ -860,7 +860,7 @@ function PairOverviewCard({
   const terdekat = tabAktif ? slotPalingDekat(tabAktif.slots, tabAktif.strategy) : null
 
   return (
-    <Card className="flex flex-col overflow-hidden border-border bg-card transition-all hover:border-zinc-400 hover:shadow-sm">
+    <Card className="flex flex-col overflow-hidden border-border bg-card transition-colors duration-150 hover:border-foreground/30">
       <CardHeader className="border-b border-border/80 pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
