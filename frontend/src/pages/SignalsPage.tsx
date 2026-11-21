@@ -269,34 +269,42 @@ export default function SignalsPage() {
       ) : activePair ? (
         /* DETAIL VIEW PER PAIR */
         <div className="space-y-6">
-          {/* Filter Bar Metode */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Metode Analisis:
-              </span>
-              <div className="flex items-center gap-1.5">
-                {strategiTersedia.map((strat) => (
-                  <Button
+          {/* Tab Utama Pemisah Metode: ILA 2.0 vs ILA 3.0 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border">
+            <div
+              role="tablist"
+              aria-label={`Metode analisis untuk ${activePair}`}
+              className="flex items-center gap-1"
+            >
+              {strategiTersedia.map((strat) => {
+                const isSelected = activeStrategyFilter === strat
+                return (
+                  <button
                     key={strat}
-                    size="sm"
-                    variant={activeStrategyFilter === strat ? 'default' : 'outline'}
-                    className="h-8 text-xs font-medium"
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
                     onClick={() => {
                       setActiveStrategyFilter(strat)
                       setSelectedSlotKey(null)
                       setSnapshotSignal(null)
                       setHistoryPage(1)
                     }}
+                    className={cn(
+                      'relative -mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors',
+                      isSelected
+                        ? 'border-foreground text-foreground'
+                        : 'border-transparent text-muted-foreground hover:text-foreground',
+                    )}
                   >
                     {strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
-                  </Button>
-                ))}
-              </div>
+                  </button>
+                )
+              })}
             </div>
-
-            <div className="text-xs text-muted-foreground">
-              Menampilkan {signalsRiwayat.length} setup · {filteredPositions.length} posisi
+            <div className="pb-2 text-xs text-muted-foreground">
+              {activeStrategyFilter === 'ila-2.0' ? 'New ILA 2.0 · Time Cycle' : 'ILA 3.0'} ·{' '}
+              {signalsRiwayat.length} setup · {filteredPositions.length} posisi
             </div>
           </div>
 
@@ -307,8 +315,16 @@ export default function SignalsPage() {
           <div className="grid gap-6 lg:grid-cols-12">
             <div className="lg:col-span-8 space-y-6">
               <Section
-                title="Radar Analisis Timeframe"
-                description={`Pemantauan matriks timeframe multi-tier untuk ${activePair}.`}
+                title={
+                  activeStrategyFilter === 'ila-2.0'
+                    ? 'Radar Time Cycle'
+                    : 'Radar Analisis Timeframe'
+                }
+                description={
+                  activeStrategyFilter === 'ila-2.0'
+                    ? `Pantauan progres time cycle New ILA 2.0 untuk ${activePair} (HTF C2 → LTF CISD → Entry).`
+                    : `Pemantauan matriks timeframe multi-tier untuk ${activePair}.`
+                }
               >
                 <TimeframeRadarMatrix
                   signals={filteredSignals}
@@ -631,12 +647,16 @@ export default function SignalsPage() {
             </Section>
 
             <Section
-              title="Timeframe per Akun"
-              description={`Pilih pasangan timeframe yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}.`}
+              title={
+                activeStrategyFilter === 'ila-2.0'
+                  ? 'Time Cycle per Akun (ILA 2.0)'
+                  : 'Timeframe per Akun (ILA 3.0)'
+              }
+              description={`Pilih pasangan ${activeStrategyFilter === 'ila-2.0' ? 'time cycle' : 'timeframe'} yang dipantau dan diizinkan eksekusi otomatis untuk ${activePair}.`}
             >
               {/* Penanda gulir: tombol "Aktifkan pemantauan" di radar menuju ke sini. */}
               <div id="pengaturan-timeframe" className="scroll-mt-20">
-                <SaklarTimeframeAkun symbol={activePair} />
+                <SaklarTimeframeAkun symbol={activePair} strategy={activeStrategyFilter} />
               </div>
             </Section>
           </div>

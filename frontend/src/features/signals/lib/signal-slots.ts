@@ -14,13 +14,13 @@ export type TimeframeSlot = {
   statusTone: 'solid' | 'outline' | 'neutral' | 'muted'
 }
 
-/** 5 Pasangan Timeframe Baku untuk New ILA 2.0 (Monthly s.d. Micro) */
-export const ILA2_SLOTS: Array<{ htf: string; ltf: string; label: string }> = [
-  { htf: 'W', ltf: 'H4', label: 'W · H4' },
-  { htf: 'D1', ltf: 'H1', label: 'D1 · H1' },
-  { htf: 'H4', ltf: 'M15', label: 'H4 · M15' },
-  { htf: 'H1', ltf: 'M5', label: 'H1 · M5' },
-  { htf: 'M15', ltf: 'M1', label: 'M15 · M1' },
+/** 5 Time Cycle Baku untuk New ILA 2.0 (Monthly s.d. Micro) */
+export const ILA2_SLOTS: Array<{ htf: string; ltf: string; cycle: string; label: string }> = [
+  { htf: 'W', ltf: 'H4', cycle: 'Monthly Cycle', label: 'W · H4' },
+  { htf: 'D1', ltf: 'H1', cycle: 'Weekly Cycle', label: 'D1 · H1' },
+  { htf: 'H4', ltf: 'M15', cycle: 'Daily Cycle', label: 'H4 · M15' },
+  { htf: 'H1', ltf: 'M5', cycle: '90M Cycle', label: 'H1 · M5' },
+  { htf: 'M15', ltf: 'M1', cycle: 'Micro Cycle', label: 'M15 · M1' },
 ]
 
 /** 4 Siklus Quarterly Baku untuk ILA 3.0 */
@@ -157,6 +157,7 @@ export function mapSignalsToSlots(
     return buildSlot({
       key: `${slot.htf}-${slot.ltf}`,
       label: slot.label,
+      cycle: slot.cycle,
       htf: slot.htf,
       ltf: slot.ltf,
       signal: matched,

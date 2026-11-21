@@ -73,8 +73,8 @@ export function getCycleBadge(strategy: string, htf: string, ltf: string): strin
     if ((h === 'W' || h === 'W1' || h === '1W') && (l === '4H' || l === 'H4')) return 'Monthly Cycle'
     if ((h === 'D' || h === 'D1' || h === '1D') && (l === '1H' || l === 'H1')) return 'Weekly Cycle'
     if ((h === '4H' || h === 'H4') && (l === '15M' || l === 'M15')) return 'Daily Cycle'
-    if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M · 6 Jam'
-    if ((h === '15M' || h === 'M15') && (l === '1M' || l === 'M1')) return 'Micro · 90 Menit'
+    if ((h === '1H' || h === 'H1') && (l === '5M' || l === 'M5')) return '90M Cycle'
+    if ((h === '15M' || h === 'M15') && (l === '1M' || l === 'M1')) return 'Micro Cycle'
     return null
   }
   if (strategy !== 'ila-3.0') return null

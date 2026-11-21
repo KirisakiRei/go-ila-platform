@@ -87,7 +87,21 @@ export function TimeframeRadarMatrix({
                     : 'border-border bg-card text-foreground hover:bg-secondary/60',
                 )}
               >
-                <span className="font-mono">{slot.label}</span>
+                {strategy === 'ila-2.0' && slot.cycle ? (
+                  <span className="inline-flex items-baseline gap-1.5">
+                    <span className="font-semibold">{slot.cycle}</span>
+                    <span
+                      className={cn(
+                        'font-mono text-[10px]',
+                        isActive ? 'text-background/75' : 'text-muted-foreground',
+                      )}
+                    >
+                      {slot.label}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="font-mono">{slot.label}</span>
+                )}
 
                 {/* Status Dot / Pill */}
                 {isReady ? (
@@ -150,10 +164,14 @@ export function TimeframeRadarMatrix({
             variant={viewMode === 'grid' ? 'default' : 'outline'}
             className="h-7 px-2.5 text-[11px] gap-1 font-medium"
             onClick={() => setViewMode('grid')}
-            title="Tampilan Pantauan 4 Timeframe Sekaligus"
+            title={
+              strategy === 'ila-2.0'
+                ? 'Tampilan Semua Time Cycle Sekaligus'
+                : 'Tampilan Pantauan 4 Timeframe Sekaligus'
+            }
           >
             <Grid2X2 className="h-3 w-3" />
-            Grid 4 TF
+            {strategy === 'ila-2.0' ? 'Semua Cycle' : 'Grid 4 TF'}
           </Button>
         </div>
       </div>
@@ -252,7 +270,7 @@ function SlotMatiState({ slot }: { slot?: TimeframeSlot; symbol: string }) {
       <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
         <Radio className="h-8 w-8 text-muted-foreground/60" />
         <h4 className="text-sm font-semibold text-foreground">
-          {slot?.label || 'Timeframe'} tidak dipantau
+          {slot?.cycle ? `${slot.cycle} (${slot.label})` : slot?.label || 'Timeframe'} tidak dipantau
         </h4>
         <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
           Pasangan timeframe ini dimatikan pada pengaturan timeframe akun, jadi engine
@@ -273,11 +291,12 @@ function SlotEmptyState({ slot, symbol }: { slot?: TimeframeSlot; symbol: string
       <CardContent className="py-12 text-center flex flex-col items-center justify-center gap-2">
         <Clock className="h-8 w-8 text-muted-foreground/60 animate-pulse" />
         <h4 className="text-sm font-semibold text-foreground">
-          Radar Memantau {symbol} · {slot?.label || 'Timeframe'}
+          Radar Memantau {symbol} ·{' '}
+          {slot?.cycle ? `${slot.cycle} (${slot.label})` : slot?.label || 'Timeframe'}
         </h4>
         <p className="max-w-md text-xs text-muted-foreground leading-relaxed">
-          Belum ada setup struktur yang terbentuk pada timeframe ini. Engine terus
-          memindai pembentukan liquidity sweep & candle close secara otomatis.
+          Belum ada setup struktur yang terbentuk pada cycle ini. Engine terus
+          memindai C2 closure pada key level HTF &amp; konfirmasi CISD secara otomatis.
         </p>
       </CardContent>
     </Card>
@@ -304,11 +323,11 @@ function SlotGridCard({
     return (
       <Card className="flex flex-col justify-between border-dashed border-border/80 bg-secondary/10 p-4">
         <div className="flex items-center justify-between border-b border-border/50 pb-2.5">
-          <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-            <span>{slot.label}</span>
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            <span>{slot.cycle ?? slot.label}</span>
             {slot.cycle && (
-              <Badge variant="outline" className="text-[9.5px]">
-                {slot.cycle}
+              <Badge variant="outline" className="font-mono text-[9.5px]">
+                {slot.label}
               </Badge>
             )}
           </div>
@@ -316,7 +335,7 @@ function SlotGridCard({
         </div>
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <p className="text-xs text-muted-foreground">
-            Pasangan {slot.label} dimatikan pada pengaturan timeframe akun.
+            {slot.cycle ? `${slot.cycle} (${slot.label})` : `Pasangan ${slot.label}`} dimatikan pada pengaturan timeframe akun.
           </p>
           <Button size="sm" variant="outline" onClick={onSelect}>
             Lihat detail
@@ -333,18 +352,18 @@ function SlotGridCard({
     return (
       <Card className="border-dashed border-border/80 bg-secondary/10 flex flex-col justify-between p-4">
         <div className="flex items-center justify-between border-b border-border/50 pb-2.5">
-          <div className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-            <span>{slot.label}</span>
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            <span>{slot.cycle ?? slot.label}</span>
             {slot.cycle && (
-              <Badge variant="outline" className="text-[9.5px]">
-                {slot.cycle}
+              <Badge variant="outline" className="font-mono text-[9.5px]">
+                {slot.label}
               </Badge>
             )}
           </div>
           <span className="text-[10px] font-mono text-muted-foreground uppercase">Scanning</span>
         </div>
         <div className="py-8 text-center text-xs text-muted-foreground">
-          Menunggu pembentukan setup pada {slot.label}
+          Menunggu pembentukan setup pada {slot.cycle ? `${slot.cycle} (${slot.label})` : slot.label}
         </div>
         <div className="text-[10.5px] text-muted-foreground text-right border-t border-border/40 pt-2">
           {symbol} · Scanning
@@ -409,15 +428,15 @@ function SlotGridCard({
         {/* Stepper Ringkas Grid */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold uppercase">
-            <span>Progress Radar</span>
+            <span>{isILA3 ? 'Progress Radar' : (cycle ?? 'Time Cycle')}</span>
             <span>
               {isILA3
                 ? ila3Prog?.label
                 : isReady
-                  ? '2/2 Ready'
+                  ? '3/3 Entry Ready'
                   : isWaitLtf
-                    ? '1/2 Wait CISD'
-                    : '0/2 Sweep'}
+                    ? '1/3 Wait CISD'
+                    : '0/3 Wait C2'}
             </span>
           </div>
 
@@ -459,10 +478,10 @@ function SlotGridCard({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+            <div className="grid grid-cols-3 gap-1.5 text-[10.5px]">
               <div
                 className={cn(
-                  'rounded border px-2.5 py-1 text-center font-mono',
+                  'rounded border px-2 py-1 text-center font-mono',
                   isHtfSweepDone
                     ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold'
                     : 'border-border bg-secondary/40 text-muted-foreground',
@@ -472,7 +491,7 @@ function SlotGridCard({
               </div>
               <div
                 className={cn(
-                  'rounded border px-2.5 py-1 text-center font-mono',
+                  'rounded border px-2 py-1 text-center font-mono',
                   isReady
                     ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold'
                     : isWaitLtf
@@ -481,6 +500,16 @@ function SlotGridCard({
                 )}
               >
                 LTF: {signal.ltf}
+              </div>
+              <div
+                className={cn(
+                  'rounded border px-2 py-1 text-center font-mono',
+                  isReady
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold'
+                    : 'border-border bg-secondary/40 text-muted-foreground',
+                )}
+              >
+                {isReady ? 'Entry' : 'Belum'}
               </div>
             </div>
           )}

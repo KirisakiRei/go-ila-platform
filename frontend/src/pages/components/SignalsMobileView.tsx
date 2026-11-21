@@ -608,30 +608,36 @@ export function SignalsMobileView({
         </div>
       )}
 
-      {/* 3. Strategy Filter (jika user memiliki akses ILA 3.0) */}
+      {/* 3. Tab Utama Pemisah Metode: ILA 2.0 vs ILA 3.0 */}
       {adaIla3 && (
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs">
-          <span className="text-[11px] font-semibold text-muted-foreground">Metode Analisis:</span>
-          <div className="flex items-center gap-1">
-            {(['ila-2.0', 'ila-3.0'] as const).map((strat) => (
+        <div
+          role="tablist"
+          aria-label="Metode analisis"
+          className="grid grid-cols-2 border-b border-border"
+        >
+          {(['ila-2.0', 'ila-3.0'] as const).map((strat) => {
+            const isSelected = activeStrategyFilter === strat
+            return (
               <button
                 key={strat}
                 type="button"
+                role="tab"
+                aria-selected={isSelected}
                 onClick={() => {
                   onSelectStrategy(strat)
                   signalPaginasi.setPage(1)
                 }}
                 className={cn(
-                  'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all',
-                  activeStrategyFilter === strat
-                    ? 'bg-foreground text-background shadow-xs'
-                    : 'bg-secondary text-muted-foreground hover:text-foreground',
+                  'relative -mb-px border-b-2 py-2.5 text-center text-xs font-bold transition-colors',
+                  isSelected
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
               >
                 {strat === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
               </button>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )}
 
@@ -826,7 +832,7 @@ export function SignalsMobileView({
                 </p>
               </div>
               <SaklarMetodeAkun symbol={activePair} />
-              <SaklarTimeframeAkun symbol={activePair} />
+              <SaklarTimeframeAkun symbol={activePair} strategy={activeStrategyFilter} />
             </div>
           )}
         </div>

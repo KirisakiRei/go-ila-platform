@@ -17,7 +17,14 @@ import { cn } from '@/lib/utils'
  * pernah mengirim pasangan untuk sebuah metode, blok itu menampilkan keterangan
  * "menunggu data engine" alih-alih daftar karangan.
  */
-export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
+export function SaklarTimeframeAkun({
+  symbol,
+  strategy,
+}: {
+  symbol: string
+  /** Bila diisi, hanya menampilkan grup timeframe untuk metode tersebut. */
+  strategy?: StrategyVersion
+}) {
   const { data, isLoading, isError } = useTimeframeSwitchMatrix(symbol)
   const ubah = useSetTimeframeSwitch(symbol)
   const isMobile = useIsMobile()
@@ -34,12 +41,15 @@ export function SaklarTimeframeAkun({ symbol }: { symbol: string }) {
     )
   }
 
-  const groups = data?.groups ?? []
+  const allGroups = data?.groups ?? []
+  const groups = strategy ? allGroups.filter((g) => g.strategy === strategy) : allGroups
   if (groups.length === 0) {
     return (
       <Card>
         <CardContent className="py-6 text-center text-xs text-muted-foreground">
-          Belum ada metode yang aktif. Nyalakan metode pada akun terlebih dahulu.
+          {strategy
+            ? `Metode ${strategy.toUpperCase()} belum aktif pada akun mana pun. Nyalakan metode pada akun terlebih dahulu.`
+            : 'Belum ada metode yang aktif. Nyalakan metode pada akun terlebih dahulu.'}
         </CardContent>
       </Card>
     )
