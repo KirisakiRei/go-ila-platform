@@ -16,13 +16,19 @@ import (
 	"ila/backend/pkg/apperror"
 )
 
-const templateInviteApproved = "invite_approved"
+const (
+	templateInviteApproved = "invite_approved"
+	// Batas keras antrean pending agar serangan bot terdistribusi tidak bisa memenuhi tabel SQL.
+	maxPendingInviteRequests   = 500
+	inviteRequestEmailCooldown = 24 * time.Hour
+)
 
 // InviteRequestStore adalah kebutuhan penyimpanan permohonan undangan.
 type InviteRequestStore interface {
 	Create(ctx context.Context, req *model.InviteRequest) error
 	FindByID(ctx context.Context, id string) (*model.InviteRequest, error)
 	HasPendingByEmail(ctx context.Context, email string) (bool, error)
+	HasRecentByEmail(ctx context.Context, email string, since time.Time) (bool, error)
 	List(ctx context.Context, status string, page, perPage int) ([]model.InviteRequest, int64, error)
 	CountPending(ctx context.Context) (int64, error)
 	MarkApproved(ctx context.Context, id, inviteID, actorID, note string, reviewedAt time.Time) error
@@ -104,6 +110,22 @@ func (s *inviteRequestService) Submit(ctx context.Context, req dto.SubmitInviteR
 	}
 	if exists {
 		return errors.Join(apperror.ErrConflict, errors.New("Permohonan dengan alamat email ini sudah masuk dan sedang ditinjau."))
+	}
+
+	recent, err := s.store.HasRecentByEmail(ctx, email, s.clock().Add(-inviteRequestEmailCooldown))
+	if err != nil {
+		return err
+	}
+	if recent {
+		return errors.Join(apperror.ErrTooManyRequests, errors.New("Permohonan untuk alamat email ini baru saja tercatat. Silakan coba lagi setelah 24 jam."))
+	}
+
+	pendingCount, err := s.store.CountPending(ctx)
+	if err != nil {
+		return err
+	}
+	if pendingCount >= maxPendingInviteRequests {
+		return errors.Join(apperror.ErrTooManyRequests, errors.New("Antrean permohonan sedang penuh. Silakan coba lagi nanti."))
 	}
 
 	row := &model.InviteRequest{

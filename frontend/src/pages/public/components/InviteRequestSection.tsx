@@ -1,10 +1,52 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowRight, CheckCircle2, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { ApiError } from '@/lib/api-error'
 import { inviteRequestApi } from '@/lib/invite-api'
 import { SocialLinksRow } from './SocialLinksRow'
 import type { SocialLinks } from '@/types/system'
+
+const SUBMITTED_STORAGE_KEY = 'ila_invite_request_submitted_v1'
+const SUBMITTED_TTL_MS = 24 * 60 * 60 * 1000
+const EASE_OUT_STRONG = [0.23, 1, 0.32, 1] as const
+
+type SubmittedRecord = {
+  name: string
+  email: string
+  submittedAt: number
+}
+
+function readSubmittedRecord(): SubmittedRecord | null {
+  try {
+    const raw = window.localStorage.getItem(SUBMITTED_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<SubmittedRecord>
+    if (
+      typeof parsed.email !== 'string' ||
+      typeof parsed.name !== 'string' ||
+      typeof parsed.submittedAt !== 'number'
+    ) {
+      return null
+    }
+    if (Date.now() - parsed.submittedAt > SUBMITTED_TTL_MS) {
+      window.localStorage.removeItem(SUBMITTED_STORAGE_KEY)
+      return null
+    }
+    return { name: parsed.name, email: parsed.email, submittedAt: parsed.submittedAt }
+  } catch {
+    return null
+  }
+}
+
+function writeSubmittedRecord(record: SubmittedRecord) {
+  try {
+    window.localStorage.setItem(SUBMITTED_STORAGE_KEY, JSON.stringify(record))
+  } catch {
+    // Abaikan kegagalan storage (misal mode privat browser); proteksi utama tetap di backend.
+  }
+}
 
 type InviteRequestSectionProps = {
   socialLinks?: SocialLinks | null
@@ -18,13 +60,27 @@ type InviteRequestSectionProps = {
  * sandi maupun kredensial broker) untuk masuk antrean undangan admin.
  */
 export function InviteRequestSection({ socialLinks }: InviteRequestSectionProps) {
+  const prefersReducedMotion = useReducedMotion() ?? false
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [contact, setContact] = useState('')
   const [note, setNote] = useState('')
   const [website, setWebsite] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  const [submittedRecord, setSubmittedRecord] = useState<SubmittedRecord | null>(() =>
+    readSubmittedRecord(),
+  )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  function lockAsSubmitted(cleanName: string, cleanEmail: string) {
+    const record: SubmittedRecord = {
+      name: cleanName || 'Anda',
+      email: cleanEmail,
+      submittedAt: Date.now(),
+    }
+    writeSubmittedRecord(record)
+    setSubmittedRecord(record)
+    setErrorMessage(null)
+  }
 
   const submitMutation = useMutation({
     mutationFn: () =>
@@ -36,10 +92,14 @@ export function InviteRequestSection({ socialLinks }: InviteRequestSectionProps)
         website,
       }),
     onSuccess: () => {
-      setErrorMessage(null)
-      setSubmitted(true)
+      lockAsSubmitted(name.trim(), email.trim().toLowerCase())
     },
     onError: (err) => {
+      // Bila email sudah tercatat pending di server (409), langsung kunci UI sebagai sudah diajukan.
+      if (err instanceof ApiError && err.status === 409) {
+        lockAsSubmitted(name.trim(), email.trim().toLowerCase())
+        return
+      }
       setErrorMessage(
         err instanceof Error
           ? err.message
@@ -50,6 +110,7 @@ export function InviteRequestSection({ socialLinks }: InviteRequestSectionProps)
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submittedRecord || submitMutation.isPending) return
     setErrorMessage(null)
     if (name.trim().length < 2) {
       setErrorMessage('Nama minimal 2 karakter.')
@@ -111,8 +172,13 @@ export function InviteRequestSection({ socialLinks }: InviteRequestSectionProps)
           {/* Kolom kanan: formulir bersih tanpa kredensial */}
           <div className="lg:col-span-7">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:p-6">
-              {submitted ? (
-                <div className="flex flex-col items-start gap-4 py-4">
+              {submittedRecord ? (
+                <motion.div
+                  initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96, y: 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.24, ease: EASE_OUT_STRONG }}
+                  className="flex flex-col items-start gap-4 py-4"
+                >
                   <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white">
                     <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
                   </div>
@@ -121,25 +187,24 @@ export function InviteRequestSection({ socialLinks }: InviteRequestSectionProps)
                       Permohonan akses diterima
                     </h3>
                     <p className="text-[13px] leading-relaxed text-zinc-300">
-                      Terima kasih, <strong className="text-white">{name}</strong>. Permohonan
-                      untuk <span className="font-mono text-zinc-200">{email}</span> sudah masuk
-                      antrean tinjauan. Tautan undangan akan dikirim ke email Anda bila disetujui.
+                      Terima kasih, <strong className="text-white">{submittedRecord.name}</strong>.
+                      Permohonan untuk{' '}
+                      <span className="break-all font-mono text-zinc-200">
+                        {submittedRecord.email}
+                      </span>{' '}
+                      sudah masuk antrean tinjauan. Tautan undangan akan dikirim ke email Anda bila
+                      disetujui.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSubmitted(false)
-                      setName('')
-                      setEmail('')
-                      setContact('')
-                      setNote('')
-                    }}
-                    className="text-[12px] font-medium text-zinc-300 underline underline-offset-4 hover:text-white"
+                    disabled
+                    className="inline-flex w-full cursor-default items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-[13px] font-medium text-zinc-200 sm:w-auto"
                   >
-                    Kirim permohonan lain
+                    <CheckCircle2 className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+                    Sudah Diajukan
                   </button>
-                </div>
+                </motion.div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                   <input

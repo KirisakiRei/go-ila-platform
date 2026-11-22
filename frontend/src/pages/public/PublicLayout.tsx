@@ -104,10 +104,10 @@ function FooterWatermark() {
       aria-hidden="true"
       className="pointer-events-none relative z-10 w-full select-none overflow-hidden"
     >
-      {/* Sedikit digeser turun agar tepi bawah huruf IMAGINARY terpotong elegan di batas dasar layar */}
+      {/* Sedikit digeser turun agar tepi bawah huruf IMAGINARY terpotong tipis & rapi */}
       <svg
         viewBox="0 0 1200 174.6"
-        className="block h-auto w-full translate-y-[22%] sm:translate-y-[24%]"
+        className="block h-auto w-full translate-y-[12%] sm:translate-y-[14%]"
         preserveAspectRatio="none"
         focusable="false"
       >
@@ -199,10 +199,29 @@ export function PublicLayout() {
       const heroEl = document.getElementById('hero-band')
       if (heroEl) {
         const rect = heroEl.getBoundingClientRect()
-        if (rect.height > 0 && rect.bottom <= 88) {
-          setHomeHeaderTheme('light')
+        if (rect.height > 0 && rect.bottom > 88) {
+          setHomeHeaderTheme('hero-scrolled')
           return
         }
+      }
+      // Saat memasuki zona obsidian bawah (Hero 5 & 6), navbar kembali gelap;
+      // begitu melewati batas bawahnya menuju footer terang, navbar kembali putih.
+      const darkBandEl = document.getElementById('dark-cta-band')
+      if (darkBandEl) {
+        const darkRect = darkBandEl.getBoundingClientRect()
+        const edgeMargin = Math.min(120, Math.round(window.innerHeight * 0.14))
+        if (
+          darkRect.height > 0 &&
+          darkRect.top <= edgeMargin &&
+          darkRect.bottom >= -edgeMargin
+        ) {
+          setHomeHeaderTheme('hero-scrolled')
+          return
+        }
+      }
+      if (heroEl && heroEl.getBoundingClientRect().height > 0) {
+        setHomeHeaderTheme('light')
+        return
       }
       if (window.scrollY > 480) {
         setHomeHeaderTheme('light')
@@ -447,27 +466,27 @@ export function PublicLayout() {
             !isHome && 'border-t border-zinc-200/80',
           )}
         >
-          {/* Konten tautan footer: lega dan rapi, mengisi proporsi fullscreen di desktop */}
-          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-12 pt-12 sm:px-6 sm:pb-16 sm:pt-16 lg:pt-20">
-            {/* Header brand besar + sosmed sejajar kanan */}
-            <div className="mb-10 flex flex-col items-start justify-between gap-5 border-b border-zinc-200/80 pb-8 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-4">
+          {/* Konten tautan footer: rata tengah, rapi & proporsional di desktop maupun mobile */}
+          <div className="relative z-10 mx-auto w-full max-w-5xl px-4 pb-10 pt-10 text-center sm:px-6 sm:pb-14 sm:pt-14 lg:pt-20">
+            {/* Header brand besar rata tengah + tautan sosmed terpusat */}
+            <div className="mb-10 flex flex-col items-center gap-5 border-b border-zinc-200/80 pb-8 sm:mb-12 sm:pb-10">
+              <div className="flex items-center justify-center gap-3.5">
                 <img
                   src="/brand/logo-light-64.png"
                   srcSet="/brand/logo-light-64.png 1x, /brand/logo-light-128.png 2x"
                   alt="Imaginary Liquidity"
-                  className="h-11 w-auto object-contain sm:h-12"
+                  className="h-10 w-auto object-contain sm:h-12"
                   decoding="async"
                 />
                 <p className="text-2xl font-semibold tracking-tight text-[#09090b] sm:text-3xl">
                   Imaginary Liquidity
                 </p>
               </div>
-              <SocialLinksRow links={socialLinks} variant="light" showLabel />
+              <SocialLinksRow links={socialLinks} variant="light" showLabel className="justify-center" />
             </div>
 
-            {/* 3 kolom tautan bersih dan seimbang */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:max-w-4xl lg:gap-x-16">
+            {/* 3 kolom tautan rata tengah yang seimbang di mobile & desktop */}
+            <div className="mx-auto grid max-w-3xl grid-cols-2 gap-x-6 gap-y-9 text-center sm:grid-cols-3 sm:gap-x-12 lg:gap-x-16">
               <div className="space-y-3.5">
                 <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
                   Produk

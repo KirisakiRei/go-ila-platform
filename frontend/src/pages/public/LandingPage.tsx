@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import Timeline from '@/components/ui/timeline'
@@ -76,6 +77,19 @@ const PILLARS = [
  */
 export default function LandingPage() {
   const { hash } = useLocation()
+  const prefersReducedMotion = useReducedMotion() ?? false
+  const heroRef = useRef<HTMLElement>(null)
+  const { scrollYProgress: heroScroll } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  })
+  // Parallax dua lapis di Hero 1: ilustrasi candle bergeser lebih lambat ke bawah,
+  // judul melayang halus ke atas agar terasa kedalaman dimensi saat digulir.
+  const chartParallaxY = useTransform(heroScroll, [0, 1], [0, 68])
+  const chartParallaxScale = useTransform(heroScroll, [0, 1], [1, 1.04])
+  const titleParallaxY = useTransform(heroScroll, [0, 1], [0, -38])
+  const titleParallaxOpacity = useTransform(heroScroll, [0, 0.85], [1, 0.55])
+
   const [kurvaRef, kurvaTerlihat] = useInView<HTMLDivElement>()
   const [metrikRef, metrikTerlihat] = useInView<HTMLDivElement>()
   const { data: status } = useQuery({
@@ -104,23 +118,37 @@ export default function LandingPage() {
         }}
       >
         {/* 1. BAGIAN HERO */}
-        <section id="hero-band" className="relative text-white">
-          {/* Background geometris tema trading yang clean & rapi */}
-          <HeroTradingGeometry
-            className="pointer-events-none absolute inset-0 h-full w-full"
-            active
-          />
+        <section ref={heroRef} id="hero-band" className="relative text-white">
+          {/* Background geometris tema trading yang clean & rapi dengan parallax latar */}
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 will-change-transform"
+            style={
+              prefersReducedMotion
+                ? undefined
+                : { y: chartParallaxY, scale: chartParallaxScale }
+            }
+          >
+            <HeroTradingGeometry className="h-full w-full" active />
+          </motion.div>
 
           <div className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-28 sm:px-6 sm:pb-24 sm:pt-36">
-            {/* Judul utama hero */}
+            {/* Judul utama hero dengan parallax latar depan */}
             <div className="relative mt-6 flex min-h-[190px] flex-col justify-center py-4 sm:mt-10 sm:min-h-[240px]">
-              <div className="relative z-10 w-full max-w-4xl text-left">
+              <motion.div
+                className="relative z-10 w-full max-w-4xl text-left will-change-transform"
+                style={
+                  prefersReducedMotion
+                    ? undefined
+                    : { y: titleParallaxY, opacity: titleParallaxOpacity }
+                }
+              >
                 <h1 className="text-4xl font-semibold leading-[1.06] tracking-tight sm:text-6xl lg:text-[4.5rem]">
                   <span className="text-white">Imaginary Liquidity</span>{' '}
                   <br />
                   <span className="text-white/60">Algorithm</span>
                 </h1>
-              </div>
+              </motion.div>
             </div>
 
             {/* Sub-bar horison tipis dengan tombol putih bersih */}
@@ -291,8 +319,10 @@ export default function LandingPage() {
           }}
         />
 
-        {/* 5. PILAR KEPUTUSAN ("Eksekusi cepat, keputusan tetap di tangan Anda.") */}
-        <section className="relative z-10 pb-8 pt-2 sm:pb-12 sm:pt-6">
+        {/* Pembungkus zona gelap Hero 5 & 6 agar navbar otomatis beralih gelap saat melewatinya */}
+        <div id="dark-cta-band">
+          {/* 5. PILAR KEPUTUSAN ("Eksekusi cepat, keputusan tetap di tangan Anda.") */}
+          <section className="relative z-10 pb-8 pt-2 sm:pb-12 sm:pt-6">
           <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
             <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
               <div className="lg:col-span-6">
@@ -344,6 +374,7 @@ export default function LandingPage() {
 
         {/* 6. CTA INVITE-ONLY: form pengajuan akses + sosmed + disclaimer ringkas */}
         <InviteRequestSection socialLinks={status?.social_links} />
+        </div>
 
         {/* Transisi keluar: obsidian (#050507) -> terang (#f5f5f7) menyatu mulus ke footer */}
         <div

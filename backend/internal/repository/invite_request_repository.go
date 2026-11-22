@@ -53,6 +53,18 @@ func (r *InviteRequestRepository) HasPendingByEmail(ctx context.Context, email s
 	return count > 0, nil
 }
 
+// HasRecentByEmail memeriksa apakah alamat surel pernah mengajukan sejak waktu `since`,
+// guna mencegah spam ulang setelah permohonan ditolak atau diproses.
+func (r *InviteRequestRepository) HasRecentByEmail(ctx context.Context, email string, since time.Time) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.InviteRequest{}).
+		Where("email = ? AND created_at >= ?", email, since).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("memeriksa jeda permohonan: %w", err)
+	}
+	return count > 0, nil
+}
+
 // List membaca permohonan secara berpaginasi, terbaru lebih dulu.
 func (r *InviteRequestRepository) List(ctx context.Context, status string, page, perPage int) ([]model.InviteRequest, int64, error) {
 	if page < 1 {

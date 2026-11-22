@@ -146,6 +146,12 @@ func TestInviteRequestReject(t *testing.T) {
 	if row.Status != model.InviteRequestRejected || row.ReviewedAt == nil || row.ReviewedAt.After(time.Now().Add(time.Minute)) {
 		t.Fatalf("status reject tidak sesuai: %+v", row)
 	}
+
+	// Email yang baru ditolak tidak boleh langsung spam ulang dalam jendela cooldown 24 jam.
+	err = svc.Submit(ctx, dto.SubmitInviteRequest{Name: "Sari Lagi", Email: "sari@example.com"})
+	if !errors.Is(err, apperror.ErrTooManyRequests) {
+		t.Fatalf("submit ulang dalam 24 jam harus ErrTooManyRequests, got: %v", err)
+	}
 }
 
 func containsString(s, sub string) bool {

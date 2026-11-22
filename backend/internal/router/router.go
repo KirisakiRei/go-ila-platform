@@ -552,8 +552,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		// Pemeriksaan tautan undangan: publik karena halaman daftar memakainya
 		// sebelum ada sesi. Tidak memakai kuota; keputusan tetap saat submit.
 		publicStatus.GET("/invites/:code", inviteHandler.Periksa)
-		// Pengajuan akses selama invite-only: dibatasi ketat per IP agar bebas spam.
-		inviteReqLimiter := middleware.NewRateLimiter(5, 10*time.Minute)
+		// Pengajuan akses selama invite-only: dibatasi ketat per IP agar bebas spam & brute-force.
+		inviteReqLimiter := middleware.NewRateLimiter(3, 15*time.Minute)
 		publicStatus.POST("/invite-requests", middleware.RateLimitByIP(inviteReqLimiter), inviteRequestHandler.Submit)
 		cmsHandler.PublicRegister(publicStatus.Group(""))
 		pageHandler.PublicRegister(publicStatus.Group(""))

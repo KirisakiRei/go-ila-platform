@@ -65,6 +65,7 @@ function renderPublicLanding() {
 
 describe('LandingPage & PublicLayout', () => {
   afterEach(() => {
+    window.localStorage.clear()
     vi.restoreAllMocks()
   })
 
@@ -148,6 +149,41 @@ describe('LandingPage & PublicLayout', () => {
     expect(header?.className).toContain('bg-white/95')
     expect(lightLogo?.className).toContain('opacity-100')
     expect(darkLogo?.className).toContain('opacity-0')
+
+    // Saat memasuki zona gelap Hero 5 & 6 (#dark-cta-band), navbar beralih gelap kembali.
+    const darkBand = container.querySelector('#dark-cta-band')
+    expect(darkBand).not.toBeNull()
+    vi.spyOn(darkBand!, 'getBoundingClientRect').mockReturnValue({
+      top: 40,
+      bottom: 620,
+      height: 580,
+      left: 0,
+      right: 1200,
+      width: 1200,
+      x: 0,
+      y: 40,
+      toJSON: () => ({}),
+    })
+    fireEvent.scroll(window)
+    expect(header?.className).toContain('bg-[#050507]/80')
+    expect(darkLogo?.className).toContain('opacity-100')
+    expect(lightLogo?.className).toContain('opacity-0')
+
+    // Setelah melewati zona gelap menuju footer terang, navbar kembali putih.
+    vi.spyOn(darkBand!, 'getBoundingClientRect').mockReturnValue({
+      top: -820,
+      bottom: -240,
+      height: 580,
+      left: 0,
+      right: 1200,
+      width: 1200,
+      x: 0,
+      y: -820,
+      toJSON: () => ({}),
+    })
+    fireEvent.scroll(window)
+    expect(header?.className).toContain('bg-white/95')
+    expect(lightLogo?.className).toContain('opacity-100')
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   })
 
@@ -170,6 +206,8 @@ describe('LandingPage & PublicLayout', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ajukan Bergabung/i }))
 
     expect(await screen.findByText(/Permohonan akses diterima/i)).toBeInTheDocument()
+    const lockedButton = screen.getByRole('button', { name: /Sudah Diajukan/i })
+    expect(lockedButton).toBeDisabled()
     expect(submitSpy).toHaveBeenCalledWith({
       name: 'Ryan Trader',
       email: 'ryan@example.com',
@@ -177,6 +215,11 @@ describe('LandingPage & PublicLayout', () => {
       note: undefined,
       website: '',
     })
+
+    // Muat ulang komponen: status "Sudah Diajukan" tetap terkunci dari localStorage.
+    const { unmount } = renderPublicLanding()
+    expect(screen.getAllByRole('button', { name: /Sudah Diajukan/i })[0]).toBeDisabled()
+    unmount()
   })
 
   it('menampilkan banner pemeliharaan saat mode sistem bukan normal', async () => {
