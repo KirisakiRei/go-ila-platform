@@ -230,7 +230,7 @@ export default function LandingPage() {
       <Timeline />
 
       {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
-      <section className="bg-[#f5f5f7] pb-12 pt-20 sm:pb-16 sm:pt-28">
+      <section className="bg-[#f5f5f7] pb-4 pt-20 sm:pb-6 sm:pt-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl space-y-3">
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
@@ -272,23 +272,27 @@ export default function LandingPage() {
       </section>
 
       {/* 5 & 6. ZONA OBSIDIAN BERGRADASI: terang -> gelap (Hero 5 & 6) -> memudar kembali ke footer terang.
-          Pita gradasi atas & bawah memakai tinggi tetap agar di mobile maupun desktop
-          teks Hero 5 & 6 selalu berada di atas #050507 ber-kontras penuh. */}
+          Pita gradasi atas & bawah memakai tinggi lega + vertical edge-feathering agar tidak pernah
+          meninggalkan garis potong diagonal di lebar layar berapa pun, sekaligus menjaga teks Hero 5 & 6
+          tetap di atas #050507 ber-kontras penuh. */}
       <div className="relative bg-[#050507] text-white">
-        {/* Transisi masuk: terang (#f5f5f7) -> obsidian (#050507) dengan sentuhan diagonal senada Hero 1 */}
+        {/* Transisi masuk: terang (#f5f5f7) -> obsidian (#050507) mulus senada Hero 1 -> 2 */}
         <div
           aria-hidden="true"
-          className="pointer-events-none h-28 w-full sm:h-40"
+          className="pointer-events-none h-56 w-full sm:h-80 lg:h-[420px]"
           style={{
             background: [
-              'radial-gradient(65% 80% at 78% 12%, rgba(245, 245, 247, 0.85) 0%, rgba(245, 245, 247, 0) 100%)',
-              'linear-gradient(172deg, #f5f5f7 0%, #f5f5f7 14%, #d4d4d8 32%, #71717a 50%, #3f3f46 66%, #18181b 82%, #050507 100%)',
+              'linear-gradient(to bottom, #f5f5f7 0%, rgba(245, 245, 247, 0.92) 8%, rgba(245, 245, 247, 0.45) 20%, rgba(245, 245, 247, 0) 38%)',
+              'linear-gradient(to top, #050507 0%, rgba(5, 5, 7, 0.92) 8%, rgba(5, 5, 7, 0.45) 20%, rgba(5, 5, 7, 0) 38%)',
+              'radial-gradient(65% 58% at 18% 26%, rgba(245, 245, 247, 0.85) 0%, rgba(245, 245, 247, 0) 100%)',
+              'radial-gradient(65% 58% at 82% 76%, rgba(5, 5, 7, 0.85) 0%, rgba(5, 5, 7, 0) 100%)',
+              'linear-gradient(173deg, #f5f5f7 0%, #f5f5f7 16%, #e4e4e7 28%, #a1a1aa 43%, #52525b 58%, #27272a 71%, #111114 82%, #050507 91%, #050507 100%)',
             ].join(', '),
           }}
         />
 
         {/* 5. PILAR KEPUTUSAN ("Eksekusi cepat, keputusan tetap di tangan Anda.") */}
-        <section className="relative z-10 pb-8 pt-6 sm:pb-12 sm:pt-10">
+        <section className="relative z-10 pb-8 pt-2 sm:pb-12 sm:pt-6">
           <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
             <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
               <div className="lg:col-span-6">
@@ -344,11 +348,14 @@ export default function LandingPage() {
         {/* Transisi keluar: obsidian (#050507) -> terang (#f5f5f7) menyatu mulus ke footer */}
         <div
           aria-hidden="true"
-          className="pointer-events-none h-28 w-full sm:h-44"
+          className="pointer-events-none h-56 w-full sm:h-80 lg:h-[420px]"
           style={{
             background: [
-              'radial-gradient(65% 80% at 22% 88%, rgba(245, 245, 247, 0.9) 0%, rgba(245, 245, 247, 0) 100%)',
-              'linear-gradient(172deg, #050507 0%, #18181b 20%, #3f3f46 38%, #71717a 56%, #d4d4d8 76%, #f5f5f7 92%, #f5f5f7 100%)',
+              'linear-gradient(to bottom, #050507 0%, rgba(5, 5, 7, 0.92) 8%, rgba(5, 5, 7, 0.45) 20%, rgba(5, 5, 7, 0) 38%)',
+              'linear-gradient(to top, #f5f5f7 0%, rgba(245, 245, 247, 0.92) 8%, rgba(245, 245, 247, 0.45) 20%, rgba(245, 245, 247, 0) 38%)',
+              'radial-gradient(65% 58% at 18% 24%, rgba(5, 5, 7, 0.85) 0%, rgba(5, 5, 7, 0) 100%)',
+              'radial-gradient(65% 58% at 82% 74%, rgba(245, 245, 247, 0.85) 0%, rgba(245, 245, 247, 0) 100%)',
+              'linear-gradient(173deg, #050507 0%, #050507 14%, #111114 25%, #27272a 37%, #52525b 50%, #a1a1aa 64%, #e4e4e7 78%, #f5f5f7 89%, #f5f5f7 100%)',
             ].join(', '),
           }}
         />

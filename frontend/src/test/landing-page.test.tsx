@@ -131,15 +131,23 @@ describe('LandingPage & PublicLayout', () => {
     expect(posEksekusi).toBeGreaterThan(posPantauan)
     expect(posAjukan).toBeGreaterThan(posEksekusi)
 
-    // Header pada posisi atas landing page menyatu transparan tanpa border bawah,
-    // lalu berubah menjadi latar putih saat di-scroll ke bagian terang.
+    // Header pada posisi atas landing page menyatu transparan tanpa border bawah
+    // dengan logo mode gelap tampil, lalu cross-fade ke logo terang saat di-scroll.
     const header = container.querySelector('header')
     expect(header?.className).toContain('border-transparent')
     expect(header?.className).toContain('bg-transparent')
 
+    const headerLogos = Array.from(header?.querySelectorAll('img') ?? [])
+    const lightLogo = headerLogos.find((img) => img.getAttribute('src')?.includes('logo-light'))
+    const darkLogo = headerLogos.find((img) => img.getAttribute('src')?.includes('logo-dark'))
+    expect(darkLogo?.className).toContain('opacity-100')
+    expect(lightLogo?.className).toContain('opacity-0')
+
     Object.defineProperty(window, 'scrollY', { value: 640, configurable: true })
     fireEvent.scroll(window)
     expect(header?.className).toContain('bg-white/95')
+    expect(lightLogo?.className).toContain('opacity-100')
+    expect(darkLogo?.className).toContain('opacity-0')
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   })
 

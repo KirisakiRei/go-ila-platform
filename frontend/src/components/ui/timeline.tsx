@@ -68,24 +68,44 @@ export const DEFAULT_ILA_MILESTONES: TimelineMilestone[] = [
 ]
 
 /**
- * Identitas Logo ILA bersih tanpa bingkai card di atas kanvas terang.
+ * Identitas Logo ILA bersih tanpa bingkai card di atas kanvas terang,
+ * dengan animasi muncul halus saat section storyline memasuki viewport.
  */
-function IlaLogoMark({ periodLabel }: { periodLabel: string }) {
+function IlaLogoMark({
+  periodLabel,
+  reducedMotion,
+}: {
+  periodLabel: string
+  reducedMotion: boolean
+}) {
+  const animateInView = !reducedMotion && typeof IntersectionObserver !== 'undefined'
+
   return (
     <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center">
-      <img
+      <motion.img
         src="/brand/logo-light-128.png"
         alt="Logo Imaginary Liquidity Algorithm"
         draggable={false}
         className="h-28 w-auto object-contain lg:h-32"
         decoding="async"
+        initial={animateInView ? { opacity: 0, y: 20, scale: 0.9 } : false}
+        whileInView={animateInView ? { opacity: 1, y: 0, scale: 1 } : undefined}
+        viewport={{ once: true, amount: 0.25 }}
+        transition={{ duration: 0.55, ease: EASE_OUT_STRONG }}
       />
-      <p className="mt-6 text-[17px] font-semibold tracking-tight text-[#09090b]">
-        Imaginary Liquidity
-      </p>
-      <p className="mt-1 font-mono text-[12px] tracking-[0.14em] text-[#52525b] tabular-nums">
-        {periodLabel}
-      </p>
+      <motion.div
+        initial={animateInView ? { opacity: 0, y: 12 } : false}
+        whileInView={animateInView ? { opacity: 1, y: 0 } : undefined}
+        viewport={{ once: true, amount: 0.25 }}
+        transition={{ duration: 0.45, delay: 0.14, ease: EASE_OUT_STRONG }}
+      >
+        <p className="mt-6 text-[17px] font-semibold tracking-tight text-[#09090b]">
+          Imaginary Liquidity
+        </p>
+        <p className="mt-1 font-mono text-[12px] tracking-[0.14em] text-[#52525b] tabular-nums">
+          {periodLabel}
+        </p>
+      </motion.div>
     </div>
   )
 }
@@ -296,7 +316,7 @@ function DesktopStoryline({
           >
             {/* Identitas Logo ILA bersih tanpa card di kiri */}
             <div className="h-[320px] w-[220px] shrink-0 lg:w-[250px]">
-              <IlaLogoMark periodLabel={periodLabel} />
+              <IlaLogoMark periodLabel={periodLabel} reducedMotion={reducedMotion} />
             </div>
 
             {/* Area Rel + 4 Milestone Selang-seling */}
@@ -365,7 +385,13 @@ function MobileStoryline({
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 md:hidden">
       {/* Identitas Logo ILA bersih tanpa card */}
-      <div className="flex items-center justify-center gap-3.5 border-y border-zinc-200/80 py-5">
+      <motion.div
+        initial={animateInView ? { opacity: 0, y: 14, scale: 0.95 } : false}
+        whileInView={animateInView ? { opacity: 1, y: 0, scale: 1 } : undefined}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.45, ease: EASE_OUT_STRONG }}
+        className="flex items-center justify-center gap-3.5 border-y border-zinc-200/80 py-5"
+      >
         <img
           src="/brand/logo-light-128.png"
           alt="Logo Imaginary Liquidity Algorithm"
@@ -381,7 +407,7 @@ function MobileStoryline({
             {periodLabel} · ILA 1.0 → 3.0
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Rel vertikal + 4 milestone beranimasi bertahap */}
       <div ref={listRef} className="relative mt-8 pl-7">

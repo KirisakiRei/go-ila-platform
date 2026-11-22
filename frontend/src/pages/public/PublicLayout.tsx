@@ -243,14 +243,23 @@ export function PublicLayout() {
             className="flex items-center gap-2.5 rounded-md focus-visible:ring-zinc-400"
             onClick={() => setOpen(false)}
           >
-            {/* Logo bersama: berkas aslinya 660 KB, diganti turunan 64/128px
-                agar tidak diunduh ulang sebagai gambar raksasa setiap halaman. */}
-            <Logo
-              className={cn(
-                'h-8 w-auto transition-opacity duration-300',
-                isLightHeader ? 'opacity-100' : 'opacity-0',
-              )}
-            />
+            {/* Logo gelap & terang ditumpuk agar cross-fade mulus saat navbar berubah tema */}
+            <span className="relative inline-flex h-8 shrink-0 items-center">
+              <Logo
+                theme="light"
+                className={cn(
+                  'h-8 w-auto transition-opacity duration-300 ease-out',
+                  isLightHeader ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              <Logo
+                theme="dark"
+                className={cn(
+                  'pointer-events-none absolute inset-0 h-8 w-auto transition-opacity duration-300 ease-out',
+                  isLightHeader ? 'opacity-0' : 'opacity-100',
+                )}
+              />
+            </span>
             <span
               className={cn(
                 'text-sm font-semibold tracking-tight transition-colors',
