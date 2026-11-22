@@ -230,7 +230,7 @@ export default function LandingPage() {
       <Timeline />
 
       {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
-      <section className="bg-[#f5f5f7] py-20 sm:py-28">
+      <section className="bg-[#f5f5f7] pb-12 pt-20 sm:pb-16 sm:pt-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl space-y-3">
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
@@ -271,59 +271,88 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 5. PILAR KEPUTUSAN ("Eksekusi cepat, keputusan tetap di tangan Anda.") */}
-      <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
-        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="grid gap-6 border-t border-zinc-200 pt-14 lg:grid-cols-12 lg:items-end">
-            <div className="lg:col-span-6">
-              <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                <span className="text-[#09090b]">Eksekusi cepat,</span>{' '}
-                <span className="text-[#52525b]">keputusan tetap di tangan Anda.</span>
-              </h2>
+      {/* 5 & 6. ZONA OBSIDIAN BERGRADASI: terang -> gelap (Hero 5 & 6) -> memudar kembali ke footer terang.
+          Pita gradasi atas & bawah memakai tinggi tetap agar di mobile maupun desktop
+          teks Hero 5 & 6 selalu berada di atas #050507 ber-kontras penuh. */}
+      <div className="relative bg-[#050507] text-white">
+        {/* Transisi masuk: terang (#f5f5f7) -> obsidian (#050507) dengan sentuhan diagonal senada Hero 1 */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none h-28 w-full sm:h-40"
+          style={{
+            background: [
+              'radial-gradient(65% 80% at 78% 12%, rgba(245, 245, 247, 0.85) 0%, rgba(245, 245, 247, 0) 100%)',
+              'linear-gradient(172deg, #f5f5f7 0%, #f5f5f7 14%, #d4d4d8 32%, #71717a 50%, #3f3f46 66%, #18181b 82%, #050507 100%)',
+            ].join(', '),
+          }}
+        />
+
+        {/* 5. PILAR KEPUTUSAN ("Eksekusi cepat, keputusan tetap di tangan Anda.") */}
+        <section className="relative z-10 pb-8 pt-6 sm:pb-12 sm:pt-10">
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+            <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
+              <div className="lg:col-span-6">
+                <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
+                  <span className="text-white">Eksekusi cepat,</span>{' '}
+                  <span className="text-zinc-400">keputusan tetap di tangan Anda.</span>
+                </h2>
+              </div>
+              <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center lg:col-span-6">
+                <p className="max-w-sm text-[14px] leading-relaxed text-zinc-300">
+                  Pilih otomatis tanpa jeda, atau konfirmasi manual sekali ketuk.
+                </p>
+                <Link
+                  to="/fitur"
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-[#09090b] press hover:bg-zinc-200"
+                >
+                  Pelajari Fitur
+                </Link>
+              </div>
             </div>
-            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center lg:col-span-6">
-              <p className="max-w-sm text-[14px] leading-relaxed text-[#52525b]">
-                Pilih otomatis tanpa jeda, atau konfirmasi manual sekali ketuk.
-              </p>
-              <Link
-                to="/fitur"
-                className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#09090b] px-4 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
-              >
-                Pelajari Fitur
-              </Link>
+
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {PILLARS.map((pillar) =>
+                pillar.kind === 'standard' ? (
+                  <div
+                    key={pillar.title}
+                    className="hover-lift flex min-h-[205px] flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-6 hover:border-white/25"
+                  >
+                    <h3 className="text-[16px] font-semibold tracking-tight text-white">
+                      {pillar.title}
+                    </h3>
+                    <p className="mt-6 text-[13px] leading-relaxed text-zinc-400">{pillar.body}</p>
+                  </div>
+                ) : (
+                  <div
+                    key={pillar.anchor}
+                    className="hover-lift flex min-h-[205px] flex-col justify-between rounded-2xl border border-white/15 bg-white/[0.08] p-6 hover:border-white/30"
+                  >
+                    <p className="text-[13px] leading-relaxed text-zinc-300">{pillar.note}</p>
+                    <p className="mt-6 text-[16px] font-semibold tracking-tight text-white">
+                      {pillar.anchor}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           </div>
+        </section>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PILLARS.map((pillar) =>
-              pillar.kind === 'standard' ? (
-                <div
-                  key={pillar.title}
-                  className="hover-lift flex min-h-[205px] flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-6 hover:border-zinc-300"
-                >
-                  <h3 className="text-[16px] font-semibold tracking-tight text-[#09090b]">
-                    {pillar.title}
-                  </h3>
-                  <p className="mt-6 text-[13px] leading-relaxed text-[#52525b]">{pillar.body}</p>
-                </div>
-              ) : (
-                <div
-                  key={pillar.anchor}
-                  className="hover-lift flex min-h-[205px] flex-col justify-between rounded-2xl border border-zinc-200 bg-[#ececef] p-6 hover:border-zinc-300"
-                >
-                  <p className="text-[13px] leading-relaxed text-[#52525b]">{pillar.note}</p>
-                  <p className="mt-6 text-[16px] font-semibold tracking-tight text-[#09090b]">
-                    {pillar.anchor}
-                  </p>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      </section>
+        {/* 6. CTA INVITE-ONLY: form pengajuan akses + sosmed + disclaimer ringkas */}
+        <InviteRequestSection socialLinks={status?.social_links} />
 
-      {/* 6. CTA INVITE-ONLY: form pengajuan akses + sosmed + disclaimer risiko */}
-      <InviteRequestSection socialLinks={status?.social_links} />
+        {/* Transisi keluar: obsidian (#050507) -> terang (#f5f5f7) menyatu mulus ke footer */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none h-28 w-full sm:h-44"
+          style={{
+            background: [
+              'radial-gradient(65% 80% at 22% 88%, rgba(245, 245, 247, 0.9) 0%, rgba(245, 245, 247, 0) 100%)',
+              'linear-gradient(172deg, #050507 0%, #18181b 20%, #3f3f46 38%, #71717a 56%, #d4d4d8 76%, #f5f5f7 92%, #f5f5f7 100%)',
+            ].join(', '),
+          }}
+        />
+      </div>
     </div>
   )
 }

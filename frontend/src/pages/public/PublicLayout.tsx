@@ -104,9 +104,10 @@ function FooterWatermark() {
       aria-hidden="true"
       className="pointer-events-none relative z-10 w-full select-none overflow-hidden"
     >
+      {/* Sedikit digeser turun agar tepi bawah huruf IMAGINARY terpotong elegan di batas dasar layar */}
       <svg
         viewBox="0 0 1200 174.6"
-        className="block h-auto w-full"
+        className="block h-auto w-full translate-y-[22%] sm:translate-y-[24%]"
         preserveAspectRatio="none"
         focusable="false"
       >
@@ -431,156 +432,134 @@ export function PublicLayout() {
       </main>
 
       {tampilkanFooter && (
-        <footer className="relative z-0 border-t border-zinc-200/80 bg-[#f5f5f7] text-[#09090b]">
-        {/* Konten tautan footer: lebih rapat dan tetap berada di zona kontras tinggi */}
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-10 pb-10 sm:px-6 sm:pt-12 sm:pb-12">
-          {/* Logo & Brand Header Footer */}
-          <div className="mb-8 flex items-center gap-3.5 border-b border-zinc-200/80 pb-6">
-            <img
-              src="/brand/logo-light-64.png"
-              srcSet="/brand/logo-light-64.png 1x, /brand/logo-light-128.png 2x"
-              alt="Imaginary Liquidity"
-              className="h-10 w-auto object-contain"
-              decoding="async"
-            />
-            <div>
-              <p className="text-base font-bold tracking-tight text-[#09090b]">Imaginary Liquidity</p>
-              <p className="text-xs text-zinc-500">Analisis Likuiditas &amp; Eksekusi Trading Presisi</p>
+        <footer
+          className={cn(
+            'relative z-0 flex flex-col justify-between bg-[#f5f5f7] text-[#09090b] lg:min-h-[82vh]',
+            !isHome && 'border-t border-zinc-200/80',
+          )}
+        >
+          {/* Konten tautan footer: lega dan rapi, mengisi proporsi fullscreen di desktop */}
+          <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-12 pt-12 sm:px-6 sm:pb-16 sm:pt-16 lg:pt-20">
+            {/* Header brand besar + sosmed sejajar kanan */}
+            <div className="mb-10 flex flex-col items-start justify-between gap-5 border-b border-zinc-200/80 pb-8 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-4">
+                <img
+                  src="/brand/logo-light-64.png"
+                  srcSet="/brand/logo-light-64.png 1x, /brand/logo-light-128.png 2x"
+                  alt="Imaginary Liquidity"
+                  className="h-11 w-auto object-contain sm:h-12"
+                  decoding="async"
+                />
+                <p className="text-2xl font-semibold tracking-tight text-[#09090b] sm:text-3xl">
+                  Imaginary Liquidity
+                </p>
+              </div>
+              <SocialLinksRow links={socialLinks} variant="light" showLabel />
             </div>
-          </div>
 
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-12">
-            <div className="space-y-3 lg:col-span-2">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#3f3f46]">
-                Produk
-              </p>
-              <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
-                <li>
-                  <Link to="/fitur" className="transition-colors hover:text-[#52525b]">
-                    Fitur Platform
-                  </Link>
-                </li>
-                {!inviteOnly && (
+            {/* 3 kolom tautan bersih dan seimbang */}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:max-w-4xl lg:gap-x-16">
+              <div className="space-y-3.5">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+                  Produk
+                </p>
+                <ul className="space-y-2.5 text-[13px] font-medium text-[#18181b]">
                   <li>
-                    <Link to="/harga" className="transition-colors hover:text-[#52525b]">
-                      Paket &amp; Harga
+                    <Link to="/fitur" className="transition-colors hover:text-[#52525b]">
+                      Fitur Platform
                     </Link>
                   </li>
-                )}
-                <li>
-                  <Link to="/#cara-kerja" className="transition-colors hover:text-[#52525b]">
-                    Cara Kerja
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/bantuan/zona-waktu" className="transition-colors hover:text-[#52525b]">
-                    Sesi &amp; Zona Waktu
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-3 lg:col-span-2">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#3f3f46]">
-                Platform
-              </p>
-              <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
-                <li>
-                  {inviteOnly ? (
-                    <Link to="/#ajukan-akses" className="transition-colors hover:text-[#52525b]">
-                      Ajukan Akses
-                    </Link>
-                  ) : (
-                    <a href="/app/register" className="transition-colors hover:text-[#52525b]">
-                      Mulai Sekarang
-                    </a>
+                  {!inviteOnly && (
+                    <li>
+                      <Link to="/harga" className="transition-colors hover:text-[#52525b]">
+                        Paket &amp; Harga
+                      </Link>
+                    </li>
                   )}
-                </li>
-                <li>
-                  <a href="/app/login" className="transition-colors hover:text-[#52525b]">
-                    Masuk Dashboard
-                  </a>
-                </li>
-                <li>
-                  <Link to="/bantuan" className="transition-colors hover:text-[#52525b]">
-                    Pusat Bantuan
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/tentang" className="transition-colors hover:text-[#52525b]">
-                    Tentang Kami
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-3 lg:col-span-3">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#3f3f46]">
-                Dokumen Legal
-              </p>
-              <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
-                <li>
-                  <Link to="/legal/tos" className="transition-colors hover:text-[#52525b]">
-                    Syarat &amp; Ketentuan
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/legal/privacy" className="transition-colors hover:text-[#52525b]">
-                    Kebijakan Privasi
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/legal/risk" className="transition-colors hover:text-[#52525b]">
-                    Disclaimer Risiko Trading
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/legal/refund" className="transition-colors hover:text-[#52525b]">
-                    Kebijakan Pengembalian Dana
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/legal/fair_use" className="transition-colors hover:text-[#52525b]">
-                    Kebijakan Penggunaan Wajar
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-4 lg:col-span-5 lg:pl-6">
-              <p className="text-[14px] leading-relaxed text-[#18181b]">
-                Platform analisis likuiditas dan eksekusi trading langsung di broker Anda. Bukan penasihat keuangan; instrumen derivatif memiliki risiko modal.
-              </p>
-              <div className="flex flex-wrap items-center gap-4">
-                {inviteOnly ? (
-                  <Link
-                    to="/#ajukan-akses"
-                    className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
-                  >
-                    Ajukan Akses
-                  </Link>
-                ) : (
-                  <a
-                    href="/app/register"
-                    className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
-                  >
-                    Mulai Sekarang
-                  </a>
-                )}
-                <Link
-                  to="/legal/risk"
-                  className="text-[13px] font-medium text-[#09090b] underline underline-offset-4 hover:text-[#52525b]"
-                >
-                  Disclaimer Risiko
-                </Link>
+                  <li>
+                    <Link to="/#cara-kerja" className="transition-colors hover:text-[#52525b]">
+                      Cara Kerja
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/bantuan/zona-waktu" className="transition-colors hover:text-[#52525b]">
+                      Sesi &amp; Zona Waktu
+                    </Link>
+                  </li>
+                </ul>
               </div>
-              <SocialLinksRow links={socialLinks} variant="light" showLabel className="pt-1" />
+
+              <div className="space-y-3.5">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+                  Platform
+                </p>
+                <ul className="space-y-2.5 text-[13px] font-medium text-[#18181b]">
+                  <li>
+                    {inviteOnly ? (
+                      <Link to="/#ajukan-akses" className="transition-colors hover:text-[#52525b]">
+                        Ajukan Akses
+                      </Link>
+                    ) : (
+                      <a href="/app/register" className="transition-colors hover:text-[#52525b]">
+                        Mulai Sekarang
+                      </a>
+                    )}
+                  </li>
+                  <li>
+                    <a href="/app/login" className="transition-colors hover:text-[#52525b]">
+                      Masuk Dashboard
+                    </a>
+                  </li>
+                  <li>
+                    <Link to="/bantuan" className="transition-colors hover:text-[#52525b]">
+                      Pusat Bantuan
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/tentang" className="transition-colors hover:text-[#52525b]">
+                      Tentang Kami
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="col-span-2 space-y-3.5 sm:col-span-1">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717a]">
+                  Dokumen Legal
+                </p>
+                <ul className="space-y-2.5 text-[13px] font-medium text-[#18181b]">
+                  <li>
+                    <Link to="/legal/tos" className="transition-colors hover:text-[#52525b]">
+                      Syarat &amp; Ketentuan
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/legal/privacy" className="transition-colors hover:text-[#52525b]">
+                      Kebijakan Privasi
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/legal/risk" className="transition-colors hover:text-[#52525b]">
+                      Disclaimer Risiko Trading
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/legal/refund" className="transition-colors hover:text-[#52525b]">
+                      Kebijakan Pengembalian Dana
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/legal/fair_use" className="transition-colors hover:text-[#52525b]">
+                      Kebijakan Penggunaan Wajar
+                    </Link>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Watermark raksasa IMAGINARY, full-width tanpa celah dengan animasi scroll */}
-        <FooterWatermark />
+          {/* Watermark raksasa IMAGINARY, full-width dengan tepi bawah terpotong rapi */}
+          <FooterWatermark />
         </footer>
       )}
     </div>
