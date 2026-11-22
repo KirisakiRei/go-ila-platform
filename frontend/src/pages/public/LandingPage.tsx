@@ -1,19 +1,13 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { Skeleton } from '@/components/ui/skeleton'
-import { formatIDR } from '@/features/admin/lib/format'
-import { publicPlanApi } from '@/lib/admin-api'
-import {
-  HeroTradingGeometry,
-  MetricsCurveSvg,
-  MonochromeHorizonTile,
-  MonochromeLiquidityWaves,
-} from './components/LandingArtwork'
+import Timeline from '@/components/ui/timeline'
+import { publicContentApi } from '@/lib/system-api'
+import { HeroTradingGeometry, MetricsCurveSvg } from './components/LandingArtwork'
+import { InviteRequestSection } from './components/InviteRequestSection'
 import { SignalOverviewGrid } from './components/SignalOverviewGrid'
 import { useInView } from './components/use-in-view'
-import { formatPlanBenefits, getPlanAudience } from './lib/plan-benefits'
 
 const CURVE_METRICS = [
   {
@@ -64,45 +58,35 @@ const PILLARS = [
   },
   {
     kind: 'accent' as const,
-    note: 'Coba seluruh alur dalam mode simulasi selama 7 hari tanpa komitmen pembayaran.',
-    anchor: 'Mulai Uji Coba Simulasi',
-  },
-]
-
-const FEATURE_STATS = [
-  {
-    value: '2 Mode',
-    detail: 'Pilih konfirmasi manual per sinyal atau eksekusi otomatis sesuai aturan Anda.',
-  },
-  {
-    value: '7 Hari',
-    detail: 'Masa uji coba fitur setara Plus dalam mode simulasi sebelum memilih paket.',
-  },
-  {
-    value: 'Jejak',
-    detail: 'Setiap sinyal, persetujuan, dan riwayat order tercatat untuk dievaluasi.',
+    note: 'Akses dibuka bertahap lewat undangan dengan mode simulasi tersedia sebelum menghubungkan akun broker live.',
+    anchor: 'Akses Terkurasi & Simulasi',
   },
 ]
 
 /**
  * LandingPage adalah beranda situs publik Imaginary Liquidity (rekavia.com).
  *
- * Seluruh bagian memakai palet monokrom hitam-putih netral, menjelaskan cara
- * kerja dan batasan produk secara jujur tanpa janji keuntungan maupun bocoran
- * parameter internal ILA (`plans/10_LANDING_PAGE.md`).
+ * Susunan beranda:
+ *  1. Hero Utama (`#hero-band`)
+ *  2. Overview & Kurva Metrik (`#cara-kerja`)
+ *  3. Storyline Evolusi Metode ILA (`#evolusi-ila`)
+ *  4. Pantauan Pasar Terkini
+ *  5. Eksekusi Cepat & Pilar Kendali
+ *  6. Form Pengajuan Akses Undangan (`#ajukan-akses`) + Disclaimer Risiko
  */
 export default function LandingPage() {
   const { hash } = useLocation()
   const [kurvaRef, kurvaTerlihat] = useInView<HTMLDivElement>()
   const [metrikRef, metrikTerlihat] = useInView<HTMLDivElement>()
-  const { data: plans, isLoading: plansLoading } = useQuery({
-    queryKey: ['public', 'plans'],
-    queryFn: publicPlanApi.list,
+  const { data: status } = useQuery({
+    queryKey: ['public', 'status'],
+    queryFn: publicContentApi.status,
+    staleTime: 30_000,
   })
 
   useEffect(() => {
-    if (hash === '#cara-kerja') {
-      const target = document.getElementById('cara-kerja')
+    if (hash === '#cara-kerja' || hash === '#ajukan-akses' || hash === '#evolusi-ila') {
+      const target = document.getElementById(hash.slice(1))
       if (target) target.scrollIntoView()
     }
   }, [hash])
@@ -119,7 +103,7 @@ export default function LandingPage() {
           ].join(', '),
         }}
       >
-        {/* BAGIAN HERO */}
+        {/* 1. BAGIAN HERO */}
         <section id="hero-band" className="relative text-white">
           {/* Background geometris tema trading yang clean & rapi */}
           <HeroTradingGeometry
@@ -127,7 +111,7 @@ export default function LandingPage() {
             active
           />
 
-          <div className="relative mx-auto w-full max-w-6xl px-4 pt-28 pb-16 sm:px-6 sm:pt-36 sm:pb-24">
+          <div className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-28 sm:px-6 sm:pb-24 sm:pt-36">
             {/* Judul utama hero */}
             <div className="relative mt-6 flex min-h-[190px] flex-col justify-center py-4 sm:mt-10 sm:min-h-[240px]">
               <div className="relative z-10 w-full max-w-4xl text-left">
@@ -146,14 +130,12 @@ export default function LandingPage() {
                   Sinyal sweep likuiditas dan eksekusi order, langsung di akun broker Anda.
                 </p>
               </div>
-
               <div className="flex shrink-0 flex-wrap items-center gap-3">
-                {/* Anchor biasa: bundel panel terpisah di /app/*. */}
                 <a
-                  href="/app/register"
+                  href="#ajukan-akses"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] shadow-lg shadow-black/30 press hover:bg-zinc-200"
                 >
-                  Mulai Trial 7 Hari
+                  Ajukan Akses
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Link
@@ -167,10 +149,10 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* OVERVIEW + KURVA NAIK TANPA CARD */}
+        {/* 2. OVERVIEW + KURVA NAIK TANPA CARD */}
         <section
           id="cara-kerja"
-          className="relative z-10 mx-auto w-full max-w-6xl scroll-mt-20 px-4 pt-12 pb-20 sm:px-6 sm:pt-16 sm:pb-24"
+          className="relative z-10 mx-auto w-full max-w-6xl scroll-mt-20 px-4 pb-20 pt-12 sm:px-6 sm:pb-24 sm:pt-16"
         >
           <div className="max-w-2xl space-y-5">
             <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight text-[#09090b] sm:text-4xl lg:text-[2.75rem]">
@@ -182,10 +164,10 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <a
-                href="/app/register"
+                href="#ajukan-akses"
                 className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
               >
-                Mulai Trial 7 Hari
+                Ajukan Akses
               </a>
               <Link
                 to="/bantuan/zona-waktu"
@@ -244,7 +226,52 @@ export default function LandingPage() {
         </section>
       </div>
 
-      {/* 3. PILAR KEPUTUSAN ("Kami buat eksekusi mudah dikendalikan") */}
+      {/* 3. STORYLINE EVOLUSI METODE ILA (ILA 1.0 -> ILA 2.0 -> ILA 2.1 -> ILA 3.0) */}
+      <Timeline />
+
+      {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
+      <section className="bg-[#f5f5f7] py-20 sm:py-28">
+        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+          <div className="max-w-2xl space-y-3">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
+              Pantauan Pasar
+            </p>
+            <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
+              <span className="text-[#09090b]">Arah pasar terkini,</span>{' '}
+              <span className="text-[#52525b]">diperbarui sepanjang sesi</span>
+            </h2>
+            <p className="text-[14px] leading-relaxed text-[#52525b]">
+              Pembacaan arah tren dari struktur likuiditas instrumen utama secara real-time.
+            </p>
+          </div>
+
+          <div className="mt-8">
+            <SignalOverviewGrid />
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6">
+            <p className="text-[13px] text-[#71717a]">
+              Angka entry, SL, dan TP masuk ke dashboard begitu sinyal Anda terima.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="#ajukan-akses"
+                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-4 py-2 text-[13px] font-medium text-white press hover:bg-[#27272a]"
+              >
+                Ajukan Akses
+              </a>
+              <Link
+                to="/fitur"
+                className="text-[13px] font-medium text-[#18181b] underline underline-offset-4 hover:text-[#52525b]"
+              >
+                Pelajari Fitur
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. PILAR KEPUTUSAN ("Eksekusi cepat, keputusan tetap di tangan Anda.") */}
       <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="grid gap-6 border-t border-zinc-200 pt-14 lg:grid-cols-12 lg:items-end">
@@ -295,358 +322,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. PANTAUAN PASAR TERKINI: tiga instrumen utama dengan arah terakhir. */}
-      <section className="bg-[#f5f5f7] pb-20 sm:pb-28">
-        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="max-w-2xl space-y-3">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
-              Pantauan Pasar
-            </p>
-            <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-              <span className="text-[#09090b]">Arah pasar terkini,</span>{' '}
-              <span className="text-[#52525b]">diperbarui sepanjang sesi</span>
-            </h2>
-            <p className="text-[14px] leading-relaxed text-[#52525b]">
-              Pembacaan arah tren dari struktur likuiditas instrumen utama secara real-time.
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <SignalOverviewGrid />
-          </div>
-
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6">
-            <p className="text-[13px] text-[#71717a]">
-              Angka entry, SL, dan TP masuk ke dashboard begitu sinyal Anda terima.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                to="/harga"
-                className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-4 py-2 text-[13px] font-medium text-white press hover:bg-[#27272a]"
-              >
-                Lihat Paket &amp; Harga
-              </Link>
-              <Link
-                to="/fitur"
-                className="text-[13px] font-medium text-[#18181b] underline underline-offset-4 hover:text-[#52525b]"
-              >
-                Pelajari Fitur
-              </Link>
-            </div>
-          </div>
-
-          <h2 className="mt-14 max-w-3xl text-3xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-            <span className="text-[#09090b]">Pantau setup, eksekusi,</span>
-            <br />
-            <span className="text-[#52525b]">tinjau hasilnya.</span>
-          </h2>
-        </div>
-      </section>
-
-      {/* 5. ILA 2.0 & ILA 3.0 (menggantikan bagian gelombang ungu) */}
-      <section className="bg-[#f5f5f7] py-20 sm:py-28">
-        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="grid gap-6 lg:grid-cols-12 lg:items-stretch">
-            <div className="flex flex-col justify-between gap-8 lg:col-span-5">
-              <div className="space-y-4">
-                <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                  <span className="text-[#09090b]">Dua mesin analisis,</span>{' '}
-                  <span className="text-[#52525b]">satu kerangka risiko.</span>
-                </h2>
-                <p className="text-[14px] leading-relaxed text-[#52525b]">
-                  Sinyal baru terbit setelah harga menyapu level acuan dan struktur bergerak searah.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <a
-                  href="/app/register"
-                  className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
-                >
-                  Mulai Trial
-                </a>
-                <Link
-                  to="/fitur"
-                  className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-[13px] font-medium text-[#09090b] press hover:bg-zinc-100"
-                >
-                  Pelajari Fitur
-                </Link>
-              </div>
-            </div>
-
-            <div className="relative min-h-[340px] overflow-hidden rounded-2xl border border-zinc-800/30 shadow-lg shadow-black/10 lg:col-span-4 lg:min-h-[420px]">
-              <MonochromeLiquidityWaves className="h-full w-full object-cover" />
-              <div className="absolute inset-x-4 bottom-4 rounded-xl border border-white/15 bg-black/75 px-4 py-3 text-white backdrop-blur-md">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-zinc-300">
-                  Pemetaan Struktur Harga
-                </p>
-                <p className="mt-0.5 text-[13px] font-medium">ILA 2.0 &amp; ILA 3.0</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-between gap-4 lg:col-span-3">
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
-                  <h3 className="text-[14px] font-semibold text-[#09090b]">
-                    ILA 2.0 · Tersedia Sekarang
-                  </h3>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
-                    Saringan sweep likuiditas dan konfirmasi struktur. Aturannya sama di semua paket.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-zinc-200/80 bg-white p-5">
-                  <h3 className="text-[14px] font-semibold text-[#09090b]">
-                    ILA 3.0 · Hadir Bertahap
-                  </h3>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-[#52525b]">
-                    Penyaringan multi-timeframe lanjutan di paket Plus, dirilis bertahap.
-                  </p>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden rounded-2xl border border-zinc-800/20">
-                <MonochromeHorizonTile className="h-32 w-full object-cover" />
-                <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/85 via-transparent to-transparent p-4">
-                  <p className="text-[12px] font-medium text-white">Fokus pada Konfirmasi</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. FITUR & CAKUPAN PEMANTAUAN (menggantikan Bento jargon internal) */}
-      <section className="bg-[#f5f5f7] pb-20 sm:pb-24">
-        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-              <span className="text-[#09090b]">Cakupan pantauan dan</span>{' '}
-              <span className="text-[#52525b]">batas risiko Anda.</span>
-            </h2>
-            <p className="mt-3 text-[14px] leading-relaxed text-[#52525b]">
-              Membantu Anda menjalankan rencana trading yang sudah ditulis, mulai dari pemindaian
-              sesi hingga pencatatan riwayat keputusan.
-            </p>
-          </div>
-
-          <div className="mt-12 grid gap-4 lg:grid-cols-12">
-            <div className="hover-lift flex flex-col justify-between gap-6 rounded-2xl border border-zinc-200/80 bg-white p-6 hover:border-zinc-300 lg:col-span-4">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#52525b]">
-                  Pemindaian Sesi Aktif
-                </p>
-                <p className="mt-2 text-[14px] leading-relaxed text-[#3f3f46]">
-                  Memantau instrumen pilihan secara terjadwal selama jam pasar dibuka dan
-                  mencatat setiap sinyal yang lolos maupun yang dilewati agar mudah Anda tinjau.
-                </p>
-              </div>
-
-              <div className="border-t border-zinc-200 pt-5">
-                <p className="text-[13px] text-[#52525b]">Cakupan instrumen likuid</p>
-                <p className="mt-1 text-2xl font-bold tracking-tight text-[#09090b]">
-                  8 Pair Utama
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 lg:col-span-4">
-              <div className="hover-lift rounded-2xl border border-zinc-200/80 bg-white p-6 hover:border-zinc-300">
-                <h3 className="text-[16px] font-semibold tracking-tight text-[#09090b]">
-                  Peringatan &amp; Persetujuan Telegram
-                </h3>
-                <p className="mt-2 text-[13px] leading-relaxed text-[#52525b]">
-                  Sinyal sampai ke Telegram, setujui dengan satu ketukan.
-                </p>
-              </div>
-
-              <div className="flex flex-1 flex-col justify-between rounded-2xl border border-zinc-200 bg-[#e6e6ea] p-6">
-                <span className="w-fit rounded-full bg-[#09090b] px-3 py-1 text-[11px] font-medium text-white">
-                  Pengendalian Risiko
-                </span>
-                <div className="mt-8">
-                  <h3 className="text-xl font-bold tracking-tight text-[#09090b]">
-                    Batas Harian Terukur per Akun
-                  </h3>
-                  <p className="mt-2 text-[13px] leading-relaxed text-[#3f3f46]">
-                    Atur persentase risiko per posisi, batas jumlah trade harian, serta aturan
-                    berhenti otomatis untuk mencegah overtrading.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 lg:col-span-4">
-              {FEATURE_STATS.map((stat) => (
-                <div
-                  key={stat.value}
-                  className="flex flex-1 flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-5"
-                >
-                  <p className="text-2xl font-bold tracking-tight text-[#09090b]">{stat.value}</p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-[#52525b]">{stat.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. OVERVIEW HARGA (TANPA CARD KOTAK, KOLOM TERBUKA + BENEFIT MANUSIAWI) */}
-      <section className="relative z-10 bg-[#f5f5f7] py-20 sm:py-24">
-        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="flex flex-col justify-between gap-4 pb-10 sm:flex-row sm:items-end">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl">
-                <span className="text-[#09090b]">Pilih paket sesuai</span>{' '}
-                <span className="text-[#52525b]">cara Anda bertrading.</span>
-              </h2>
-              <p className="max-w-xl text-[14px] text-[#52525b]">
-                Mulai gratis dengan data simulasi, atau uji coba 7 hari setara Plus tanpa kartu
-                kredit.
-              </p>
-            </div>
-            <Link
-              to="/harga"
-              className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-[#09090b] underline underline-offset-4 hover:text-[#52525b]"
-            >
-              Bandingkan paket selengkapnya
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-
-          {plansLoading ? (
-            <div className="grid gap-8 border-t border-zinc-200 pt-8 sm:grid-cols-3">
-              {[0, 1, 2].map((idx) => (
-                <div key={idx} className="flex flex-col justify-between border-t border-zinc-200 pt-6 space-y-6">
-                  <div className="space-y-4">
-                    <Skeleton className="h-6 w-28 bg-zinc-200" />
-                    <Skeleton className="h-4 w-4/5 bg-zinc-200" />
-                    <Skeleton className="h-8 w-36 bg-zinc-200" />
-                    <div className="space-y-2 pt-2">
-                      <Skeleton className="h-4 w-full bg-zinc-200" />
-                      <Skeleton className="h-4 w-5/6 bg-zinc-200" />
-                      <Skeleton className="h-4 w-3/4 bg-zinc-200" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-10 w-full rounded-lg bg-zinc-200" />
-                </div>
-              ))}
-            </div>
-          ) : plans && plans.length > 0 ? (
-            <div className="grid gap-10 sm:grid-cols-3 sm:gap-8">
-              {plans.map((plan) => {
-                const isHighlight = plan.code === 'plus'
-                const benefits = formatPlanBenefits(plan)
-                return (
-                  <div
-                    key={plan.code}
-                    className={
-                      isHighlight
-                        ? 'flex flex-col justify-between border-t-2 border-[#09090b] pt-6'
-                        : 'flex flex-col justify-between border-t border-zinc-300 pt-6'
-                    }
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-lg font-semibold text-[#09090b]">{plan.name}</h3>
-                        {isHighlight && (
-                          <span className="rounded-full bg-[#09090b] px-2.5 py-0.5 text-[11px] font-medium text-white">
-                            Paling Lengkap
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="mt-2 min-h-[40px] text-[13px] leading-relaxed text-[#52525b]">
-                        {getPlanAudience(plan)}
-                      </p>
-
-                      <div className="mt-5 flex items-baseline gap-1.5 border-b border-zinc-200 pb-5">
-                        <span className="text-3xl font-bold tracking-tight text-[#09090b] tabular-nums">
-                          {formatIDR(plan.price_idr)}
-                        </span>
-                        <span className="text-[12px] text-[#52525b]">/ bulan</span>
-                      </div>
-
-                      <ul className="mt-5 space-y-3 text-[13px] text-[#27272a]">
-                        {benefits.map((benefit) => (
-                          <li key={benefit.label} className="flex items-start gap-2.5">
-                            <Check
-                              className="mt-0.5 h-4 w-4 shrink-0 text-[#09090b]"
-                              aria-hidden="true"
-                            />
-                            <span>{benefit.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="mt-8">
-                      <a
-                        href="/app/register"
-                        className={
-                          isHighlight
-                            ? 'block rounded-lg bg-[#09090b] px-4 py-2.5 text-center text-[13px] font-medium text-white press hover:bg-[#27272a]'
-                            : 'block rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-center text-[13px] font-medium text-[#09090b] press hover:bg-zinc-100'
-                        }
-                      >
-                        Pilih {plan.name}
-                      </a>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="border-t border-zinc-200 pt-6 text-[13px] text-[#52525b]">
-              Perbandingan paket lengkap ada di halaman{' '}
-              <Link to="/harga" className="font-medium text-[#09090b] underline">
-                Harga
-              </Link>
-              .
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* 8. BANNER CTA GET STARTED (transparan di luar agar gradasi kontinu footer menyatu dari belakang kartu) */}
-      <section className="relative z-10 bg-transparent px-4 pt-10 pb-2 sm:px-6 sm:pt-12 sm:pb-4">
-        <div className="mx-auto w-full max-w-6xl">
-          <div className="rounded-3xl bg-[#050507] px-6 py-12 text-white shadow-2xl shadow-black/15 sm:px-12 sm:py-16">
-            <div className="max-w-2xl space-y-6">
-              <h2 className="text-3xl font-semibold leading-[1.12] tracking-tight sm:text-4xl lg:text-[2.6rem]">
-                <span className="text-white">Tujuh hari untuk melihat</span>{' '}
-                <span className="text-zinc-400">apakah cara kerja ini cocok.</span>
-              </h2>
-
-              <p className="text-[14px] leading-relaxed text-zinc-300">
-                Mulai di mode simulasi tanpa kartu kredit. Broker dihubungkan saat Anda siap eksekusi.
-              </p>
-
-              <p className="border-l-2 border-zinc-700 pl-4 text-[12px] leading-relaxed text-zinc-300">
-                <strong className="font-semibold text-white">Disclaimer Risiko Trading:</strong>{' '}
-                Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi. Platform ini
-                adalah alat bantu analisis dan eksekusi. Tidak menjamin hasil, bukan nasihat
-                keuangan.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <a
-                  href="/app/register"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-[13px] font-semibold text-[#09090b] press hover:bg-zinc-200"
-                >
-                  Mulai Trial 7 Hari
-                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
-                <Link
-                  to="/legal/risk"
-                  className="text-[13px] font-medium text-zinc-200 underline underline-offset-4 transition-colors hover:text-white"
-                >
-                  Baca Disclaimer Risiko
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* 6. CTA INVITE-ONLY: form pengajuan akses + sosmed + disclaimer risiko */}
+      <InviteRequestSection socialLinks={status?.social_links} />
     </div>
   )
 }

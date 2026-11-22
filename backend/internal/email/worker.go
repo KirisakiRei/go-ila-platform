@@ -134,6 +134,17 @@ func Render(row model.EmailOutbox, tokens TokenSource) (Message, error) {
 				link + "\n\n" +
 				"Setelah kata sandi diganti, seluruh perangkat akan keluar otomatis.\n" +
 				"Bila Anda tidak meminta ini, abaikan pesan ini; kata sandi tidak berubah.\n",
+			HTML: renderHTML(emailLayoutData{
+				Preheader:   "Tautan atur ulang kata sandi akun Imaginary Liquidity Anda (berlaku 30 menit).",
+				Eyebrow:     "Keamanan Akun",
+				Heading:     "Atur ulang kata sandi",
+				Greeting:    "Halo " + name + ",",
+				Intro:       "Kami menerima permintaan untuk mengatur ulang kata sandi akun Imaginary Liquidity Anda. Klik tombol di bawah untuk membuat kata sandi baru.",
+				ButtonLabel: "Atur Ulang Kata Sandi",
+				Link:        link,
+				Highlight:   "Tautan ini berlaku selama 30 menit. Setelah kata sandi diganti, seluruh perangkat yang sedang masuk akan keluar otomatis.",
+				Footnote:    "Bila Anda tidak mengajukan permintaan ini, abaikan saja email ini — kata sandi Anda tidak berubah.",
+			}),
 		}, nil
 	case "verify_email":
 		return Message{
@@ -145,6 +156,39 @@ func Render(row model.EmailOutbox, tokens TokenSource) (Message, error) {
 				"Tautan berlaku 24 jam. Selama email belum terverifikasi, akun tetap " +
 				"bisa digunakan untuk melihat dashboard, namun trial, koneksi broker, " +
 				"dan pembayaran belum tersedia.\n",
+			HTML: renderHTML(emailLayoutData{
+				Preheader:   "Konfirmasi alamat email Anda untuk mengaktifkan penuh akun Imaginary Liquidity.",
+				Eyebrow:     "Verifikasi Email",
+				Heading:     "Konfirmasi alamat email Anda",
+				Greeting:    "Halo " + name + ",",
+				Intro:       "Satu langkah singkat untuk memastikan alamat email ini benar milik Anda dan membuka akses penuh di dashboard.",
+				ButtonLabel: "Verifikasi Email",
+				Link:        link,
+				Highlight:   "Tautan verifikasi berlaku selama 24 jam.",
+				Footnote:    "Email ini dikirim otomatis karena pendaftaran akun baru di Imaginary Liquidity.",
+			}),
+		}, nil
+	case "invite_approved":
+		return Message{
+			To:      row.ToEmail,
+			Subject: "Undangan akses Imaginary Liquidity Anda siap digunakan",
+			Body: "Halo " + name + ",\n\n" +
+				"Permohonan akses Anda ke Imaginary Liquidity telah disetujui.\n" +
+				"Gunakan tautan undangan pribadi berikut untuk membuat akun:\n\n" +
+				link + "\n\n" +
+				"Tautan ini hanya berlaku satu kali dan terkunci khusus untuk alamat email ini.\n" +
+				"Jika tautan sudah kedaluwarsa, silakan hubungi tim kami kembali.\n",
+			HTML: renderHTML(emailLayoutData{
+				Preheader:   "Permohonan akses disetujui — buka tautan undangan pribadi Imaginary Liquidity Anda.",
+				Eyebrow:     "Akses Undangan Disetujui",
+				Heading:     "Selamat datang di Imaginary Liquidity",
+				Greeting:    "Halo " + name + ",",
+				Intro:       "Permohonan akses Anda telah kami tinjau dan disetujui. Gunakan tautan undangan pribadi di bawah ini untuk menyelesaikan pembuatan akun Anda.",
+				ButtonLabel: "Buat Akun dengan Undangan",
+				Link:        link,
+				Highlight:   "Tautan ini bersifat pribadi (1× pakai) dan terkunci khusus untuk alamat email ini. Mohon tidak membagikan tautan ke pihak lain.",
+				Footnote:    "Perdagangan derivatif memiliki risiko kerugian tinggi. Platform ini adalah alat bantu analisis dan eksekusi, bukan nasihat keuangan.",
+			}),
 		}, nil
 	default:
 		return Message{}, errUnknownTemplate
@@ -163,6 +207,8 @@ func LinkFor(template, rawToken string) string {
 		return PublicBaseURL + "/reset-password?token=" + rawToken
 	case "verify_email":
 		return PublicBaseURL + "/verifikasi?token=" + rawToken
+	case "invite_approved":
+		return PublicBaseURL + "/daftar?invite=" + rawToken
 	default:
 		return ""
 	}

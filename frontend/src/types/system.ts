@@ -149,6 +149,12 @@ export type MarketWindow = {
   next_change_pair: { wib: string; ny: string; utc: string }
 }
 
+export type SocialLinks = {
+  discord: string
+  x: string
+  telegram: string
+}
+
 export type PublicStatus = {
   mode: string
   message: string
@@ -161,4 +167,6 @@ export type PublicStatus = {
    * dan pembayaran tidak ditawarkan. Akun baru hanya dari undangan admin.
    */
   invite_only: boolean
+  /** Tautan komunitas publik yang dikelola dari dashboard admin. */
+  social_links?: SocialLinks
 }

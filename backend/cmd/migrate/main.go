@@ -89,7 +89,7 @@ func main() {
 		&model.Page{},
 		&model.PageSection{},
 		&model.PageItem{},
-		&model.InviteCode{}, &model.InviteRedemption{},
+		&model.InviteCode{}, &model.InviteRedemption{}, &model.InviteRequest{},
 		&model.BugReport{}, &model.BugReportAttachment{},
 		&model.EmailOutbox{},
 		&model.EmailToken{},

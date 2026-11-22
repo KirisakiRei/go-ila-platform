@@ -447,7 +447,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	publicSignalHandler := handler.NewPublicSignalHandler(
 		service.NewPublicSignalService(repository.NewPublicSignalStore(db), systemOpsService),
 	)
-	cmsHandler := handler.NewCMSHandler(cmsService)
+	socialLinksService := service.NewSocialLinksService(settingsService, settingsRepo, adminAudit)
+	cmsHandler := handler.NewCMSHandler(cmsService).WithSocialLinks(socialLinksService)
 	pageHandler := handler.NewPageHandler(pageService)
 	emailAccountHandler := handler.NewEmailAccountHandler(emailAccountService)
 	pricingHandler := handler.NewPricingHandler(pricingService)
@@ -475,6 +476,16 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 	billingHandler := handler.NewBillingHandler(billingService)
 	inviteService := service.NewInviteService(repository.NewInviteRepository(db), authService, adminAudit)
 	inviteHandler := handler.NewInviteHandler(inviteService, inviteService)
+	smtpEnabled := cfg.SMTPHost != "" && cfg.SMTPFrom != ""
+	inviteRequestService := service.NewInviteRequestService(
+		repository.NewInviteRequestRepository(db),
+		inviteService,
+		emailRepo,
+		smtpEnabled,
+		adminAudit,
+		logger,
+	)
+	inviteRequestHandler := handler.NewInviteRequestHandler(inviteRequestService, inviteRequestService)
 	bugService := service.NewBugService(repository.NewBugReportRepository(db), cfg.UploadDir, adminAudit)
 	bugHandler := handler.NewBugHandler(bugService, bugService)
 	// Pendaftaran hanya bisa lewat undangan selama mode invite only.
@@ -541,6 +552,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		// Pemeriksaan tautan undangan: publik karena halaman daftar memakainya
 		// sebelum ada sesi. Tidak memakai kuota; keputusan tetap saat submit.
 		publicStatus.GET("/invites/:code", inviteHandler.Periksa)
+		// Pengajuan akses selama invite-only: dibatasi ketat per IP agar bebas spam.
+		inviteReqLimiter := middleware.NewRateLimiter(5, 10*time.Minute)
+		publicStatus.POST("/invite-requests", middleware.RateLimitByIP(inviteReqLimiter), inviteRequestHandler.Submit)
 		cmsHandler.PublicRegister(publicStatus.Group(""))
 		pageHandler.PublicRegister(publicStatus.Group(""))
 	}
@@ -680,7 +694,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		}
 	}
 
-	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler, inviteHandler, bugHandler)
+	registerAdmin(r, cfg, logger, userRepo, permCache, adminAuthHandler, adminRoleHandler, twoFactorHandler, legalHandler, adminUserHandler, auditAdminHandler, adminBillingHandler, adminReportHandler, adminSystemHandler, cmsHandler, pageHandler, adminTrialHandler, adminPairHandler, adminSignalHandler, inviteHandler, inviteRequestHandler, bugHandler)
 
 	// Tidak ada endpoint admin tanpa izin: bila ada yang lupa dideklarasikan,
 	// proses berhenti sebelum menerima permintaan (plans/04 §5.2).
@@ -729,6 +743,7 @@ func registerAdmin(
 	adminPairHandler *handler.AdminPairHandler,
 	adminSignalHandler *handler.AdminSignalHandler,
 	inviteHandler *handler.InviteHandler,
+	inviteRequestHandler *handler.InviteRequestHandler,
 	bugHandler *handler.BugHandler,
 ) {
 	issuer := newAdminTokenIssuer(cfg)
@@ -819,6 +834,7 @@ func registerAdmin(
 	// Pelanggan: daftar, profil, dan aksi berlapis.
 	// Kredensial broker tidak punya endpoint di sini, dan itu disengaja.
 	inviteHandler.Register(admin.Group(""), guard)
+	inviteRequestHandler.Register(admin.Group(""), guard)
 	bugHandler.Register(admin.Group(""), guard)
 	userHandler.Register(admin.Group(""), guard)
 	auditHandler.Register(admin.Group(""), guard)

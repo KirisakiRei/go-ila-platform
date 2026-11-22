@@ -4,12 +4,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import LandingPage from '@/pages/public/LandingPage'
 import { PublicLayout } from '@/pages/public/PublicLayout'
-import { publicPlanApi } from '@/lib/admin-api'
+import { inviteRequestApi } from '@/lib/invite-api'
 import { publicContentApi } from '@/lib/system-api'
-import type { PublicPlan } from '@/types/admin'
 import type { PublicStatus } from '@/types/system'
 
-function makePublicStatus(mode: string, message = ''): PublicStatus {
+function makePublicStatus(
+  mode: string,
+  message = '',
+  overrides: Partial<PublicStatus> = {},
+): PublicStatus {
   return {
     mode,
     message,
@@ -22,15 +25,31 @@ function makePublicStatus(mode: string, message = ''): PublicStatus {
       next_label: 'Buka',
       next_change_pair: { wib: '05:00 WIB', ny: '17:00 NY', utc: '22:00 UTC' },
     },
-    invite_only: false,
+    invite_only: true,
+    social_links: {
+      discord: 'https://discord.gg/imaginary',
+      x: 'https://x.com/imaginaryliq',
+      telegram: 'https://t.me/imaginaryliq',
+    },
+    ...overrides,
   }
+}
+
+const EMPTY_SIGNAL_PREVIEW = {
+  generated_at: '2026-11-08T12:00:00Z',
+  market: {
+    open: false,
+    label: 'Tutup',
+    next_label: 'Buka',
+    next_change_pair: { wib: '05:00 WIB', ny: '17:00 NY', utc: '22:00 UTC' },
+  },
+  items: [],
 }
 
 function renderPublicLanding() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: 0 } },
   })
-
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/']}>
@@ -44,50 +63,14 @@ function renderPublicLanding() {
   )
 }
 
-const SAMPLE_PLANS: PublicPlan[] = [
-  {
-    code: 'free',
-    name: 'Free',
-    description: 'Simulasi dasar',
-    price_idr: 0,
-    interval: 'month',
-    features: {
-      account_limit: '1',
-      auto_execute: 'false',
-      max_symbols: '1',
-      signal_delay_minutes: '15',
-      strategies: 'ila-2.0',
-    },
-    ila3_coming_soon: false,
-    active: true,
-  },
-  {
-    code: 'plus',
-    name: 'Plus',
-    description: 'Otomatis penuh',
-    price_idr: 299000,
-    interval: 'month',
-    features: {
-      account_limit: '2',
-      auto_execute: 'true',
-      max_symbols: '8',
-      reason_ai: 'true',
-      signal_delay_minutes: '0',
-      strategies: 'ila-2.0',
-    },
-    ila3_coming_soon: true,
-    active: true,
-  },
-]
-
 describe('LandingPage & PublicLayout', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('menampilkan satu h1, disclaimer risiko, paket DB, dan slug legal baku', async () => {
+  it('menampilkan susunan beranda baru, storyline ILA, form undangan, sosmed, dan menyembunyikan harga/trial', async () => {
     vi.spyOn(publicContentApi, 'status').mockResolvedValue(makePublicStatus('normal'))
-    vi.spyOn(publicPlanApi, 'list').mockResolvedValue(SAMPLE_PLANS)
+    vi.spyOn(publicContentApi, 'signalPreview').mockResolvedValue(EMPTY_SIGNAL_PREVIEW)
 
     const { container } = renderPublicLanding()
 
@@ -95,31 +78,58 @@ describe('LandingPage & PublicLayout', () => {
     expect(h1List).toHaveLength(1)
     expect(h1List[0]).toHaveTextContent(/Imaginary Liquidity Algorithm/i)
 
+    // Storyline ILA 1.0 -> 3.0 tampil di beranda.
+    expect(screen.getAllByText('ILA 1.0').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ILA 2.0').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ILA 2.1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ILA 3.0').length).toBeGreaterThan(0)
+
+    // Bagian lama yang diminta dihapus tidak muncul lagi.
+    expect(screen.queryByText(/Pantau setup, eksekusi/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Dua mesin analisis/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Pilih paket sesuai/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Cakupan pantauan dan/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Mulai Trial 7 Hari/i)).not.toBeInTheDocument()
+
+    // Disclaimer risiko tetap hadir dan tidak ada janji keuntungan.
     expect(
       screen.getByText(/Perdagangan mata uang dan derivatif memiliki risiko kerugian tinggi/i),
     ).toBeInTheDocument()
     expect(screen.queryByText(/profit pasti/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/win rate/i)).not.toBeInTheDocument()
 
-    // Paket dimuat dari API, harga diformat rupiah, dan benefit tidak mentah.
-    expect(await screen.findByText('Plus')).toBeInTheDocument()
-    expect(screen.getByText(/Rp\s?299\.000/)).toBeInTheDocument()
-    expect(screen.getByText(/Eksekusi otomatis & konfirmasi manual/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sinyal tanpa jeda/i)).toBeInTheDocument()
-    expect(screen.queryByText(/auto_execute/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/signal_delay_minutes/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/AES-256/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/mTLS/i)).not.toBeInTheDocument()
+    // Tautan sosmed dari status publik tampil.
+    const discordLinks = await screen.findAllByRole('link', { name: 'Discord' })
+    expect(discordLinks[0]).toHaveAttribute('href', 'https://discord.gg/imaginary')
+    expect(screen.getAllByRole('link', { name: 'X' })[0]).toHaveAttribute(
+      'href',
+      'https://x.com/imaginaryliq',
+    )
+    expect(screen.getAllByRole('link', { name: 'Telegram' })[0]).toHaveAttribute(
+      'href',
+      'https://t.me/imaginaryliq',
+    )
 
-    // Footer memakai slug legal resmi backend.
+    // Saat invite_only aktif, menu Harga disembunyikan dari navigasi & footer.
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
+    expect(hrefs).not.toContain('/harga')
     expect(hrefs).toContain('/legal/tos')
     expect(hrefs).toContain('/legal/privacy')
     expect(hrefs).toContain('/legal/risk')
     expect(hrefs).toContain('/legal/refund')
     expect(hrefs).toContain('/legal/fair_use')
-    expect(hrefs).toContain('/app/register')
     expect(hrefs).toContain('/app/login')
+
+    // Urutan section utama: Storyline -> Pantauan Pasar -> Eksekusi cepat -> Ajukan Akses.
+    const html = container.innerHTML
+    const posStoryline = html.indexOf('id="evolusi-ila"')
+    const posPantauan = html.indexOf('Pantauan Pasar')
+    const posEksekusi = html.indexOf('Eksekusi cepat,')
+    const posAjukan = html.indexOf('id="ajukan-akses"')
+    expect(posStoryline).toBeGreaterThan(-1)
+    expect(posPantauan).toBeGreaterThan(posStoryline)
+    expect(posEksekusi).toBeGreaterThan(posPantauan)
+    expect(posAjukan).toBeGreaterThan(posEksekusi)
 
     // Header pada posisi atas landing page menyatu transparan tanpa border bawah,
     // lalu berubah menjadi latar putih saat di-scroll ke bagian terang.
@@ -133,6 +143,34 @@ describe('LandingPage & PublicLayout', () => {
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
   })
 
+  it('mengirim form pengajuan akses tanpa kredensial dan menampilkan konfirmasi', async () => {
+    vi.spyOn(publicContentApi, 'status').mockResolvedValue(makePublicStatus('normal'))
+    vi.spyOn(publicContentApi, 'signalPreview').mockResolvedValue(EMPTY_SIGNAL_PREVIEW)
+    const submitSpy = vi.spyOn(inviteRequestApi, 'submit').mockResolvedValue(undefined)
+
+    renderPublicLanding()
+
+    fireEvent.change(screen.getByLabelText(/Nama \/ Panggilan/i), {
+      target: { value: 'Ryan Trader' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Email/i), {
+      target: { value: 'ryan@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText(/Telegram \/ Discord/i), {
+      target: { value: '@ryantrader' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Ajukan Bergabung/i }))
+
+    expect(await screen.findByText(/Permohonan akses diterima/i)).toBeInTheDocument()
+    expect(submitSpy).toHaveBeenCalledWith({
+      name: 'Ryan Trader',
+      email: 'ryan@example.com',
+      contact: '@ryantrader',
+      note: undefined,
+      website: '',
+    })
+  })
+
   it('menampilkan banner pemeliharaan saat mode sistem bukan normal', async () => {
     vi.spyOn(publicContentApi, 'status').mockResolvedValue(
       makePublicStatus(
@@ -140,7 +178,7 @@ describe('LandingPage & PublicLayout', () => {
         'Sedang pemeliharaan terjadwal; entry baru ditahan sementara.',
       ),
     )
-    vi.spyOn(publicPlanApi, 'list').mockResolvedValue([])
+    vi.spyOn(publicContentApi, 'signalPreview').mockResolvedValue(EMPTY_SIGNAL_PREVIEW)
 
     renderPublicLanding()
 

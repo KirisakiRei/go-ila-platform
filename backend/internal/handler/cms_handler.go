@@ -11,14 +11,21 @@ import (
 	"ila/backend/pkg/httpx"
 )
 
-// CMSHandler adalah pintu HTTP konten: FAQ dan pengumuman.
+// CMSHandler adalah pintu HTTP konten: FAQ, pengumuman, dan tautan media sosial.
 type CMSHandler struct {
-	cms service.CMSService
+	cms    service.CMSService
+	social service.SocialLinksService
 }
 
 // NewCMSHandler merangkai handler konten.
 func NewCMSHandler(cms service.CMSService) *CMSHandler {
 	return &CMSHandler{cms: cms}
+}
+
+// WithSocialLinks memasang pengelola tautan media sosial publik.
+func (h *CMSHandler) WithSocialLinks(social service.SocialLinksService) *CMSHandler {
+	h.social = social
+	return h
 }
 
 // Register memasang route konten admin.
@@ -27,11 +34,14 @@ func (h *CMSHandler) Register(g *gin.RouterGroup, guard AdminGuard) {
 	g.POST("/faq", guard(http.MethodPost, "/faq", authz.CMSEdit), h.CreateFaq)
 	g.PATCH("/faq/:id", guard(http.MethodPatch, "/faq/:id", authz.CMSEdit), h.UpdateFaq)
 	g.DELETE("/faq/:id", guard(http.MethodDelete, "/faq/:id", authz.CMSEdit), h.DeleteFaq)
-
 	g.GET("/announcements", guard(http.MethodGet, "/announcements", authz.CMSView), h.ListAnnouncements)
 	g.POST("/announcements", guard(http.MethodPost, "/announcements", authz.CMSPublish), h.CreateAnnouncement)
 	g.PATCH("/announcements/:id", guard(http.MethodPatch, "/announcements/:id", authz.CMSPublish), h.UpdateAnnouncement)
 	g.DELETE("/announcements/:id", guard(http.MethodDelete, "/announcements/:id", authz.CMSPublish), h.DeleteAnnouncement)
+	if h.social != nil {
+		g.GET("/social-links", guard(http.MethodGet, "/social-links", authz.CMSView), h.GetSocialLinks)
+		g.PUT("/social-links", guard(http.MethodPut, "/social-links", authz.CMSEdit), h.UpdateSocialLinks)
+	}
 }
 
 // PublicRegister memasang route konten publik.
@@ -143,4 +153,24 @@ func (h *CMSHandler) DeleteAnnouncement(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, "Pengumuman dihapus", nil)
+}
+
+// GetSocialLinks menangani GET /api/v1/admin/social-links.
+func (h *CMSHandler) GetSocialLinks(c *gin.Context) {
+	httpx.OK(c, "Tautan media sosial", h.social.Get(c.Request.Context()))
+}
+
+// UpdateSocialLinks menangani PUT /api/v1/admin/social-links.
+func (h *CMSHandler) UpdateSocialLinks(c *gin.Context) {
+	var req dto.SocialLinks
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(httpx.WrapValidation(err.Error()))
+		return
+	}
+	updated, err := h.social.Update(c.Request.Context(), actorOf(c), req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	httpx.OK(c, "Tautan media sosial diperbarui", updated)
 }

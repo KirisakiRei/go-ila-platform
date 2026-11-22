@@ -53,3 +53,54 @@ type InvitePublic struct {
 	SisaKuota     int       `json:"sisa_kuota"`
 	EmailTerkunci bool      `json:"email_terkunci"`
 }
+
+// SubmitInviteRequest adalah payload publik form "Ajukan Bergabung".
+// Tidak memuat kredensial apa pun; field Website adalah honeypot anti-bot.
+type SubmitInviteRequest struct {
+	Name    string `json:"name" binding:"required,min=2,max=100"`
+	Email   string `json:"email" binding:"required,email,max=150"`
+	Contact string `json:"contact" binding:"omitempty,max=100"`
+	Note    string `json:"note" binding:"omitempty,max=500"`
+	Website string `json:"website" binding:"omitempty,max=100"`
+}
+
+// InviteRequestItem adalah satu baris permohonan akses di panel admin.
+type InviteRequestItem struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Email      string     `json:"email"`
+	Contact    string     `json:"contact"`
+	Note       string     `json:"note"`
+	Status     string     `json:"status"`
+	InviteID   string     `json:"invite_id,omitempty"`
+	ReviewedBy string     `json:"reviewed_by,omitempty"`
+	ReviewedAt *time.Time `json:"reviewed_at,omitempty"`
+	ReviewNote string     `json:"review_note,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// InviteRequestList adalah daftar berpaginasi permohonan akses untuk admin.
+type InviteRequestList struct {
+	Items        []InviteRequestItem `json:"items"`
+	PendingCount int64               `json:"pending_count"`
+}
+
+// ApproveInviteRequestBody adalah opsi saat admin menyetujui permohonan akses.
+type ApproveInviteRequestBody struct {
+	Tier        string `json:"tier" binding:"omitempty,oneof=free basic plus"`
+	ExpiresDays int    `json:"expires_days" binding:"omitempty,min=1,max=365"`
+	Note        string `json:"note" binding:"omitempty,max=255"`
+}
+
+// RejectInviteRequestBody adalah payload penolakan permohonan akses.
+type RejectInviteRequestBody struct {
+	Reason string `json:"reason" binding:"omitempty,max=255"`
+}
+
+// ApprovedInviteRequestResult mengembalikan permohonan yang disetujui beserta
+// tautan undangan sekali tampil dan status pengiriman antrean surel.
+type ApprovedInviteRequestResult struct {
+	Request     InviteRequestItem `json:"request"`
+	Invite      CreatedInvite     `json:"invite"`
+	EmailQueued bool              `json:"email_queued"`
+}

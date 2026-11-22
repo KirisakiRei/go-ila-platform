@@ -314,6 +314,11 @@ func (s *systemOpsService) Status(ctx context.Context) (*dto.PublicStatus, error
 		// Gagal membaca flag diperlakukan sebagai tertutup: registry yang
 		// terbuka tiba-tiba lebih mahal daripada satu penolakan pendaftaran.
 		InviteOnly: s.flags.Bool(ctx, settings.KeyInviteOnly, true),
+		SocialLinks: dto.SocialLinks{
+			Discord:  s.flags.Value(ctx, KeySocialDiscordURL),
+			X:        s.flags.Value(ctx, KeySocialXURL),
+			Telegram: s.flags.Value(ctx, KeySocialTelegramURL),
+		},
 	}
 	if state.Mode != model.ModeNormal {
 		out.ExpectedEnd = state.ExpectedEnd

@@ -1,15 +1,16 @@
 import { request } from './http'
 import type {
   AnnouncementItem,
-  PublicStatus,
   BrokerHealth,
   EngineOverview,
   FaqItem,
   MaintenanceState,
   PageContent,
   PageContentPayload,
+  PublicStatus,
   RunnerOverview,
   SettingRow,
+  SocialLinks,
   SupportNoteItem,
   SystemOverview,
 } from '@/types/system'
@@ -68,6 +69,9 @@ export const adminCmsApi = {
   page: (slug: string) => request<PageContent>(`${ADMIN}/pages/${slug}`),
   savePage: (slug: string, payload: PageContentPayload) =>
     request<PageContent>(`${ADMIN}/pages/${slug}`, { method: 'PUT', body: payload }),
+  socialLinks: () => request<SocialLinks>(`${ADMIN}/social-links`),
+  saveSocialLinks: (payload: SocialLinks) =>
+    request<SocialLinks>(`${ADMIN}/social-links`, { method: 'PUT', body: payload }),
 }
 
 /** Konten publik: dibaca halaman bantuan dan dashboard tanpa sesi. */
@@ -100,6 +104,7 @@ export type {
   PublicStatus,
   RunnerOverview,
   SettingRow,
+  SocialLinks,
   SupportNoteItem,
   SystemOverview,
 }

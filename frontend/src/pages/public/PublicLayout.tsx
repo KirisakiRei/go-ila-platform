@@ -4,6 +4,7 @@ import { AlertTriangle, Menu, X } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { publicContentApi } from '@/lib/system-api'
 import { Logo } from '@/components/brand/Logo'
+import { SocialLinksRow } from '@/pages/public/components/SocialLinksRow'
 import { cn } from '@/lib/utils'
 
 
@@ -181,6 +182,10 @@ export function PublicLayout() {
   const tampilkanFooter = ruteDikenal(pathname)
   const [homeHeaderTheme, setHomeHeaderTheme] = useState<HeaderTheme>('top')
   const status = useQuery({ queryKey: ['public', 'status'], queryFn: publicContentApi.status })
+  // Default fail-closed: harga dan pendaftaran mandiri disembunyikan saat invite-only aktif.
+  const inviteOnly = status.data ? status.data.invite_only !== false : true
+  const navItems = inviteOnly ? NAV.filter((item) => item.to !== '/harga') : NAV
+  const socialLinks = status.data?.social_links
 
   useEffect(() => {
     if (!isHome) return
@@ -256,7 +261,7 @@ export function PublicLayout() {
           </Link>
 
           <nav aria-label="Navigasi situs" className="hidden items-center gap-1 md:flex">
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -294,17 +299,31 @@ export function PublicLayout() {
             >
               Masuk
             </a>
-            <a
-              href="/app/register"
-              className={cn(
-                'rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors',
-                isLightHeader
-                  ? 'bg-[#09090b] text-white hover:bg-zinc-800'
-                  : 'bg-white text-[#09090b] hover:bg-zinc-200',
-              )}
-            >
-              Mulai Sekarang
-            </a>
+            {inviteOnly ? (
+              <Link
+                to="/#ajukan-akses"
+                className={cn(
+                  'rounded-lg px-4 py-2 text-[13px] font-semibold press',
+                  isLightHeader
+                    ? 'bg-[#09090b] text-white hover:bg-zinc-800'
+                    : 'bg-white text-[#09090b] hover:bg-zinc-200',
+                )}
+              >
+                Ajukan Akses
+              </Link>
+            ) : (
+              <a
+                href="/app/register"
+                className={cn(
+                  'rounded-lg px-4 py-2 text-[13px] font-semibold press',
+                  isLightHeader
+                    ? 'bg-[#09090b] text-white hover:bg-zinc-800'
+                    : 'bg-white text-[#09090b] hover:bg-zinc-200',
+                )}
+              >
+                Mulai Sekarang
+              </a>
+            )}
           </div>
 
           <button
@@ -333,7 +352,7 @@ export function PublicLayout() {
                 : 'border-white/10 bg-[#09090b] text-white',
             )}
           >
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
@@ -366,18 +385,33 @@ export function PublicLayout() {
               >
                 Masuk
               </a>
-              <a
-                href="/app/register"
-                className={cn(
-                  'rounded-lg px-3 py-2 text-center text-[13px] font-semibold',
-                  isLightHeader
-                    ? 'bg-[#09090b] text-white hover:bg-zinc-800'
-                    : 'bg-white text-[#09090b] hover:bg-zinc-200',
-                )}
-                onClick={() => setOpen(false)}
-              >
-                Mulai Sekarang
-              </a>
+              {inviteOnly ? (
+                <Link
+                  to="/#ajukan-akses"
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-center text-[13px] font-semibold',
+                    isLightHeader
+                      ? 'bg-[#09090b] text-white hover:bg-zinc-800'
+                      : 'bg-white text-[#09090b] hover:bg-zinc-200',
+                  )}
+                  onClick={() => setOpen(false)}
+                >
+                  Ajukan Akses
+                </Link>
+              ) : (
+                <a
+                  href="/app/register"
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-center text-[13px] font-semibold',
+                    isLightHeader
+                      ? 'bg-[#09090b] text-white hover:bg-zinc-800'
+                      : 'bg-white text-[#09090b] hover:bg-zinc-200',
+                  )}
+                  onClick={() => setOpen(false)}
+                >
+                  Mulai Sekarang
+                </a>
+              )}
             </div>
           </nav>
         )}
@@ -426,11 +460,13 @@ export function PublicLayout() {
                     Fitur Platform
                   </Link>
                 </li>
-                <li>
-                  <Link to="/harga" className="transition-colors hover:text-[#52525b]">
-                    Paket &amp; Harga
-                  </Link>
-                </li>
+                {!inviteOnly && (
+                  <li>
+                    <Link to="/harga" className="transition-colors hover:text-[#52525b]">
+                      Paket &amp; Harga
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <Link to="/#cara-kerja" className="transition-colors hover:text-[#52525b]">
                     Cara Kerja
@@ -450,9 +486,15 @@ export function PublicLayout() {
               </p>
               <ul className="space-y-2.5 text-[13px] font-medium text-[#09090b]">
                 <li>
-                  <a href="/app/register" className="transition-colors hover:text-[#52525b]">
-                    Mulai Trial
-                  </a>
+                  {inviteOnly ? (
+                    <Link to="/#ajukan-akses" className="transition-colors hover:text-[#52525b]">
+                      Ajukan Akses
+                    </Link>
+                  ) : (
+                    <a href="/app/register" className="transition-colors hover:text-[#52525b]">
+                      Mulai Sekarang
+                    </a>
+                  )}
                 </li>
                 <li>
                   <a href="/app/login" className="transition-colors hover:text-[#52525b]">
@@ -510,12 +552,21 @@ export function PublicLayout() {
                 Platform analisis likuiditas dan eksekusi trading langsung di broker Anda. Bukan penasihat keuangan; instrumen derivatif memiliki risiko modal.
               </p>
               <div className="flex flex-wrap items-center gap-4">
-                <a
-                  href="/app/register"
-                  className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#27272a]"
-                >
-                  Mulai Sekarang
-                </a>
+                {inviteOnly ? (
+                  <Link
+                    to="/#ajukan-akses"
+                    className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
+                  >
+                    Ajukan Akses
+                  </Link>
+                ) : (
+                  <a
+                    href="/app/register"
+                    className="inline-flex items-center justify-center rounded-lg bg-[#09090b] px-5 py-2.5 text-[13px] font-medium text-white press hover:bg-[#27272a]"
+                  >
+                    Mulai Sekarang
+                  </a>
+                )}
                 <Link
                   to="/legal/risk"
                   className="text-[13px] font-medium text-[#09090b] underline underline-offset-4 hover:text-[#52525b]"
@@ -523,6 +574,7 @@ export function PublicLayout() {
                   Disclaimer Risiko
                 </Link>
               </div>
+              <SocialLinksRow links={socialLinks} variant="light" showLabel className="pt-1" />
             </div>
           </div>
         </div>

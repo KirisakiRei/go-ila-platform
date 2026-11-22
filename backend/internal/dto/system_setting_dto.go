@@ -97,6 +97,13 @@ type MarketWindow struct {
 	NextChangePair TimePair `json:"next_change_pair"`
 }
 
+// SocialLinks menyimpan tautan komunitas publik yang dikelola dari dashboard admin.
+type SocialLinks struct {
+	Discord  string `json:"discord"`
+	X        string `json:"x"`
+	Telegram string `json:"telegram"`
+}
+
 // PublicStatus adalah status publik untuk ditampilkan di halaman masuk dan
 // dashboard pelanggan. Tidak memuat detail internal apa pun.
 type PublicStatus struct {
@@ -111,4 +118,6 @@ type PublicStatus struct {
 	// Frontend memakainya untuk menyembunyikan pendaftaran, uji coba, dan
 	// pembayaran tanpa menebak-nebak.
 	InviteOnly bool `json:"invite_only"`
+	// SocialLinks berisi tautan komunitas publik (Discord, X, Telegram).
+	SocialLinks SocialLinks `json:"social_links"`
 }

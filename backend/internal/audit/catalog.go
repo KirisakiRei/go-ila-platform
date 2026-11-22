@@ -45,9 +45,12 @@ const (
 	AdminDelete Action = "admin.delete"
 	// Undangan komunitas: pembuatan tautan, pencabutan, dan pemakaian.
 	// Kode mentah tidak pernah masuk catatan audit.
-	InviteCreate Action = "invite.create"
-	InviteRevoke Action = "invite.revoke"
-	InviteRedeem Action = "invite.redeem"
+	InviteCreate         Action = "invite.create"
+	InviteRevoke         Action = "invite.revoke"
+	InviteRedeem         Action = "invite.redeem"
+	InviteRequestApprove Action = "invite.request.approve"
+	InviteRequestReject  Action = "invite.request.reject"
+	SocialLinksUpdate    Action = "cms.social_links.update"
 	// Laporan bug: dibuat pengguna, ditriage admin. Tidak memuat isi laporan.
 	BugReportTriage Action = "bugreport.triage"
 )
@@ -146,6 +149,9 @@ var Catalog = []Entry{
 	{InviteCreate, "Undangan", "Tautan undangan dibuat", false},
 	{InviteRevoke, "Undangan", "Tautan undangan dicabut", true},
 	{InviteRedeem, "Undangan", "Akun dibuat lewat undangan", false},
+	{InviteRequestApprove, "Undangan", "Permohonan undangan disetujui", false},
+	{InviteRequestReject, "Undangan", "Permohonan undangan ditolak", false},
+	{SocialLinksUpdate, "Konten", "Tautan media sosial diperbarui", false},
 	{BugReportTriage, "Laporan Bug", "Status laporan bug diubah", false},
 
 	{AccountCreate, "Akun Broker", "Akun broker ditambah", false},

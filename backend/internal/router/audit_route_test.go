@@ -75,8 +75,10 @@ var harapanAksiAudit = map[string]audit.Action{
 
 	// Undangan komunitas: membuat tautan berarti memberi akses masuk, jadi
 	// jejaknya wajib tercatat seperti pembuatan akun.
-	"POST /api/v1/admin/invites":            audit.InviteCreate,
-	"POST /api/v1/admin/invites/:id/revoke": audit.InviteRevoke,
+	"POST /api/v1/admin/invites":                     audit.InviteCreate,
+	"POST /api/v1/admin/invites/:id/revoke":          audit.InviteRevoke,
+	"POST /api/v1/admin/invite-requests/:id/approve": audit.InviteRequestApprove,
+	"POST /api/v1/admin/invite-requests/:id/reject":  audit.InviteRequestReject,
 
 	// Triage laporan bug: mengubah status yang dilihat pelapor, jadi
 	// perubahannya harus punya jejak pelaku.
@@ -92,6 +94,7 @@ var harapanAksiAudit = map[string]audit.Action{
 	"PATCH /api/v1/admin/announcements/:id":  audit.CMSAnnouncement,
 	"DELETE /api/v1/admin/announcements/:id": audit.CMSAnnouncement,
 	"PUT /api/v1/admin/pages/:slug":          audit.CMSPageChange,
+	"PUT /api/v1/admin/social-links":         audit.SocialLinksUpdate,
 
 	// Katalog pair: menentukan simbol yang boleh dipilih pengguna.
 	"POST /api/v1/admin/pair-categories":       audit.PairCategoryChange,

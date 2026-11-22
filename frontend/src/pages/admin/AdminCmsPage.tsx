@@ -16,9 +16,10 @@ import {
   PageHeader,
   Skeleton,
 } from '@/components/ui'
+import { Can } from '@/features/admin/components/Can'
 import { adminCmsApi } from '@/lib/system-api'
 import { formatDateTime } from '@/lib/format'
-import type { AnnouncementItem, FaqItem } from '@/types/system'
+import type { AnnouncementItem, FaqItem, SocialLinks } from '@/types/system'
 
 /**
  * AdminCmsPage mengelola FAQ dan pengumuman.
@@ -43,10 +44,111 @@ export default function AdminCmsPage() {
         </Link>
       </div>
       <div className="grid gap-4">
+        <SocialLinksSection />
         <FaqSection />
         <AnnouncementSection />
       </div>
     </>
+  )
+}
+
+function SocialLinksSection() {
+  const queryClient = useQueryClient()
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [draft, setDraft] = useState<SocialLinks | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'cms', 'social-links'],
+    queryFn: adminCmsApi.socialLinks,
+  })
+
+  const current: SocialLinks = draft ?? {
+    discord: data?.discord ?? '',
+    x: data?.x ?? '',
+    telegram: data?.telegram ?? '',
+  }
+
+  const save = useMutation({
+    mutationFn: () => adminCmsApi.saveSocialLinks(current),
+    onSuccess: (updated) => {
+      setDraft(updated)
+      setNotice({ kind: 'ok', text: 'Tautan media sosial disimpan dan tampil di situs publik.' })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'cms', 'social-links'] })
+      void queryClient.invalidateQueries({ queryKey: ['public', 'status'] })
+    },
+    onError: (err) => {
+      setNotice({
+        kind: 'err',
+        text: err instanceof Error ? err.message : 'Gagal menyimpan tautan media sosial.',
+      })
+    },
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Tautan Media Sosial</CardTitle>
+        <CardDescription className="text-xs">
+          Tampil di beranda dan footer situs publik. Kosongkan kolom untuk menyembunyikan ikon
+          tertentu. Semua tautan wajib berawal <code className="font-mono">https://</code>.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {notice && (
+          <Alert variant={notice.kind === 'err' ? 'destructive' : 'default'}>{notice.text}</Alert>
+        )}
+        {isLoading ? (
+          <Skeleton className="h-28 w-full" />
+        ) : (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <Label htmlFor="social-discord">Discord</Label>
+                <Input
+                  id="social-discord"
+                  type="url"
+                  value={current.discord}
+                  onChange={(e) => setDraft({ ...current, discord: e.target.value })}
+                  placeholder="https://discord.gg/..."
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="social-x">X (Twitter)</Label>
+                <Input
+                  id="social-x"
+                  type="url"
+                  value={current.x}
+                  onChange={(e) => setDraft({ ...current, x: e.target.value })}
+                  placeholder="https://x.com/..."
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="social-telegram">Telegram</Label>
+                <Input
+                  id="social-telegram"
+                  type="url"
+                  value={current.telegram}
+                  onChange={(e) => setDraft({ ...current, telegram: e.target.value })}
+                  placeholder="https://t.me/..."
+                />
+              </div>
+            </div>
+            <Can permission="cms.edit">
+              <Button
+                size="sm"
+                disabled={save.isPending}
+                onClick={() => {
+                  setNotice(null)
+                  save.mutate()
+                }}
+              >
+                {save.isPending ? 'Menyimpan…' : 'Simpan Tautan Sosmed'}
+              </Button>
+            </Can>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
