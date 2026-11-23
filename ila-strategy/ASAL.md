@@ -6,9 +6,9 @@ Folder ini adalah **salinan** aturan trading ILA 2.0. Sumbernya:
 |---|---|
 | Repo asal | `go-trade` (engine live, VPS 1) |
 | Path asal | `pkg/ila` dan `pkg/indicators` |
-| Commit SHA | `19878c3c13ab142492525a669031be3640e91eb2` |
+| Commit SHA | `1a5d2bbdfc88640b3a43f7f63ed9f18ac6061f59` |
 | Tanggal commit | 2026-11-23 |
-| Judul commit | perf(ila): lewati evaluasi key level CISD untuk candle di luar jendela C3 |
+| Judul commit | fix(ila): tolak key level lama tergantikan di peak-1, wajibkan puncak sentuh key level, bump engine 2.1.1 |
 | Disalin pada | 2026-11-23 |
 
 ## Mengapa disalin, bukan diimpor
