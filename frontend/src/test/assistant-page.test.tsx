@@ -193,4 +193,60 @@ describe('Halaman ILA AI (/asisten)', () => {
     expect(getSessionSpy).toHaveBeenNthCalledWith(1, { limit: 20 })
     expect(getSessionSpy).toHaveBeenNthCalledWith(2, { beforeSeq: 21, limit: 20 })
   })
+
+  it('merender placeholder streaming dan diagram SVG skematik untuk blok ila-diagram', () => {
+    const streaming = '```ila-diagram\n{"title": "C2 Closure"'
+    const { rerender } = render(<MarkdownContent content={streaming} />)
+    expect(screen.getByText(/menyiapkan ilustrasi candlestick/i)).toBeInTheDocument()
+
+    const completed = [
+      '```ila-diagram',
+      JSON.stringify({
+        title: 'Contoh C2 Closure ERL',
+        subtitle: 'HTF H4',
+        candles: [
+          { o: 100, h: 104, l: 99, c: 103, label: 'C1' },
+          { o: 103, h: 106, l: 101, c: 102, marker: 'C2 Sweep' },
+          { o: 102, h: 103, l: 97, c: 98, label: 'C3' },
+        ],
+        levels: [
+          { price: 104, label: 'Swing High ERL', kind: 'sweep' },
+          { price: 98, label: 'Entry', kind: 'entry' },
+        ],
+        zones: [{ from_idx: 0, to_idx: 2, top: 101, bottom: 100, label: 'FVG' }],
+      }),
+      '```',
+    ].join('\n')
+
+    rerender(<MarkdownContent content={completed} />)
+    expect(screen.getByRole('img', { name: /contoh c2 closure erl/i })).toBeInTheDocument()
+    expect(screen.getByText('Swing High ERL')).toBeInTheDocument()
+    expect(screen.getByText('C2 Sweep')).toBeInTheDocument()
+
+    rerender(<MarkdownContent content={'```ila-diagram\n{json rusak}\n```'} />)
+    expect(screen.getByText(/ilustrasi tidak dapat ditampilkan/i)).toBeInTheDocument()
+  })
+
+  it('menahan pemuatan canvas chart TradingView pada pesan lama sampai diklik pengguna', () => {
+    const chartMd = [
+      '```ila-chart',
+      JSON.stringify({
+        title: 'XAUUSD (M15) — Setup SELL',
+        symbol: 'XAUUSD',
+        timeframe: 'M15',
+        lines: [{ price: 3615.03, label: 'Entry', kind: 'entry' }],
+      }),
+      '```',
+    ].join('\n')
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MarkdownContent content={chartMd} autoLoadChart={false} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('XAUUSD (M15) — Setup SELL')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /tampilkan chart/i })).toBeInTheDocument()
+  })
 })

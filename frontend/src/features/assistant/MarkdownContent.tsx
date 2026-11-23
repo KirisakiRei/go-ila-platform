@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
+import { AssistantChartEmbed } from './AssistantChartEmbed'
+import { CandleDiagram } from './CandleDiagram'
+import { parseChartSpec } from './lib/chart-spec'
+import { parseDiagramSpec } from './lib/diagram-spec'
 
 type MarkdownContentProps = {
   content: string
+  /** Mengizinkan chart TradingView langsung dimuat (dipakai pada pesan terbaru saja). */
+  autoLoadChart?: boolean
 }
 
 const HEADING_RE = /^(#{1,6})\s+(.+)$/
@@ -14,7 +20,7 @@ const ORDERED_RE = /^\d+\.\s+/
  * mendukung heading (h1-h6), paragraf, daftar, blockquote, tabel harga (.tabular),
  * serta format inline (**tebal**, *miring*, `kode`).
  */
-export function MarkdownContent({ content }: MarkdownContentProps) {
+export function MarkdownContent({ content, autoLoadChart = false }: MarkdownContentProps) {
   const lines = content.replace(/\r\n/g, '\n').split('\n')
   const lineAt = (idx: number): string => lines[idx] ?? ''
   const blocks: ReactNode[] = []
@@ -30,15 +36,76 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
       continue
     }
 
-    // Code block ```
+    // Code block ``` (termasuk blok khusus ila-diagram dan ila-chart)
     if (trimmed.startsWith('```')) {
+      const lang = trimmed.slice(3).trim().toLowerCase()
       const codeLines: string[] = []
       i++
       while (i < lines.length && !lineAt(i).trim().startsWith('```')) {
         codeLines.push(lineAt(i))
         i++
       }
-      if (i < lines.length) i++
+      const isClosed = i < lines.length
+      if (isClosed) i++
+
+      if (lang === 'ila-diagram') {
+        if (!isClosed) {
+          blocks.push(
+            <div
+              key={key++}
+              className="my-2 rounded-xl border border-border bg-secondary/40 px-3 py-4 text-[12.5px] text-muted-foreground"
+            >
+              Menyiapkan ilustrasi candlestick...
+            </div>,
+          )
+          continue
+        }
+        const spec = parseDiagramSpec(codeLines.join('\n'))
+        if (spec) {
+          blocks.push(<CandleDiagram key={key++} spec={spec} />)
+        } else {
+          blocks.push(
+            <div
+              key={key++}
+              className="my-2 rounded-xl border border-border bg-secondary/30 px-3 py-2.5 text-[12.5px] text-muted-foreground"
+            >
+              Ilustrasi tidak dapat ditampilkan karena format datanya belum sesuai.
+            </div>,
+          )
+        }
+        continue
+      }
+
+      if (lang === 'ila-chart') {
+        if (!isClosed) {
+          blocks.push(
+            <div
+              key={key++}
+              className="my-2 rounded-xl border border-border bg-secondary/40 px-3 py-4 text-[12.5px] text-muted-foreground"
+            >
+              Menyiapkan chart TradingView...
+            </div>,
+          )
+          continue
+        }
+        const spec = parseChartSpec(codeLines.join('\n'))
+        if (spec) {
+          blocks.push(
+            <AssistantChartEmbed key={key++} spec={spec} autoLoad={autoLoadChart} />,
+          )
+        } else {
+          blocks.push(
+            <div
+              key={key++}
+              className="my-2 rounded-xl border border-border bg-secondary/30 px-3 py-2.5 text-[12.5px] text-muted-foreground"
+            >
+              Chart tidak dapat ditampilkan karena parameter simbol atau timeframe tidak lengkap.
+            </div>,
+          )
+        }
+        continue
+      }
+
       blocks.push(
         <pre
           key={key++}

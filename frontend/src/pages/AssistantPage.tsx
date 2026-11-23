@@ -482,7 +482,10 @@ export default function AssistantPage() {
                             ))}
                           </div>
                         )}
-                        <MarkdownContent content={msg.content} />
+                        <MarkdownContent
+                          content={msg.content}
+                          autoLoadChart={idx === messages.length - 1}
+                        />
                       </div>
                     )}
                   </div>
@@ -518,7 +521,7 @@ export default function AssistantPage() {
                           ))}
                         </div>
                       )}
-                      <MarkdownContent content={streamContent} />
+                      <MarkdownContent content={streamContent} autoLoadChart />
                     </>
                   ) : (
                     <ThinkingIndicator
