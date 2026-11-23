@@ -160,9 +160,29 @@
     display: none;
   }
 
-  /* Fokus selalu terlihat: navigasi keyboard harus jelas walau tanpa warna. */
+  /* Fokus terlihat lewat bentuk ring, bukan outline.
+
+     Ring dipakai karena outline bawaan peramban berhenti di bentuk kotak,
+     sedangkan ring mengikuti radius sudut komponen. Nilai --tw-ring-shadow
+     di-reset lebih dulu supaya tidak ada bayangan fokus sisa dari kelas
+     utilitas lain. */
   :focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-offset-shadow: 0 0 #0000;
+    @apply ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Kolom tulis chat tidak memakai outline maupun ring.
+
+     Bingkai pembungkus sudah menjadi penanda fokus lewat perubahan warna
+     garis tepi, jadi kotak hitam bawaan peramban hanya mengganggu. */
+  .chat-input:focus,
+  .chat-input:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border-color: transparent;
   }
 
   /* Hormati preferensi pengguna yang membatasi animasi.

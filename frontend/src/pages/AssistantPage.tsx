@@ -561,7 +561,7 @@ export default function AssistantPage() {
         }}
         className="shrink-0 space-y-1.5 border-t border-border pt-3"
       >
-        <div className="flex items-end gap-2 rounded-2xl border border-input bg-card px-3 py-2 transition-colors focus-within:border-foreground/35">
+        <div className="flex items-end gap-2 rounded-2xl border border-input bg-card px-3 py-2 transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-foreground/35">
           <textarea
             ref={textareaRef}
             rows={1}
@@ -578,7 +578,7 @@ export default function AssistantPage() {
                 : 'ILA AI belum aktif'
             }
             aria-label="Pesan untuk ILA AI"
-            className="max-h-36 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[16px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13.5px]"
+            className="chat-input max-h-36 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[16px] leading-relaxed text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13.5px]"
           />
 
           {isStreaming ? (
