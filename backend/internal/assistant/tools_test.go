@@ -170,3 +170,42 @@ func TestExecuteTool_JournalIncludesSourceSignalID(t *testing.T) {
 		t.Fatalf("source_signal_id tidak terbawa: %+v", body.Positions)
 	}
 }
+
+func TestExecuteTool_SkippedSimulationCleanLabels(t *testing.T) {
+	deps := ToolDeps{Journal: fakeJournalWithSkipped{}, Pairs: fakePairs{}}
+	res := ExecuteTool(context.Background(), deps, "u1", "get_positions_and_journal", `{"status":"SKIPPED"}`)
+	if !res.OK {
+		t.Fatalf("journal skipped tool gagal: %+v", res)
+	}
+	var body struct {
+		Skipped []map[string]any `json:"skipped_simulations"`
+	}
+	if err := json.Unmarshal([]byte(res.OutputJSON), &body); err != nil {
+		t.Fatalf("json parse: %v", err)
+	}
+	if len(body.Skipped) != 1 {
+		t.Fatalf("expected 1 skipped item, got %d", len(body.Skipped))
+	}
+	item := body.Skipped[0]
+	if _, hasRaw := item["eval_status"]; hasRaw {
+		t.Fatalf("field mentah eval_status tidak boleh dikirim saat kosong: %+v", item)
+	}
+	if _, hasRawR := item["eval_r_lower"]; hasRawR {
+		t.Fatalf("field mentah eval_r_lower tidak boleh dikirim: %+v", item)
+	}
+	if item["simulation_label"] != "Belum dievaluasi" {
+		t.Fatalf("simulation_label salah: %+v", item["simulation_label"])
+	}
+}
+
+type fakeJournalWithSkipped struct{ fakeJournal }
+
+func (fakeJournalWithSkipped) ListSkipped(_ context.Context, _ string, _ repository.JournalFilter, _, _ int) ([]model.UserSignal, error) {
+	return []model.UserSignal{{
+		SignalID:     "sig-skip",
+		Status:       "EXPIRED",
+		RejectReason: "Harga tidak menyentuh entry",
+		EvalStatus:   "",
+		EvalRLower:   -1,
+	}}, nil
+}

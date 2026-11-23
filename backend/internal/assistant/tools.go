@@ -358,8 +358,7 @@ func summarizeDTOSignal(r *dto.SignalResponse) map[string]any {
 		item["outcome_r"] = r.OutcomeR
 	}
 	if r.EvalStatus != "" {
-		item["eval_status"] = r.EvalStatus
-		item["eval_r_lower"] = r.EvalRLower
+		item["simulation_label"] = formatSimulationLabel(r.EvalStatus, r.EvalRLower)
 		item["eval_note"] = r.EvalNote
 	}
 	if r.HtfSweep != nil {
@@ -409,8 +408,7 @@ func summarizeModelSignal(sig *model.Signal, us *model.UserSignal) map[string]an
 			item["reject_reason"] = us.RejectReason
 		}
 		if us.EvalStatus != "" {
-			item["eval_status"] = us.EvalStatus
-			item["eval_r_lower"] = us.EvalRLower
+			item["simulation_label"] = formatSimulationLabel(us.EvalStatus, us.EvalRLower)
 			item["eval_note"] = us.EvalNote
 		}
 	}
@@ -558,14 +556,17 @@ func execGetPositionsAndJournal(ctx context.Context, deps ToolDeps, userID, rawA
 			for i := range skipped {
 				u := skipped[i]
 				item := map[string]any{
-					"signal_id":     u.SignalID,
-					"user_status":   u.Status,
-					"reject_reason": u.RejectReason,
-					"eval_status":   u.EvalStatus,
-					"eval_price":    u.EvalPrice,
-					"eval_r_lower":  u.EvalRLower,
-					"eval_note":     u.EvalNote,
-					"note_context":  "Hasil eval_* adalah simulasi pantauan harga (bukan PnL akun).",
+					"signal_id":        u.SignalID,
+					"status_label":     formatUserSignalStatus(u.Status),
+					"reject_reason":    u.RejectReason,
+					"simulation_label": formatSimulationLabel(u.EvalStatus, u.EvalRLower),
+					"note_context":     "Hasil simulasi hanya pantauan harga (bukan PnL akun).",
+				}
+				if u.EvalStatus != "" {
+					item["eval_price"] = u.EvalPrice
+					if u.EvalNote != "" {
+						item["eval_note"] = u.EvalNote
+					}
 				}
 				if u.PublishedAt != nil {
 					item["published_at_wib"] = formatWIB(*u.PublishedAt)
@@ -978,6 +979,55 @@ func formatNY(t time.Time) string {
 		return ""
 	}
 	return t.In(timezone.NY).Format("02 Jan 2006 15:04 NY")
+}
+
+func formatSimulationLabel(status string, rLower float64) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "":
+		return "Belum dievaluasi"
+	case "TP":
+		if rLower != 0 {
+			return fmt.Sprintf("Target TP tercapai (simulasi %+.2fR)", rLower)
+		}
+		return "Target TP tercapai (simulasi)"
+	case "SL":
+		if rLower != 0 {
+			return fmt.Sprintf("Stop Loss tersentuh (simulasi %+.2fR)", rLower)
+		}
+		return "Stop Loss tersentuh (simulasi -1.00R)"
+	case "NO_ENTRY":
+		return "Harga tidak menyentuh titik entry"
+	case "RUNNING":
+		return "Simulasi sedang berjalan"
+	case "PENDING":
+		return "Menunggu pemantauan harga"
+	case "UNKNOWN":
+		return "Data candle sudah tidak tersedia"
+	default:
+		return "Belum dievaluasi"
+	}
+}
+
+func formatUserSignalStatus(status string) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "REJECTED":
+		return "Ditolak aturan akun/risiko"
+	case "SKIPPED":
+		return "Dilewati"
+	case "EXPIRED":
+		return "Kedaluwarsa sebelum tersentuh"
+	case "FAILED":
+		return "Gagal dikirim ke broker"
+	case "EXECUTED":
+		return "Tereksekusi"
+	case "RECEIVED", "PENDING":
+		return "Menunggu eksekusi"
+	default:
+		if status == "" {
+			return "Tidak diketahui"
+		}
+		return status
+	}
 }
 
 func parseFlexibleTime(raw string) (time.Time, error) {

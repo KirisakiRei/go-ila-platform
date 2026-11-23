@@ -4,9 +4,14 @@ type MarkdownContentProps = {
   content: string
 }
 
+const HEADING_RE = /^(#{1,6})\s+(.+)$/
+const HR_RE = /^(-{3,}|\*{3,})$/
+const BULLET_RE = /^[-*]\s+/
+const ORDERED_RE = /^\d+\.\s+/
+
 /**
  * Perender Markdown ringkas bebas dangerouslySetInnerHTML:
- * mendukung heading, paragraf, daftar, blockquote, tabel harga (.tabular),
+ * mendukung heading (h1-h6), paragraf, daftar, blockquote, tabel harga (.tabular),
  * serta format inline (**tebal**, *miring*, `kode`).
  */
 export function MarkdownContent({ content }: MarkdownContentProps) {
@@ -17,6 +22,7 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
   let i = 0
   let key = 0
   while (i < lines.length) {
+    const startI = i
     const trimmed = lineAt(i).trim()
 
     if (!trimmed) {
@@ -44,8 +50,8 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
       continue
     }
 
-    // Heading (#, ##, ###)
-    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/)
+    // Heading (# s/d ######)
+    const headingMatch = trimmed.match(HEADING_RE)
     if (headingMatch) {
       const level = (headingMatch[1] ?? '').length
       const text = headingMatch[2] ?? ''
@@ -65,7 +71,7 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
     }
 
     // Horizontal rule
-    if (/^(-{3,}|\*{3,})$/.test(trimmed)) {
+    if (HR_RE.test(trimmed)) {
       blocks.push(<hr key={key++} className="my-2 border-border" />)
       i++
       continue
@@ -132,10 +138,10 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
     }
 
     // Bullet list
-    if (/^[-*]\s+/.test(trimmed)) {
+    if (BULLET_RE.test(trimmed)) {
       const items: string[] = []
       while (i < lines.length && /^\s*[-*]\s+/.test(lineAt(i))) {
-        items.push(lineAt(i).trim().replace(/^[-*]\s+/, ''))
+        items.push(lineAt(i).trim().replace(BULLET_RE, ''))
         i++
       }
       blocks.push(
@@ -149,10 +155,10 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
     }
 
     // Ordered list
-    if (/^\d+\.\s+/.test(trimmed)) {
+    if (ORDERED_RE.test(trimmed)) {
       const items: string[] = []
       while (i < lines.length && /^\s*\d+\.\s+/.test(lineAt(i))) {
-        items.push(lineAt(i).trim().replace(/^\d+\.\s+/, ''))
+        items.push(lineAt(i).trim().replace(ORDERED_RE, ''))
         i++
       }
       blocks.push(
@@ -171,23 +177,29 @@ export function MarkdownContent({ content }: MarkdownContentProps) {
       const cur = lineAt(i).trim()
       if (
         !cur ||
-        cur.startsWith('#') ||
+        HEADING_RE.test(cur) ||
         cur.startsWith('```') ||
         cur.startsWith('>') ||
-        /^[-*]\s+/.test(cur) ||
-        /^\d+\.\s+/.test(cur) ||
-        /^(-{3,}|\*{3,})$/.test(cur)
+        BULLET_RE.test(cur) ||
+        ORDERED_RE.test(cur) ||
+        HR_RE.test(cur)
       ) {
         break
       }
       paraLines.push(cur)
       i++
     }
-    blocks.push(
-      <p key={key++} className="text-[13.5px] leading-relaxed text-foreground">
-        {renderInline(paraLines.join(' '))}
-      </p>,
-    )
+    if (paraLines.length > 0) {
+      blocks.push(
+        <p key={key++} className="text-[13.5px] leading-relaxed text-foreground">
+          {renderInline(paraLines.join(' '))}
+        </p>,
+      )
+    }
+    // Jaminan progres agar parser tidak pernah terjebak infinite loop pada input aneh.
+    if (i === startI) {
+      i++
+    }
   }
 
   return <div className="min-w-0 max-w-full space-y-2.5 break-words">{blocks}</div>

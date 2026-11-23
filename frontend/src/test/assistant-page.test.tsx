@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import AssistantPage from '@/pages/AssistantPage'
+import { MarkdownContent } from '@/features/assistant/MarkdownContent'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { authApi } from '@/lib/auth-api'
@@ -110,5 +111,24 @@ describe('Halaman ILA AI (/asisten)', () => {
     expect(await screen.findByText(/sudah masuk watchlist Anda/i)).toBeInTheDocument()
     expect(screen.getByText(/USDJPY ditambahkan ke pantauan/i)).toBeInTheDocument()
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.subscriptions })
+  })
+
+  it('merender markdown h4, hashtag, dan garis pemisah tanpa infinite loop atau OOM', () => {
+    render(
+      <MarkdownContent
+        content={[
+          '#### Ringkasan Setup',
+          '#W525654572960402 posisi SELL',
+          '#1 batas harian',
+          '| Pair | Arah | tanpa garis pemisah',
+          '####### tujuh pagar',
+        ].join('\n')}
+      />,
+    )
+
+    expect(screen.getByText('Ringkasan Setup')).toBeInTheDocument()
+    expect(screen.getByText(/#W525654572960402 posisi SELL/)).toBeInTheDocument()
+    expect(screen.getByText(/#1 batas harian/)).toBeInTheDocument()
+    expect(screen.getByText(/####### tujuh pagar/)).toBeInTheDocument()
   })
 })
