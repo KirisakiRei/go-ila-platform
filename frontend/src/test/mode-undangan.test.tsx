@@ -69,6 +69,7 @@ describe('Mode undangan di UI', () => {
   it('navigasi bawah menyembunyikan tab Billing saat invite only', () => {
     bungkus(<MobileBottomNav inviteOnly />)
     expect(screen.queryByRole('link', { name: /billing/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ila ai/i })).toHaveAttribute('href', '/asisten')
   })
 
   it('navigasi bawah tetap menampilkan tab Billing saat pendaftaran dibuka', () => {

@@ -35,6 +35,7 @@ import { ScrollToTop } from './ScrollToTop'
 
 // Halaman berat & seluruh panel admin dimuat malas (code-splitting) agar
 // pengunjung halaman masuk/dashboard pelanggan tidak mengunduh bundel admin.
+const AssistantPage = lazy(() => import('@/pages/AssistantPage'))
 const BacktestPage = lazy(() => import('@/pages/BacktestPage'))
 const BacktestHistoryPage = lazy(() => import('@/pages/BacktestHistoryPage'))
 const BacktestDetailPage = lazy(() => import('@/pages/BacktestDetailPage'))
@@ -277,6 +278,18 @@ export function AppRoutes() {
             <RequireAuth>
               <ShellPage>
                 <StrategiesPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/asisten"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <Suspense fallback={<FullPageLoading label="Memuat ILA AI..." />}>
+                  <AssistantPage />
+                </Suspense>
               </ShellPage>
             </RequireAuth>
           }

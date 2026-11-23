@@ -7,6 +7,7 @@ import {
   CreditCard,
   FlaskConical,
   LogOut,
+  MessageSquareText,
   Radio,
   Settings,
   ShieldCheck,
@@ -110,6 +111,12 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
               label="Watchlist Pair"
               description="Pilih instrumen trading yang dipantau"
               onClick={() => go('/strategi')}
+            />
+            <MobileMenuRow
+              icon={MessageSquareText}
+              label="ILA AI"
+              description="Asisten analisis New ILA 2.0 & data akun"
+              onClick={() => go('/asisten')}
             />
             <MobileMenuRow
               icon={FlaskConical}

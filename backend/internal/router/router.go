@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"ila/backend/internal/assistant"
 	"ila/backend/internal/authstate"
 	"ila/backend/internal/authz"
 	"ila/backend/internal/config"
@@ -414,6 +415,51 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		marketStreamHub.Close()
 	})
 	marketHandler := handler.NewMarketHandler(marketService, pairRepo).WithStream(marketStreamHub)
+
+	// ILA AI Assistant (Nanobot ILA 2.0 via 9router OpenAI-compatible).
+	assistantRepo := repository.NewAssistantRepository(db)
+	if db != nil {
+		if err := assistantRepo.EnsureSchema(context.Background()); err != nil {
+			logger.Warn("gagal memastikan skema asisten AI", "error", err.Error())
+		}
+	}
+	var aiLLM assistant.LLMClient
+	if cfg.IsAIConfigured() {
+		aiLLM = assistant.NewOpenAIClient(assistant.ClientConfig{
+			BaseURL: cfg.AIBaseURL,
+			APIKey:  cfg.AIAPIKey,
+			Timeout: cfg.AITimeout,
+		})
+	}
+	assistantService := service.NewAssistantService(service.AssistantServiceDeps{
+		Enabled:      cfg.IsAIConfigured(),
+		Model:        cfg.AIModel,
+		CompactModel: cfg.AICompactModel,
+		Repo:         assistantRepo,
+		LLM:          aiLLM,
+		Tools: assistant.ToolDeps{
+			Signals:        tradingService,
+			SignalByID:     assistantSignalReader{signalReader: signalReader{repo: signalRepo}, runner: runnerRepo},
+			Journal:        journalRepo,
+			Accounts:       accountService,
+			Pairs:          pairCatalogService,
+			PairMeta:       pairRepo,
+			Candles:        marketService,
+			Quota:          runnerRepo,
+			Users:          userRepo,
+			Features:       repository.NewTierFeatureReader(db),
+			MaxDailyTrades: cfg.MaxDailyTrades,
+		},
+		CompactOpts: assistant.CompactionOptions{
+			IdleAfter:   cfg.AICompactIdleAfter,
+			MaxMessages: cfg.AICompactMaxMessages,
+			MaxChars:    cfg.AICompactMaxChars,
+			KeepRecent:  cfg.AIKeepRecentMessages,
+		},
+		Logger: logger,
+	})
+	assistantHandler := handler.NewAssistantHandler(assistantService)
+	assistantChatLimiter := middleware.RateLimitByUser(middleware.NewRateLimiter(12, time.Minute))
 	systemHandler := handler.NewSystemHandler(systemService)
 	tgClient := pilihan.tgClient
 	if tgClient == nil {
@@ -678,6 +724,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		// pair yang dipilih admin agar selaras dengan evaluasi engine.
 		me.GET("/market/candles", marketHandler.Candles)
 		me.GET("/market/candles/stream", marketHandler.StreamCandles)
+
+		// ILA AI Assistant (Nanobot ILA 2.0).
+		assistantHandler.Register(me, assistantChatLimiter)
 
 		// Persetujuan dokumen legal. `blocked` pada balasan berarti eksekusi
 		// dan pembayaran ditahan sampai dokumen wajib disetujui.

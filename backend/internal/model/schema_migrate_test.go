@@ -38,6 +38,7 @@ func allModels() []any {
 		&model.AccountPairStrategy{}, &model.AccountPairTimeframe{},
 		&model.BacktestRun{}, &model.BacktestTrade{}, &model.BacktestQuota{},
 		&model.WebPushVAPID{}, &model.WebPushSubscription{},
+		&model.AISession{}, &model.AIMessage{}, &model.AIUserMemory{},
 	}
 }
 

@@ -13,24 +13,27 @@ import "gorm.io/gorm"
 // menolak id kosong sementara SQLite diam-diam menerimanya, jadi kelalaian ini
 // baru terlihat saat pindah ke database sungguhan.
 
-func (m *AuditLog) BeforeCreate(_ *gorm.DB) error           { return ensureID(&m.ID) }
-func (m *ApprovalToken) BeforeCreate(_ *gorm.DB) error      { return ensureID(&m.ID) }
-func (m *NotificationLog) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
-func (m *CouponRedemption) BeforeCreate(_ *gorm.DB) error   { return ensureID(&m.ID) }
-func (m *CreditRedemption) BeforeCreate(_ *gorm.DB) error   { return ensureID(&m.ID) }
-func (m *CreditTransaction) BeforeCreate(_ *gorm.DB) error  { return ensureID(&m.ID) }
-func (m *LegalDocument) BeforeCreate(_ *gorm.DB) error      { return ensureID(&m.ID) }
-func (m *LegalAcceptance) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
-func (m *Role) BeforeCreate(_ *gorm.DB) error               { return ensureID(&m.ID) }
-func (m *SignalEvent) BeforeCreate(_ *gorm.DB) error        { return ensureID(&m.ID) }
-func (m *ExecutionRecord) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
-func (m *Session) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
-func (m *SubscriptionRecord) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }
-func (m *Invoice) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
-func (m *Payment) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
-func (m *Refund) BeforeCreate(_ *gorm.DB) error             { return ensureID(&m.ID) }
-func (m *TwoFactor) BeforeCreate(_ *gorm.DB) error          { return ensureID(&m.ID) }
-func (m *RecoveryCode) BeforeCreate(_ *gorm.DB) error       { return ensureID(&m.ID) }
-func (m *TwoFactorChallenge) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }
-func (m *TelegramMessage) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *AuditLog) BeforeCreate(_ *gorm.DB) error            { return ensureID(&m.ID) }
+func (m *ApprovalToken) BeforeCreate(_ *gorm.DB) error       { return ensureID(&m.ID) }
+func (m *NotificationLog) BeforeCreate(_ *gorm.DB) error     { return ensureID(&m.ID) }
+func (m *CouponRedemption) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *CreditRedemption) BeforeCreate(_ *gorm.DB) error    { return ensureID(&m.ID) }
+func (m *CreditTransaction) BeforeCreate(_ *gorm.DB) error   { return ensureID(&m.ID) }
+func (m *LegalDocument) BeforeCreate(_ *gorm.DB) error       { return ensureID(&m.ID) }
+func (m *LegalAcceptance) BeforeCreate(_ *gorm.DB) error     { return ensureID(&m.ID) }
+func (m *Role) BeforeCreate(_ *gorm.DB) error                { return ensureID(&m.ID) }
+func (m *SignalEvent) BeforeCreate(_ *gorm.DB) error         { return ensureID(&m.ID) }
+func (m *ExecutionRecord) BeforeCreate(_ *gorm.DB) error     { return ensureID(&m.ID) }
+func (m *Session) BeforeCreate(_ *gorm.DB) error             { return ensureID(&m.ID) }
+func (m *SubscriptionRecord) BeforeCreate(_ *gorm.DB) error  { return ensureID(&m.ID) }
+func (m *Invoice) BeforeCreate(_ *gorm.DB) error             { return ensureID(&m.ID) }
+func (m *Payment) BeforeCreate(_ *gorm.DB) error             { return ensureID(&m.ID) }
+func (m *Refund) BeforeCreate(_ *gorm.DB) error              { return ensureID(&m.ID) }
+func (m *TwoFactor) BeforeCreate(_ *gorm.DB) error           { return ensureID(&m.ID) }
+func (m *RecoveryCode) BeforeCreate(_ *gorm.DB) error        { return ensureID(&m.ID) }
+func (m *TwoFactorChallenge) BeforeCreate(_ *gorm.DB) error  { return ensureID(&m.ID) }
+func (m *TelegramMessage) BeforeCreate(_ *gorm.DB) error     { return ensureID(&m.ID) }
 func (m *WebPushSubscription) BeforeCreate(_ *gorm.DB) error { return ensureID(&m.ID) }
+func (m *AISession) BeforeCreate(_ *gorm.DB) error           { return ensureID(&m.ID) }
+func (m *AIMessage) BeforeCreate(_ *gorm.DB) error           { return ensureID(&m.ID) }
+func (m *AIUserMemory) BeforeCreate(_ *gorm.DB) error        { return ensureID(&m.ID) }

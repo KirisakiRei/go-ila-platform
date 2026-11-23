@@ -1,5 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CreditCard, LayoutDashboard, Radio, Settings } from 'lucide-react'
+import {
+  BarChart3,
+  CreditCard,
+  LayoutDashboard,
+  MessageSquareText,
+  Radio,
+  Settings,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const BOTTOM_NAV_ITEMS = [
@@ -11,13 +18,17 @@ const BOTTOM_NAV_ITEMS = [
 ]
 
 type MobileBottomNavProps = {
-  /** Saat invite only, tab Billing diganti Pengaturan agar tidak ada pintu mati. */
+  /** Saat invite only, tab Billing diganti ILA AI agar tidak ada pintu mati dan asisten mudah dijangkau. */
   inviteOnly?: boolean
 }
 
 export function MobileBottomNav({ inviteOnly = false }: MobileBottomNavProps) {
   const items = inviteOnly
-    ? BOTTOM_NAV_ITEMS.filter((item) => item.to !== '/langganan')
+    ? BOTTOM_NAV_ITEMS.map((item) =>
+        item.to === '/langganan'
+          ? { to: '/asisten', label: 'ILA AI', icon: MessageSquareText }
+          : item,
+      )
     : BOTTOM_NAV_ITEMS
 
   return (
@@ -25,7 +36,7 @@ export function MobileBottomNav({ inviteOnly = false }: MobileBottomNavProps) {
       aria-label="Navigasi bawah mobile"
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_16px_rgba(0,0,0,0.45)]"
     >
-      <div className="flex h-[3.75rem] items-center justify-around px-1 py-1">
+      <div className="mx-auto flex h-[3.75rem] max-w-xl items-center justify-around px-1 py-1">
         {items.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -33,7 +44,7 @@ export function MobileBottomNav({ inviteOnly = false }: MobileBottomNavProps) {
             end={end}
             className={({ isActive }) =>
               cn(
-                'flex min-w-0 flex-1 flex-col items-center justify-center px-1 py-1 transition-colors active:scale-95',
+                'flex min-w-0 flex-1 flex-col items-center justify-center rounded-lg px-1 py-1 transition-[transform,color] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 isActive
                   ? 'font-semibold text-foreground'
                   : 'text-muted-foreground hover:text-foreground',

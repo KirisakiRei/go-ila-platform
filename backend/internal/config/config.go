@@ -148,6 +148,20 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string
+
+	// ILA AI Assistant (OpenAI-compatible via 9router).
+	// Bila AI_ENABLED=false atau kredensial belum diisi, asisten nonaktif
+	// tanpa mengganggu jalannya layanan platform lainnya.
+	AIEnabled            bool
+	AIBaseURL            string
+	AIAPIKey             string
+	AIModel              string
+	AICompactModel       string
+	AITimeout            time.Duration
+	AICompactIdleAfter   time.Duration
+	AICompactMaxMessages int
+	AICompactMaxChars    int
+	AIKeepRecentMessages int
 }
 
 // Load membaca env lalu memvalidasi nilai wajib.
@@ -228,6 +242,16 @@ func Load(service string) (*Config, error) {
 		VAPIDPublicKey:        env("VAPID_PUBLIC_KEY", ""),
 		VAPIDPrivateKey:       env("VAPID_PRIVATE_KEY", ""),
 		VAPIDSubject:          env("VAPID_SUBJECT", "mailto:notifikasi@rekavia.com"),
+		AIEnabled:             envBool("AI_ENABLED", false),
+		AIBaseURL:             strings.TrimRight(env("AI_BASE_URL", ""), "/"),
+		AIAPIKey:              env("AI_API_KEY", ""),
+		AIModel:               env("AI_MODEL", ""),
+		AICompactModel:        env("AI_COMPACT_MODEL", ""),
+		AITimeout:             envDuration("AI_TIMEOUT", 90*time.Second),
+		AICompactIdleAfter:    envDuration("AI_COMPACT_IDLE_AFTER", 2*time.Hour),
+		AICompactMaxMessages:  envInt("AI_COMPACT_MAX_MESSAGES", 20),
+		AICompactMaxChars:     envInt("AI_COMPACT_MAX_CHARS", 24000),
+		AIKeepRecentMessages:  envInt("AI_KEEP_RECENT_MESSAGES", 8),
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -322,6 +346,15 @@ func (c *Config) LegacyMasterKeys() map[int]string {
 // IsProduction menandai konfigurasi produksi.
 func (c *Config) IsProduction() bool {
 	return strings.EqualFold(c.AppEnv, "production")
+}
+
+// IsAIConfigured mengembalikan true bila fitur ILA AI diaktifkan dan
+// endpoint/kunci/model 9router sudah lengkap.
+func (c *Config) IsAIConfigured() bool {
+	return c.AIEnabled &&
+		strings.TrimSpace(c.AIBaseURL) != "" &&
+		strings.TrimSpace(c.AIAPIKey) != "" &&
+		strings.TrimSpace(c.AIModel) != ""
 }
 
 func env(key, fallback string) string {

@@ -100,6 +100,7 @@ func main() {
 		&model.AccountPairTimeframe{},
 		&model.BacktestRun{}, &model.BacktestTrade{}, &model.BacktestQuota{},
 		&model.WebPushVAPID{}, &model.WebPushSubscription{},
+		&model.AISession{}, &model.AIMessage{}, &model.AIUserMemory{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {
