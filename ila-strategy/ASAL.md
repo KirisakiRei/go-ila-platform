@@ -6,10 +6,10 @@ Folder ini adalah **salinan** aturan trading ILA 2.0. Sumbernya:
 |---|---|
 | Repo asal | `go-trade` (engine live, VPS 1) |
 | Path asal | `pkg/ila` dan `pkg/indicators` |
-| Commit SHA | `8064a2ff6a6b3f4b69e9cd3e2543f482a7e48aa4` |
-| Tanggal commit | 2026-11-21 |
-| Judul commit | feat(ila): upgrade engine ke New ILA 2.0 dan tambah feed makro MN1/Q1 |
-| Disalin pada | 2026-11-21 |
+| Commit SHA | `b540dee4eacbd24c09d89972acd5c6b4f17a1fb5` |
+| Tanggal commit | 2026-11-23 |
+| Judul commit | fix(ila): batasi CISD di jendela C3, gugurkan rangkaian/key level lama, dan cegah re-emit sinyal basi |
+| Disalin pada | 2026-11-23 |
 
 ## Mengapa disalin, bukan diimpor
 

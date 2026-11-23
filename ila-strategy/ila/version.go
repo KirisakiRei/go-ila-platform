@@ -22,8 +22,8 @@ const (
 
 	// Version adalah versi aturan, dalam bentuk yang aman ditampilkan ke UI
 	// maupun disimpan sebagai kunci pembanding hasil.
-	Version = "ila-2.0-v2.0.0"
+	Version = "ila-2.0-v2.1.0"
 	// VersionNumber adalah bagian angka saja, untuk perbandingan terurut
 	// ketika UI perlu mengurutkan hasil menurut versi.
-	VersionNumber = "2.0.0"
+	VersionNumber = "2.1.0"
 )
