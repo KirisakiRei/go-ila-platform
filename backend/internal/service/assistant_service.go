@@ -169,7 +169,7 @@ func (s *assistantService) CompactSession(ctx context.Context, userID string) (*
 	if err != nil {
 		return nil, err
 	}
-	msgs, hasMore, err := s.deps.Repo.ListDisplayMessages(ctx, sess.ID, 0, 50)
+	msgs, hasMore, err := s.deps.Repo.ListDisplayMessages(ctx, sess.ID, 0, 20)
 	if err != nil {
 		return nil, err
 	}

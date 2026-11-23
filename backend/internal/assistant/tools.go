@@ -101,7 +101,7 @@ func ToolDefinitions() []ToolDefinition {
 			Type: "function",
 			Function: ToolFunctionSchema{
 				Name:        "inspect_trade_candles",
-				Description: "Mengambil data candle historis (OHLC + waktu WIB/NY) dari feed resmi pair untuk memverifikasi pergerakan harga sebelum entry atau penyebab menyentuh SL/TP.",
+				Description: "Mengambil data candle historis aktual (waktu WIB/NY, OHLC, serta tipe bullish/bearish/doji) langsung dari feed resmi pair untuk menganalisa ulang setup HTF/LTF sesuai New ILA 2.0 dan memverifikasi penyebab menyentuh SL/TP.",
 				Parameters: json.RawMessage(`{
 					"type": "object",
 					"properties": {
@@ -109,7 +109,7 @@ func ToolDefinitions() []ToolDefinition {
 						"timeframe": {"type": "string", "description": "Timeframe candle: M1, M5, M15, H1, H4, D1, W"},
 						"from_iso": {"type": "string", "description": "Batas awal waktu ISO-8601/RFC3339 opsional"},
 						"to_iso": {"type": "string", "description": "Batas akhir waktu ISO-8601/RFC3339 opsional"},
-						"limit": {"type": "integer", "description": "Maksimal jumlah candle dikembalikan (maks 60)"}
+						"limit": {"type": "integer", "description": "Maksimal jumlah candle dikembalikan (default 40, maks 80)"}
 					},
 					"required": ["symbol", "timeframe"]
 				}`),
@@ -284,7 +284,7 @@ func execGetSignals(ctx context.Context, deps ToolDeps, userID, rawArgs string) 
 	if sigID := strings.TrimSpace(in.SignalID); sigID != "" && deps.SignalByID != nil {
 		sig, err := deps.SignalByID.FindSignal(ctx, sigID)
 		if err != nil {
-			return toolErr("SIGNAL_NOT_FOUND", "Sinyal dengan ID tersebut tidak ditemukan.", "Sinyal tidak ditemukan")
+			return toolErr("SIGNAL_NOT_FOUND", "Sinyal dengan ID tersebut tidak ditemukan. Jangan memotong ID; cari ulang memakai parameter symbol saja untuk melihat daftar sinyal terbaru.", "Sinyal tidak ditemukan")
 		}
 		var us *model.UserSignal
 		if foundUS, usErr := deps.SignalByID.FindUserSignal(ctx, userID, sigID); usErr == nil {
@@ -435,10 +435,10 @@ func compactSweep(s *dto.SignalHtfSweep) map[string]any {
 		}
 	}
 	if s.SweepCandle != nil {
-		out["sweep_candle"] = compactCandle(s.SweepCandle)
+		out["candle_sweep"] = compactCandle(s.SweepCandle)
 	}
 	if s.SweptCandle != nil {
-		out["swept_candle"] = compactCandle(s.SweptCandle)
+		out["candle_yang_disapu"] = compactCandle(s.SweptCandle)
 	}
 	return out
 }
@@ -447,33 +447,34 @@ func compactCISD(c *dto.SignalCISD) map[string]any {
 	out := map[string]any{
 		"detected":    c.Detected,
 		"direction":   c.Direction,
-		"cisd_level":  c.CISDLevel,
-		"extreme_sl":  c.ExtremeSL,
-		"entry_price": c.EntryPrice,
-		"details":     c.Details,
+		"level_cisd":  c.CISDLevel,
+		"sl_ekstrem":  c.ExtremeSL,
+		"harga_entry": c.EntryPrice,
+		"ringkasan":   c.Details,
 	}
 	if c.BreakTime != nil {
-		out["break_time_wib"] = formatWIB(*c.BreakTime)
-		out["break_time_ny"] = formatNY(*c.BreakTime)
+		out["waktu_konfirmasi_wib"] = formatWIB(*c.BreakTime)
+		out["waktu_konfirmasi_ny"] = formatNY(*c.BreakTime)
 	}
 	if c.RefCandle != nil {
-		out["ref_candle"] = compactCandle(c.RefCandle)
+		out["candle_acuan_engine"] = compactCandle(c.RefCandle)
 	}
 	if c.BreakCandle != nil {
-		out["break_candle"] = compactCandle(c.BreakCandle)
+		out["candle_penembus"] = compactCandle(c.BreakCandle)
 	}
 	return out
 }
 
 func compactCandle(c *dto.SignalCandle) map[string]any {
 	return map[string]any{
-		"time_wib":  formatWIB(c.Timestamp),
-		"time_ny":   formatNY(c.Timestamp),
-		"open":      c.Open,
-		"high":      c.High,
-		"low":       c.Low,
-		"close":     c.Close,
-		"is_closed": c.IsClosed,
+		"waktu_wib":   formatWIB(c.Timestamp),
+		"waktu_ny":    formatNY(c.Timestamp),
+		"arah_candle": candleType(c.Open, c.Close),
+		"open":        c.Open,
+		"high":        c.High,
+		"low":         c.Low,
+		"close":       c.Close,
+		"sudah_tutup": c.IsClosed,
 	}
 }
 
@@ -534,8 +535,8 @@ func execGetPositionsAndJournal(ctx context.Context, deps ToolDeps, userID, rawA
 				"exit_price":       p.ExitPrice,
 				"profit_loss":      p.ProfitLoss,
 				"outcome_r":        p.OutcomeR,
-				"status":           p.Status,
-				"is_dry_run":       p.IsDryRun,
+				"status_label":     formatPositionStatus(p.Status),
+				"account_mode":     formatAccountMode(p.IsDryRun),
 				"opened_at_iso":    p.OpenedAt.UTC().Format(time.RFC3339),
 				"opened_at_wib":    formatWIB(p.OpenedAt),
 			}
@@ -620,7 +621,7 @@ func execInspectTradeCandles(ctx context.Context, deps ToolDeps, rawArgs string)
 		}
 	}
 
-	candles, usedFeed, err := deps.Candles.Candles(ctx, sym, feed, tf, 180)
+	candles, usedFeed, err := deps.Candles.Candles(ctx, sym, feed, tf, 300)
 	if err != nil || len(candles) == 0 {
 		reason := "Data candle belum tersedia dari feed pasar."
 		if err != nil {
@@ -660,11 +661,11 @@ func execInspectTradeCandles(ctx context.Context, deps ToolDeps, rawArgs string)
 			"feed":          usedFeed,
 			"oldest_candle": formatWIB(time.Unix(candles[0].Time, 0).UTC()),
 			"newest_candle": formatWIB(time.Unix(candles[len(candles)-1].Time, 0).UTC()),
-			"reason":        "Rentang waktu yang diminta sudah lebih lama dari jendela 180 candle terakhir yang tersedia di feed.",
+			"reason":        "Rentang waktu yang diminta sudah lebih lama dari jendela 300 candle terakhir yang tersedia di feed.",
 		}, "Rentang candle di luar jendela")
 	}
 
-	maxOut := clampLimit(in.Limit, 40, 60)
+	maxOut := clampLimit(in.Limit, 40, 80)
 	if len(filtered) > maxOut {
 		filtered = filtered[len(filtered)-maxOut:]
 	}
@@ -673,12 +674,13 @@ func execInspectTradeCandles(ctx context.Context, deps ToolDeps, rawArgs string)
 	for _, c := range filtered {
 		ts := time.Unix(c.Time, 0).UTC()
 		rows = append(rows, map[string]any{
-			"wib":   formatWIB(ts),
-			"ny":    formatNY(ts),
-			"open":  c.Open,
-			"high":  c.High,
-			"low":   c.Low,
-			"close": c.Close,
+			"wib":         formatWIB(ts),
+			"ny":          formatNY(ts),
+			"candle_type": candleType(c.Open, c.Close),
+			"open":        c.Open,
+			"high":        c.High,
+			"low":         c.Low,
+			"close":       c.Close,
 		})
 	}
 
@@ -979,6 +981,42 @@ func formatNY(t time.Time) string {
 		return ""
 	}
 	return t.In(timezone.NY).Format("02 Jan 2006 15:04 NY")
+}
+
+func candleType(open, closePrice float64) string {
+	switch {
+	case closePrice > open:
+		return "bullish"
+	case closePrice < open:
+		return "bearish"
+	default:
+		return "doji"
+	}
+}
+
+func formatPositionStatus(status string) string {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "OPEN":
+		return "Posisi sedang berjalan"
+	case "CLOSED_TP":
+		return "Target TP tercapai"
+	case "CLOSED_SL":
+		return "Stop Loss tersentuh"
+	case "CLOSED_MANUAL":
+		return "Ditutup manual"
+	default:
+		if status == "" {
+			return "Tidak diketahui"
+		}
+		return status
+	}
+}
+
+func formatAccountMode(isDryRun bool) string {
+	if isDryRun {
+		return "Simulasi (Dry-Run)"
+	}
+	return "Akun Live"
 }
 
 func formatSimulationLabel(status string, rLower float64) string {

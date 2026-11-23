@@ -50,7 +50,7 @@ func (h *AssistantHandler) GetSession(c *gin.Context) {
 		return
 	}
 	beforeSeq, _ := strconv.ParseInt(c.Query("before_seq"), 10, 64)
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
 	res, err := h.svc.GetSession(c.Request.Context(), middleware.CurrentUserID(c), beforeSeq, limit)
 	if err != nil {

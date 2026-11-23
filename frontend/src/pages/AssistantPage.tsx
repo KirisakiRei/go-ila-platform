@@ -27,6 +27,7 @@ const STARTER_PROMPTS = [
 ] as const
 
 const MAX_MESSAGE_CHARS = 2000
+const HISTORY_PAGE_SIZE = 20
 const SESSION_QUERY_KEY = ['assistant', 'session'] as const
 
 export default function AssistantPage() {
@@ -34,7 +35,7 @@ export default function AssistantPage() {
 
   const sessionQuery = useQuery({
     queryKey: SESSION_QUERY_KEY,
-    queryFn: () => assistantApi.getSession({ limit: 50 }),
+    queryFn: () => assistantApi.getSession({ limit: HISTORY_PAGE_SIZE }),
     staleTime: 60_000,
   })
 
@@ -117,17 +118,24 @@ export default function AssistantPage() {
     const el = scrollBoxRef.current
     const prevHeight = el?.scrollHeight ?? 0
 
+    // Lepas pin ke bawah sebelum menambah pesan lama agar layar tidak melompat
+    // balik ke pesan terbaru ketika daftar pesan bertambah panjang.
+    stickBottomRef.current = false
     setLoadingOlder(true)
     try {
       const older = await assistantApi.getSession({
         beforeSeq: firstMsg.seq,
-        limit: 40,
+        limit: HISTORY_PAGE_SIZE,
       })
-      updateSessionCache((prev) => ({
-        ...prev,
-        has_more: Boolean(older.has_more),
-        messages: [...(older.messages ?? []), ...prev.messages],
-      }))
+      updateSessionCache((prev) => {
+        const seen = new Set(prev.messages.map((m) => m.seq))
+        const uniqueOlder = (older.messages ?? []).filter((m) => !seen.has(m.seq))
+        return {
+          ...prev,
+          has_more: Boolean(older.has_more),
+          messages: [...uniqueOlder, ...prev.messages],
+        }
+      })
       requestAnimationFrame(() => {
         if (el) {
           el.scrollTop = el.scrollHeight - prevHeight
@@ -422,16 +430,16 @@ export default function AssistantPage() {
           ) : (
             <div className="space-y-5">
               {hasMore && (
-                <div className="flex justify-center">
+                <div className="flex justify-center pb-1">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="press gap-1.5 text-[12px] text-muted-foreground"
+                    className="press gap-1.5 rounded-full text-[12px] text-muted-foreground hover:text-foreground"
                     disabled={loadingOlder}
                     onClick={() => void handleLoadOlder()}
                   >
                     <History className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>{loadingOlder ? 'Memuat...' : 'Muat riwayat sebelumnya'}</span>
+                    <span>{loadingOlder ? 'Memuat riwayat...' : 'Muat riwayat sebelumnya'}</span>
                   </Button>
                 </div>
               )}
@@ -553,7 +561,7 @@ export default function AssistantPage() {
         }}
         className="shrink-0 space-y-1.5 border-t border-border pt-3"
       >
-        <div className="flex items-end gap-2 rounded-2xl border border-input bg-card px-3 py-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 focus-within:ring-offset-background">
+        <div className="flex items-end gap-2 rounded-2xl border border-input bg-card px-3 py-2 transition-colors focus-within:border-foreground/35">
           <textarea
             ref={textareaRef}
             rows={1}
@@ -570,7 +578,7 @@ export default function AssistantPage() {
                 : 'ILA AI belum aktif'
             }
             aria-label="Pesan untuk ILA AI"
-            className="max-h-36 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[16px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13.5px]"
+            className="max-h-36 min-h-[24px] flex-1 resize-none bg-transparent py-1 text-[16px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13.5px]"
           />
 
           {isStreaming ? (

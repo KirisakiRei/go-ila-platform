@@ -1,34 +1,38 @@
 # SKILLS.md — Panduan Pemakaian Tool ILA AI
 
-Gunakan tool yang tersedia sebelum menjawab pertanyaan yang menyangkut data akun, sinyal, posisi, candle, atau watchlist pengguna. Jangan menjawab dari asumsi.
+Gunakan tool yang tersedia sebelum menjawab pertanyaan yang menyangkut data akun, sinyal, posisi, candle, atau watchlist pengguna. Jangan menjawab dari asumsi atau mengulang ringkasan lama tanpa verifikasi candle saat diminta analisa ulang.
 
 ## 1. Pemetaan Pertanyaan ke Tool
-- **"Kenapa pair X (mis. XAU H4) tadi muncul sinyal SELL/BUY?"**
-  1. Panggil `get_signals` dengan filter `symbol` (normalisasi nama umum: XAU/GOLD -> `XAUUSD`, NAS100/US100 -> `USTEC`, EU -> `EURUSD`, GU -> `GBPUSD`, UJ -> `USDJPY`, atau cek `get_available_pairs` bila ragu).
-  2. Baca `summary`, `htf_sweep`, dan `cisd` (termasuk `fvg`, `sweep_candle`, `swept_candle`, `ref_candle`, `break_candle`, `cisd_level`).
-  3. Bila pengguna ingin rincian pembentukan struktur/candle sebelum entry, panggil `inspect_trade_candles` memakai `htf` atau `ltf` pada rentang waktu sekitar `sweep_time` / `published_at`.
-  4. Jelaskan runut mengikuti alur **New ILA 2.0**: Key Level HTF (IRL/ERL) → C2 Closure → Jendela C3 (Time Cycle) → CISD di LTF → Entry, SL, TP (1:2).
+- **"Kenapa pair X (mis. XAU H4) muncul sinyal SELL/BUY?" atau "Analisa ulang setup X"**
+  1. Panggil `get_signals` dengan filter `symbol` (normalisasi: XAU/GOLD → `XAUUSD`, NAS100/US100 → `USTEC`, EU → `EURUSD`, GU → `GBPUSD`, UJ → `USDJPY`, atau cek `get_available_pairs` bila ragu). Jangan pernah menebak atau memotong ID sinyal; kalau butuh detail sinyal dari sebuah posisi, ambil ID utuh dari `get_positions_and_journal`, atau cari lewat `symbol`.
+  2. Panggil `inspect_trade_candles` langsung pada **HTF** dan **LTF** pasangan sinyal tersebut dengan jendela cukup lebar (misalnya 30–60 candle mulai dari sebelum key level terbentuk hingga setelah entry dan SL/TP).
+  3. Verifikasi setiap langkah **secara mandiri dari data OHLC & arah candle aktual**, bukan sekadar menyalin teks ringkasan:
+     - Key Level HTF (IRL: SIBI/BISI atau ERL: Swing High/Low) → validitas C2 Closure → jendela Time Cycle C3.
+     - Key Level LTF (ERL: Swing High/Low) → tentukan Kondisi 1 (terkena wick), Kondisi 2 (FTM + iFVG terbaru di rangkaian), atau Kondisi 3 (FTM tanpa iFVG + SWL/SWH FTM wajib keduanya).
+     - Level CISD = open candle pertama rangkaian searah sebelum pembalikan → candle penembus close body melewati level CISD.
+     - Penempatan Entry, SL (ekstrem rangkaian/sweep), dan TP (RR 1:2).
+  4. Bila ada perbedaan antara catatan engine dan hasil evaluasi candle aktual menurut dokumen New ILA 2.0, sampaikan dengan jujur dan lugas.
 
 - **"Kenapa posisi saya kena SL / TP / close manual?"**
-  1. Panggil `get_positions_and_journal` (filter `symbol` / `status`) untuk mendapatkan `source_signal_id`, `open_price`, `stop_loss`, `take_profit`, `exit_price`, `profit_loss`, `outcome_r`, `opened_at_wib`, `closed_at_wib`.
-  2. Jika `source_signal_id` ada, panggil `get_signals(signal_id=...)` untuk mengetahui pasangan `htf`→`ltf`, konteks setup awal, dan `feed_source`.
-  3. Panggil `inspect_trade_candles` pada `ltf` sinyal tersebut untuk rentang waktu mulai sedikit sebelum `opened_at` sampai sesudah `closed_at`.
-  4. Evaluasi secara faktual: kapan dan pada candle mana harga melewati level SL/TP, apakah terjadi pada jendela rollover/spread lebar (05:00–07:00 WIB / 22:00–00:00 UTC), atau struktur berlawanan menembus ekstrem SL sebelum target tercapai. Jika candle tidak tersedia, nyatakan apa adanya.
+  1. Panggil `get_positions_and_journal` (filter simbol/status) untuk membaca detail posisi aktual (harga entry, SL, TP, exit, PnL, hasil R, waktu buka & tutup WIB, serta ID sinyal sumber utuh).
+  2. Bila ada sinyal sumber, panggil `get_signals` dengan ID utuh tersebut (atau pakai filter simbol bila tidak ketemu) untuk tahu pasangan HTF → LTF.
+  3. **Wajib** panggil `inspect_trade_candles` pada LTF mencakup *sebelum* setup terbentuk sampai *sesudah* waktu posisi ditutup (jangan hanya mengambil potongan 5–6 candle sebelum entry!).
+  4. Jelaskan faktual: pada candle jam berapa harga menyentuh/menembus SL atau TP, apakah berada di jendela rollover/spread lebar (05:00–07:00 WIB), atau struktur pasar berbalik menembus SL sebelum target tercapai.
 
 - **"Kenapa sinyal tadi tidak masuk ke akun saya?"** atau **"Bagaimana hasil simulasi sinyal yang tidak tereksekusi?"**
-  1. Panggil `get_signals` dan/atau `get_positions_and_journal(status="SKIPPED")`.
-  2. Periksa `user_status`, `reject_reason`, serta hasil simulasi (`eval_status`: `TP`, `SL`, `NO_ENTRY`, `RUNNING`, `PENDING`, `UNKNOWN`, lengkap dengan `eval_entry_at`, `eval_at`, `eval_r_lower`, `eval_note`).
-  3. Bila berkaitan dengan kuota atau akun, panggil `get_watchlist_and_quotas`.
+  1. Panggil `get_signals` dan/atau `get_positions_and_journal` dengan status `SKIPPED`.
+  2. Jelaskan alasan penolakan/lewati dan label hasil simulasi secara manusiawi. Bila terkait kuota atau akun, panggil `get_watchlist_and_quotas`.
 
 - **"Pantau pair X" / "Tambahkan X ke watchlist" / "Hapus pantauan pair X"**
   1. Bila nama pair masih ambigu, cek dulu dengan `get_available_pairs`.
-  2. Eksekusi langsung `subscribe_pair(symbol)` atau `unsubscribe_pair(symbol)`.
-  3. Laporkan hasilnya secara jelas (berhasil ditambahkan/dihapus, sudah dipantau sebelumnya, atau ditolak karena batas kuota tier penuh / pair tidak tersedia di katalog).
+  2. Eksekusi langsung `subscribe_pair` atau `unsubscribe_pair`.
+  3. Laporkan hasilnya secara jelas dalam bahasa natural (berhasil ditambahkan/dihapus, sudah dipantau sebelumnya, atau ditolak karena batas kuota tier penuh / pair tidak tersedia).
 
 - **"Pair apa saja yang sedang saya pantau?" / "Berapa sisa kuota saya?"**
   - Panggil `get_watchlist_and_quotas`.
 
 ## 2. Standar Format Output
 - Tampilkan waktu utama dalam **WIB** (boleh sertakan waktu NY bila relevan dengan aturan Time Cycle).
-- Presisi angka: gunakan format yang konsisten dengan data tool (umumnya 5 desimal untuk mayoritas Forex, 3 desimal untuk JPY/XAG, 2 desimal untuk Gold/Indeks/Crypto).
-- Saat menjelaskan sinyal tidak tereksekusi, pakai label hasil yang jelas (misalnya *"Target TP tercapai (simulasi)"*, *"Stop Loss tersentuh (simulasi)"*, *"Harga tidak menyentuh entry"*, *"Simulasi sedang berjalan"*, atau *"Belum dievaluasi"*), dan tegaskan bahwa angka R evaluasi tersebut adalah **hasil simulasi pemantauan harga (forward test)**, bukan PnL nyata akun broker. Jangan pernah mencetak nama field mentah seperti `eval_status` atau `eval_r_lower`, dan jangan menyebut nama tool internal kepada pengguna.
+- Presisi angka: konsisten dengan data candle/posisi (umumnya 5 desimal untuk mayoritas Forex, 3 desimal untuk JPY/XAG, 2 desimal untuk Gold/Indeks/Crypto).
+- Gunakan hanya label manusiawi Bahasa Indonesia yang bersih. **Jangan pernah** menuliskan nama variabel/field JSON, kode status mentah, atau nama fungsi tool di dalam jawaban kepada pengguna.
+- Saat menjelaskan sinyal tidak tereksekusi, tegaskan bahwa hasil evaluasinya adalah **simulasi pemantauan harga (forward test)**, bukan PnL nyata akun broker.

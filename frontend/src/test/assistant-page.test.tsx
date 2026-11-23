@@ -131,4 +131,66 @@ describe('Halaman ILA AI (/asisten)', () => {
     expect(screen.getByText(/#1 batas harian/)).toBeInTheDocument()
     expect(screen.getByText(/####### tujuh pagar/)).toBeInTheDocument()
   })
+
+  it('memuat riwayat chat sebelumnya per halaman dengan before_seq tanpa duplikasi', async () => {
+    const getSessionSpy = vi
+      .spyOn(assistantApiModule.assistantApi, 'getSession')
+      .mockResolvedValueOnce({
+        enabled: true,
+        session_id: 'sess-1',
+        compacted_before_seq: 0,
+        active_message_count: 25,
+        has_summary: false,
+        has_more: true,
+        messages: [
+          {
+            id: 'm21',
+            seq: 21,
+            role: 'user',
+            content: 'Pesan terbaru halaman 1',
+            created_at: '2026-11-23T12:00:00Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        enabled: true,
+        session_id: 'sess-1',
+        compacted_before_seq: 0,
+        active_message_count: 25,
+        has_summary: false,
+        has_more: false,
+        messages: [
+          {
+            id: 'm10',
+            seq: 10,
+            role: 'user',
+            content: 'Pesan lama halaman 2',
+            created_at: '2026-11-23T11:00:00Z',
+          },
+          {
+            id: 'm21-dup',
+            seq: 21,
+            role: 'user',
+            content: 'Pesan terbaru halaman 1',
+            created_at: '2026-11-23T12:00:00Z',
+          },
+        ],
+      })
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AssistantPage />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('Pesan terbaru halaman 1')).toBeInTheDocument()
+    const loadOlderBtn = screen.getByRole('button', { name: /muat riwayat sebelumnya/i })
+    fireEvent.click(loadOlderBtn)
+
+    expect(await screen.findByText('Pesan lama halaman 2')).toBeInTheDocument()
+    expect(screen.getAllByText('Pesan terbaru halaman 1')).toHaveLength(1)
+    expect(getSessionSpy).toHaveBeenNthCalledWith(1, { limit: 20 })
+    expect(getSessionSpy).toHaveBeenNthCalledWith(2, { beforeSeq: 21, limit: 20 })
+  })
 })

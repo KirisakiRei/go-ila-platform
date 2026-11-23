@@ -169,6 +169,38 @@ func TestExecuteTool_JournalIncludesSourceSignalID(t *testing.T) {
 	if len(body.Positions) != 1 || body.Positions[0]["source_signal_id"] != "sig-1" {
 		t.Fatalf("source_signal_id tidak terbawa: %+v", body.Positions)
 	}
+	if body.Positions[0]["status_label"] != "Stop Loss tersentuh" {
+		t.Fatalf("status_label salah: %+v", body.Positions[0]["status_label"])
+	}
+}
+
+func TestExecuteTool_CandlesIncludeDirectionType(t *testing.T) {
+	deps := ToolDeps{
+		Candles: &fakeCandles{
+			candles: []market.Candle{
+				{Time: 1795434300, Open: 3621.14, High: 3621.805, Low: 3616.08, Close: 3617.745},
+				{Time: 1795435200, Open: 3617.745, High: 3621.12, Low: 3616.945, Close: 3620.505},
+				{Time: 1795436100, Open: 3620.50, High: 3622.00, Low: 3619.00, Close: 3620.50},
+			},
+		},
+		Pairs: fakePairs{},
+	}
+	res := ExecuteTool(context.Background(), deps, "u1", "inspect_trade_candles", `{"symbol":"XAUUSD","timeframe":"M15"}`)
+	if !res.OK {
+		t.Fatalf("inspect_trade_candles gagal: %+v", res)
+	}
+	var body struct {
+		Candles []map[string]any `json:"candles"`
+	}
+	if err := json.Unmarshal([]byte(res.OutputJSON), &body); err != nil {
+		t.Fatalf("json parse: %v", err)
+	}
+	if len(body.Candles) != 3 {
+		t.Fatalf("expected 3 candles, got %d", len(body.Candles))
+	}
+	if body.Candles[0]["candle_type"] != "bearish" || body.Candles[1]["candle_type"] != "bullish" || body.Candles[2]["candle_type"] != "doji" {
+		t.Fatalf("candle_type tidak akurat: %+v", body.Candles)
+	}
 }
 
 func TestExecuteTool_SkippedSimulationCleanLabels(t *testing.T) {
