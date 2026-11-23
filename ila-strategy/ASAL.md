@@ -6,9 +6,9 @@ Folder ini adalah **salinan** aturan trading ILA 2.0. Sumbernya:
 |---|---|
 | Repo asal | `go-trade` (engine live, VPS 1) |
 | Path asal | `pkg/ila` dan `pkg/indicators` |
-| Commit SHA | `b540dee4eacbd24c09d89972acd5c6b4f17a1fb5` |
+| Commit SHA | `19878c3c13ab142492525a669031be3640e91eb2` |
 | Tanggal commit | 2026-11-23 |
-| Judul commit | fix(ila): batasi CISD di jendela C3, gugurkan rangkaian/key level lama, dan cegah re-emit sinyal basi |
+| Judul commit | perf(ila): lewati evaluasi key level CISD untuk candle di luar jendela C3 |
 | Disalin pada | 2026-11-23 |
 
 ## Mengapa disalin, bukan diimpor
