@@ -155,6 +155,7 @@ export function SkippedEvidenceChart({
         height={height}
         digits={digits}
         focusTime={masuk || mulai}
+        fullscreenTitle={`${item.symbol} · ${item.direction} (${item.ltf})`}
         footer={
           <p className="text-[10.5px] leading-relaxed text-muted-foreground">
             Garis putus-putus adalah level entry, garis penuh adalah SL dan TP. Tanda panah menempel

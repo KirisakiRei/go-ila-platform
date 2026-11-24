@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { TimeframeRadarMatrix } from '@/features/signals/components/TimeframeRadarMatrix'
@@ -233,5 +233,18 @@ describe('Sinkronisasi Timeframe Radar ↔ Chart & Live Stream SSE', () => {
     expect(screen.getByText(/Potongan Histori · SELL H4\/M15/)).toBeInTheDocument()
     expect(screen.getByText('Hit TP (+2.00R)')).toBeInTheDocument()
     expect(screen.getByText('Statis')).toBeInTheDocument()
+
+    // Tombol layar penuh di toolbar radar membuka modal berisi kontrol timeframe chart.
+    const tombolFullscreen = await screen.findByRole('button', {
+      name: 'Perbesar chart ke layar penuh',
+    })
+    fireEvent.click(tombolFullscreen)
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'H4 Setup' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'M15 Trigger' })).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 })

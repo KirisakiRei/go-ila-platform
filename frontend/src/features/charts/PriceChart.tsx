@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Maximize2 } from 'lucide-react'
 import {
   CandlestickSeries,
   createChart,
@@ -18,6 +19,7 @@ import {
 import { Skeleton } from '@/components/ui'
 import type { MarketCandle } from '@/types/api'
 import { cn } from '@/lib/utils'
+import { ChartFullscreenModal } from './ChartFullscreenModal'
 import { useChartTheme } from './lib/theme'
 import { ZonePrimitive, type ZoneSpec } from './lib/zonePrimitive'
 import { priceStep } from '@/lib/pricePrecision'
@@ -81,6 +83,34 @@ type PriceChartProps = {
    * dua instrumen memiliki timestamp awal yang sama.
    */
   seriesKey?: string
+  /** Mengaktifkan tombol dan modal layar penuh (bawaan: true). */
+  allowFullscreen?: boolean
+  /** Judul yang tampil pada bar atas modal layar penuh. */
+  fullscreenTitle?: ReactNode
+  /** Kontrol tambahan (mis. tab timeframe) pada bar atas modal layar penuh. */
+  fullscreenToolbar?: ReactNode
+  /** State fullscreen terkendali bila pemanggil memasang tombol sendiri di toolbar. */
+  fullscreen?: boolean
+  onFullscreenChange?: (open: boolean) => void
+  /** Sembunyikan tombol melayang bawaan bila pemanggil menyediakan tombol di luar kanvas. */
+  hideFullscreenButton?: boolean
+}
+
+type PriceChartCanvasProps = Pick<
+  PriceChartProps,
+  | 'candles'
+  | 'priceLines'
+  | 'markers'
+  | 'zones'
+  | 'segments'
+  | 'height'
+  | 'loading'
+  | 'emptyMessage'
+  | 'focusTime'
+  | 'digits'
+  | 'seriesKey'
+> & {
+  fillHeight?: boolean
 }
 
 const EMPTY_PRICE_LINES: PriceLineSpec[] = []
@@ -149,7 +179,7 @@ function snapKeBar(time: number, barTimes: number[]): number | null {
  * sini sebagai jaring pengaman terakhir agar chart tidak pernah mogok karena
  * payload dari jaringan.
  */
-export function PriceChart({
+function PriceChartCanvas({
   candles,
   priceLines = EMPTY_PRICE_LINES,
   markers = EMPTY_MARKERS,
@@ -158,12 +188,11 @@ export function PriceChart({
   height = 380,
   loading = false,
   emptyMessage = 'Belum ada data candle untuk ditampilkan.',
-  className,
   focusTime,
-  footer,
   digits = 2,
   seriesKey,
-}: PriceChartProps) {
+  fillHeight = false,
+}: PriceChartCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -457,19 +486,124 @@ export function PriceChart({
   const hasData = candles.length > 0
 
   return (
-    <div className={cn('relative w-full overflow-hidden rounded-xl border border-border bg-card', className)}>
+    <div className={cn('relative w-full', fillHeight && 'min-h-0 flex-1')}>
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/80">
           <Skeleton className="h-full w-full" />
         </div>
       )}
-      <div ref={containerRef} style={{ height }} className="w-full" />
+      <div
+        ref={containerRef}
+        style={fillHeight ? undefined : { height }}
+        className={cn('w-full', fillHeight && 'h-full')}
+      />
       {!hasData && !loading && (
         <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs text-muted-foreground">
           {emptyMessage}
         </div>
       )}
-      {footer && <div className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">{footer}</div>}
     </div>
+  )
+}
+
+export function PriceChart({
+  candles,
+  priceLines = EMPTY_PRICE_LINES,
+  markers = EMPTY_MARKERS,
+  zones = EMPTY_ZONES,
+  segments = EMPTY_SEGMENTS,
+  height = 380,
+  loading = false,
+  emptyMessage = 'Belum ada data candle untuk ditampilkan.',
+  className,
+  focusTime,
+  footer,
+  digits = 2,
+  seriesKey,
+  allowFullscreen = true,
+  fullscreenTitle,
+  fullscreenToolbar,
+  fullscreen,
+  onFullscreenChange,
+  hideFullscreenButton = false,
+}: PriceChartProps) {
+  const [internalFullscreen, setInternalFullscreen] = useState(false)
+  const isControlled = fullscreen !== undefined
+  const isFullscreen = isControlled ? fullscreen : internalFullscreen
+
+  const setFullscreen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) setInternalFullscreen(next)
+      onFullscreenChange?.(next)
+    },
+    [isControlled, onFullscreenChange],
+  )
+
+  const hasData = candles.length > 0
+  const showFloatingButton = allowFullscreen && !hideFullscreenButton && hasData && !loading
+
+  return (
+    <>
+      <div className={cn('relative w-full overflow-hidden rounded-xl border border-border bg-card', className)}>
+        {showFloatingButton && (
+          <button
+            type="button"
+            onClick={() => setFullscreen(true)}
+            aria-label="Perbesar chart ke layar penuh"
+            title="Layar penuh"
+            className="press absolute left-2.5 top-2.5 z-20 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/80 bg-card/85 text-muted-foreground shadow-xs backdrop-blur-sm hover:border-foreground/30 hover:bg-card hover:text-foreground"
+          >
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        )}
+        <PriceChartCanvas
+          candles={candles}
+          priceLines={priceLines}
+          markers={markers}
+          zones={zones}
+          segments={segments}
+          height={height}
+          loading={loading}
+          emptyMessage={emptyMessage}
+          focusTime={focusTime}
+          digits={digits}
+          seriesKey={seriesKey}
+        />
+        {footer && (
+          <div className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
+            {footer}
+          </div>
+        )}
+      </div>
+
+      {allowFullscreen && (
+        <ChartFullscreenModal
+          open={isFullscreen}
+          onClose={() => setFullscreen(false)}
+          title={fullscreenTitle}
+          toolbar={fullscreenToolbar}
+          footer={footer}
+          ariaLabel={
+            typeof fullscreenTitle === 'string' && fullscreenTitle.trim() !== ''
+              ? fullscreenTitle
+              : 'Tampilan layar penuh chart harga'
+          }
+        >
+          <PriceChartCanvas
+            candles={candles}
+            priceLines={priceLines}
+            markers={markers}
+            zones={zones}
+            segments={segments}
+            loading={loading}
+            emptyMessage={emptyMessage}
+            focusTime={focusTime}
+            digits={digits}
+            seriesKey={seriesKey}
+            fillHeight
+          />
+        </ChartFullscreenModal>
+      )}
+    </>
   )
 }

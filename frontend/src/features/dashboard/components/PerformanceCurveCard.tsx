@@ -1,8 +1,9 @@
 import { useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowRight, LineChart } from 'lucide-react'
+import { ArrowRight, LineChart, Maximize2 } from 'lucide-react'
 import { Button, Card, CardContent, Skeleton } from '@/components/ui'
+import { ChartFullscreenModal } from '@/features/charts/ChartFullscreenModal'
 import { usePositions } from '@/lib/queries'
 import { formatDateTime, formatMoney, formatR } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,7 @@ export function PerformanceCurveCard() {
   const [period, setPeriod] = useState<CurvePeriod>('30d')
   const [metric, setMetric] = useState<CurveMetric>('r')
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
 
   const { data: positions, isLoading } = usePositions(POSISI_LIMIT_DASHBOARD)
   const summary = useMemo(() => buildEquityCurve(positions, period), [positions, period])
@@ -87,7 +89,273 @@ export function PerformanceCurveCard() {
     hoverIdx !== null && hoverIdx > 0 ? summary.points[hoverIdx - 1] ?? null : null
   const activeCoord = hoverIdx !== null ? series.coords[hoverIdx] ?? null : null
 
+  const controls = (
+    <div className="flex items-center gap-1.5">
+      {/* Metric Toggle */}
+      <div className="inline-flex rounded-lg border border-border bg-secondary/40 p-0.5">
+        {METRICS.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => {
+              setMetric(m.id)
+              setHoverIdx(null)
+            }}
+            className={cn(
+              'press rounded-md px-2 py-1 text-[11px] font-semibold',
+              metric === m.id
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Period Toggle */}
+      <div className="inline-flex rounded-lg border border-border bg-secondary/40 p-0.5">
+        {PERIODS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => {
+              setPeriod(p.id)
+              setHoverIdx(null)
+            }}
+            className={cn(
+              'press rounded-md px-2.5 py-1 text-[11px] font-semibold',
+              period === p.id
+                ? 'bg-foreground text-background shadow-xs'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
+  const renderCurve = (isExpanded: boolean) => {
+    const strokeId = isExpanded ? `${strokeGradId}-fs` : strokeGradId
+    const areaId = isExpanded ? `${areaGradId}-fs` : areaGradId
+    return (
+      <div className={cn('relative flex flex-1 flex-col', isExpanded && 'min-h-0 justify-between p-4 sm:p-6')}>
+        <svg
+          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          className={cn(
+            'w-full select-none overflow-visible',
+            isExpanded ? 'min-h-0 flex-1' : 'h-auto max-h-[210px]',
+          )}
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label={`Kurva performa kumulatif ${summary.count} trade`}
+          onPointerLeave={() => setHoverIdx(null)}
+        >
+          <defs>
+            {/* Gradasi stroke vertikal: hijau di atas 0, transisi lembut di garis 0, merah di bawah 0 */}
+            <linearGradient
+              id={strokeId}
+              gradientUnits="userSpaceOnUse"
+              x1="0"
+              y1={PAD.top}
+              x2="0"
+              y2={SVG_H - PAD.bottom}
+            >
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset={`${strokeSoftUp.toFixed(2)}%`} stopColor="#10b981" />
+              <stop offset={`${strokeSoftDown.toFixed(2)}%`} stopColor="#f43f5e" />
+              <stop offset="100%" stopColor="#f43f5e" />
+            </linearGradient>
+
+            {/* Gradasi area vertikal: memudar ke bening tepat di garis 0 agar split warna seamless */}
+            <linearGradient
+              id={areaId}
+              gradientUnits="userSpaceOnUse"
+              x1="0"
+              y1={PAD.top}
+              x2="0"
+              y2={SVG_H - PAD.bottom}
+            >
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
+              <stop offset={`${areaSoftUp.toFixed(2)}%`} stopColor="#10b981" stopOpacity="0.05" />
+              <stop offset={`${zeroPct.toFixed(2)}%`} stopColor="#10b981" stopOpacity="0.01" />
+              <stop offset={`${zeroPct.toFixed(2)}%`} stopColor="#f43f5e" stopOpacity="0.01" />
+              <stop offset={`${areaSoftDown.toFixed(2)}%`} stopColor="#f43f5e" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.26" />
+            </linearGradient>
+          </defs>
+
+          {/* Garis baseline 0 */}
+          <line
+            x1={PAD.left}
+            y1={series.zeroY}
+            x2={SVG_W - PAD.right}
+            y2={series.zeroY}
+            className="stroke-border"
+            strokeDasharray="4 4"
+            strokeWidth="1"
+          />
+          <text
+            x={PAD.left - 8}
+            y={series.zeroY + 3}
+            textAnchor="end"
+            className="fill-muted-foreground font-mono text-[10px]"
+          >
+            0
+          </text>
+          <text
+            x={PAD.left - 8}
+            y={PAD.top + 6}
+            textAnchor="end"
+            className="fill-muted-foreground font-mono text-[10px]"
+          >
+            {metric === 'r' ? `${series.hi.toFixed(1)}R` : Math.round(series.hi)}
+          </text>
+          <text
+            x={PAD.left - 8}
+            y={SVG_H - PAD.bottom}
+            textAnchor="end"
+            className="fill-muted-foreground font-mono text-[10px]"
+          >
+            {metric === 'r' ? `${series.lo.toFixed(1)}R` : Math.round(series.lo)}
+          </text>
+
+          {/* Area fill */}
+          <motion.path
+            key={`area-${isExpanded ? 'fs' : 'in'}-${period}-${metric}-${summary.count}`}
+            d={series.areaPath}
+            fill={`url(#${areaId})`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduceMotion ? 0.12 : 0.35, ease: EASE_OUT }}
+          />
+
+          {/* Garis kurva utama beranimasi */}
+          <motion.path
+            key={`line-${isExpanded ? 'fs' : 'in'}-${period}-${metric}-${summary.count}`}
+            d={series.linePath}
+            fill="none"
+            stroke={`url(#${strokeId})`}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            initial={reduceMotion ? { opacity: 0 } : { pathLength: 0, opacity: 0.4 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{
+              duration: reduceMotion ? 0.15 : 0.55,
+              ease: EASE_OUT,
+            }}
+          />
+
+          {/* Crosshair vertikal saat hover */}
+          {activeCoord && (
+            <line
+              x1={activeCoord.x}
+              y1={PAD.top}
+              x2={activeCoord.x}
+              y2={SVG_H - PAD.bottom}
+              className="stroke-foreground/30"
+              strokeDasharray="3 3"
+              strokeWidth="1"
+            />
+          )}
+
+          {/* Titik-titik trade interaktif */}
+          {series.coords.slice(1).map((c, idx) => {
+            const coordIndex = idx + 1
+            const isLast = coordIndex === series.coords.length - 1
+            const isHovered = hoverIdx === coordIndex
+            const dotFill = pointColor(c.value)
+            return (
+              <g key={coordIndex}>
+                <circle
+                  cx={c.x}
+                  cy={c.y}
+                  r={isHovered ? 5 : isLast ? 3.8 : 2.5}
+                  fill={dotFill}
+                  className="stroke-background"
+                  strokeWidth={isHovered || isLast ? 2 : 1}
+                />
+                {/* Hit target lebar biar mudah di-hover maupun di-tap di mobile/tablet */}
+                <circle
+                  cx={c.x}
+                  cy={c.y}
+                  r={14}
+                  fill="transparent"
+                  className="cursor-pointer"
+                  onPointerEnter={() => setHoverIdx(coordIndex)}
+                  onClick={() =>
+                    setHoverIdx((prev) => (prev === coordIndex ? null : coordIndex))
+                  }
+                />
+              </g>
+            )
+          })}
+        </svg>
+
+        {/* Detail Hover Bar (tanpa layout shift) */}
+        <div className="mt-1 flex min-h-[24px] shrink-0 items-center justify-between border-t border-border/60 pt-2 text-[11.5px]">
+          <AnimatePresence mode="wait">
+            {activePoint ? (
+              <motion.div
+                key={activePoint.positionId}
+                initial={{ opacity: 0, y: 2 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.14, ease: EASE_OUT }}
+                className="flex w-full flex-wrap items-center justify-between gap-2"
+              >
+                <span className="font-medium text-foreground">
+                  #{activePoint.index} ·{' '}
+                  <span className="font-semibold">{activePoint.symbol}</span>{' '}
+                  <span className="text-muted-foreground">{activePoint.direction}</span> ·{' '}
+                  <span className="font-mono text-[11px] uppercase text-muted-foreground">
+                    {activePoint.strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2 font-mono tabular-nums">
+                  <span
+                    className={cn(
+                      'font-semibold',
+                      activePoint.deltaR > 0 || activePoint.deltaPnL > 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : activePoint.deltaR < 0 || activePoint.deltaPnL < 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-foreground',
+                    )}
+                  >
+                    {formatR(activePoint.deltaR)} ({formatMoney(activePoint.deltaPnL)})
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatDateTime(activePoint.closedAt)}
+                  </span>
+                </span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="idle"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.14 }}
+                className="flex w-full items-center justify-between text-muted-foreground"
+              >
+                <span className="truncate">Pilih titik kurva untuk detail trade</span>
+                <span className="font-mono text-[11px]">
+                  {summary.wins}W · {summary.losses}L
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    )
+  }
+
   return (
+    <>
     <Card className="flex h-full flex-col border-border/80 bg-card/95">
       <CardContent className="flex flex-1 flex-col gap-3 p-3.5 sm:gap-4 sm:p-5">
         {/* Header & Controls */}
@@ -130,49 +398,18 @@ export function PerformanceCurveCard() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Metric Toggle */}
-            <div className="inline-flex rounded-lg border border-border bg-secondary/40 p-0.5">
-              {METRICS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setMetric(m.id)
-                    setHoverIdx(null)
-                  }}
-                  className={cn(
-                    'rounded-md px-2 py-1 text-[11px] font-semibold transition-colors duration-150 active:scale-[0.97]',
-                    metric === m.id
-                      ? 'bg-card text-foreground shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Period Toggle */}
-            <div className="inline-flex rounded-lg border border-border bg-secondary/40 p-0.5">
-              {PERIODS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setPeriod(p.id)
-                    setHoverIdx(null)
-                  }}
-                  className={cn(
-                    'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors duration-150 active:scale-[0.97]',
-                    period === p.id
-                      ? 'bg-foreground text-background shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
+            {controls}
+            {summary.count > 0 && (
+              <button
+                type="button"
+                onClick={() => setFullscreen(true)}
+                aria-label="Perbesar kurva performa ke layar penuh"
+                title="Layar penuh"
+                className="press inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary/40 text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              >
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -204,216 +441,39 @@ export function PerformanceCurveCard() {
             </div>
           </div>
         ) : (
-          <div className="relative flex-1">
-            <svg
-              viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-              className="h-auto max-h-[210px] w-full select-none overflow-visible"
-              role="img"
-              aria-label={`Kurva performa kumulatif ${summary.count} trade`}
-              onPointerLeave={() => setHoverIdx(null)}
-            >
-              <defs>
-                {/* Gradasi stroke vertikal: hijau di atas 0, transisi lembut di garis 0, merah di bawah 0 */}
-                <linearGradient
-                  id={strokeGradId}
-                  gradientUnits="userSpaceOnUse"
-                  x1="0"
-                  y1={PAD.top}
-                  x2="0"
-                  y2={SVG_H - PAD.bottom}
-                >
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset={`${strokeSoftUp.toFixed(2)}%`} stopColor="#10b981" />
-                  <stop offset={`${strokeSoftDown.toFixed(2)}%`} stopColor="#f43f5e" />
-                  <stop offset="100%" stopColor="#f43f5e" />
-                </linearGradient>
-
-                {/* Gradasi area vertikal: memudar ke bening tepat di garis 0 agar split warna seamless */}
-                <linearGradient
-                  id={areaGradId}
-                  gradientUnits="userSpaceOnUse"
-                  x1="0"
-                  y1={PAD.top}
-                  x2="0"
-                  y2={SVG_H - PAD.bottom}
-                >
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.26" />
-                  <stop offset={`${areaSoftUp.toFixed(2)}%`} stopColor="#10b981" stopOpacity="0.05" />
-                  <stop offset={`${zeroPct.toFixed(2)}%`} stopColor="#10b981" stopOpacity="0.01" />
-                  <stop offset={`${zeroPct.toFixed(2)}%`} stopColor="#f43f5e" stopOpacity="0.01" />
-                  <stop offset={`${areaSoftDown.toFixed(2)}%`} stopColor="#f43f5e" stopOpacity="0.05" />
-                  <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.26" />
-                </linearGradient>
-              </defs>
-
-              {/* Garis baseline 0 */}
-              <line
-                x1={PAD.left}
-                y1={series.zeroY}
-                x2={SVG_W - PAD.right}
-                y2={series.zeroY}
-                className="stroke-border"
-                strokeDasharray="4 4"
-                strokeWidth="1"
-              />
-              <text
-                x={PAD.left - 8}
-                y={series.zeroY + 3}
-                textAnchor="end"
-                className="fill-muted-foreground font-mono text-[10px]"
-              >
-                0
-              </text>
-              <text
-                x={PAD.left - 8}
-                y={PAD.top + 6}
-                textAnchor="end"
-                className="fill-muted-foreground font-mono text-[10px]"
-              >
-                {metric === 'r' ? `${series.hi.toFixed(1)}R` : Math.round(series.hi)}
-              </text>
-              <text
-                x={PAD.left - 8}
-                y={SVG_H - PAD.bottom}
-                textAnchor="end"
-                className="fill-muted-foreground font-mono text-[10px]"
-              >
-                {metric === 'r' ? `${series.lo.toFixed(1)}R` : Math.round(series.lo)}
-              </text>
-
-              {/* Area fill */}
-              <motion.path
-                key={`area-${period}-${metric}-${summary.count}`}
-                d={series.areaPath}
-                fill={`url(#${areaGradId})`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: reduceMotion ? 0.12 : 0.35, ease: EASE_OUT }}
-              />
-
-              {/* Garis kurva utama beranimasi */}
-              <motion.path
-                key={`line-${period}-${metric}-${summary.count}`}
-                d={series.linePath}
-                fill="none"
-                stroke={`url(#${strokeGradId})`}
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={reduceMotion ? { opacity: 0 } : { pathLength: 0, opacity: 0.4 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{
-                  duration: reduceMotion ? 0.15 : 0.55,
-                  ease: EASE_OUT,
-                }}
-              />
-
-              {/* Crosshair vertikal saat hover */}
-              {activeCoord && (
-                <line
-                  x1={activeCoord.x}
-                  y1={PAD.top}
-                  x2={activeCoord.x}
-                  y2={SVG_H - PAD.bottom}
-                  className="stroke-foreground/30"
-                  strokeDasharray="3 3"
-                  strokeWidth="1"
-                />
-              )}
-
-              {/* Titik-titik trade interaktif */}
-              {series.coords.slice(1).map((c, idx) => {
-                const coordIndex = idx + 1
-                const isLast = coordIndex === series.coords.length - 1
-                const isHovered = hoverIdx === coordIndex
-                const dotFill = pointColor(c.value)
-                return (
-                  <g key={coordIndex}>
-                    <circle
-                      cx={c.x}
-                      cy={c.y}
-                      r={isHovered ? 5 : isLast ? 3.8 : 2.5}
-                      fill={dotFill}
-                      className="stroke-background"
-                      strokeWidth={isHovered || isLast ? 2 : 1}
-                    />
-                    {/* Hit target lebar biar mudah di-hover maupun di-tap di mobile/tablet */}
-                    <circle
-                      cx={c.x}
-                      cy={c.y}
-                      r={14}
-                      fill="transparent"
-                      className="cursor-pointer"
-                      onPointerEnter={() => setHoverIdx(coordIndex)}
-                      onClick={() =>
-                        setHoverIdx((prev) => (prev === coordIndex ? null : coordIndex))
-                      }
-                    />
-                  </g>
-                )
-              })}
-            </svg>
-
-            {/* Detail Hover Bar (tanpa layout shift) */}
-            <div className="mt-1 flex min-h-[24px] items-center justify-between border-t border-border/60 pt-2 text-[11.5px]">
-              <AnimatePresence mode="wait">
-                {activePoint ? (
-                  <motion.div
-                    key={activePoint.positionId}
-                    initial={{ opacity: 0, y: 2 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.14, ease: EASE_OUT }}
-                    className="flex w-full flex-wrap items-center justify-between gap-2"
-                  >
-                    <span className="font-medium text-foreground">
-                      #{activePoint.index} ·{' '}
-                      <span className="font-semibold">{activePoint.symbol}</span>{' '}
-                      <span className="text-muted-foreground">{activePoint.direction}</span> ·{' '}
-                      <span className="font-mono text-[11px] uppercase text-muted-foreground">
-                        {activePoint.strategy === 'ila-2.0' ? 'ILA 2.0' : 'ILA 3.0'}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2 font-mono tabular-nums">
-                      <span
-                        className={cn(
-                          'font-semibold',
-                          activePoint.deltaR > 0 || activePoint.deltaPnL > 0
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : activePoint.deltaR < 0 || activePoint.deltaPnL < 0
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : 'text-foreground',
-                        )}
-                      >
-                        {formatR(activePoint.deltaR)} ({formatMoney(activePoint.deltaPnL)})
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {formatDateTime(activePoint.closedAt)}
-                      </span>
-                    </span>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="idle"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.14 }}
-                    className="flex w-full items-center justify-between text-muted-foreground"
-                  >
-                    <span className="truncate">
-                      Pilih titik kurva untuk detail trade
-                    </span>
-                    <span className="font-mono text-[11px]">
-                      {summary.wins}W · {summary.losses}L
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
+          renderCurve(false)
         )}
       </CardContent>
     </Card>
+
+    <ChartFullscreenModal
+      open={fullscreen}
+      onClose={() => setFullscreen(false)}
+      ariaLabel="Tampilan layar penuh kurva performa"
+      title={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <span>Kurva Performa</span>
+          <span className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-muted-foreground">
+            {summary.count} trade
+          </span>
+          <span
+            className={cn(
+              'font-mono text-xs font-bold tabular-nums sm:text-sm',
+              isPositive
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : isNegative
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-foreground',
+            )}
+          >
+            {metric === 'r' ? formatR(summary.totalR) : formatMoney(summary.totalPnL)}
+          </span>
+        </span>
+      }
+      toolbar={controls}
+    >
+      {renderCurve(true)}
+    </ChartFullscreenModal>
+    </>
   )
 }

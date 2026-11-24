@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MarketCandle } from '@/types/api'
 
 /**
@@ -81,5 +81,31 @@ describe('PriceChart presisi harga', () => {
       (call) => (call[0] as { priceFormat?: { precision?: number } })?.priceFormat?.precision === 3,
     )
     expect(dipanggil).toBe(true)
+  })
+
+  it('membuka chart layar penuh, mengunci scroll body, dan menutup dengan Escape atau tombol keluar', async () => {
+    const { PriceChart } = await import('@/features/charts/PriceChart')
+    render(<PriceChart candles={candles} digits={2} fullscreenTitle="XAUUSD (M15)" />)
+
+    const tombolBuka = screen.getByRole('button', { name: 'Perbesar chart ke layar penuh' })
+    fireEvent.click(tombolBuka)
+
+    const dialog = screen.getByRole('dialog', { name: 'XAUUSD (M15)' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(document.body.style.overflow).toBe('hidden')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    expect(document.body.style.overflow).toBe('')
+
+    fireEvent.click(tombolBuka)
+    expect(screen.getByRole('dialog', { name: 'XAUUSD (M15)' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Keluar layar penuh' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    expect(document.body.style.overflow).toBe('')
   })
 })

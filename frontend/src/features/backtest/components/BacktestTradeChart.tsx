@@ -268,6 +268,7 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
             focusTime={detail.waktu_masuk}
             digits={digits}
             tinggi={isMobile ? 270 : TINGGI_PANEL_ACUAN}
+            judulLayarPenuh={`${symbol} · ${detail.htf} (${PERAN_TIMEFRAME[detail.htf] ?? 'acuan'})`}
             pesanKosong={`Candle ${detail.htf} tidak tersedia untuk entry ini.`}
           />
         </PanelChart>
@@ -298,6 +299,7 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
             focusTime={detail.waktu_masuk}
             digits={digits}
             tinggi={isMobile ? 300 : TINGGI_PANEL_EKSEKUSI}
+            judulLayarPenuh={`${symbol} · ${detail.ltf} (${PERAN_TIMEFRAME[detail.ltf] ?? 'eksekusi'})`}
             pesanKosong={`Candle ${detail.ltf} tidak tersedia untuk entry ini.`}
           />
         </PanelChart>
@@ -410,6 +412,7 @@ function PanelIsi({
   focusTime,
   digits,
   tinggi,
+  judulLayarPenuh,
   pesanKosong,
 }: {
   candle: BacktestTradeDetail['candle_ltf']
@@ -420,6 +423,7 @@ function PanelIsi({
   focusTime: number
   digits: number
   tinggi: number
+  judulLayarPenuh: string
   pesanKosong: string
 }) {
   if (candle.length === 0) {
@@ -444,6 +448,7 @@ function PanelIsi({
       digits={digits}
       height={tinggi}
       className="w-full"
+      fullscreenTitle={judulLayarPenuh}
       emptyMessage={pesanKosong}
     />
   )

@@ -6,7 +6,9 @@
  * titik. Ringkasan satu run cukup empat puluh titik, jadi gambar vektor sederhana
  * lebih ringan dan lebih jernih daripada pustaka chart penuh.
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Maximize2 } from 'lucide-react'
+import { ChartFullscreenModal } from '@/features/charts/ChartFullscreenModal'
 import type { BacktestEquityPoint } from '@/types/api'
 import { formatWaktu } from '../lib/tanggal'
 
@@ -20,6 +22,7 @@ export function EquityCurve({
   titik: BacktestEquityPoint[]
   ekuitasAwal: number
 }) {
+  const [fullscreen, setFullscreen] = useState(false)
   const geometri = useMemo(() => hitungGeometri(titik, ekuitasAwal), [titik, ekuitasAwal])
 
   if (titik.length < 2) {
@@ -32,57 +35,91 @@ export function EquityCurve({
 
   const { garis, bayangan, tandon, nilaiMin, nilaiMaks, titikDrawdownMaks } = geometri
 
-  return (
-    <figure className="flex flex-col gap-3">
-      <svg
-        viewBox={`0 0 ${LEBAR_SVD} ${TINGGI}`}
-        className="h-[180px] w-full"
-        role="img"
-        aria-label={`Kurva ekuitas dari ${formatUang(nilaiMin)} ke ${formatUang(nilaiMaks)}`}
-        preserveAspectRatio="none"
-      >
-        {/* Garis modal awal: patokan tanpa itu, kurva tidak bisa dinilai. */}
-        <line
-          x1={0}
-          x2={LEBAR_SVD}
-          y1={tandon(ekuitasAwal)}
-          y2={tandon(ekuitasAwal)}
-          stroke="currentColor"
-          strokeOpacity={0.2}
-          strokeDasharray="4 4"
-          strokeWidth={1}
-        />
-        {/* Pita penurunan antara ekuitas berjalan dan puncaknya. */}
-        <path d={bayangan} fill="currentColor" fillOpacity={0.08} />
-        <path
-          d={garis}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
+  const renderSvg = (expanded: boolean) => (
+    <svg
+      viewBox={`0 0 ${LEBAR_SVD} ${TINGGI}`}
+      className={expanded ? 'min-h-0 w-full flex-1' : 'h-[180px] w-full'}
+      role="img"
+      aria-label={`Kurva ekuitas dari ${formatUang(nilaiMin)} ke ${formatUang(nilaiMaks)}`}
+      preserveAspectRatio="none"
+    >
+      {/* Garis modal awal: patokan tanpa itu, kurva tidak bisa dinilai. */}
+      <line
+        x1={0}
+        x2={LEBAR_SVD}
+        y1={tandon(ekuitasAwal)}
+        y2={tandon(ekuitasAwal)}
+        stroke="currentColor"
+        strokeOpacity={0.2}
+        strokeDasharray="4 4"
+        strokeWidth={1}
+      />
+      {/* Pita penurunan antara ekuitas berjalan dan puncaknya. */}
+      <path d={bayangan} fill="currentColor" fillOpacity={0.08} />
+      <path
+        d={garis}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      {titikDrawdownMaks && (
+        <circle
+          cx={titikDrawdownMaks.x}
+          cy={titikDrawdownMaks.y}
+          r={3}
+          fill="currentColor"
           vectorEffect="non-scaling-stroke"
         />
-        {titikDrawdownMaks && (
-          <circle
-            cx={titikDrawdownMaks.x}
-            cy={titikDrawdownMaks.y}
-            r={3}
-            fill="currentColor"
-            vectorEffect="non-scaling-stroke"
-          />
-        )}
-      </svg>
+      )}
+    </svg>
+  )
 
-      <figcaption className="flex flex-wrap items-baseline justify-between gap-2 text-[12px] text-muted-foreground">
-        <span className="tabular">
-          {formatUang(nilaiMin)} sampai {formatUang(nilaiMaks)}
-        </span>
-        <span className="tabular">
-          puncak terendah {formatWaktu(titikDrawdownMaks?.waktu ?? 0)}
-        </span>
-      </figcaption>
-    </figure>
+  return (
+    <>
+      <figure className="flex flex-col gap-3">
+        {renderSvg(false)}
+
+        <figcaption className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
+          <span className="tabular">
+            {formatUang(nilaiMin)} sampai {formatUang(nilaiMaks)}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="tabular">
+              puncak terendah {formatWaktu(titikDrawdownMaks?.waktu ?? 0)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setFullscreen(true)}
+              aria-label="Perbesar kurva ekuitas ke layar penuh"
+              title="Layar penuh"
+              className="press inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-secondary/40 text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+            >
+              <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        </figcaption>
+      </figure>
+
+      <ChartFullscreenModal
+        open={fullscreen}
+        onClose={() => setFullscreen(false)}
+        title="Kurva Ekuitas Backtest"
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2 tabular">
+            <span>
+              {formatUang(nilaiMin)} sampai {formatUang(nilaiMaks)}
+            </span>
+            <span>puncak terendah {formatWaktu(titikDrawdownMaks?.waktu ?? 0)}</span>
+          </div>
+        }
+        contentClassName="p-4 sm:p-6"
+      >
+        {renderSvg(true)}
+      </ChartFullscreenModal>
+    </>
   )
 }
 

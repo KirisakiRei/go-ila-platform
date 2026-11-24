@@ -135,6 +135,7 @@ export function AssistantChartEmbed({ spec, autoLoad = false }: AssistantChartEm
                 height={260}
                 loading={query.isLoading}
                 seriesKey={`${spec.symbol}:${spec.timeframe}:assistant`}
+                fullscreenTitle={spec.title ?? `${spec.symbol} (${spec.timeframe})`}
                 emptyMessage={`Data candle ${spec.symbol} ${spec.timeframe} belum tersedia.`}
               />
             </Suspense>

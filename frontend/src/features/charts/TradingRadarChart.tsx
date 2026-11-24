@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { History, X } from 'lucide-react'
+import { History, Maximize2, X } from 'lucide-react'
 import { Badge, Button, Skeleton } from '@/components/ui'
 import { useMarketCandles } from '@/lib/queries'
 import { useLiveCandleStream } from '@/lib/use-live-candle-stream'
@@ -408,7 +408,68 @@ export function TradingRadarChart({
     )
   }
 
+  const [fullscreen, setFullscreen] = useState(false)
   const snapshotOutcome = snapshotSignal ? describeSignalOutcome(snapshotSignal) : null
+
+  const tabButtons =
+    tabs.length === 0 ? (
+      <span className="text-xs text-muted-foreground">Belum ada timeframe untuk digambar.</span>
+    ) : (
+      tabs.map((tab, index) => (
+        <button
+          key={`${tab.timeframe}-${index}`}
+          type="button"
+          onClick={() => setTabState({ contextKey: modeContextKey, index })}
+          className={cn(
+            'press rounded-lg border px-2.5 py-1 text-[11px] font-medium',
+            index === tabIndex
+              ? 'border-foreground bg-foreground text-background'
+              : 'border-border bg-card text-muted-foreground hover:border-foreground/40',
+          )}
+        >
+          {tab.label}
+        </button>
+      ))
+    )
+
+  const statusBadges = (
+    <>
+      {!isSnapshotMode && isLive && (
+        <span
+          className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400"
+          title="Aliran harga candle berjalan secara langsung"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Live
+        </span>
+      )}
+      {isSnapshotMode && (
+        <Badge variant="outline" className="text-[10px]">
+          Statis
+        </Badge>
+      )}
+      {feed && (
+        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+          {feed}
+        </Badge>
+      )}
+      {signal?.feed_source && feed && signal.feed_source !== feed && (
+        <Badge variant="muted" className="text-[10px]" title="Setup dihitung sebelum feed pair diubah">
+          Setup: {signal.feed_source}
+        </Badge>
+      )}
+      {!isSnapshotMode && signal && (
+        <Badge variant="muted" className="text-[10px]">
+          {SIGNAL_LABEL[signal.status] ?? signal.status}
+        </Badge>
+      )}
+      {!isSnapshotMode && !signal && activeSlot && (
+        <Badge variant="muted" className="text-[10px]">
+          Scanning · {activeSlot.label}
+        </Badge>
+      )}
+    </>
+  )
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -449,62 +510,21 @@ export function TradingRadarChart({
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {tabs.length === 0 ? (
-            <span className="text-xs text-muted-foreground">Belum ada timeframe untuk digambar.</span>
-          ) : (
-            tabs.map((tab, index) => (
-              <button
-                key={`${tab.timeframe}-${index}`}
-                type="button"
-                onClick={() => setTabState({ contextKey: modeContextKey, index })}
-                className={cn(
-                  'rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors',
-                  index === tabIndex
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-border bg-card text-muted-foreground hover:border-foreground/40',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))
-          )}
-        </div>
+        <div className="flex flex-wrap items-center gap-1.5">{tabButtons}</div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {!isSnapshotMode && isLive && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400"
-              title="Aliran harga candle berjalan secara langsung"
+          {statusBadges}
+          {candles.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setFullscreen(true)}
+              aria-label="Perbesar chart ke layar penuh"
+              title="Layar penuh"
+              className="press inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-card px-2 text-[11px] font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live
-            </span>
-          )}
-          {isSnapshotMode && (
-            <Badge variant="outline" className="text-[10px]">
-              Statis
-            </Badge>
-          )}
-          {feed && (
-            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-              {feed}
-            </Badge>
-          )}
-          {signal?.feed_source && feed && signal.feed_source !== feed && (
-            <Badge variant="muted" className="text-[10px]" title="Setup dihitung sebelum feed pair diubah">
-              Setup: {signal.feed_source}
-            </Badge>
-          )}
-          {!isSnapshotMode && signal && (
-            <Badge variant="muted" className="text-[10px]">
-              {SIGNAL_LABEL[signal.status] ?? signal.status}
-            </Badge>
-          )}
-          {!isSnapshotMode && !signal && activeSlot && (
-            <Badge variant="muted" className="text-[10px]">
-              Scanning · {activeSlot.label}
-            </Badge>
+              <Maximize2 className="h-3 w-3" aria-hidden="true" />
+              <span className="hidden sm:inline">Layar penuh</span>
+            </button>
           )}
         </div>
       </div>
@@ -522,6 +542,28 @@ export function TradingRadarChart({
           height={340}
           digits={digits}
           loading={query.isFetching && candles.length === 0}
+          fullscreen={fullscreen}
+          onFullscreenChange={setFullscreen}
+          hideFullscreenButton
+          fullscreenTitle={
+            <span className="inline-flex items-center gap-2">
+              <span className="font-mono font-bold">{symbol}</span>
+              {activeTab && (
+                <span className="text-muted-foreground font-normal">{activeTab.label}</span>
+              )}
+              {snapshotSignal && (
+                <Badge variant="outline" className="text-[10px]">
+                  Histori {snapshotSignal.direction}
+                </Badge>
+              )}
+            </span>
+          }
+          fullscreenToolbar={
+            <div className="flex flex-wrap items-center gap-1.5">
+              {tabButtons}
+              <span className="hidden sm:inline-flex items-center gap-1.5">{statusBadges}</span>
+            </div>
+          }
           emptyMessage={
             query.isError
               ? 'Chart belum bisa dimuat. Coba muat ulang beberapa saat lagi.'

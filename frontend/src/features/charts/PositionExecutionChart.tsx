@@ -183,6 +183,7 @@ export function PositionExecutionChart({
       height={height}
       digits={digits}
       focusTime={entryTime || undefined}
+      fullscreenTitle={`${position.symbol} · ${position.direction} (${chartTimeframe})`}
       emptyMessage={
         query.isError
           ? 'Chart posisi belum bisa dimuat. Coba lagi beberapa saat.'
