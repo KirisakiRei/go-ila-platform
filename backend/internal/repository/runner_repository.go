@@ -167,12 +167,22 @@ func NewRunnerRepository(db *gorm.DB) RunnerRepository {
 func (r *runnerRepository) UpsertSignal(ctx context.Context, signal *model.Signal) error {
 	// Sinyal yang sudah ada tidak ditimpa: status lokal (ACKED/CONSUMED)
 	// lebih baru daripada payload PUBLISH yang mungkin terkirim ulang.
+	// Khusus baris status radar (WAIT_*), ID slotnya tetap sehingga arah dan
+	// konteks struktur (HTF sweep, CISD, versi engine) wajib ikut diperbarui
+	// agar tidak macet di arah setup lama.
+	cols := []string{
+		"summary", "next_action", "expires_at", "feed_source", "updated_at",
+	}
+	if model.IsWaitingSignalStatus(signal.Status) {
+		cols = append(cols,
+			"direction", "htf_sweep_json", "cisd_json",
+			"engine_version", "strategy_version", "published_at",
+		)
+	}
 	err := r.db.WithContext(ctx).
 		Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "signal_id"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"summary", "next_action", "expires_at", "feed_source", "updated_at",
-			}),
+			Columns:   []clause.Column{{Name: "signal_id"}},
+			DoUpdates: clause.AssignmentColumns(cols),
 		}).
 		Create(signal).Error
 	if err != nil {

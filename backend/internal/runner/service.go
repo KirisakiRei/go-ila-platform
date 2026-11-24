@@ -596,8 +596,11 @@ func (s *Service) prosesSinyalMasuk(ctx context.Context, signal *model.Signal) {
 
 	// Baris status radar memakai identitas tetap per slot, sedangkan UpsertSignal
 	// sengaja tidak menimpa kolom status agar status lokal (ACKED) tidak hilang.
-	// Tanpa pembaruan khusus ini status menunggu macet di nilai pertama
-	// selamanya, sehingga radar tampak tidak pernah bergerak.
+	// Bila baris dengan ID yang sama sudah berstatus non-waiting (mis. ACKED),
+	// kiriman status menunggu tidak boleh menimpanya.
+	if findErr == nil && !model.IsWaitingSignalStatus(existing.Status) && model.IsWaitingSignalStatus(signal.Status) {
+		return
+	}
 	if findErr == nil && model.IsWaitingSignalStatus(existing.Status) && existing.Status != signal.Status {
 		if err := s.store.UpdateSignalStatus(ctx, signal.SignalID, signal.Status, ""); err != nil {
 			s.logger.Warn("gagal memperbarui status menunggu",

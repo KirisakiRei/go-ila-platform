@@ -60,3 +60,70 @@ func TestHandleSignalTidakMengubahStatusLokal(t *testing.T) {
 		t.Errorf("status = %q, ingin tetap ACKED", got)
 	}
 }
+
+// TestHandleSignalMemperbaruiArahDanStrukturRadar memastikan baris status radar
+// yang berganti bias (mis. BUY -> SELL -> NEUTRAL) ikut memperbarui direction,
+// htf_sweep_json, cisd_json, dan engine_version agar tidak bertentangan dengan
+// next_action.
+func TestHandleSignalMemperbaruiArahDanStrukturRadar(t *testing.T) {
+	store := newFakeStore()
+	svc := newService(store, &fakePublisher{})
+
+	const id = "status-XAUUSD-D1-H1"
+	svc.HandleSignal(context.Background(), &enginev1.Signal{
+		SignalId:        id,
+		Symbol:          "XAUUSD",
+		StrategyVersion: "ila-2.0",
+		EngineVersion:   "2.0.0",
+		Htf:             "D1",
+		Ltf:             "H1",
+		Status:          enginev1.SignalStatus_WAIT_LTF_CISD,
+		Direction:       enginev1.Direction_BUY,
+		Summary:         "lama buy",
+		NextAction:      "lama buy",
+		HtfSweep:        &enginev1.HTFSweepInfo{Direction: "BULLISH", Details: "FVG bullish lama"},
+	})
+
+	svc.HandleSignal(context.Background(), &enginev1.Signal{
+		SignalId:        id,
+		Symbol:          "XAUUSD",
+		StrategyVersion: "ila-2.0",
+		EngineVersion:   "2.1.1",
+		Htf:             "D1",
+		Ltf:             "H1",
+		Status:          enginev1.SignalStatus_WAIT_LTF_CISD,
+		Direction:       enginev1.Direction_SELL,
+		Summary:         "menunggu -CISD di H1",
+		NextAction:      "menunggu -CISD di H1",
+		HtfSweep:        &enginev1.HTFSweepInfo{Direction: "BEARISH", Details: "Swing High D1 C2 aktif"},
+		Cisd:            &enginev1.CISDInfo{Direction: "BEARISH", CisdLevel: 3632.97, Details: "-CISD belum terkonfirmasi"},
+	})
+
+	got := store.signals[id]
+	if got.Direction != "SELL" {
+		t.Fatalf("direction radar = %q, ingin SELL", got.Direction)
+	}
+	if got.EngineVersion != "2.1.1" {
+		t.Errorf("engine_version = %q, ingin 2.1.1", got.EngineVersion)
+	}
+	if got.CisdJSON == "" || got.HtfSweepJSON == "" {
+		t.Errorf("htf_sweep_json / cisd_json harus diperbarui: htf=%q cisd=%q", got.HtfSweepJSON, got.CisdJSON)
+	}
+
+	// Kembali ke WAIT_HTF_SWEEP tanpa arah -> direction wajib kembali NEUTRAL.
+	svc.HandleSignal(context.Background(), &enginev1.Signal{
+		SignalId:        id,
+		Symbol:          "XAUUSD",
+		StrategyVersion: "ila-2.0",
+		EngineVersion:   "2.1.1",
+		Htf:             "D1",
+		Ltf:             "H1",
+		Status:          enginev1.SignalStatus_WAIT_HTF_SWEEP,
+		Direction:       enginev1.Direction_DIRECTION_UNSPECIFIED,
+		Summary:         "belum ada C2",
+		NextAction:      "belum ada C2",
+	})
+	if got := store.signals[id]; got.Direction != "NEUTRAL" || got.Status != model.SignalStatusWaitHTFSweep || got.HtfSweepJSON != "" || got.CisdJSON != "" {
+		t.Errorf("reset radar ke WAIT_HTF_SWEEP gagal: dir=%q status=%q htf=%q cisd=%q", got.Direction, got.Status, got.HtfSweepJSON, got.CisdJSON)
+	}
+}

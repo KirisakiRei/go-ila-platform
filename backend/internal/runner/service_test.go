@@ -69,9 +69,9 @@ func newFakeStore() *fakeStore {
 func userSignalKey(userID, signalID string) string { return userID + "|" + signalID }
 func dailyKey(userID, day string) string           { return userID + "|" + day }
 
-// UpsertSignal meniru repository asli: baris yang sudah ada hanya diperbarui
-// pada kolom ringkasan dan masa berlaku. Kolom status sengaja tidak ditimpa
-// agar status lokal (ACKED) tidak hilang oleh kiriman ulang engine.
+// UpsertSignal meniru repository asli: kolom status sengaja tidak ditimpa
+// agar status lokal (ACKED) tidak hilang oleh kiriman ulang engine. Khusus
+// baris status radar (WAIT_*), arah dan konteks struktur ikut diperbarui.
 func (s *fakeStore) UpsertSignal(_ context.Context, signal *model.Signal) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -80,7 +80,16 @@ func (s *fakeStore) UpsertSignal(_ context.Context, signal *model.Signal) error 
 		ada.Summary = signal.Summary
 		ada.NextAction = signal.NextAction
 		ada.ExpiresAt = signal.ExpiresAt
+		ada.FeedSource = signal.FeedSource
 		ada.UpdatedAt = signal.UpdatedAt
+		if model.IsWaitingSignalStatus(signal.Status) {
+			ada.Direction = signal.Direction
+			ada.HtfSweepJSON = signal.HtfSweepJSON
+			ada.CisdJSON = signal.CisdJSON
+			ada.EngineVersion = signal.EngineVersion
+			ada.StrategyVersion = signal.StrategyVersion
+			ada.PublishedAt = signal.PublishedAt
+		}
 		return nil
 	}
 
