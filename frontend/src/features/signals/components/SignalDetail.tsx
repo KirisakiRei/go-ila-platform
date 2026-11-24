@@ -27,6 +27,7 @@ import type { Signal } from '@/types/api'
 import { buildIla2Timeline, type Ila2StepState } from '../lib/ila2-progress'
 import { SIGNAL_LABEL, SIGNAL_TONE, getCycleBadge, getIla3Mtf, getIla3Progress } from '../lib/status'
 import { TimeframeBadge } from './TimeframeBadge'
+import { TombolEksekusi } from './TombolEksekusi'
 
 type AnalysisPoint = {
   id: string
@@ -593,11 +594,14 @@ export function SignalDetail({ signal }: { signal: Signal }) {
         })()}
 
         {signal.reject_reason && (
-          <div className="border-l-2 border-foreground pl-3 py-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Penahanan Sistem
-            </span>
-            <p className="text-[13px] text-foreground">{signal.reject_reason}</p>
+          <div className="space-y-2.5 border-l-2 border-foreground pl-3 py-1">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Penahanan Sistem
+              </span>
+              <p className="text-[13px] text-foreground">{signal.reject_reason}</p>
+            </div>
+            {signal.can_confirm && <TombolEksekusi signal={signal} />}
           </div>
         )}
 

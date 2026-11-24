@@ -77,6 +77,7 @@ func TestOverrideKuotaHanyaUntukPagarHarian(t *testing.T) {
 		runner.RejectDailyQuota,
 		runner.RejectDailyWin,
 		runner.RejectTwoStrike,
+		runner.RejectOpenPosition,
 	}
 	for _, reason := range boleh {
 		if !runner.OverrideKuotaManual(reason) {
@@ -90,7 +91,6 @@ func TestOverrideKuotaHanyaUntukPagarHarian(t *testing.T) {
 		runner.RejectSuspended,
 		runner.RejectLegalPending,
 		runner.RejectSlippage,
-		runner.RejectOpenPosition,
 		runner.RejectExpired,
 		runner.RejectMarketClosed,
 		runner.RejectEntitlement,
@@ -132,6 +132,67 @@ func TestApproveMenembusKuotaHarian(t *testing.T) {
 	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
 	if len(positions) != 1 {
 		t.Fatalf("posisi terbuka = %d, ingin 1", len(positions))
+	}
+}
+
+// TestApproveMenembusPosisiTerbuka memastikan posisi terbuka tetap menahan
+// mode auto, tetapi user tetap boleh mengeksekusi sinyal lain secara manual;
+// sinyal yang sama tetap tidak boleh dibuka dua kali (idempotency).
+func TestApproveMenembusPosisiTerbuka(t *testing.T) {
+	store := newFakeStore()
+	pub := &fakePublisher{}
+	addUser(store, "u1", "plus", "auto", true)
+
+	// Sudah ada satu posisi terbuka di pair lain pada akun yang sama.
+	store.positions["pos-existing"] = &model.Position{
+		Base:            model.Base{ID: "pos-existing"},
+		UserID:          "u1",
+		BrokerAccountID: "acct-u1",
+		SourceSignalID:  "sig-USTEC",
+		Symbol:          "USTEC",
+		Direction:       "BUY",
+		Status:          runner.PositionOpen,
+		OpenedAt:        time.Now().Add(-30 * time.Minute),
+	}
+
+	svc := newService(store, pub)
+	sig := readySignal("XAUUSD", time.Hour)
+	svc.HandleSignal(context.Background(), sig)
+
+	// Mode auto harus tetap menahan dengan RejectOpenPosition.
+	us, err := store.FindUserSignal(context.Background(), "u1", sig.SignalId)
+	if err != nil {
+		t.Fatalf("FindUserSignal: %v", err)
+	}
+	if us.Status != runner.SignalRejected || us.RejectReason != string(runner.RejectOpenPosition) {
+		t.Fatalf("mode auto harus menahan posisi terbuka, got status=%q reason=%q", us.Status, us.RejectReason)
+	}
+	positions, _ := store.ListOpenPositionsByUser(context.Background(), "u1")
+	if len(positions) != 1 {
+		t.Fatalf("mode auto tidak boleh menambah posisi, got %d", len(positions))
+	}
+
+	// Eksekusi manual oleh user harus lolos dan membuka posisi kedua.
+	reason, err := svc.Approve(context.Background(), "u1", sig.SignalId, "acct-u1")
+	if err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+	if reason != runner.RejectNone {
+		t.Fatalf("eksekusi manual seharusnya lolos walau ada posisi terbuka, ditolak: %q", reason)
+	}
+
+	positions, _ = store.ListOpenPositionsByUser(context.Background(), "u1")
+	if len(positions) != 2 {
+		t.Fatalf("posisi terbuka = %d, ingin 2", len(positions))
+	}
+
+	// Eksekusi manual kedua untuk sinyal yang SAMA harus tetap ditolak.
+	reason2, err := svc.Approve(context.Background(), "u1", sig.SignalId, "acct-u1")
+	if err != nil {
+		t.Fatalf("Approve ulang: %v", err)
+	}
+	if reason2 == runner.RejectNone {
+		t.Fatal("sinyal yang sama tidak boleh dieksekusi dua kali")
 	}
 }
 

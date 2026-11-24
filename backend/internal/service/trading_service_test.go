@@ -296,6 +296,69 @@ func TestCanConfirmHanyaSaatSiap(t *testing.T) {
 	}
 }
 
+// TestCanConfirmUntukPenahananYangBisaManual memastikan sinyal tertahan posisi
+// terbuka atau kuota harian tetap membuka tombol eksekusi manual selama belum
+// kedaluwarsa, sementara penolakan non-override (seperti slippage) tetap mati.
+func TestCanConfirmUntukPenahananYangBisaManual(t *testing.T) {
+	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	signals := []model.Signal{
+		newSignal("sig-open", now.Add(-time.Minute), now.Add(30*time.Minute)),
+		newSignal("sig-slip", now.Add(-time.Minute), now.Add(30*time.Minute)),
+		newSignal("sig-exp", now.Add(-2*time.Hour), now.Add(-time.Minute)),
+	}
+	signals[0].Symbol = "XAUUSD"
+	signals[1].Symbol = "EURUSD"
+	signals[2].Symbol = "GBPUSD"
+
+	users := newFakeUserRepo()
+	users.users["u1@contoh.id"] = newTestUser("plus")
+
+	svc := NewTradingService(
+		users,
+		&fakeSignalLister{signals: signals},
+		&fakePositionLister{},
+		&fakeUserSignalReader{status: map[string]*model.UserSignal{
+			"sig-open": {
+				SignalID:     "sig-open",
+				UserID:       userIDTest,
+				Status:       model.SignalStatusRejected,
+				RejectReason: "Masih ada posisi terbuka. Tunggu sampai ditutup.",
+			},
+			"sig-slip": {
+				SignalID:     "sig-slip",
+				UserID:       userIDTest,
+				Status:       model.SignalStatusRejected,
+				RejectReason: "Harga sudah bergerak terlalu jauh dari level entry.",
+			},
+			"sig-exp": {
+				SignalID:     "sig-exp",
+				UserID:       userIDTest,
+				Status:       model.SignalStatusRejected,
+				RejectReason: "Masih ada posisi terbuka. Tunggu sampai ditutup.",
+			},
+		}},
+	)
+	svc.clock = func() time.Time { return now }
+
+	list, err := svc.Signals(context.Background(), userIDTest, 0)
+	if err != nil {
+		t.Fatalf("signals: %v", err)
+	}
+	byID := map[string]bool{}
+	for _, item := range list {
+		byID[item.SignalID] = item.CanConfirm
+	}
+	if !byID["sig-open"] {
+		t.Error("sinyal tertahan posisi terbuka yang masih aktif harus memiliki CanConfirm=true")
+	}
+	if byID["sig-slip"] {
+		t.Error("sinyal tertahan slippage tidak boleh memiliki CanConfirm=true")
+	}
+	if byID["sig-exp"] {
+		t.Error("sinyal kedaluwarsa tidak boleh memiliki CanConfirm=true")
+	}
+}
+
 func TestPositionsMapping(t *testing.T) {
 	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
 

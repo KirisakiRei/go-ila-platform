@@ -316,7 +316,7 @@ func TestPreviewShowsNonOverridableRejectionAndAllowsDailyQuotaOverride(t *testi
 	h.signals.signal = freshSignal()
 	h.users.signal = &model.UserSignal{
 		Status:       model.SignalStatusRejected,
-		RejectReason: "Masih ada posisi terbuka. Tunggu sampai ditutup.",
+		RejectReason: "Harga sudah bergerak terlalu jauh dari level entry.",
 	}
 
 	preview, err := h.svc.Resolve(context.Background(), "u1", rawToken)
@@ -324,10 +324,24 @@ func TestPreviewShowsNonOverridableRejectionAndAllowsDailyQuotaOverride(t *testi
 		t.Fatalf("Resolve: %v", err)
 	}
 	if preview.CanConfirm {
-		t.Fatal("sinyal tertahan posisi terbuka tidak boleh dikonfirmasi")
+		t.Fatal("sinyal tertahan slippage tidak boleh dikonfirmasi")
 	}
 	if preview.BlockedReason != h.users.signal.RejectReason {
 		t.Fatalf("alasan = %q", preview.BlockedReason)
+	}
+
+	// Posisi terbuka hanya menghentikan auto-entry; manual tetap bisa dikonfirmasi.
+	h.users.signal = &model.UserSignal{
+		Status:          model.SignalStatusRejected,
+		RejectReason:    "Masih ada posisi terbuka. Tunggu sampai ditutup.",
+		BrokerAccountID: "acct-1",
+	}
+	previewPosisi, err := h.svc.Resolve(context.Background(), "u1", rawToken)
+	if err != nil {
+		t.Fatalf("Resolve posisi: %v", err)
+	}
+	if !previewPosisi.CanConfirm {
+		t.Fatalf("posisi terbuka seharusnya tetap mengizinkan konfirmasi manual, alasan: %q", previewPosisi.BlockedReason)
 	}
 
 	// Kuota harian hanya menghentikan auto-entry; manual tetap bisa dikonfirmasi.

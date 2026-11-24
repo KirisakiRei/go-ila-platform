@@ -253,6 +253,16 @@ function SingleCallEntryCard({
           </div>
         </div>
 
+        {signal.reject_reason && (
+          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-foreground" />
+            <span>
+              <strong className="font-medium text-foreground">Auto-entry ditahan:</strong>{' '}
+              {signal.reject_reason} Anda tetap dapat mengeksekusi manual.
+            </span>
+          </div>
+        )}
+
         {/* Action Controls & Info Bar */}
         <div className="flex flex-col gap-3 border-t border-border pt-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground sm:text-[11.5px]">

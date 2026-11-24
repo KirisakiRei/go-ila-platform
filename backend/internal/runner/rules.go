@@ -566,18 +566,20 @@ const (
 	GroupSistem RejectGroup = "sistem"
 )
 
-// OverrideKuotaManual menandai alasan harian yang boleh dilewati lewat
-// eksekusi manual.
+// OverrideKuotaManual menandai alasan penahanan otomatis yang boleh dilewati
+// lewat eksekusi manual.
 //
-// Batas harian adalah pagar otomatis: setelah 1 win atau 2 trade, sistem
-// berhenti membuka posisi sendiri. User tetap boleh memutuskan masuk lewat
-// tombol konfirmasi, karena keputusan akhir ada di tangan pemilik akun.
+// Batas harian dan posisi terbuka adalah pagar otomatis: setelah 1 win,
+// kuota harian habis, atau masih ada posisi berjalan, sistem berhenti membuka
+// posisi sendiri. User tetap boleh memutuskan masuk lewat tombol konfirmasi
+// manual, karena keputusan akhir ada di tangan pemilik akun.
 //
 // Pagar lain sengaja tidak bisa dilewati: ban, akun dibekukan, dokumen belum
-// disetujui, harga sudah lewat, dan posisi ganda tetap menolak walau manual.
+// disetujui, harga sudah lewat (slippage), dan sinyal duplikat tetap menolak
+// walau manual.
 func OverrideKuotaManual(reason RejectReason) bool {
 	switch reason {
-	case RejectDailyQuota, RejectDailyWin, RejectTwoStrike:
+	case RejectDailyQuota, RejectDailyWin, RejectTwoStrike, RejectOpenPosition:
 		return true
 	default:
 		return false

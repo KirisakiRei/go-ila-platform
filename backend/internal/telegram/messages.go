@@ -520,8 +520,8 @@ func penahananTeks(alasan AlasanPenahanan) (emoji, keadaan, penutup, label strin
 			"⚡ Eksekusi Manual", "eksekusi"
 	case PenahananPosisi:
 		return "🔔", "Tahap " + tahapSiap + " · Ditahan posisi jalan",
-			"Masih ada posisi jalan di pair ini. Sistem gak buka dua posisi sekaligus.",
-			"📊 Lihat Posisi Aktif", "posisi"
+			"Masih ada posisi terbuka di akun ini. Auto-entry ditahan, tapi kalau mau tetap masuk, eksekusi manual masih bisa.",
+			"⚡ Eksekusi Manual", "eksekusi"
 	case PenahananAkun:
 		return "⚠️", "Tahap " + tahapSiap + " · Akun ada masalah",
 			"Setup tetap dipantau setelah urusan akun selesai. Buka pengaturan buat beresin.",

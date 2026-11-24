@@ -77,6 +77,24 @@ describe('SignalDetail', () => {
 
     expect(screen.queryByRole('button')).toBeNull()
   })
+
+  it('menampilkan tombol eksekusi manual saat tertahan posisi terbuka dan can_confirm aktif', () => {
+    const berlaku = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    renderWithProviders(
+      <SignalDetail
+        signal={{
+          ...signal,
+          can_confirm: true,
+          expires_at: berlaku,
+          reject_reason: 'Masih ada posisi terbuka. Tunggu sampai ditutup.',
+        }}
+      />,
+    )
+
+    expect(screen.getByText(/Masih ada posisi terbuka/)).toBeInTheDocument()
+    const tombol = screen.getByRole('button', { name: /Eksekusi/ }) as HTMLButtonElement
+    expect(tombol.disabled).toBe(false)
+  })
 })
 
 describe('status sinyal', () => {

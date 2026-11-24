@@ -1064,7 +1064,7 @@ func (s *Service) processSignalForUser(ctx context.Context, user *model.User, si
 			s.logger.Info("sinyal tertahan",
 				"user_id", user.ID, "signal_id", signal.SignalID,
 				"account_id", account.ID, "reason", string(reason))
-			return s.reject(ctx, user.ID, signal.SignalID, reason)
+			return s.rejectAccount(ctx, user.ID, account.ID, signal.SignalID, reason)
 		}
 
 		// Semua syarat lolos.
@@ -1796,12 +1796,19 @@ func (s *Service) Approve(ctx context.Context, userID, signalID, accountID strin
 		return RejectNone, evalErr
 	}
 	if reason != RejectNone {
-		// Pagar harian bisa dilewati di jalur manual, pagar lain tidak.
-		// Keputusan menembus kuota dicatat agar bisa diaudit nanti.
+		// Pagar otomatis (kuota harian / posisi terbuka) bisa dilewati di jalur
+		// manual, pagar keamanan lain tidak.
 		if !OverrideKuotaManual(reason) {
 			return reason, nil
 		}
-		s.logger.Info("kuota harian dilewati lewat eksekusi manual",
+		// evaluate() berhenti di pagar harian/posisi sebelum gerbang slippage;
+		// periksa slippage ulang agar eksekusi manual tidak masuk di harga basi.
+		if s.opts.SlippageGuard && !s.mustDryRun(ctx, &userSession{User: user}, account) {
+			if slip := s.checkSlippage(ctx, account, signal); slip != RejectNone {
+				return slip, nil
+			}
+		}
+		s.logger.Info("pagar otomatis dilewati lewat eksekusi manual",
 			"evt", "signal.override.kuota",
 			"user_id", userID, "signal_id", signal.SignalID,
 			"account_id", account.ID, "alasan", string(reason))

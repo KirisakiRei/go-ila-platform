@@ -81,6 +81,7 @@ func TestFormatHeldMessageAlwaysExplainsReason(t *testing.T) {
 		Htf: "H4", Ltf: "M15", RiskReward: 2.1,
 		Alasan:     PenahananPosisi,
 		Keterangan: "Masih ada posisi terbuka. Tunggu sampai ditutup.",
+		Link:       "https://rekavia.com/app/approve?token=abc",
 	})
 
 	if !strings.Contains(msg.Text, "Masih ada posisi terbuka") {
@@ -91,6 +92,9 @@ func TestFormatHeldMessageAlwaysExplainsReason(t *testing.T) {
 	}
 	if !strings.Contains(msg.Text, "Tahap 4/6") {
 		t.Errorf("tahap siklus harus tampil:\n%s", msg.Text)
+	}
+	if len(msg.Buttons) != 1 || len(msg.Buttons[0]) != 1 || !strings.Contains(msg.Buttons[0][0].Text, "Eksekusi Manual") {
+		t.Errorf("penahanan posisi terbuka harus menampilkan tombol Eksekusi Manual, dapat: %+v", msg.Buttons)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"ila/backend/internal/dto"
 	"ila/backend/internal/model"
+	"ila/backend/internal/runner"
 )
 
 // FreeTierDelay adalah jeda tampil sinyal untuk tier Free (plans/14 §3.1).
@@ -268,6 +269,12 @@ func (s *tradingService) Signals(ctx context.Context, userID string, limit int) 
 					now.Before(signal.ExpiresAt)
 			} else if us.Status == model.SignalStatusOpportunity && now.Before(signal.ExpiresAt) {
 				view.Status = model.SignalStatusOpportunity
+			} else if us.Status == model.SignalStatusRejected {
+				// Pagar otomatis (kuota harian / posisi terbuka) tetap membuka
+				// tombol eksekusi manual selama sinyal belum kedaluwarsa.
+				view.CanConfirm = signal.Status == model.SignalStatusReadyToEntry &&
+					runner.OverrideKuotaManual(runner.RejectReason(us.RejectReason)) &&
+					now.Before(signal.ExpiresAt)
 			} else if us.Status == model.SignalStatusConsumed {
 				view.Status = model.SignalStatusConsumed
 			}
