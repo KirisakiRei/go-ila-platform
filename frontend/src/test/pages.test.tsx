@@ -24,12 +24,21 @@ function renderWithProviders(ui: ReactNode) {
 }
 
 describe('LoginPage', () => {
-  it('menampilkan formulir masuk', () => {
+  it('menampilkan formulir masuk sesuai tata letak baru tanpa tombol Telegram', async () => {
+    const user = userEvent.setup()
     renderWithProviders(<LoginPage />)
 
-    expect(screen.getByRole('heading', { name: 'Masuk' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Email atau username')).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Masuk ke akun' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Username atau Email')).toBeInTheDocument()
+    const passwordInput = screen.getByLabelText('Kata Sandi')
+    expect(passwordInput).toHaveAttribute('type', 'password')
+    expect(screen.getByRole('button', { name: /Masuk ke Dashboard/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Telegram/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Tampilkan kata sandi' }))
+    expect(passwordInput).toHaveAttribute('type', 'text')
+    await user.click(screen.getByRole('button', { name: 'Sembunyikan kata sandi' }))
+    expect(passwordInput).toHaveAttribute('type', 'password')
   })
 })
 
