@@ -35,11 +35,20 @@ func (p *runnerPublisher) lepasTombol(ctx context.Context, userID, signalID, sta
 		p.logger.Warn("gagal membaca jejak pesan bertombol", "signal_id", signalID, "error", err.Error())
 		return
 	}
+	symbol, htf, ltf := "", "", ""
+	if len(rows) > 0 {
+		signal, err := p.store.FindSignal(ctx, signalID)
+		if err != nil {
+			p.logger.Warn("konteks setup pesan tidak ditemukan", "signal_id", signalID, "error", err.Error())
+		} else if signal != nil {
+			symbol, htf, ltf = signal.Symbol, signal.Htf, signal.Ltf
+		}
+	}
 	for _, row := range rows {
 		if row.UserID != userID {
 			continue
 		}
-		pesan := telegram.FormatSudahTidakBerlaku("", "", "", alasanTidakBerlaku(status, reason))
+		pesan := telegram.FormatSudahTidakBerlaku(symbol, htf, ltf, alasanTidakBerlaku(status, reason))
 		if err := p.tg.EditMessageText(ctx, row.ChatID, row.MessageID, pesan.Text, nil); err != nil {
 			p.logger.Info("pesan bertombol tidak bisa diperbarui",
 				"signal_id", signalID, "message_id", row.MessageID, "error", err.Error())

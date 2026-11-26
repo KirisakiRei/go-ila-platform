@@ -801,7 +801,7 @@ export default function PositionsPage() {
 
                 {expanded && (
                   <div className="border-t border-border p-3">
-                    <PositionExecutionChart position={position} enabled={expanded} height={260} />
+                    <PositionExecutionChart position={position} enabled={expanded} height={260} mobile />
                   </div>
                 )}
               </div>

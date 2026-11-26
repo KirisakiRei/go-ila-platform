@@ -1,11 +1,17 @@
-import { useMemo, useState } from 'react'
-import { Skeleton } from '@/components/ui'
+import { useId, useMemo, useState } from 'react'
+import { Button, Skeleton } from '@/components/ui'
 import { useMarketCandles } from '@/lib/queries'
 import { formatMoney, formatNumber, formatPrice, formatR } from '@/lib/format'
 import { priceDigits } from '@/lib/pricePrecision'
 import type { Position } from '@/types/api'
-import { PriceChart, type ChartMarkerSpec, type PriceLineSpec, type SegmentSpec } from './PriceChart'
+import {
+  PriceChart,
+  type ChartMarkerSpec,
+  type PriceLineSpec,
+  type SegmentSpec,
+} from './PriceChart'
 import { useChartTheme } from './lib/theme'
+import { candleEnd, normalizeTimeframe, snapKeBar } from './lib/candleTime'
 
 type PositionExecutionChartProps = {
   position: Position
@@ -14,6 +20,7 @@ type PositionExecutionChartProps = {
   /** Paksa timeframe tertentu; bila kosong dipilih otomatis dari umur posisi. */
   timeframe?: string
   height?: number
+  mobile?: boolean
 }
 
 function toUnix(value: string | null | undefined): number {
@@ -23,6 +30,8 @@ function toUnix(value: string | null | undefined): number {
 }
 
 const BAR_SECONDS: Record<string, number> = {
+  M1: 60,
+  M5: 5 * 60,
   M15: 15 * 60,
   H1: 60 * 60,
   H4: 4 * 60 * 60,
@@ -53,7 +62,87 @@ function pilihTimeframe(entryTime: number, now: number): string {
  * (open_price, stop_loss, take_profit, exit_price) — tidak ada harga yang
  * dihitung ulang di sini agar posisi visual selalu sama dengan yang dieksekusi.
  */
-export function PositionExecutionChart({
+export function PositionExecutionChart(props: PositionExecutionChartProps) {
+  const [active, setActive] = useState<'htf' | 'ltf'>('htf')
+  const id = useId()
+  const { position, mobile = false } = props
+  if (props.timeframe || !position.htf || !position.ltf) {
+    return (
+      <div className="space-y-2">
+        {!props.timeframe && (
+          <p className="text-xs text-muted-foreground">
+            Timeframe source tidak tersedia; memakai timeframe otomatis.
+          </p>
+        )}
+        <PositionTimeframeChart {...props} />
+      </div>
+    )
+  }
+  const panels = [
+    { key: 'htf' as const, title: 'HTF · Konteks', timeframe: position.htf },
+    { key: 'ltf' as const, title: 'LTF · Eksekusi', timeframe: position.ltf },
+  ]
+  return (
+    <div className="space-y-3">
+      {mobile && (
+        <div role="tablist" aria-label="Timeframe chart posisi" className="flex gap-2">
+          {panels.map((panel, index) => (
+            <Button
+              key={panel.key}
+              id={`${id}-${panel.key}-tab`}
+              role="tab"
+              aria-selected={active === panel.key}
+              aria-controls={`${id}-${panel.key}-panel`}
+              tabIndex={active === panel.key ? 0 : -1}
+              variant={active === panel.key ? 'secondary' : 'ghost'}
+              onClick={() => setActive(panel.key)}
+              onKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+                event.preventDefault()
+                const next =
+                  event.key === 'Home'
+                    ? panels[0]
+                    : event.key === 'End'
+                      ? panels[1]
+                      : panels[1 - index]
+                if (next) {
+                  setActive(next.key)
+                  document.getElementById(`${id}-${next.key}-tab`)?.focus()
+                }
+              }}
+            >
+              {panel.title} · {panel.timeframe}
+            </Button>
+          ))}
+        </div>
+      )}
+      <div className={mobile ? '' : 'grid min-w-0 grid-cols-2 gap-3'}>
+        {panels
+          .filter((panel) => !mobile || panel.key === active)
+          .map((panel) => (
+            <section
+              key={panel.key}
+              id={`${id}-${panel.key}-panel`}
+              role={mobile ? 'tabpanel' : undefined}
+              aria-labelledby={mobile ? `${id}-${panel.key}-tab` : undefined}
+              aria-label={mobile ? undefined : `${panel.title} · ${panel.timeframe}`}
+              tabIndex={mobile ? 0 : undefined}
+              className="min-w-0 space-y-2"
+            >
+              {!mobile && (
+                <h3 className="text-xs font-medium">
+                  {panel.title} · {panel.timeframe}
+                </h3>
+              )}
+              <PositionTimeframeChart {...props} timeframe={panel.timeframe} />
+            </section>
+          ))}
+      </div>
+    </div>
+  )
+}
+
+function PositionTimeframeChart({
   position,
   enabled = true,
   timeframe,
@@ -74,7 +163,7 @@ export function PositionExecutionChart({
   // Waktu acuan dikunci sekali agar hasilnya stabil antar render.
   const [nowSec] = useState(() => Math.floor(Date.now() / 1000))
   const chartTimeframe = useMemo(
-    () => timeframe || pilihTimeframe(entryTime, nowSec),
+    () => normalizeTimeframe(timeframe ?? '') ?? timeframe ?? pilihTimeframe(entryTime, nowSec),
     [timeframe, entryTime, nowSec],
   )
 
@@ -84,7 +173,12 @@ export function PositionExecutionChart({
 
   const candles = query.data?.candles ?? []
   const windowStart = candles.length > 0 ? (candles[0]?.time ?? 0) : 0
-  const entryDiLuarJendela = entryTime > 0 && windowStart > 0 && entryTime < windowStart
+  const windowEnd = candles.at(-1)?.time ?? 0
+  const lastBarEnd = candleEnd(windowEnd, chartTimeframe)
+  const entryDiLuarJendela =
+    entryTime > 0 &&
+    windowStart > 0 &&
+    snapKeBar(entryTime, [windowStart, windowEnd], lastBarEnd) === null
 
   const { priceLines, markers, segments } = useMemo(() => {
     const lines: PriceLineSpec[] = []
@@ -177,6 +271,7 @@ export function PositionExecutionChart({
   return (
     <PriceChart
       candles={candles}
+      timeframe={chartTimeframe}
       priceLines={priceLines}
       markers={markers}
       segments={segments}
@@ -192,13 +287,17 @@ export function PositionExecutionChart({
       footer={
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>
-            {position.symbol} · {chartTimeframe}
+            {position.symbol} · {chartTimeframe} · Feed {query.data?.feed || 'tidak diketahui'}
           </span>
+          {position.feed_source && query.data?.feed && position.feed_source !== query.data.feed && (
+            <span className="w-full text-muted-foreground">
+              Feed source {position.feed_source} tidak tersedia di chart ini; candle memakai{' '}
+              {query.data.feed}.
+            </span>
+          )}
           <span className="tabular">Entry {formatPrice(position.open_price, digits)}</span>
           {hasExit && (
-            <span className="tabular">
-              Exit {formatPrice(position.exit_price, digits)}
-            </span>
+            <span className="tabular">Exit {formatPrice(position.exit_price, digits)}</span>
           )}
           {position.pnl_known && (
             <span
@@ -210,7 +309,8 @@ export function PositionExecutionChart({
           )}
           {entryDiLuarJendela && (
             <span className="w-full text-[10.5px] text-muted-foreground">
-              Entry berada di luar jendela candle yang tersedia; penanda entry tidak digambar.
+              Histori candle saat entry tidak tersedia. Chart menampilkan candle terbaru, bukan
+              rekonstruksi eksekusi.
             </span>
           )}
         </div>

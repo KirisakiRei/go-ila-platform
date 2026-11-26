@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"testing"
 
+	"ila/backend/internal/model"
 	"ila/backend/internal/runner"
+	"ila/backend/internal/runner/notify"
 	"ila/backend/internal/settings"
 	"ila/backend/internal/telegram"
 )
@@ -58,6 +62,60 @@ func TestKuotaAngkaHanyaUntukGrupKuota(t *testing.T) {
 
 	if got := p.kuotaAngka(context.Background(), "u-1", runner.RejectSlippage, true); got != 0 {
 		t.Fatalf("alasan non-kuota tidak boleh mengisi angka kuota, dapat %d", got)
+	}
+}
+
+type cycleStore struct {
+	*storeUji
+	position *model.Position
+}
+
+func (s *cycleStore) HitungKejadianSlot(context.Context, string, string, string, string, string) (int, error) {
+	return 0, nil
+}
+func (s *cycleStore) FindOpenPositionBySignal(context.Context, string, string) (*model.Position, error) {
+	return s.position, nil
+}
+func (s *cycleStore) FindUserByID(context.Context, string) (*model.User, error) {
+	chat := "123"
+	return &model.User{TelegramChatID: &chat, NotifyEnabled: true}, nil
+}
+
+type cycleTransport func(*http.Request) (*http.Response, error)
+
+func (f cycleTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestPublisherConsumedRetainsSetupCycle(t *testing.T) {
+	for _, withPosition := range []bool{false, true} {
+		t.Run(map[bool]string{false: "signal-fallback", true: "existing-position"}[withPosition], func(t *testing.T) {
+			signal := &model.Signal{SignalID: "sig-1", Symbol: "EURUSD", Direction: "BUY", Htf: "H4", Ltf: "M1"}
+			store := &cycleStore{storeUji: &storeUji{signals: map[string]*model.Signal{"sig-1": signal}}}
+			if withPosition {
+				store.position = &model.Position{Symbol: signal.Symbol, Direction: signal.Direction, SourceSignalID: signal.SignalID}
+			}
+			var text string
+			previous := http.DefaultTransport
+			http.DefaultTransport = cycleTransport(func(r *http.Request) (*http.Response, error) {
+				var payload struct {
+					Text string `json:"text"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					return nil, err
+				}
+				text = payload.Text
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true,"result":{"message_id":1}}`)), Header: make(http.Header)}, nil
+			})
+			defer func() { http.DefaultTransport = previous }()
+			p := publisherUji(nil)
+			p.store = store
+			client := telegram.NewClient(telegram.Config{BotToken: "test"}, p.logger)
+			p.notifier = notify.New(store, nil, client, nil, p.logger, 1)
+			p.PublishSignal(context.Background(), "u-1", "sig-1", model.SignalStatusConsumed, "")
+			p.notifier.Close()
+			if !strings.Contains(text, "EURUSD · H4 ➔ M1") || !strings.Contains(text, "Setup: H4 ➔ M1\nCycle: DAILY\n") {
+				t.Fatalf("konteks consumed hilang: %s", text)
+			}
+		})
 	}
 }
 

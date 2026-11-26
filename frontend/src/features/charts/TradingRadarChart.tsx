@@ -535,6 +535,7 @@ export function TradingRadarChart({
         <PriceChart
           seriesKey={`${symbol}:${activeTab?.timeframe ?? ''}:${feed}:${snapshotSignal?.signal_id ?? 'live'}`}
           candles={candles}
+          timeframe={activeTab?.timeframe}
           priceLines={priceLines}
           markers={markers}
           zones={zones}

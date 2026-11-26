@@ -382,6 +382,81 @@ func TestSanitizeMempertahankanAngka(t *testing.T) {
 
 // TestRadarLTFTanpaLevelTetapInformatif memastikan tahap 3 tidak menjadi
 // pesan kosong saat tingkat acuan belum terbentuk.
+func TestCycleLabels(t *testing.T) {
+	for _, tc := range []struct{ htf, ltf, cycle string }{
+		{"Q", "W", "YEARLY"}, {"MN1", "D1", "QUARTERLY"},
+		{"W1", "H4", "MONTHLY"}, {"D1", "H1", "WEEKLY"},
+		{"4h", "M15", "DAILY"}, {"60", "M5", "90M"}, {"15m", "M1", "MICRO"},
+		{"H4", "M1", "DAILY"}, // ILA3: LTF tidak menentukan cycle.
+		{"", "M15", "Tidak diketahui"}, {"H2", "M15", "Tidak diketahui"},
+		{"1M", "M1", "Tidak diketahui"}, {"M5", "M1", "Tidak diketahui"},
+	} {
+		t.Run(tc.htf+"-"+tc.ltf, func(t *testing.T) {
+			msg := FormatSetupDetailedMessage(SetupMessageParams{Symbol: "EURUSD", Htf: tc.htf, Ltf: tc.ltf})
+			if !strings.Contains(msg.Text, "Cycle: "+tc.cycle+"\n") {
+				t.Fatalf("cycle salah: %s", msg.Text)
+			}
+		})
+	}
+}
+
+func TestAllTradingAlertsRetainSetupCycle(t *testing.T) {
+	messages := []Message{
+		FormatRadarHTFMessage(RadarHTFParams{Htf: "H4", Ltf: "M15"}),
+		FormatRadarSweepMessage(RadarHTFParams{Htf: "H4", Ltf: "M15"}),
+		FormatRadarLTFMessage(RadarLTFParams{Htf: "H4", Ltf: "M15"}),
+		FormatSetupDetailedMessage(SetupMessageParams{Htf: "H4", Ltf: "M15"}),
+		FormatHeldMessage(HeldParams{Htf: "H4", Ltf: "M15", Alasan: PenahananKuota}),
+		FormatCancelledMessage(HeldParams{Htf: "H4", Ltf: "M15"}),
+		FormatCancelledMessage(HeldParams{Htf: "H4", Ltf: "M15", Alasan: PenahananHarga}),
+		FormatPositionOpenedMessage(PositionOpenedParams{Htf: "H4", Ltf: "M15"}),
+		FormatClosedMessage(ClosedParams{Htf: "H4", Ltf: "M15"}),
+		FormatOpportunityMessage("EURUSD", "BUY", "ila-3.0", "H4", "M15", 1, 1, 1, 1, ""),
+		FormatRadarStepMessage("EURUSD", "ila-2.0", "H4", "M15", "Radar", ""),
+		FormatEksekusiBerhasil(EksekusiParams{Htf: "H4", Ltf: "M15"}),
+		FormatEksekusiGagal("EURUSD", "H4", "M15", "Ditolak"),
+		FormatDilewatiMessage("EURUSD", "H4", "M15"),
+		FormatSudahTidakBerlaku("EURUSD", "H4", "M15", "Berakhir"),
+	}
+	for _, msg := range messages {
+		if !strings.Contains(msg.Text, "Setup: H4 ➔ M15\nCycle: DAILY\n") {
+			t.Errorf("konteks hilang: %s", msg.Text)
+		}
+		if ContainsForbiddenTerms(msg.Text) {
+			t.Errorf("istilah internal bocor: %s", msg.Text)
+		}
+	}
+	for _, msg := range []Message{FormatFinishedMessage("EURUSD", "Berakhir"), FormatKedaluwarsaTautan("EURUSD"), FormatSetupMessage("EURUSD", "BUY", "ila-2.0", 1, 1, 1, 1, 1, 1, "")} {
+		if !strings.Contains(msg.Text, "Setup: Tidak diketahui\nCycle: Tidak diketahui\n") {
+			t.Errorf("konteks kosong harus eksplisit: %s", msg.Text)
+		}
+	}
+}
+
+func TestRetainSetupContext(t *testing.T) {
+	for _, original := range []string{
+		"🟢 EURUSD · H4 ➔ M1\nTahap 4/6 · Siap masuk\nSetup: H4 ➔ M1\nCycle: DAILY\n",
+		"🟢 EURUSD · H4 ➔ M1\nTahap 4/6 · Siap masuk\n", // Pesan sebelum label cycle ditambahkan.
+	} {
+		for _, msg := range []Message{FormatDilewatiMessage("", "", ""), FormatEksekusiGagal("", "", "", "Ditolak"), FormatKedaluwarsaTautan(""), {Text: "⚡ Eksekusi dikirim\n\nRincian menyusul.\n"}} {
+			got := RetainSetupContext(msg, original)
+			if !strings.Contains(got.Text, "EURUSD · H4 ➔ M1\n") || !strings.Contains(got.Text, "Setup: H4 ➔ M1\nCycle: DAILY\n") {
+				t.Errorf("konteks edit hilang: %s", got.Text)
+			}
+		}
+	}
+	got := RetainSetupContext(FormatDilewatiMessage("", "", ""), "🟢 A<& · H4 ➔ M1\n")
+	if strings.Contains(got.Text, "A<&") || !strings.Contains(got.Text, "A&lt;&amp;") {
+		t.Fatalf("identitas harus di-escape: %s", got.Text)
+	}
+	for _, original := range []string{"", "pesan", "🟢 EURUSD · M15\n"} {
+		got := RetainSetupContext(FormatKedaluwarsaTautan(""), original)
+		if !strings.Contains(got.Text, "Cycle: Tidak diketahui\n") {
+			t.Fatalf("jangan menebak HTF dari LTF: %s", got.Text)
+		}
+	}
+}
+
 func TestRadarLTFTanpaLevelTetapInformatif(t *testing.T) {
 	msg := FormatRadarLTFMessage(RadarLTFParams{
 		Symbol: "XAUUSD", Direction: "BUY", Htf: "H1", Ltf: "M5",

@@ -21,7 +21,8 @@ type callbackUpdate struct {
 		ID int64 `json:"id"`
 	} `json:"from"`
 	Message struct {
-		MessageID int64 `json:"message_id"`
+		MessageID int64  `json:"message_id"`
+		Text      string `json:"text"`
 		Chat      struct {
 			ID int64 `json:"id"`
 		} `json:"chat"`
@@ -82,13 +83,13 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 			h.kirimTeks(ctx, chatID, "Konfirmasi entry belum tersedia. Silakan buka dashboard.")
 			return
 		}
-		h.confirmEntry(ctx, user, chatID, messageID, strings.TrimPrefix(aksi, telegram.CallbackEksekusi))
+		h.confirmEntry(ctx, user, chatID, messageID, strings.TrimPrefix(aksi, telegram.CallbackEksekusi), cb.Message.Text)
 	case strings.HasPrefix(aksi, telegram.CallbackLewati):
 		if h.approve == nil {
 			h.kirimTeks(ctx, chatID, "Keputusan entry belum dapat diproses. Silakan buka dashboard.")
 			return
 		}
-		h.declineEntry(ctx, user, chatID, messageID, strings.TrimPrefix(aksi, telegram.CallbackLewati))
+		h.declineEntry(ctx, user, chatID, messageID, strings.TrimPrefix(aksi, telegram.CallbackLewati), cb.Message.Text)
 	case strings.HasPrefix(aksi, telegram.CallbackRiwayat):
 		if !butuhMenu() {
 			return
@@ -170,38 +171,44 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, cb *callbackUpdate
 
 // confirmEntry mengeksekusi setup lewat jalur yang sama dengan halaman
 // konfirmasi web. Seluruh syarat trading tetap diperiksa ulang di Runner.
-func (h *TelegramHandler) confirmEntry(ctx context.Context, user *model.User, chatID string, messageID int64, token string) {
+func (h *TelegramHandler) confirmEntry(ctx context.Context, user *model.User, chatID string, messageID int64, token, original string) {
+	edit := func(msg telegram.Message) {
+		h.ketikPesan(ctx, chatID, messageID, telegram.RetainSetupContext(msg, original), nil)
+	}
 	if token == "" {
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatKedaluwarsaTautan(""), nil)
+		edit(telegram.FormatKedaluwarsaTautan(""))
 		return
 	}
 	hasil, err := h.approve.Confirm(ctx, user.ID, token)
 	if err != nil {
 		h.logInfo(ctx, "eksekusi dari telegram gagal", err)
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatKedaluwarsaTautan(""), nil)
+		edit(telegram.FormatKedaluwarsaTautan(""))
 		return
 	}
 	if hasil.Status == model.SignalStatusRejected {
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatEksekusiGagal("", "", "", hasil.Message), nil)
+		edit(telegram.FormatEksekusiGagal("", "", "", hasil.Message))
 		return
 	}
-	h.ketikPesan(ctx, chatID, messageID, telegram.Message{
+	edit(telegram.Message{
 		Text: "⚡ Eksekusi dikirim\n\nEntry sudah diteruskan ke broker. Rincian order menyusul di chat ini begitu konfirmasi diterima.\n",
-	}, nil)
+	})
 }
 
 // declineEntry menandai setup dilewati dan melepas tombolnya.
-func (h *TelegramHandler) declineEntry(ctx context.Context, user *model.User, chatID string, messageID int64, token string) {
+func (h *TelegramHandler) declineEntry(ctx context.Context, user *model.User, chatID string, messageID int64, token, original string) {
+	edit := func(msg telegram.Message) {
+		h.ketikPesan(ctx, chatID, messageID, telegram.RetainSetupContext(msg, original), nil)
+	}
 	if token == "" {
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatKedaluwarsaTautan(""), nil)
+		edit(telegram.FormatKedaluwarsaTautan(""))
 		return
 	}
 	if _, err := h.approve.Decline(ctx, user.ID, token); err != nil {
 		h.logInfo(ctx, "melewati setup dari telegram gagal", err)
-		h.ketikPesan(ctx, chatID, messageID, telegram.FormatKedaluwarsaTautan(""), nil)
+		edit(telegram.FormatKedaluwarsaTautan(""))
 		return
 	}
-	h.ketikPesan(ctx, chatID, messageID, telegram.FormatDilewatiMessage("", "", ""), nil)
+	edit(telegram.FormatDilewatiMessage("", "", ""))
 }
 
 // gantiPesan menyusun halaman lalu mengganti isi pesan yang ditekan.

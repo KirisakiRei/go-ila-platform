@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -431,6 +432,15 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 			Timeout: cfg.AITimeout,
 		})
 	}
+	manualJournalService := service.NewManualJournalService(repository.NewManualJournalRepository(db), filepath.Join(cfg.UploadDir, "manual-journal"))
+	manualJournalReviewService := service.NewManualJournalReviewService(repository.NewManualJournalReviewRepository(db), manualJournalReviewJournal{manualJournalService}, aiLLM, cfg.IsAIConfigured(), cfg.AIModel)
+	manualJournalHandler := handler.NewManualJournalHandler(manualJournalService)
+	manualJournalReviewHandler := handler.NewManualJournalReviewHandler(manualJournalReviewService)
+	backgroundWorkers = append(backgroundWorkers, func(ctx context.Context) {
+		runManualJournalReviews(ctx, manualJournalReviewService.Poll, logger)
+	}, func(ctx context.Context) {
+		runManualJournalReviews(ctx, manualJournalService.CleanupScreenshots, logger)
+	})
 	assistantService := service.NewAssistantService(service.AssistantServiceDeps{
 		Enabled:      cfg.IsAIConfigured(),
 		Model:        cfg.AIModel,
@@ -693,6 +703,9 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 
 		// Backtest ILA 2.0 atas data historis.
 		backtestHandler.Register(me)
+
+		manualJournalHandler.Register(me)
+		manualJournalReviewHandler.Register(me)
 
 		// Notifikasi Web Push (VAPID + aes128gcm) per perangkat.
 		webPushHandler.Register(me)

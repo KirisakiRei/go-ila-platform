@@ -101,6 +101,9 @@ func main() {
 		&model.BacktestRun{}, &model.BacktestTrade{}, &model.BacktestQuota{},
 		&model.WebPushVAPID{}, &model.WebPushSubscription{},
 		&model.AISession{}, &model.AIMessage{}, &model.AIUserMemory{},
+		&model.ManualJournalAccount{}, &model.ManualJournalCapital{}, &model.ManualJournalEntry{},
+		&model.ManualJournalScreenshot{}, &model.ManualJournalImportToken{},
+		&model.ManualJournalReview{}, &model.ManualJournalReviewSetting{},
 	}
 
 	if err := config.AutoMigrate(ctx, db, models...); err != nil {

@@ -164,6 +164,8 @@ func (p *runnerPublisher) PublishSignal(ctx context.Context, userID, signalID, s
 				return telegram.FormatPositionOpenedMessage(telegram.PositionOpenedParams{
 					Symbol:       pos.Symbol,
 					Direction:    pos.Direction,
+					Htf:          signal.Htf,
+					Ltf:          signal.Ltf,
 					TicketNumber: pos.TicketNumber,
 					BrokerType:   p.namaBroker(ctx, pos.BrokerAccountID, pos.UserID),
 					LotSize:      pos.LotSize,

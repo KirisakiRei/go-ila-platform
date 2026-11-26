@@ -1,0 +1,95 @@
+import { describe, expect, it } from 'vitest'
+import {
+  emptyTrade,
+  filterTrades,
+  fromWib,
+  localWib,
+  safeLink,
+  tradeDay,
+  validateDecimal,
+  validateTrade,
+  wibDay,
+} from './model'
+import type { JournalFilters, JournalTrade } from './types'
+
+const filters: JournalFilters = {
+  account_id: 'a1',
+  from: '',
+  to: '',
+  status: '',
+  asset: '',
+  setup: '',
+  tag: '',
+  emotion: '',
+  mistake: '',
+}
+const trade: JournalTrade = { ...emptyTrade('a1'), id: 't1', created_at: '2026-11-25T18:00:00Z' }
+
+describe('manual journal domain', () => {
+  it('uses WIB boundaries independent of browser timezone and round trips local input', () => {
+    expect(wibDay('2026-11-25T17:00:00Z')).toBe('2026-11-26')
+    expect(localWib('2026-11-25T17:00:00Z')).toBe('2026-11-26T00:00')
+    expect(fromWib('2026-11-26T00:00')).toBe('2026-11-25T17:00:00.000Z')
+    expect(tradeDay(trade)).toBe('2026-11-26')
+  })
+  it('filters draft creation dates and closed exit dates with the same inclusive WIB window', () => {
+    const closed = {
+      ...trade,
+      id: 't2',
+      status: 'closed' as const,
+      opened_at: '2026-11-24T00:00:00Z',
+      closed_at: '2026-11-25T17:00:00Z',
+      asset: 'XAUUSD',
+      setup: 'Breakout',
+      tags: ['London'],
+    }
+    expect(
+      filterTrades([trade, closed], { ...filters, from: '2026-11-26', to: '2026-11-26' }),
+    ).toHaveLength(2)
+    expect(filterTrades([trade, closed], { ...filters, asset: 'xau', tag: 'london' })).toEqual([
+      closed,
+    ])
+    expect(filterTrades([trade], { ...filters, to: '2026-11-25' })).toEqual([])
+  })
+  it('preserves decimal strings and rejects exponent, excess precision, negative unsigned and overflow', () => {
+    expect(validateDecimal('0.0001')).toBe(true)
+    expect(validateDecimal('-123.4500', 4, true)).toBe(true)
+    for (const value of ['1e3', 'NaN', '-1', '1.00001', '1000000000.0001', ''])
+      expect(validateDecimal(value)).toBe(false)
+    expect(validateDecimal('0.12345678', 8)).toBe(true)
+  })
+  it('allows incomplete drafts, requires complete open and accepts zero closed pnl', () => {
+    expect(validateTrade(emptyTrade('a1'))).toBe('')
+    expect(validateTrade({ ...emptyTrade('a1'), size: '0' })).toMatch(/lebih dari nol/)
+    expect(validateTrade({ ...emptyTrade('a1'), stop_loss: '0' })).toMatch(/lebih dari nol/)
+    expect(validateTrade({ ...emptyTrade('a1'), risk_amount: '0', capital_snapshot: '0' })).toBe('')
+    expect(validateTrade({ ...emptyTrade('a1'), status: 'open' })).not.toBe('')
+    const open = {
+      ...emptyTrade('a1'),
+      status: 'open' as const,
+      asset: 'XAUUSD',
+      opened_at: '2026-11-25T10:00:00Z',
+      entry_price: '2600.00000001',
+      size: '0.01',
+      size_unit: 'lot',
+    }
+    expect(validateTrade(open)).toBe('')
+    expect(
+      validateTrade({ ...open, status: 'closed', closed_at: '2026-11-25T11:00:00Z', net_pnl: '0' }),
+    ).toBe('')
+    expect(validateTrade({ ...open, net_pnl: '1' })).toMatch(/hanya/)
+    expect(
+      validateTrade({ ...open, status: 'closed', closed_at: '2026-11-24T11:00:00Z', net_pnl: '0' }),
+    ).toMatch(/sebelum/)
+  })
+  it('only accepts credential-free HTTPS TradingView links', () => {
+    expect(safeLink('https://www.tradingview.com/x/test')).toBe(true)
+    for (const url of [
+      'javascript:alert(1)',
+      'https://tradingview.com.evil.test/x',
+      'https://user:pass@tradingview.com/x',
+      'http://tradingview.com/x',
+    ])
+      expect(safeLink(url)).toBe(false)
+  })
+})

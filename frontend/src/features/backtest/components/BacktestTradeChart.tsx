@@ -261,6 +261,7 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
         >
           <PanelIsi
             candle={detail.candle_htf}
+            timeframe={detail.htf}
             lines={bersama.lines}
             markers={[...bersama.marks, ...penandaAcuan]}
             segments={bersama.segments}
@@ -292,6 +293,7 @@ function IsiChart({ detail, symbol }: { detail: BacktestTradeDetail; symbol: str
         >
           <PanelIsi
             candle={detail.candle_ltf}
+            timeframe={detail.ltf}
             lines={bersama.lines}
             markers={[...bersama.marks, ...penandaEksekusi]}
             segments={bersama.segments}
@@ -405,6 +407,7 @@ function Kolom({
  */
 function PanelIsi({
   candle,
+  timeframe,
   lines,
   markers,
   segments,
@@ -416,6 +419,7 @@ function PanelIsi({
   pesanKosong,
 }: {
   candle: BacktestTradeDetail['candle_ltf']
+  timeframe: string
   lines: PriceLineSpec[]
   markers: ChartMarkerSpec[]
   segments: SegmentSpec[]
@@ -440,6 +444,7 @@ function PanelIsi({
   return (
     <PriceChart
       candles={candle}
+      timeframe={timeframe}
       priceLines={lines}
       markers={markers}
       segments={segments}

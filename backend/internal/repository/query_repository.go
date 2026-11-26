@@ -74,6 +74,23 @@ func (r *signalRepository) ListKnownTimeframes(ctx context.Context) (map[string]
 	return out, nil
 }
 
+// FindPositionSources reads only metadata for the bounded position list.
+func (r *signalRepository) FindPositionSources(ctx context.Context, signalIDs []string) (map[string]model.Signal, error) {
+	out := make(map[string]model.Signal, len(signalIDs))
+	if len(signalIDs) == 0 {
+		return out, nil
+	}
+	var rows []model.Signal
+	if err := r.db.WithContext(ctx).Select("signal_id", "htf", "ltf", "feed_source").
+		Where("signal_id IN ?", signalIDs).Limit(len(signalIDs)).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("reading position source metadata: %w", err)
+	}
+	for _, row := range rows {
+		out[row.SignalID] = row
+	}
+	return out, nil
+}
+
 // ListForUser mengembalikan sinyal riwayat pada simbol yang dipantau user.
 //
 // Baris radar (identitas `status-*`) SENGAJA tidak diambil di sini. Baris itu

@@ -34,6 +34,10 @@ type SignalLister interface {
 	ListRadarForUser(ctx context.Context, userID string, batas int) ([]model.Signal, error)
 }
 
+type positionSourceReader interface {
+	FindPositionSources(ctx context.Context, signalIDs []string) (map[string]model.Signal, error)
+}
+
 // PositionLister membaca posisi user.
 type PositionLister interface {
 	ListByUser(ctx context.Context, userID string, limit int) ([]model.Position, error)
@@ -313,33 +317,30 @@ func (s *tradingService) Positions(ctx context.Context, userID string, limit int
 		return nil, err
 	}
 
-	out := make([]dto.PositionResponse, 0, len(rows))
-	for _, pos := range rows {
-		out = append(out, dto.PositionResponse{
-			ID:              pos.ID,
-			BrokerAccountID: pos.BrokerAccountID,
-			Symbol:          pos.Symbol,
-			StrategyVersion: pos.StrategyVersion,
-			Direction:       pos.Direction,
-			TicketNumber:    pos.TicketNumber,
-			LotSize:         pos.LotSize,
-			OpenPrice:       pos.OpenPrice,
-			StopLoss:        pos.StopLoss,
-			TakeProfit:      pos.TakeProfit,
-			ExitPrice:       pos.ExitPrice,
-			ProfitLoss:      pos.ProfitLoss,
-			OutcomeR:        pos.OutcomeR,
-			RiskPercent:     pos.RiskPercent,
-			Status:          pos.Status,
-			IsDryRun:        pos.IsDryRun,
-			OpenedAt:        pos.OpenedAt,
-			OpenedAtPair:    dto.NewTimePair(pos.OpenedAt),
-			ClosedAt:        pos.ClosedAt,
-			ClosedAtPair:    dto.NewTimePairPtr(pos.ClosedAt),
-			PnLKnown:        pnlKnown(&pos),
-		})
+	sources, err := s.positionSources(ctx, rows)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	return jurnalPositionsResponse(rows, sources), nil
+}
+
+func (s *tradingService) positionSources(ctx context.Context, rows []model.Position) (map[string]model.Signal, error) {
+	reader, ok := s.signals.(positionSourceReader)
+	if !ok {
+		return nil, nil
+	}
+	ids := make([]string, 0, len(rows))
+	seen := make(map[string]bool)
+	for _, pos := range rows {
+		if pos.SourceSignalID != "" && !seen[pos.SourceSignalID] {
+			ids = append(ids, pos.SourceSignalID)
+			seen[pos.SourceSignalID] = true
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return reader.FindPositionSources(ctx, ids)
 }
 
 // waktuTerjadi memilih waktu yang mewakili "kapan ini terjadi" untuk sebuah sinyal.

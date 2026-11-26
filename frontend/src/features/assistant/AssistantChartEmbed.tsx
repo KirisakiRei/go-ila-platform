@@ -127,6 +127,7 @@ export function AssistantChartEmbed({ spec, autoLoad = false }: AssistantChartEm
             <Suspense fallback={<Skeleton className="h-[260px] w-full rounded-lg" />}>
               <LazyPriceChart
                 candles={candles}
+                timeframe={spec.timeframe}
                 priceLines={priceLines}
                 markers={markers}
                 zones={zones}

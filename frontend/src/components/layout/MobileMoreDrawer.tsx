@@ -101,6 +101,12 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
               onClick={() => go('/posisi')}
             />
             <MobileMenuRow
+              icon={BarChart3}
+              label="Jurnal Manual"
+              description="Catatan trade mandiri, modal, & evaluasi"
+              onClick={() => go('/jurnal')}
+            />
+            <MobileMenuRow
               icon={Wallet}
               label="Akun Broker"
               description="Kelola koneksi cTrader & Match-Trader"

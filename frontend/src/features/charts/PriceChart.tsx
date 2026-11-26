@@ -23,6 +23,7 @@ import { ChartFullscreenModal } from './ChartFullscreenModal'
 import { useChartTheme } from './lib/theme'
 import { ZonePrimitive, type ZoneSpec } from './lib/zonePrimitive'
 import { priceStep } from '@/lib/pricePrecision'
+import { candleEnd, snapKeBar } from './lib/candleTime'
 
 export type PriceLineSpec = {
   price: number
@@ -56,6 +57,8 @@ export type SegmentSpec = {
 
 type PriceChartProps = {
   candles: MarketCandle[]
+  /** Timeframe eksplisit untuk menentukan akhir candle terakhir tanpa menebak jarak bar. */
+  timeframe?: string
   priceLines?: PriceLineSpec[]
   markers?: ChartMarkerSpec[]
   zones?: ZoneSpec[]
@@ -99,6 +102,7 @@ type PriceChartProps = {
 type PriceChartCanvasProps = Pick<
   PriceChartProps,
   | 'candles'
+  | 'timeframe'
   | 'priceLines'
   | 'markers'
   | 'zones'
@@ -141,38 +145,6 @@ function sortedBarTimes(candles: MarketCandle[]): number[] {
 }
 
 /**
- * snapKeBar menggeser sebuah waktu ke lilin yang menaunginya.
- *
- * Lightweight-charts hanya menggambar marker pada waktu yang ada di data,
- * sedangkan waktu eksekusi broker tidak selalu jatuh tepat di grid timeframe
- * (mis. entry 10:07 pada chart M15). Tanpa penyelarasan ini marker dan garis
- * entry→exit hilang tanpa pesan. Waktu di luar jendela data mengembalikan null
- * supaya titik tidak digambar di lilin yang salah.
- */
-function snapKeBar(time: number, barTimes: number[]): number | null {
-  if (barTimes.length === 0 || !Number.isFinite(time)) return null
-
-  const first = barTimes[0]
-  const last = barTimes[barTimes.length - 1]
-  if (first === undefined || last === undefined) return null
-  if (time < first || time > last) return null
-
-  let lo = 0
-  let hi = barTimes.length - 1
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1
-    const current = barTimes[mid]
-    if (current === undefined) break
-    if (current === time) return current
-    if (current < time) lo = mid + 1
-    else hi = mid - 1
-  }
-  // hi kini menunjuk lilin terakhir yang waktunya <= time.
-  const snapped = hi >= 0 ? barTimes[hi] : undefined
-  return snapped ?? null
-}
-
-/**
  * PriceChart adalah pembungkus tipis lightweight-charts.
  *
  * Data candle wajib terurut menaik dengan waktu unik; pengurutan dilakukan di
@@ -181,6 +153,7 @@ function snapKeBar(time: number, barTimes: number[]): number | null {
  */
 function PriceChartCanvas({
   candles,
+  timeframe,
   priceLines = EMPTY_PRICE_LINES,
   markers = EMPTY_MARKERS,
   zones = EMPTY_ZONES,
@@ -207,28 +180,29 @@ function PriceChartCanvas({
 
   const theme = useChartTheme()
   const barTimes = useMemo(() => sortedBarTimes(candles), [candles])
+  const lastBarEnd = candleEnd(barTimes.at(-1) ?? NaN, timeframe)
 
   // Marker dan garis penghubung diselaraskan ke lilin nyata sebelum digambar.
   const snappedMarkers = useMemo(() => {
     const out: (ChartMarkerSpec & { time: number })[] = []
     for (const marker of markers) {
-      const time = snapKeBar(marker.time, barTimes)
+      const time = snapKeBar(marker.time, barTimes, lastBarEnd)
       if (time === null) continue
       out.push({ ...marker, time })
     }
     return out
-  }, [markers, barTimes])
+  }, [markers, barTimes, lastBarEnd])
 
   const snappedSegments = useMemo(() => {
     const out: SegmentSpec[] = []
     for (const segment of segments) {
-      const fromTime = snapKeBar(segment.fromTime, barTimes)
-      const toTime = snapKeBar(segment.toTime, barTimes)
+      const fromTime = snapKeBar(segment.fromTime, barTimes, lastBarEnd)
+      const toTime = snapKeBar(segment.toTime, barTimes, lastBarEnd)
       if (fromTime === null || toTime === null || fromTime === toTime) continue
       out.push({ ...segment, fromTime, toTime })
     }
     return out
-  }, [segments, barTimes])
+  }, [segments, barTimes, lastBarEnd])
 
   // Chart dibuat sekali; data dan overlay diperbarui lewat effect terpisah.
   useEffect(() => {
@@ -360,7 +334,8 @@ function PriceChartCanvas({
       return
     }
 
-    const prevLast = prev.length > 0 ? (prev[prev.length - 1] as CandlestickData<UTCTimestamp>).time : null
+    const prevLast =
+      prev.length > 0 ? (prev[prev.length - 1] as CandlestickData<UTCTimestamp>).time : null
     const focusPending = focusTime != null && focusAppliedRef.current !== focusTime
     const sameHeadBar =
       !seriesChanged &&
@@ -508,6 +483,7 @@ function PriceChartCanvas({
 
 export function PriceChart({
   candles,
+  timeframe,
   priceLines = EMPTY_PRICE_LINES,
   markers = EMPTY_MARKERS,
   zones = EMPTY_ZONES,
@@ -544,7 +520,12 @@ export function PriceChart({
 
   return (
     <>
-      <div className={cn('relative w-full overflow-hidden rounded-xl border border-border bg-card', className)}>
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-xl border border-border bg-card',
+          className,
+        )}
+      >
         {showFloatingButton && (
           <button
             type="button"
@@ -558,6 +539,7 @@ export function PriceChart({
         )}
         <PriceChartCanvas
           candles={candles}
+          timeframe={timeframe}
           priceLines={priceLines}
           markers={markers}
           zones={zones}
@@ -591,6 +573,7 @@ export function PriceChart({
         >
           <PriceChartCanvas
             candles={candles}
+            timeframe={timeframe}
             priceLines={priceLines}
             markers={markers}
             zones={zones}

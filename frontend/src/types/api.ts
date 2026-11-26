@@ -480,6 +480,10 @@ export type MarketCandlesResponse = {
 
 export type Position = {
   id: string
+  source_signal_id?: string
+  htf?: string
+  ltf?: string
+  feed_source?: string
   broker_account_id?: string
   symbol: string
   strategy_version: StrategyVersion

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -74,12 +75,18 @@ func (f *fakeApprove) Issue(context.Context, string, string) (*service.ApproveIs
 
 func kirimCallback(t *testing.T, h *TelegramHandler, data string, chatID int64) *httptest.ResponseRecorder {
 	t.Helper()
+	return kirimCallbackText(t, h, data, chatID, "")
+}
+
+func kirimCallbackText(t *testing.T, h *TelegramHandler, data string, chatID int64, text string) *httptest.ResponseRecorder {
+	t.Helper()
 	payload, _ := json.Marshal(map[string]any{
 		"callback_query": map[string]any{
 			"id":   "cb-1",
 			"data": data,
 			"message": map[string]any{
 				"message_id": 99,
+				"text":       text,
 				"chat":       map[string]any{"id": chatID},
 			},
 		},
@@ -161,6 +168,38 @@ func TestCallbackEksekusiDitolakMenampilkanAlasan(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(sender.edits[0]), []byte("terlalu jauh")) {
 		t.Fatalf("alasan penolakan hilang dari pesan: %q", sender.edits[0])
+	}
+}
+
+func TestCallbackRetainsSetupCycle(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name, action, status string
+		err                  error
+	}{
+		{"confirmed", telegram.CallbackEksekusi + "token-abc", model.SignalStatusConsumed, nil},
+		{"rejected", telegram.CallbackEksekusi + "token-abc", model.SignalStatusRejected, nil},
+		{"confirm-expired", telegram.CallbackEksekusi + "token-abc", "", errors.New("expired")},
+		{"confirm-empty", telegram.CallbackEksekusi, "", nil},
+		{"declined", telegram.CallbackLewati + "token-abc", model.SignalStatusSkipped, nil},
+		{"decline-expired", telegram.CallbackLewati + "token-abc", "", errors.New("expired")},
+		{"decline-empty", telegram.CallbackLewati, "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sender := &fakeTelegramEditor{}
+			svc := &fakeTelegramService{resolveChatFn: func(context.Context, string) (*model.User, error) {
+				return &model.User{Base: model.Base{ID: "u-1"}}, nil
+			}}
+			approve := &fakeApprove{hasil: &service.ApproveResult{Status: tc.status, Message: "Ditolak"}, err: tc.err}
+			h := NewTelegramHandler(svc, "bot", "", sender).WithMenu(nil, approve, "", nil)
+			kirimCallbackText(t, h, tc.action, 123, "🟢 EURUSD · H4 ➔ M1\nTahap 4/6 · Siap masuk\n")
+			if len(sender.edits) != 1 || !strings.Contains(sender.edits[0], "EURUSD · H4 ➔ M1\n") || !strings.Contains(sender.edits[0], "Setup: H4 ➔ M1\nCycle: DAILY\n") {
+				t.Fatalf("konteks callback hilang: %v", sender.edits)
+			}
+			if strings.Contains(sender.edits[0], "token-abc") {
+				t.Fatal("token tidak boleh muncul di pesan")
+			}
+		})
 	}
 }
 

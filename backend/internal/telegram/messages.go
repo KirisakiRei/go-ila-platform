@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"ila-strategy/ila"
 )
 
 // Istilah internal yang dilarang muncul di teks untuk user (plans/12 §7.1).
@@ -70,6 +72,7 @@ const (
 // judulPesan menyusun baris pertama: emoji, pair, pasangan timeframe, lalu
 // keadaan sekarang. Dua baris ini yang dibaca user duluan di notifikasi.
 func judulPesan(emoji, symbol, htf, ltf, keadaan string) string {
+	konteks := setupCycle(htf, ltf)
 	pasangan := strings.TrimSpace(htf)
 	if ltf != "" {
 		if pasangan != "" {
@@ -79,9 +82,47 @@ func judulPesan(emoji, symbol, htf, ltf, keadaan string) string {
 		}
 	}
 	if pasangan == "" {
-		return fmt.Sprintf("%s %s\n%s\n", emoji, symbol, keadaan)
+		return fmt.Sprintf("%s %s\n%s\n%s", emoji, escapeHTML(symbol), keadaan, konteks)
 	}
-	return fmt.Sprintf("%s %s · %s\n%s\n", emoji, symbol, pasangan, keadaan)
+	return fmt.Sprintf("%s %s · %s\n%s\n%s", emoji, escapeHTML(symbol), escapeHTML(pasangan), keadaan, konteks)
+}
+
+func setupCycle(htf, ltf string) string {
+	setup := "Tidak diketahui"
+	if strings.TrimSpace(htf) != "" && strings.TrimSpace(ltf) != "" {
+		setup = strings.TrimSpace(htf) + " ➔ " + strings.TrimSpace(ltf)
+	}
+	cycle := "Tidak diketahui"
+	// ILA3 memakai LTF berbeda; cycle tetap ditentukan oleh HTF, bukan pasangan ILA2.
+	if c, ok := ila.CycleForHTF(htf); ok {
+		cycle = string(c)
+	}
+	return "Setup: " + escapeHTML(setup) + "\nCycle: " + cycle + "\n"
+}
+
+// RetainSetupContext mempertahankan identitas pesan callback, hanya untuk tampilan.
+// Isi pesan tidak pernah dipakai untuk otorisasi, token, atau keputusan order.
+func RetainSetupContext(msg Message, original string) Message {
+	if !strings.Contains(msg.Text, "\nSetup: ") {
+		header, body, _ := strings.Cut(msg.Text, "\n")
+		emoji, status, _ := strings.Cut(header, " ")
+		msg.Text = emoji + " \n" + status + "\n" + setupCycle("", "") + body
+	}
+	header, _, _ := strings.Cut(original, "\n")
+	_, identity, ok := strings.Cut(header, " ")
+	if !ok || strings.TrimSpace(identity) == "" {
+		return msg
+	}
+	_, pair, _ := strings.Cut(identity, " · ")
+	htf, ltf, hasPair := strings.Cut(pair, " ➔ ")
+	if !hasPair {
+		htf, ltf = "", ""
+	}
+	emoji, _, _ := strings.Cut(msg.Text, " ")
+	_, body, _ := strings.Cut(msg.Text, "\n")
+	body = strings.Replace(body, setupCycle("", ""), setupCycle(htf, ltf), 1)
+	msg.Text = emoji + " " + escapeHTML(identity) + "\n" + body
+	return msg
 }
 
 // makeBox merender baris label-nilai sebagai kotak monospace.
@@ -946,10 +987,8 @@ func FormatSudahTidakBerlaku(symbol, htf, ltf, sebab string) Message {
 
 // FormatKedaluwarsaTautan dipakai saat tombol ditekan tetapi tautannya sudah mati.
 func FormatKedaluwarsaTautan(symbol string) Message {
-	return Message{Text: fmt.Sprintf(
-		"⌛ %s\n\nTautan ini sudah tidak berlaku. Setup mungkin sudah lewat, sudah dieksekusi, atau sudah dibatalkan.\n",
-		symbol,
-	)}
+	return Message{Text: judulPesan("⌛", symbol, "", "", "Tautan tidak berlaku") +
+		"\nTautan ini sudah tidak berlaku. Setup mungkin sudah lewat, sudah dieksekusi, atau sudah dibatalkan.\n"}
 }
 
 // nomorOrder menampilkan nomor tiket, atau keterangan bila belum ada.

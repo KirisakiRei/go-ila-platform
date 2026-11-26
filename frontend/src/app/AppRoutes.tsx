@@ -35,6 +35,7 @@ import { ScrollToTop } from './ScrollToTop'
 
 // Halaman berat & seluruh panel admin dimuat malas (code-splitting) agar
 // pengunjung halaman masuk/dashboard pelanggan tidak mengunduh bundel admin.
+const ManualJournalPage = lazy(() => import('@/pages/ManualJournalPage'))
 const AssistantPage = lazy(() => import('@/pages/AssistantPage'))
 const BacktestPage = lazy(() => import('@/pages/BacktestPage'))
 const BacktestHistoryPage = lazy(() => import('@/pages/BacktestHistoryPage'))
@@ -238,6 +239,16 @@ export function AppRoutes() {
             <RequireAuth>
               <ShellPage>
                 <SignalsPage />
+              </ShellPage>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/jurnal"
+          element={
+            <RequireAuth>
+              <ShellPage>
+                <ManualJournalPage />
               </ShellPage>
             </RequireAuth>
           }

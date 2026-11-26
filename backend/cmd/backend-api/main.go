@@ -123,7 +123,7 @@ func main() {
 		}
 	}()
 
-	// Pekerjaan latar (backtest) dikumpulkan saat perakitan lalu dijalankan di
+	// Pekerjaan latar (backtest dan review jurnal) dikumpulkan saat perakitan lalu dijalankan di
 	// sini, supaya siklus hidupnya jelas milik proses utama dan tidak berlipat
 	// saat router dirakit ulang.
 	var pekerjaanLatar []func(ctx context.Context)
@@ -154,6 +154,7 @@ func main() {
 
 	logger.Info("menghentikan backend-api")
 
+	cancelWorker()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 

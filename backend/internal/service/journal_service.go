@@ -102,9 +102,13 @@ func (s *tradingService) Journal(ctx context.Context, userID string, query Journ
 		return nil, err
 	}
 
+	sources, err := s.positionSources(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
 	return &dto.JournalResponse{
 		Stats:       jurnalStatsResponse(stats),
-		Positions:   jurnalPositionsResponse(rows),
+		Positions:   jurnalPositionsResponse(rows, sources),
 		Skipped:     s.jurnalSkippedResponse(ctx, skipped),
 		SkippedMeta: jurnalMetaResponse(halamanSkipped, limitSkipped, totalSkipped),
 		Filters: dto.JournalFiltersResponse{
@@ -177,11 +181,17 @@ func jurnalStatsResponse(stats repository.JournalStats) dto.JournalStatsResponse
 }
 
 // jurnalPositionsResponse memetakan posisi ke bentuk tampilan.
-func jurnalPositionsResponse(rows []model.Position) []dto.PositionResponse {
+func jurnalPositionsResponse(rows []model.Position, sources map[string]model.Signal) []dto.PositionResponse {
 	out := make([]dto.PositionResponse, 0, len(rows))
 	for i := range rows {
 		pos := &rows[i]
+		source := sources[pos.SourceSignalID]
 		out = append(out, dto.PositionResponse{
+			SourceSignalID:  pos.SourceSignalID,
+			Htf:             source.Htf,
+			Ltf:             source.Ltf,
+			FeedSource:      source.FeedSource,
+			BrokerAccountID: pos.BrokerAccountID,
 			ID:              pos.ID,
 			Symbol:          pos.Symbol,
 			StrategyVersion: pos.StrategyVersion,

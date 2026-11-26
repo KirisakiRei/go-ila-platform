@@ -107,6 +107,10 @@ type SignalResponse struct {
 
 // PositionResponse adalah posisi hidup atau tertutup milik user.
 type PositionResponse struct {
+	SourceSignalID  string     `json:"source_signal_id,omitempty"`
+	Htf             string     `json:"htf,omitempty"`
+	Ltf             string     `json:"ltf,omitempty"`
+	FeedSource      string     `json:"feed_source,omitempty"`
 	ID              string     `json:"id"`
 	BrokerAccountID string     `json:"broker_account_id,omitempty"`
 	Symbol          string     `json:"symbol"`

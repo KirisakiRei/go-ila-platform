@@ -150,6 +150,7 @@ export function SkippedEvidenceChart({
     <div className="overflow-hidden rounded-xl border border-border">
       <PriceChart
         candles={candles}
+        timeframe={item.ltf}
         priceLines={priceLines}
         markers={markers}
         height={height}
