@@ -162,7 +162,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	result, err := h.authService.Login(c.Request.Context(), req)
+	var (
+		result *dto.LoginResponse
+		err    error
+	)
+	type deviceLoginService interface {
+		LoginWithDevice(ctx context.Context, req dto.LoginRequest, device service.LoginContext) (*dto.LoginResponse, error)
+	}
+	if withDevice, ok := h.authService.(deviceLoginService); ok {
+		result, err = withDevice.LoginWithDevice(c.Request.Context(), req, service.LoginContext{
+			UserAgent: c.Request.UserAgent(),
+		})
+	} else {
+		result, err = h.authService.Login(c.Request.Context(), req)
+	}
 	if err != nil {
 		if h.limiter != nil {
 			h.limiter.Fail(key)
@@ -173,6 +186,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	if h.limiter != nil {
 		h.limiter.Reset(key)
+	}
+
+	if result.Step == string(service.StepTwoFactor) {
+		result.Token = ""
+		httpx.OK(c, "Verifikasi dua langkah diperlukan", result)
+		return
 	}
 
 	expiresAt, err := time.Parse(time.RFC3339, result.ExpiresAt)

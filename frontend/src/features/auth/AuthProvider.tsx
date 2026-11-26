@@ -4,14 +4,8 @@ import { authApi } from '@/lib/auth-api'
 import { onUnauthorized, readCsrfToken, selamaPemulihan } from '@/lib/http'
 import type { User } from '@/types/api'
 import { AuthContext, type AuthContextValue } from './auth-context'
-import { IdleWarningDialog } from './components/IdleWarningDialog'
-import { useIdleTimer } from './hooks/use-idle-timer'
 
 type SessionStatus = 'restoring' | 'authenticated' | 'anonymous'
-
-/** Batas diam sebelum peringatan muncul (plans/23 §2). */
-const IDLE_WARN_MINUTES = 25
-const IDLE_COUNTDOWN_SECONDS = 60
 
 /** Alasan keluar disimpan agar halaman masuk bisa menjelaskannya. */
 export const LOGOUT_REASON_KEY = 'ila_logout_reason'
@@ -105,15 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => onUnauthorized(null)
   }, [finishSignOut])
 
-  const auth = useIdleTimer({
-    // Peringatan muncul lebih dulu; saat hitung mundur habis, signOut dipanggil
-    // termasuk menghapus cookie di server.
-    warnAfterMinutes: IDLE_WARN_MINUTES,
-    countdownSeconds: IDLE_COUNTDOWN_SECONDS,
-    enabled: status === 'authenticated' && (user?.idle_warning ?? true),
-    onTimeout: () => signOut('idle'),
-  })
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -125,16 +110,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, status, signIn, signOut],
   )
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-      {auth.warningVisible && (
-        <IdleWarningDialog
-          remainingSeconds={auth.remainingSeconds}
-          onStay={auth.stay}
-          onLeaveNow={auth.leaveNow}
-        />
-      )}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

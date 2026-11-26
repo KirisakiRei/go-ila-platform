@@ -194,6 +194,10 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 	return toUserResponse(user), nil
 }
 
+// RememberMeSessionTTL adalah masa berlaku sesi saat user mencentang
+// "Ingat perangkat ini" di halaman login.
+const RememberMeSessionTTL = 30 * 24 * time.Hour
+
 // Login dengan pencatatan perangkat kosong; dipakai pemanggil lama.
 func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.LoginResponse, error) {
 	return s.LoginWithDevice(ctx, req, LoginContext{})
@@ -236,44 +240,7 @@ func (s *authService) LoginWithDevice(ctx context.Context, req dto.LoginRequest,
 		}, nil
 	}
 
-	expiresAt := s.now().Add(s.tokenIssuer.TTL())
-
-	// Sesi dicatat lebih dulu agar token bisa membawa ID-nya. Bila pencatatan
-	// gagal, login tetap jalan: pelacakan perangkat bukan syarat masuk.
-	sessionID := ""
-	if s.sessions != nil {
-		id, err := s.sessions.Record(ctx, user.ID, "", utils.ScopeUser, device.UserAgent, device.IPHash, expiresAt)
-		if err != nil {
-			s.recordAudit(ctx, user.ID, "auth.session_record_failed", "user", user.ID)
-		} else {
-			sessionID = id
-		}
-	}
-
-	token, expiresAt, err := s.tokenIssuer.IssueWithClaims(utils.Claims{
-		UserID:    user.ID,
-		Role:      user.Role,
-		Scope:     utils.ScopeUser,
-		Session:   user.SessionVersion,
-		SessionID: sessionID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.userRepo.UpdateLastLogin(ctx, user.ID, s.now()); err != nil {
-		return nil, err
-	}
-
-	s.recordAudit(ctx, user.ID, "auth.login", "user", user.ID)
-
-	return &dto.LoginResponse{
-		Step:      string(StepComplete),
-		Token:     token,
-		SessionID: sessionID,
-		ExpiresAt: expiresAt.Format(time.RFC3339),
-		User:      *toUserResponse(user),
-	}, nil
+	return s.issueSession(ctx, user, device, req.RememberMe)
 }
 
 // VerifyTwoFactor menuntaskan masuk user setelah kode 2FA diperiksa.
@@ -300,12 +267,21 @@ func (s *authService) VerifyTwoFactor(ctx context.Context, req dto.VerifyTwoFact
 		return nil, apperror.ErrForbidden
 	}
 
-	return s.issueSession(ctx, user, device)
+	return s.issueSession(ctx, user, device, req.RememberMe)
+}
+
+func (s *authService) sessionTTL(rememberMe bool) time.Duration {
+	base := s.tokenIssuer.TTL()
+	if rememberMe && RememberMeSessionTTL > base {
+		return RememberMeSessionTTL
+	}
+	return base
 }
 
 // issueSession menerbitkan token user beserta data akunnya.
-func (s *authService) issueSession(ctx context.Context, user *model.User, device LoginContext) (*dto.LoginResponse, error) {
-	expiresAt := s.now().Add(s.tokenIssuer.TTL())
+func (s *authService) issueSession(ctx context.Context, user *model.User, device LoginContext, rememberMe bool) (*dto.LoginResponse, error) {
+	ttl := s.sessionTTL(rememberMe)
+	expiresAt := s.now().Add(ttl)
 
 	sessionID := ""
 	if s.sessions != nil {
@@ -323,6 +299,7 @@ func (s *authService) issueSession(ctx context.Context, user *model.User, device
 		Scope:     utils.ScopeUser,
 		Session:   user.SessionVersion,
 		SessionID: sessionID,
+		TTL:       ttl,
 	})
 	if err != nil {
 		return nil, err

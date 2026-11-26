@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/features/auth/AuthProvider'
+import { authApi } from '@/lib/auth-api'
 import LoginPage from '@/pages/LoginPage'
 import { RegisterForm } from '@/features/auth/components/RegisterForm'
 
@@ -24,6 +25,10 @@ function renderWithProviders(ui: ReactNode) {
 }
 
 describe('LoginPage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('menampilkan formulir masuk sesuai tata letak baru tanpa tombol Telegram', async () => {
     const user = userEvent.setup()
     renderWithProviders(<LoginPage />)
@@ -32,6 +37,8 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('Username atau Email')).toBeInTheDocument()
     const passwordInput = screen.getByLabelText('Kata Sandi')
     expect(passwordInput).toHaveAttribute('type', 'password')
+    const rememberBox = screen.getByRole('checkbox', { name: /Ingat perangkat ini/i })
+    expect(rememberBox).toBeChecked()
     expect(screen.getByRole('button', { name: /Masuk ke Dashboard/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Telegram/i })).not.toBeInTheDocument()
 
@@ -39,6 +46,41 @@ describe('LoginPage', () => {
     expect(passwordInput).toHaveAttribute('type', 'text')
     await user.click(screen.getByRole('button', { name: 'Sembunyikan kata sandi' }))
     expect(passwordInput).toHaveAttribute('type', 'password')
+  })
+
+  it('mengirim remember_me sesuai centang Ingat perangkat ini', async () => {
+    const user = userEvent.setup()
+    const loginSpy = vi.spyOn(authApi, 'login').mockResolvedValue({
+      step: 'complete',
+      expires_at: '2026-12-27T00:00:00Z',
+      user: {
+        id: 'u1',
+        name: 'Ryan',
+        username: 'ryan',
+        email: 'ryan@example.com',
+        phone: '',
+        role: 'user',
+        tier: 'plus',
+        idle_warning: false,
+        email_verified_at: null,
+        created_at: '2026-11-01T00:00:00Z',
+        updated_at: '2026-11-01T00:00:00Z',
+      },
+    })
+
+    renderWithProviders(<LoginPage />)
+    await user.type(screen.getByLabelText('Username atau Email'), 'ryan@example.com')
+    await user.type(screen.getByLabelText('Kata Sandi'), 'password-aman-123')
+    await user.click(screen.getByRole('checkbox', { name: /Ingat perangkat ini/i }))
+    await user.click(screen.getByRole('button', { name: /Masuk ke Dashboard/i }))
+
+    await waitFor(() => {
+      expect(loginSpy).toHaveBeenCalledWith({
+        identifier: 'ryan@example.com',
+        password: 'password-aman-123',
+        remember_me: false,
+      })
+    })
   })
 })
 

@@ -21,6 +21,7 @@ const identifierField = z
 export const loginSchema = z.object({
   identifier: identifierField,
   password: z.string().min(1, 'Password wajib diisi'),
+  rememberMe: z.boolean(),
 })
 
 /** Username dipakai untuk masuk, jadi bentuknya dibatasi dan mudah diingat. */

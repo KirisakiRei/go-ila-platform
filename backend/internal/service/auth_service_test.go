@@ -239,3 +239,41 @@ func TestLoginSucceedsAndRecordsAudit(t *testing.T) {
 		t.Errorf("audit login tidak tercatat: %v", audit.events)
 	}
 }
+
+func TestLoginRememberMeExtendsSessionTo30Days(t *testing.T) {
+	repo := newFakeUserRepo()
+	audit := &fakeAuditRepo{}
+	issuer := utils.NewJWTIssuer("test-secret-remember-me", 12*time.Hour)
+	svc := NewAuthService(repo, audit, issuer)
+	ctx := context.Background()
+	_, _ = svc.Register(ctx, dto.RegisterRequest{Name: "Budi", Email: "budi@example.com", Password: "rahasia-panjang-123"})
+
+	standard, err := svc.Login(ctx, dto.LoginRequest{
+		Identifier: "budi@example.com",
+		Password:   "rahasia-panjang-123",
+		RememberMe: false,
+	})
+	if err != nil {
+		t.Fatalf("login standar gagal: %v", err)
+	}
+	remembered, err := svc.Login(ctx, dto.LoginRequest{
+		Identifier: "budi@example.com",
+		Password:   "rahasia-panjang-123",
+		RememberMe: true,
+	})
+	if err != nil {
+		t.Fatalf("login remember_me gagal: %v", err)
+	}
+
+	stdClaims, err := issuer.Verify(standard.Token)
+	if err != nil {
+		t.Fatalf("verify token standar: %v", err)
+	}
+	remClaims, err := issuer.Verify(remembered.Token)
+	if err != nil {
+		t.Fatalf("verify token remember_me: %v", err)
+	}
+	if remClaims.ExpiresAt.Sub(stdClaims.ExpiresAt) < 28*24*time.Hour {
+		t.Fatalf("sesi remember_me seharusnya ~30 hari lebih lama dari standar: std=%s rem=%s", stdClaims.ExpiresAt, remClaims.ExpiresAt)
+	}
+}

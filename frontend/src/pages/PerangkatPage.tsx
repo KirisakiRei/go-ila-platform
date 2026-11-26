@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '@/components/ui'
-import { IdleWarningCard, SessionsCard } from './SecuritySettingsPage'
+import { SessionsCard } from './SecuritySettingsPage'
 
 /**
  * PerangkatPage memisahkan sesi perangkat dari Keamanan.
@@ -24,11 +24,10 @@ export default function PerangkatPage() {
       </div>
       <PageHeader
         title="Perangkat & Sesi"
-        description="Perangkat yang sedang masuk dan pengeluaran otomatis saat tidak aktif."
+        description="Daftar perangkat yang sedang masuk ke akun Anda."
       />
       <div className="flex flex-col gap-4">
         <SessionsCard />
-        <IdleWarningCard />
       </div>
     </>
   )

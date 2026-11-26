@@ -55,6 +55,7 @@ export type User = {
 export type LoginPayload = {
   identifier: string
   password: string
+  remember_me?: boolean
 }
 
 export type RegisterPayload = {

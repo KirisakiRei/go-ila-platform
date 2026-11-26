@@ -80,4 +80,5 @@ type CodeOnlyRequest struct {
 type VerifyTwoFactorRequest struct {
 	ChallengeID string `json:"challenge_id" binding:"required,max=64"`
 	Code        string `json:"code" binding:"required,max=40"`
+	RememberMe  bool   `json:"remember_me"`
 }

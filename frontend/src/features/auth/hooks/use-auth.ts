@@ -48,8 +48,15 @@ export function useVerifyTwoFactor() {
   const [params] = useSearchParams()
 
   return useMutation({
-    mutationFn: ({ challengeId, code }: { challengeId: string; code: string }) =>
-      authApi.verifyTwoFactor(challengeId, code),
+    mutationFn: ({
+      challengeId,
+      code,
+      rememberMe,
+    }: {
+      challengeId: string
+      code: string
+      rememberMe?: boolean
+    }) => authApi.verifyTwoFactor(challengeId, code, rememberMe),
     onSuccess: (result) => {
       signIn(result.user)
       navigate(resolveSafeNextPath(params.get('next')), { replace: true })

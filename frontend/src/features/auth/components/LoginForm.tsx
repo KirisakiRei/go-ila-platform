@@ -24,26 +24,41 @@ export function LoginForm() {
   const [logoutNotice] = useState(readLogoutNotice)
   const [showPassword, setShowPassword] = useState(false)
   // Tantangan 2FA dipegang di sini: selama belum diverifikasi, belum ada sesi.
-  const [challenge, setChallenge] = useState<{ id: string; code: string } | null>(null)
+  const [challenge, setChallenge] = useState<{
+    id: string
+    code: string
+    rememberMe: boolean
+  } | null>(null)
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: '', password: '' },
+    defaultValues: { identifier: '', password: '', rememberMe: true },
   })
 
   const onSubmit = handleSubmit((values) => {
     setFormError('')
-    signIn.mutate(values, {
-      onSuccess: (result) => {
-        if (result.step === 'two_factor_required' && result.challenge_id) {
-          setChallenge({ id: result.challenge_id, code: '' })
-        }
+    signIn.mutate(
+      {
+        identifier: values.identifier,
+        password: values.password,
+        remember_me: values.rememberMe,
       },
-      onError: (error) => setFormError(describeError(error)),
-    })
+      {
+        onSuccess: (result) => {
+          if (result.step === 'two_factor_required' && result.challenge_id) {
+            setChallenge({
+              id: result.challenge_id,
+              code: '',
+              rememberMe: values.rememberMe,
+            })
+          }
+        },
+        onError: (error) => setFormError(describeError(error)),
+      },
+    )
   })
 
   const onSubmitCode = (event: FormEvent) => {
@@ -51,7 +66,7 @@ export function LoginForm() {
     if (!challenge) return
     setFormError('')
     verify.mutate(
-      { challengeId: challenge.id, code: challenge.code },
+      { challengeId: challenge.id, code: challenge.code, rememberMe: challenge.rememberMe },
       { onError: (error) => setFormError(describeError(error)) },
     )
   }
@@ -192,6 +207,15 @@ export function LoginForm() {
           </p>
         )}
       </div>
+
+      <label className="flex cursor-pointer select-none items-center gap-2.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground">
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-border accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          {...register('rememberMe')}
+        />
+        <span>Ingat perangkat ini (tetap masuk 30 hari)</span>
+      </label>
 
       {formError && <Alert>{formError}</Alert>}
 

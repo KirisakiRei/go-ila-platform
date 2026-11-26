@@ -34,6 +34,8 @@ type Claims struct {
 	Session int
 	// SessionID menunjuk baris tabel session; kosong untuk token lama.
 	SessionID string
+	// TTL opsional untuk menimpa masa hidup bawaan issuer (mis. fitur "ingat perangkat ini").
+	TTL time.Duration
 }
 
 type claimsPayload struct {
@@ -53,7 +55,11 @@ func (j *JWTIssuer) Issue(userID, role string) (string, time.Time, error) {
 // IssueWithClaims membuat token dengan scope dan session version eksplisit.
 func (j *JWTIssuer) IssueWithClaims(c Claims) (string, time.Time, error) {
 	now := time.Now().UTC()
-	expiresAt := now.Add(j.ttl)
+	ttl := c.TTL
+	if ttl <= 0 {
+		ttl = j.ttl
+	}
+	expiresAt := now.Add(ttl)
 
 	claims := claimsPayload{
 		Role:    c.Role,

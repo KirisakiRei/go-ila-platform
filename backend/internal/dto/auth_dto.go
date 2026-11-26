@@ -26,6 +26,7 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Identifier string `json:"identifier" binding:"required,min=3,max=150"`
 	Password   string `json:"password" binding:"required"`
+	RememberMe bool   `json:"remember_me"`
 }
 
 // ChangePasswordRequest meminta verifikasi password lama sebelum berganti.

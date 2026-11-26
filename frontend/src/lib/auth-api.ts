@@ -12,10 +12,10 @@ export const authApi = {
   },
 
   /** Menuntaskan masuk setelah kode 2FA diverifikasi. */
-  verifyTwoFactor(challengeId: string, code: string) {
+  verifyTwoFactor(challengeId: string, code: string, rememberMe?: boolean) {
     return request<LoginResult>('/auth/verify-2fa', {
       method: 'POST',
-      body: { challenge_id: challengeId, code },
+      body: { challenge_id: challengeId, code, remember_me: Boolean(rememberMe) },
     })
   },
 
