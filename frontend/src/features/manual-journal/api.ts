@@ -1,4 +1,5 @@
 import { downloadFile, request } from '@/lib/http'
+import { compressChartImage } from './image'
 import type {
   AccountInput,
   CapitalInput,
@@ -148,13 +149,9 @@ export const journalApi = {
   screenshotUrl: (id: string, sid: string) =>
     `/api/v1${root}/entries/${encodeURIComponent(id)}/screenshots/${encodeURIComponent(sid)}`,
   async uploadScreenshot(id: string, file: File) {
-    if (
-      !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type) ||
-      file.size > 5 * 1024 * 1024
-    )
-      throw new Error('Pilih PNG/JPEG/WebP/GIF maksimal 5 MiB.')
+    const ready = await compressChartImage(file)
     const body = new FormData()
-    body.append('file', file)
+    body.append('file', ready)
     return request<JournalScreenshot>(`${root}/entries/${encodeURIComponent(id)}/screenshots`, {
       method: 'POST',
       body,

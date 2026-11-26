@@ -224,7 +224,8 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		FingerprintSecret: cfg.InternalSecret,
 		CTrader:           ctraderapi.NewClient(cfg.CTraderClientID, cfg.CTraderClientSecret, cfg.CTraderRedirectURI),
 		// Katalog pair dikelola admin; user hanya memilih dari daftar itu.
-		Catalog: pairCatalogService,
+		Catalog:    pairCatalogService,
+		Timeframes: accountPairTimeframeRepo,
 	})
 	// Saklar metode butuh daftar akun dan hak tier, sedangkan AccountService butuh
 	// saklar untuk menyiapkan bawaan saat pair baru dipantau. Siklus ini diputus
@@ -246,6 +247,7 @@ func NewBackendAPI(cfg *config.Config, db *gorm.DB, logger *slog.Logger, opsi ..
 		repository.NewTierFeatureReader(db),
 	)
 	service.SetAccountStrategyLister(accountService, accountPairStrategyRepo)
+	service.SetTimeframeAccountPairs(timeframeSwitchService, subscriptionRepo)
 	// Jurnal eksekusi memakai pembaca sendiri: kebutuhannya (rentang, agregat,
 	// peluang terlewat) tidak dimiliki daftar posisi biasa.
 	journalRepo := repository.NewJournalRepository(db)

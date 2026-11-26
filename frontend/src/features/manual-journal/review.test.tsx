@@ -70,7 +70,8 @@ describe('manual journal review', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(screen.getByText('Insight hari pertama.')).toBeInTheDocument()
-    expect(screen.getByText('Aturan')).toBeInTheDocument()
+    expect(screen.queryByText('Aturan')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Atur' })).not.toBeInTheDocument()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60001)
@@ -80,21 +81,24 @@ describe('manual journal review', () => {
     view.unmount()
   })
 
-  it('shows pending fallback, source badge and hover tooltip metadata', async () => {
+  it('shows Insight AI tooltip on lamp icon and update metadata without Aturan badge or Atur button', async () => {
     vi.mocked(journalApi.review).mockResolvedValue({
       ...ready,
       status: 'running',
       text: '',
       source: '',
     })
-    const onOpenSettings = vi.fn()
-    const view = mount(<JournalReview accountId="a1" onOpenSettings={onOpenSettings} />)
+    const view = mount(<JournalReview accountId="a1" />)
     expect(await screen.findByText(/Menyiapkan insight harian/)).toBeInTheDocument()
-    expect(screen.getByText(/Menunggu/)).toBeInTheDocument()
+    expect(screen.queryByText(/Aturan|Menunggu/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Atur' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Insight AI' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Insight AI')
+    fireEvent.keyDown(window, { key: 'Escape' })
+
     fireEvent.click(screen.getByRole('button', { name: 'Info insight harian' }))
     expect(screen.getByRole('tooltip')).toHaveTextContent(/WIB/)
-    fireEvent.click(screen.getByRole('button', { name: 'Atur' }))
-    expect(onOpenSettings).toHaveBeenCalledOnce()
     view.unmount()
   })
 

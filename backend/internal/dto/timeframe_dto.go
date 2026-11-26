@@ -26,6 +26,9 @@ type TimeframeSwitchItem struct {
 type TimeframeSwitchAccount struct {
 	AccountID string `json:"account_id"`
 	Label     string `json:"label"`
+	// PairAllowed menandai apakah pair ini dicentang pada Filter Pair Eksekusi
+	// akun. Bila false, seluruh saklar auto dimatikan namun pantau tetap berjalan.
+	PairAllowed bool `json:"pair_allowed"`
 	// Pairs berisi saklar per pasangan timeframe.
 	Pairs []TimeframeSwitchItem `json:"pairs"`
 }

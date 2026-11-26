@@ -35,6 +35,11 @@ type timeframeEntitlements interface {
 	Strategies(ctx context.Context, userID string) ([]dto.StrategyResponse, error)
 }
 
+// AccountPairAllowanceReader membaca pair yang diizinkan dieksekusi oleh akun.
+type AccountPairAllowanceReader interface {
+	ListActiveByAccount(ctx context.Context, userID, accountID string) ([]model.Subscription, error)
+}
+
 type timeframeSwitchService struct {
 	accounts    switchAccountReader
 	strategies  repository.AccountPairStrategyRepository
@@ -43,6 +48,7 @@ type timeframeSwitchService struct {
 	features    timeframeEntitlements
 	tierOf      func(ctx context.Context, userID string) (string, error)
 	tierFeature TierFeatureReader
+	subs        AccountPairAllowanceReader
 }
 
 // NewTimeframeSwitchService merangkai layanan saklar timeframe.
@@ -64,6 +70,30 @@ func NewTimeframeSwitchService(
 		tierOf:      tierOf,
 		tierFeature: tierFeature,
 	}
+}
+
+// SetTimeframeAccountPairs memasang pembaca filter pair per akun agar saklar
+// auto-eksekusi selalu menghormati pilihan pair di halaman akun broker.
+func SetTimeframeAccountPairs(target TimeframeSwitchService, subs AccountPairAllowanceReader) {
+	if svc, ok := target.(*timeframeSwitchService); ok {
+		svc.subs = subs
+	}
+}
+
+func (s *timeframeSwitchService) pairDiizinkan(ctx context.Context, userID, accountID, symbol string) (bool, error) {
+	if s.subs == nil {
+		return true, nil
+	}
+	subs, err := s.subs.ListActiveByAccount(ctx, userID, accountID)
+	if err != nil {
+		return false, err
+	}
+	for _, sub := range subs {
+		if strings.EqualFold(sub.Symbol, symbol) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Matrix menyusun tampilan saklar timeframe untuk satu pair.
@@ -107,6 +137,15 @@ func (s *timeframeSwitchService) Matrix(ctx context.Context, userID, symbol stri
 
 	autoAllowed := s.autoDiizinkan(ctx, userID)
 
+	allowedByAccount := make(map[string]bool, len(accounts))
+	for _, account := range accounts {
+		ok, err := s.pairDiizinkan(ctx, userID, account.ID, symbol)
+		if err != nil {
+			return nil, err
+		}
+		allowedByAccount[account.ID] = ok
+	}
+
 	out := &dto.TimeframeSwitchMatrix{
 		Symbol:      symbol,
 		Tersedia:    tersedia,
@@ -121,10 +160,12 @@ func (s *timeframeSwitchService) Matrix(ctx context.Context, userID, symbol stri
 			Akun:     make([]dto.TimeframeSwitchAccount, 0, len(accounts)),
 		}
 		for _, account := range accounts {
+			pairAllowed := allowedByAccount[account.ID]
 			item := dto.TimeframeSwitchAccount{
-				AccountID: account.ID,
-				Label:     account.Label,
-				Pairs:     make([]dto.TimeframeSwitchItem, 0, len(daftar)),
+				AccountID:   account.ID,
+				Label:       account.Label,
+				PairAllowed: pairAllowed,
+				Pairs:       make([]dto.TimeframeSwitchItem, 0, len(daftar)),
 			}
 			for _, pair := range daftar {
 				key := account.ID + "|" + strategy + "|" + pair.Htf + "|" + pair.Ltf
@@ -132,9 +173,9 @@ func (s *timeframeSwitchService) Matrix(ctx context.Context, userID, symbol stri
 				if row, ok := indeks[key]; ok {
 					saklar.Watch = row.IsWatch
 					saklar.Auto = row.IsAuto
-					if !autoAllowed {
-						// Tier tanpa auto_execute tidak boleh melihat auto menyala;
-						// nilainya mungkin tersisa dari tier sebelumnya.
+					if !autoAllowed || !pairAllowed {
+						// Tier tanpa auto_execute atau pair yang tidak dicentang di filter
+						// pair akun tidak boleh melihat auto menyala; setelan pantau tetap utuh.
 						saklar.Auto = false
 					}
 				}
@@ -173,6 +214,10 @@ func (s *timeframeSwitchService) Set(ctx context.Context, userID, accountID, sym
 	}
 
 	autoAllowed := s.autoDiizinkan(ctx, userID)
+	pairAllowed, err := s.pairDiizinkan(ctx, userID, accountID, symbol)
+	if err != nil {
+		return nil, err
+	}
 
 	rows := make([]repository.TimeframeSwitch, 0, len(req.Pairs))
 	for _, pair := range req.Pairs {
@@ -185,6 +230,9 @@ func (s *timeframeSwitchService) Set(ctx context.Context, userID, accountID, sym
 		auto := pair.Auto
 		if auto && !autoAllowed {
 			return nil, fmt.Errorf("%w: eksekusi otomatis tidak tersedia pada tier Anda", apperror.ErrForbidden)
+		}
+		if auto && !pairAllowed {
+			return nil, fmt.Errorf("%w: pair %s belum diaktifkan di Filter Pair Eksekusi akun ini", apperror.ErrForbidden, symbol)
 		}
 
 		// Auto tanpa pantau tidak sah: sinyalnya tidak akan pernah diminta ke

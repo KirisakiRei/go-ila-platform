@@ -152,15 +152,27 @@ func (f *fakeSubRepo) Deactivate(_ context.Context, id, userID string) error {
 	return errors.New("tidak ditemukan")
 }
 
-// ListActiveByAccount meniru aturan repository: langganan tanpa akun berlaku
-// untuk semua akun; yang punya akun hanya untuk akun tersebut.
+// ListActiveByAccount meniru aturan repository: bila akun sudah memiliki baris
+// khusus (aktif maupun nonaktif), hanya baris aktif akun itu yang dikembalikan.
+// Bila belum pernah diatur, fallback ke langganan global (BrokerAccountID == nil).
 func (f *fakeSubRepo) ListActiveByAccount(_ context.Context, userID, accountID string) ([]model.Subscription, error) {
+	hasAccountRows := false
+	for _, s := range f.subs {
+		if s.UserID == userID && s.BrokerAccountID != nil && *s.BrokerAccountID == accountID {
+			hasAccountRows = true
+			break
+		}
+	}
 	var out []model.Subscription
 	for _, s := range f.subs {
 		if s.UserID != userID || !s.IsActive {
 			continue
 		}
-		if s.BrokerAccountID == nil || *s.BrokerAccountID == accountID {
+		if hasAccountRows {
+			if s.BrokerAccountID != nil && *s.BrokerAccountID == accountID {
+				out = append(out, *s)
+			}
+		} else if s.BrokerAccountID == nil {
 			out = append(out, *s)
 		}
 	}
@@ -170,31 +182,50 @@ func (f *fakeSubRepo) ListActiveByAccount(_ context.Context, userID, accountID s
 func (f *fakeSubRepo) ReplaceAccountPairs(_ context.Context, userID, accountID string, symbols []string) error {
 	wanted := make(map[string]bool, len(symbols))
 	for _, s := range symbols {
-		wanted[s] = true
+		wanted[strings.ToUpper(s)] = true
 	}
+	byKey := make(map[string]*model.Subscription)
 	for _, s := range f.subs {
 		if s.UserID == userID && s.BrokerAccountID != nil && *s.BrokerAccountID == accountID {
-			if !wanted[s.Symbol] {
+			key := strings.ToUpper(s.Symbol)
+			byKey[key] = s
+			if !wanted[key] {
 				s.IsActive = false
 			}
 		}
 	}
-	for _, sym := range symbols {
-		found := false
-		for _, s := range f.subs {
-			if s.UserID == userID && s.Symbol == sym && s.BrokerAccountID != nil && *s.BrokerAccountID == accountID {
-				s.IsActive = true
-				found = true
-				break
-			}
+	for _, raw := range symbols {
+		sym := strings.ToUpper(raw)
+		if row, ok := byKey[sym]; ok {
+			row.IsActive = true
+			continue
 		}
-		if !found {
-			acc := accountID
-			f.subs = append(f.subs, &model.Subscription{
-				UserID: userID, Symbol: sym,
-				IsActive: true, BrokerAccountID: &acc,
-			})
+		acc := accountID
+		row := &model.Subscription{
+			UserID: userID, Symbol: sym,
+			IsActive: true, BrokerAccountID: &acc,
 		}
+		f.subs = append(f.subs, row)
+		byKey[sym] = row
+	}
+	for _, s := range f.subs {
+		if s.UserID != userID || !s.IsActive || s.BrokerAccountID != nil {
+			continue
+		}
+		sym := strings.ToUpper(s.Symbol)
+		if wanted[sym] {
+			continue
+		}
+		if _, exists := byKey[sym]; exists {
+			continue
+		}
+		acc := accountID
+		row := &model.Subscription{
+			UserID: userID, Symbol: sym,
+			IsActive: false, BrokerAccountID: &acc,
+		}
+		f.subs = append(f.subs, row)
+		byKey[sym] = row
 	}
 	return nil
 }

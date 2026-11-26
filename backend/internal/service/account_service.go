@@ -44,6 +44,13 @@ type AccountStrategyLister interface {
 	ListByUser(ctx context.Context, userID string) ([]model.AccountPairStrategy, error)
 }
 
+// AccountTimeframeAutoDisabler mematikan toggle auto-eksekusi di Signal & Radar
+// untuk pair yang tidak lagi diizinkan pada Filter Pair Eksekusi akun, tanpa
+// menyentuh setelan pantau (is_watch).
+type AccountTimeframeAutoDisabler interface {
+	DisableAutoExcept(ctx context.Context, accountID string, allowedSymbols []string) error
+}
+
 // AccountService mengelola akun broker user dan langganan simbol.
 //
 // Batas tier ditegakkan di sini (plans/14 §5.1), bukan di Runner, karena
@@ -94,6 +101,8 @@ type accountService struct {
 	seeder StrategySwitchService
 	// switches membaca saklar metode per akun untuk laporan status strategi.
 	switches AccountStrategyLister
+	// timeframes mematikan auto-eksekusi untuk pair yang di-uncheck dari akun.
+	timeframes AccountTimeframeAutoDisabler
 }
 
 // CTraderOAuthClient mendefinisikan kontrak komunikasi ke REST API cTrader Spotware.
@@ -156,6 +165,8 @@ type AccountServiceDeps struct {
 	SwitchSeeder StrategySwitchService
 	// Switches membaca saklar metode per akun untuk laporan status strategi.
 	Switches AccountStrategyLister
+	// Timeframes menyelaraskan toggle auto-eksekusi saat filter pair akun berubah.
+	Timeframes AccountTimeframeAutoDisabler
 }
 
 // StrategyCatalog melaporkan ketersediaan strategi bagi user.
@@ -188,6 +199,7 @@ func NewAccountService(deps AccountServiceDeps) AccountService {
 		catalog:    deps.Catalog,
 		seeder:     deps.SwitchSeeder,
 		switches:   deps.Switches,
+		timeframes: deps.Timeframes,
 	}
 }
 
@@ -606,7 +618,9 @@ func (s *accountService) Subscribe(ctx context.Context, userID string, req dto.C
 	var foundSame *model.Subscription
 	for i := range existing {
 		row := &existing[i]
-		if strings.EqualFold(row.Symbol, symbol) {
+		sameScope := (req.BrokerAccountID == "" && row.BrokerAccountID == nil) ||
+			(req.BrokerAccountID != "" && row.BrokerAccountID != nil && *row.BrokerAccountID == req.BrokerAccountID)
+		if sameScope && strings.EqualFold(row.Symbol, symbol) {
 			foundSame = row
 		}
 		if row.IsActive && !seenSymbol[row.Symbol] {
@@ -1366,6 +1380,11 @@ func (s *accountService) UpdateAccountPairs(ctx context.Context, userID, account
 
 	if err := s.subs.ReplaceAccountPairs(ctx, userID, accountID, canonical); err != nil {
 		return nil, err
+	}
+	if s.timeframes != nil {
+		if err := s.timeframes.DisableAutoExcept(ctx, accountID, canonical); err != nil {
+			return nil, err
+		}
 	}
 
 	s.recordStrategyAudit(ctx, userID, "", "subscription.account.update", accountID)

@@ -654,10 +654,11 @@ func (f pairFeatureReader) Feature(_ context.Context, tier, key, fallback string
 }
 
 type accountPairFixture struct {
-	svc      AccountService
-	accounts *fakeAccountRepo
-	subs     *fakeSubRepo
-	pairs    *fakePairRepo
+	svc        AccountService
+	accounts   *fakeAccountRepo
+	subs       *fakeSubRepo
+	pairs      *fakePairRepo
+	timeframes *fakeTimeframeRepo
 }
 
 func newAccountPairFixture(t *testing.T, tier string, features TierFeatureReader) accountPairFixture {
@@ -670,6 +671,7 @@ func newAccountPairFixture(t *testing.T, tier string, features TierFeatureReader
 	creds := &fakeCredRepo{creds: map[string]*model.Credential{}}
 	subs := &fakeSubRepo{}
 	pairs := newFakePairRepo()
+	timeframes := &fakeTimeframeRepo{}
 	seedPairFixture(t, pairs)
 
 	svc := NewAccountService(AccountServiceDeps{
@@ -683,8 +685,9 @@ func newAccountPairFixture(t *testing.T, tier string, features TierFeatureReader
 		FingerprintSecret: fingerprintTestSecret,
 		Features:          features,
 		Catalog:           NewPairCatalogService(pairs),
+		Timeframes:        timeframes,
 	})
-	return accountPairFixture{svc: svc, accounts: accounts, subs: subs, pairs: pairs}
+	return accountPairFixture{svc: svc, accounts: accounts, subs: subs, pairs: pairs, timeframes: timeframes}
 }
 
 func (f accountPairFixture) addAccount(t *testing.T, token string, risk float64) *dto.AccountResponse {
@@ -723,6 +726,76 @@ func TestAccountPairs_SimpanDanBacaPerAkun(t *testing.T) {
 	}
 	if len(other.Selected) != 0 {
 		t.Fatalf("akun kedua selected = %v, ingin kosong", other.Selected)
+	}
+}
+
+func TestAccountPairs_TidakTertimpaWatchlistGlobalDanMatikanAutoSaja(t *testing.T) {
+	fx := newAccountPairFixture(t, model.TierPlus, nil)
+	ctx := context.Background()
+	account := fx.addAccount(t, sampleToken+"-a", 0.5)
+
+	// User punya 3 pair di watchlist global (broker_account_id = nil).
+	fx.subs.subs = append(fx.subs.subs,
+		&model.Subscription{UserID: userIDTest, Symbol: "XAUUSD", IsActive: true},
+		&model.Subscription{UserID: userIDTest, Symbol: "EURUSD", IsActive: true},
+		&model.Subscription{UserID: userIDTest, Symbol: "GBPUSD", IsActive: true},
+	)
+	// Di Signal & Radar, XAUUSD dan EURUSD sama-sama punya watch=true & auto=true.
+	fx.timeframes.rows = append(fx.timeframes.rows,
+		model.AccountPairTimeframe{
+			BrokerAccountID: account.ID, UserID: userIDTest, Symbol: "XAUUSD", Strategy: "ila-2.0",
+			Htf: "H4", Ltf: "M15", IsWatch: true, IsAuto: true,
+		},
+		model.AccountPairTimeframe{
+			BrokerAccountID: account.ID, UserID: userIDTest, Symbol: "EURUSD", Strategy: "ila-2.0",
+			Htf: "H4", Ltf: "M15", IsWatch: true, IsAuto: true,
+		},
+	)
+
+	// User memilih HANYA XAUUSD lalu simpan.
+	res, err := fx.svc.UpdateAccountPairs(ctx, userIDTest, account.ID, dto.UpdateAccountPairsRequest{
+		Symbols: []string{"XAUUSD"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateAccountPairs: %v", err)
+	}
+	if strings.Join(res.Selected, ",") != "XAUUSD" {
+		t.Fatalf("selected setelah simpan = %v, ingin hanya [XAUUSD]", res.Selected)
+	}
+
+	// Saat dicek ulang, tetap hanya XAUUSD (tidak balik terpilih semua).
+	reloaded, err := fx.svc.AccountPairs(ctx, userIDTest, account.ID)
+	if err != nil {
+		t.Fatalf("AccountPairs reload: %v", err)
+	}
+	if strings.Join(reloaded.Selected, ",") != "XAUUSD" {
+		t.Fatalf("selected setelah reload = %v, ingin hanya [XAUUSD]", reloaded.Selected)
+	}
+
+	// Di Signal & Radar: XAUUSD tetap watch=true & auto=true; EURUSD watch=true & auto=false.
+	for _, row := range fx.timeframes.rows {
+		if row.Symbol == "XAUUSD" && (!row.IsWatch || !row.IsAuto) {
+			t.Fatalf("XAUUSD seharusnya tetap watch=true auto=true, dapat %+v", row)
+		}
+		if row.Symbol == "EURUSD" && (!row.IsWatch || row.IsAuto) {
+			t.Fatalf("EURUSD seharusnya watch=true auto=false, dapat %+v", row)
+		}
+	}
+
+	// Saat batal pilih semua (Symbols kosong), reload tetap kosong & semua auto mati.
+	emptyRes, err := fx.svc.UpdateAccountPairs(ctx, userIDTest, account.ID, dto.UpdateAccountPairsRequest{
+		Symbols: []string{},
+	})
+	if err != nil {
+		t.Fatalf("UpdateAccountPairs kosong: %v", err)
+	}
+	if len(emptyRes.Selected) != 0 {
+		t.Fatalf("selected setelah batal pilih = %v, ingin kosong", emptyRes.Selected)
+	}
+	for _, row := range fx.timeframes.rows {
+		if !row.IsWatch || row.IsAuto {
+			t.Fatalf("setelah batal pilih semua, %s seharusnya watch=true auto=false, dapat %+v", row.Symbol, row)
+		}
 	}
 }
 

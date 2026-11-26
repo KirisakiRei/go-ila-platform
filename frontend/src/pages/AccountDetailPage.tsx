@@ -848,7 +848,9 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 
   const selectedSymbols = useMemo(() => {
     const raw = pilihanLokal ?? data?.selected ?? []
-    return raw.filter((s) => watchlistSymbols.has(s.toUpperCase()))
+    return raw
+      .map((s) => s.toUpperCase())
+      .filter((s) => watchlistSymbols.has(s))
   }, [pilihanLokal, data?.selected, watchlistSymbols])
   const setSelectedSymbols = setPilihanLokal
 
@@ -864,13 +866,14 @@ function TabPairFilter({ accountId }: { accountId: string }) {
   }, [allPairs, search])
 
   const toggleSymbol = (symbol: string) => {
+    const canonical = symbol.toUpperCase()
     setSelectedSymbols((prev) => {
-      const current = (prev ?? data?.selected ?? []).filter((s) =>
-        watchlistSymbols.has(s.toUpperCase()),
-      )
-      return current.includes(symbol)
-        ? current.filter((s) => s !== symbol)
-        : [...current, symbol]
+      const current = (prev ?? data?.selected ?? [])
+        .map((s) => s.toUpperCase())
+        .filter((s) => watchlistSymbols.has(s))
+      return current.includes(canonical)
+        ? current.filter((s) => s !== canonical)
+        : [...current, canonical]
     })
   }
 
@@ -889,6 +892,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
         id: accountId,
         symbols: selectedSymbols,
       })
+      setPilihanLokal(null)
       setNotice('Pilihan pair untuk akun ini berhasil diperbarui.')
     } catch (err) {
       setNotice(err instanceof ApiError ? err.message : 'Gagal menyimpan pilihan pair.')
@@ -959,7 +963,7 @@ function TabPairFilter({ accountId }: { accountId: string }) {
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
               {filteredPairs.map((pair) => {
-                const isSelected = selectedSymbols.includes(pair.symbol)
+                const isSelected = selectedSymbols.includes(pair.symbol.toUpperCase())
                 return (
                   <button
                     key={pair.symbol}

@@ -67,4 +67,45 @@ describe('manual journal API contract', () => {
       journalApi.uploadScreenshot('t1', new File(['bad'], 'bad.svg', { type: 'image/svg+xml' })),
     ).rejects.toThrow(/PNG/)
   })
+
+  it('compresses oversized screenshots into webp before uploading', async () => {
+    const bigBytes = new Uint8Array(6 * 1024 * 1024)
+    const bigPng = new File([bigBytes], 'chart-4k.png', { type: 'image/png' })
+
+    const close = vi.fn()
+    const origBitmap = globalThis.createImageBitmap
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 3840, height: 2160, close })
+    const getCtxSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high',
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      fillStyle: '',
+    } as unknown as CanvasRenderingContext2D)
+    const toBlobSpy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+      .mockImplementation((cb, mime) => {
+        cb(new Blob(['compressed-webp'], { type: mime ?? 'image/webp' }))
+      })
+    vi.mocked(request).mockResolvedValue({ id: 's1', file_name: 'chart-4k.webp' })
+
+    try {
+      await journalApi.uploadScreenshot('t1', bigPng)
+      expect(close).toHaveBeenCalledOnce()
+      expect(request).toHaveBeenCalledWith(
+        '/manual-journal/entries/t1/screenshots',
+        expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+      )
+      const [, opts] = vi.mocked(request).mock.calls[0]!
+      const uploaded = (opts?.body as FormData).get('file') as File
+      expect(uploaded.type).toBe('image/webp')
+      expect(uploaded.name).toBe('chart-4k.webp')
+      expect(uploaded.size).toBeLessThan(1024)
+    } finally {
+      globalThis.createImageBitmap = origBitmap
+      getCtxSpy.mockRestore()
+      toBlobSpy.mockRestore()
+    }
+  })
 })

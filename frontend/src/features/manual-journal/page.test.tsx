@@ -260,9 +260,9 @@ describe('standalone journal UI', () => {
     expect(screen.getByLabelText('Nama jurnal')).toBeInTheDocument()
   })
 
-  it('opens daily recap and trade cards on calendar selection', () => {
+  it('opens detail directly on 1-trade calendar day and opens modal list on multi-trade day', () => {
     const select = vi.fn()
-    wrap(
+    const single = wrap(
       <CalendarView
         trades={[trade]}
         accounts={[account]}
@@ -273,9 +273,26 @@ describe('standalone journal UI', () => {
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: /2026-11-26 WIB, 1 trade/ }))
-    expect(screen.getByText('Rekap 2026-11-26 · WIB')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /XAUUSD/ }))
     expect(select).toHaveBeenCalledWith(trade)
+    single.unmount()
+
+    const secondTrade = { ...trade, id: 't2', asset: 'BTCUSD' }
+    select.mockClear()
+    wrap(
+      <CalendarView
+        trades={[trade, secondTrade]}
+        accounts={[account]}
+        month="2026-11"
+        onMonth={() => {}}
+        onSelect={select}
+        calendar={stats.calendar}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /2026-11-26 WIB, 2 trade/ }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Rekap 2026-11-26 · WIB')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /BTCUSD/ }))
+    expect(select).toHaveBeenCalledWith(secondTrade)
   })
 
   it('switches workspace tabs and shares filters across table, analytics, and stats', async () => {

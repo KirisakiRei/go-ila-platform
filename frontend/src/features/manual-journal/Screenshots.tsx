@@ -55,7 +55,7 @@ export function Screenshots({
           busy={busy}
           disabled={readOnly}
           ariaLabel="Unggah gambar chart"
-          hint="Privat · PNG, JPG, WebP, GIF · maks 5 MiB"
+          hint="Privat · otomatis dikompres · PNG, JPG, WebP, GIF"
           onFiles={(files) => void handleFiles(files)}
         />
       )}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"ila/backend/internal/dto"
@@ -60,6 +61,22 @@ func (f *fakeTimeframeRepo) Replace(_ context.Context, accountID, userID, symbol
 
 func (f *fakeTimeframeRepo) Ensure(_ context.Context, rows []model.AccountPairTimeframe) error {
 	f.rows = append(f.rows, rows...)
+	return nil
+}
+
+func (f *fakeTimeframeRepo) DisableAutoExcept(_ context.Context, accountID string, allowedSymbols []string) error {
+	allowed := make(map[string]bool, len(allowedSymbols))
+	for _, s := range allowedSymbols {
+		allowed[strings.ToUpper(s)] = true
+	}
+	for i := range f.rows {
+		if f.rows[i].BrokerAccountID != accountID {
+			continue
+		}
+		if !allowed[strings.ToUpper(f.rows[i].Symbol)] {
+			f.rows[i].IsAuto = false
+		}
+	}
 	return nil
 }
 
@@ -224,7 +241,6 @@ func TestTimeframeSet_MenolakAutoUntukTierTanpaHak(t *testing.T) {
 
 func TestTimeframeSet_MenolakMetodeYangTidakAktif(t *testing.T) {
 	svc, _, _ := siapkanTimeframe(t)
-
 	// Saklar metode hanya menyalakan ila-2.0.
 	_, err := svc.Set(context.Background(), "u1", "acc-1", "XAUUSD", dto.UpdateTimeframeSwitchRequest{
 		Strategy: "ila-3.0",
@@ -234,5 +250,52 @@ func TestTimeframeSet_MenolakMetodeYangTidakAktif(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("metode yang tidak dinyalakan akun harus ditolak")
+	}
+}
+
+func TestTimeframeMatrixDanSet_MenghormatiFilterPairAkun(t *testing.T) {
+	svc, repo, _ := siapkanTimeframe(t)
+	accID := "acc-1"
+	subs := &fakeSubRepo{
+		subs: []*model.Subscription{
+			{UserID: "u1", Symbol: "XAUUSD", IsActive: true, BrokerAccountID: &accID},
+			{UserID: "u1", Symbol: "EURUSD", IsActive: false, BrokerAccountID: &accID},
+		},
+	}
+	SetTimeframeAccountPairs(svc, subs)
+
+	// EURUSD punya baris lama dengan watch=true, auto=true.
+	repo.rows = append(repo.rows, model.AccountPairTimeframe{
+		BrokerAccountID: accID, UserID: "u1", Symbol: "EURUSD", Strategy: "ila-2.0",
+		Htf: "W", Ltf: "H4", IsWatch: true, IsAuto: true,
+	})
+
+	matrix, err := svc.Matrix(context.Background(), "u1", "EURUSD")
+	if err != nil {
+		t.Fatalf("Matrix EURUSD: %v", err)
+	}
+	acct := matrix.Groups[0].Akun[0]
+	if acct.PairAllowed {
+		t.Fatal("EURUSD seharusnya pair_allowed=false untuk acc-1")
+	}
+	if !acct.Pairs[0].Watch || acct.Pairs[0].Auto {
+		t.Fatalf("EURUSD W/H4 seharusnya watch=true, auto=false; dapat watch=%v auto=%v",
+			acct.Pairs[0].Watch, acct.Pairs[0].Auto)
+	}
+
+	// Menyalakan auto pada pair yang tidak dicentang harus ditolak.
+	if _, err := svc.Set(context.Background(), "u1", accID, "EURUSD", dto.UpdateTimeframeSwitchRequest{
+		Strategy: "ila-2.0",
+		Pairs:    []dto.TimeframeSwitchItem{{Htf: "W", Ltf: "H4", Watch: true, Auto: true}},
+	}); err == nil {
+		t.Fatal("menyalakan auto untuk pair yang tidak dicentang harus ditolak")
+	}
+
+	// Mengubah pantau (watch) tanpa auto tetap diizinkan.
+	if _, err := svc.Set(context.Background(), "u1", accID, "EURUSD", dto.UpdateTimeframeSwitchRequest{
+		Strategy: "ila-2.0",
+		Pairs:    []dto.TimeframeSwitchItem{{Htf: "W", Ltf: "H4", Watch: false, Auto: false}},
+	}); err != nil {
+		t.Fatalf("mengubah watch tanpa auto harus diizinkan: %v", err)
 	}
 }

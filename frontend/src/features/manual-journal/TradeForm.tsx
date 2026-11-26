@@ -13,6 +13,7 @@ import {
   validateTradeFields,
   type TradeFieldKey,
 } from './model'
+import { validateChartImageInput } from './image'
 import { Screenshots } from './Screenshots'
 import type { JournalAccount, JournalStatus, TradeInput } from './types'
 import { ChipInput, ImageDropzone, SegmentedControl } from './ui'
@@ -165,17 +166,17 @@ export function TradeForm({
   }
 
   function queueFiles(incoming: File[]) {
-    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
     const valid: File[] = []
-    let rejected = false
+    let firstError = ''
     for (const file of incoming) {
-      if (!allowed.has(file.type) || file.size > 5 * 1024 * 1024) {
-        rejected = true
+      const err = validateChartImageInput(file)
+      if (err) {
+        if (!firstError) firstError = err
         continue
       }
       valid.push(file)
     }
-    setFileError(rejected ? 'Hanya PNG/JPG/WebP/GIF maks 5 MiB per gambar.' : '')
+    setFileError(firstError)
     if (valid.length) {
       setQueuedFiles((prev) => [...prev, ...valid].slice(0, 6))
     }
@@ -929,7 +930,7 @@ export function TradeForm({
                 multiple
                 disabled={disabled}
                 ariaLabel="Pilih gambar"
-                hint="Otomatis diunggah saat trade disimpan · PNG, JPG, WebP, GIF maks 5 MiB (maks 6)"
+                hint="Otomatis dikompres & diunggah saat simpan · PNG, JPG, WebP, GIF (maks 6)"
                 onFiles={queueFiles}
               />
               {fileError && <Alert variant="destructive">{fileError}</Alert>}

@@ -107,6 +107,7 @@ export function useUpdateAccountPairs() {
       void qc.invalidateQueries({ queryKey: queryKeys.accountPairs(variables.id) })
       void qc.invalidateQueries({ queryKey: queryKeys.subscriptions })
       void qc.invalidateQueries({ queryKey: queryKeys.accounts })
+      void qc.invalidateQueries({ queryKey: ['timeframe-switch'] })
     },
   })
 }

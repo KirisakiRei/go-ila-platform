@@ -231,6 +231,7 @@ export type TimeframeSwitchItem = {
 export type TimeframeSwitchAccount = {
   account_id: string
   label: string
+  pair_allowed?: boolean
   pairs: TimeframeSwitchItem[]
 }
 

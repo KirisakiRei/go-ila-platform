@@ -363,6 +363,62 @@ describe('PengaturanPairModal', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'ILA 3.0' }))
     expect(screen.getByText(/ILA 3\.0 Nonaktif/i)).toBeInTheDocument()
   })
+
+  it('mematikan dan mengunci toggle Eksekusi bila pair tidak dicentang di Filter Pair akun namun Pantau tetap aktif', async () => {
+    vi.spyOn(strategySwitchApi, 'matrix').mockResolvedValue({
+      symbol: 'EURUSD',
+      accounts: [
+        {
+          account_id: 'acc-1',
+          label: 'Akun Utama',
+          broker_type: 'matchtrader',
+          is_active: true,
+          is_dry_run: false,
+          strategies: { 'ila-2.0': true, 'ila-3.0': false },
+          allowed: { 'ila-2.0': true, 'ila-3.0': false },
+        },
+      ],
+    })
+    vi.spyOn(timeframeSwitchApi, 'matrix').mockResolvedValue({
+      symbol: 'EURUSD',
+      tersedia: { 'ila-2.0': [{ htf: 'H4', ltf: 'M15', label: 'H4 · M15' }] },
+      auto_allowed: true,
+      groups: [
+        {
+          strategy: 'ila-2.0',
+          accounts: [
+            {
+              account_id: 'acc-1',
+              label: 'Akun Utama',
+              pair_allowed: false,
+              pairs: [{ htf: 'H4', ltf: 'M15', watch: true, auto: false }],
+            },
+          ],
+        },
+      ],
+    })
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <PengaturanPairModal
+          open
+          onClose={() => {}}
+          symbol="EURUSD"
+          initialStrategy="ila-2.0"
+          adaIla3={false}
+        />
+      </QueryClientProvider>,
+    )
+
+    const watchToggle = await screen.findByRole('switch', { name: /Pantau.*Akun Utama/i })
+    const execToggle = screen.getByRole('switch', { name: /Eksekusi.*Akun Utama/i })
+    expect(watchToggle).toBeEnabled()
+    expect(watchToggle).toHaveAttribute('aria-checked', 'true')
+    expect(execToggle).toBeDisabled()
+    expect(execToggle).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText(/tidak dicentang di Filter Pair Eksekusi/i)).toBeInTheDocument()
+  })
 })
 
 describe('Ila2FlowGuide', () => {

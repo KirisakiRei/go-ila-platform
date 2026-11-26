@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Badge, Modal, Skeleton } from '@/components/ui'
 import { getCycleBadge, getIla3Mtf } from '@/features/signals/lib/status'
@@ -35,13 +35,12 @@ export function PengaturanPairModal({
   initialStrategy: Metode
   adaIla3: boolean
 }) {
-  const [tab, setTab] = useState<Metode>(initialStrategy)
-
-  useEffect(() => {
-    if (open) {
-      setTab(adaIla3 ? initialStrategy : 'ila-2.0')
-    }
-  }, [open, initialStrategy, adaIla3])
+  const [selectedTab, setSelectedTab] = useState<Metode | null>(null)
+  const tab: Metode = !adaIla3 ? 'ila-2.0' : (selectedTab ?? initialStrategy)
+  const handleClose = () => {
+    setSelectedTab(null)
+    onClose()
+  }
 
   const {
     data: stratMatrix,
@@ -79,7 +78,7 @@ export function PengaturanPairModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       size="lg"
       title={`Pengaturan ${symbol}`}
       description="Aktifkan metode analisis dan atur toggle pantau serta eksekusi otomatis per time cycle untuk tiap akun."
@@ -98,7 +97,7 @@ export function PengaturanPairModal({
               type="button"
               role="tab"
               aria-selected={aktif}
-              onClick={() => setTab(m)}
+              onClick={() => setSelectedTab(m)}
               className={cn(
                 '-mb-px border-b-2 px-4 py-2 text-xs font-semibold transition-colors',
                 aktif
@@ -132,6 +131,7 @@ export function PengaturanPairModal({
             const sibukMetode =
               ubahMetode.isPending && ubahMetode.variables?.accountID === account.account_id
             const tfAccount = tfGroup?.accounts.find((a) => a.account_id === account.account_id)
+            const pairDiizinkan = tfAccount?.pair_allowed !== false
             const sibukTf =
               ubahTf.isPending &&
               ubahTf.variables?.accountID === account.account_id &&
@@ -241,9 +241,9 @@ export function PengaturanPairModal({
                             {autoAllowed && (
                               <ToggleSaklar
                                 label={`Eksekusi ${cycle ?? tfLabel} untuk ${namaAkun}`}
-                                menyala={pair.auto}
+                                menyala={pairDiizinkan ? pair.auto : false}
                                 sibuk={sibukTf}
-                                nonaktif={!pair.watch}
+                                nonaktif={!pair.watch || !pairDiizinkan}
                                 onToggle={(nilai) =>
                                   toggleTf(tfAccount, tab, pair, {
                                     watch: pair.watch,
@@ -256,6 +256,13 @@ export function PengaturanPairModal({
                         </div>
                       )
                     })}
+
+                    {autoAllowed && !pairDiizinkan && (
+                      <div className="bg-secondary/20 px-3.5 py-2 text-[11px] text-muted-foreground">
+                        Eksekusi otomatis nonaktif karena {symbol} tidak dicentang di Filter Pair
+                        Eksekusi akun ini. Setelan pantau tetap mengikuti pilihan Anda.
+                      </div>
+                    )}
 
                     {!autoAllowed && (
                       <div className="bg-secondary/10 px-3.5 py-2 text-[11px] text-muted-foreground">

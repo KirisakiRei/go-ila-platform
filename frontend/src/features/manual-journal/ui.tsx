@@ -23,11 +23,15 @@ export function InfoTooltip({
   content,
   align = 'center',
   className,
+  triggerClassName,
+  children,
 }: {
   label: string
   content: ReactNode
   align?: 'start' | 'center' | 'end'
   className?: string
+  triggerClassName?: string
+  children?: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [instant, setInstant] = useState(false)
@@ -77,8 +81,9 @@ export function InfoTooltip({
     const btn = buttonRef.current
     if (!btn) return
     const rect = btn.getBoundingClientRect()
-    const tipWidth = Math.min(256, window.innerWidth - 24)
-    const tipHeight = tooltipRef.current?.offsetHeight ?? 72
+    const maxWidth = Math.min(256, window.innerWidth - 24)
+    const tipWidth = Math.min(tooltipRef.current?.offsetWidth || maxWidth, maxWidth)
+    const tipHeight = tooltipRef.current?.offsetHeight || 40
     const margin = 12
     const gap = 8
 
@@ -166,9 +171,12 @@ export function InfoTooltip({
           if (open) closeNow()
           else openWithDelay(true)
         }}
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          'inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/80 transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          triggerClassName,
+        )}
       >
-        <Info className="h-3.5 w-3.5" aria-hidden="true" />
+        {children ?? <Info className="h-3.5 w-3.5" aria-hidden="true" />}
       </button>
       {open &&
         typeof document !== 'undefined' &&
@@ -180,7 +188,11 @@ export function InfoTooltip({
             data-instant={instant ? 'true' : 'false'}
             style={
               coords
-                ? { top: coords.top, left: coords.left, width: 'min(16rem, calc(100vw - 1.5rem))' }
+                ? {
+                    top: coords.top,
+                    left: coords.left,
+                    maxWidth: 'min(16rem, calc(100vw - 1.5rem))',
+                  }
                 : { visibility: 'hidden', top: 0, left: 0 }
             }
             className={cn(
@@ -576,7 +588,7 @@ export function ImageDropzone({
         id={id}
         type="file"
         multiple={multiple}
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp"
         disabled={disabled || busy}
         aria-label={ariaLabel}
         className="sr-only"

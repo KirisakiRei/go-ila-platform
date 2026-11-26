@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Lightbulb, Settings2, Sparkles } from 'lucide-react'
+import { Lightbulb, Sparkles } from 'lucide-react'
 import { Alert, Button, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { journalApi } from './api'
@@ -7,13 +7,7 @@ import { useJournalMutation, useJournalReview, useJournalReviewSettings } from '
 import { wibTime } from './model'
 import { InfoTooltip } from './ui'
 
-export function JournalReview({
-  accountId,
-  onOpenSettings,
-}: {
-  accountId: string
-  onOpenSettings?: () => void
-}) {
+export function JournalReview({ accountId }: { accountId: string }) {
   const review = useJournalReview(accountId)
   const pending = review.data?.status === 'pending' || review.data?.status === 'running'
   const isAI = review.data?.source === 'ai'
@@ -43,21 +37,23 @@ export function JournalReview({
       ? 'Menyiapkan insight harian…'
       : 'Catat trade closed untuk melihat insight harian')
 
-  const sourceLabel = isAI ? 'AI' : review.data?.source === 'rules' ? 'Aturan' : 'Menunggu'
   const metaTip = review.data
-    ? `Update ${wibTime(review.data.updated_at)} WIB · Sumber: ${sourceLabel}`
-    : 'Insight harian otomatis (WIB).'
+    ? `Diperbarui ${wibTime(review.data.updated_at)} WIB`
+    : 'Diperbarui otomatis setiap hari (WIB).'
 
   return (
     <div
       role="status"
       aria-label="Insight harian jurnal"
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-lg border border-border/80 bg-secondary/35 px-3.5 py-2.5 text-xs sm:flex-nowrap"
+      className="flex items-center justify-between gap-3 rounded-lg border border-border/80 bg-secondary/35 px-3.5 py-2.5 text-xs"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        <span
-          className={cn(
-            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground',
+        <InfoTooltip
+          label="Insight AI"
+          content="Insight AI"
+          align="start"
+          triggerClassName={cn(
+            'h-6 w-6 shrink-0 rounded-md border border-border/70 bg-background text-muted-foreground hover:text-foreground',
             isAI && 'text-foreground',
           )}
         >
@@ -66,29 +62,13 @@ export function JournalReview({
           ) : (
             <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-        </span>
+        </InfoTooltip>
         <p className="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
           {text}
         </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 pl-8 sm:pl-0">
-        <span className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          {sourceLabel}
-          {pending ? ' · proses' : ''}
-        </span>
-        <InfoTooltip label="Info insight harian" content={metaTip} align="end" />
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Settings2 className="h-3 w-3" aria-hidden="true" />
-            <span>Atur</span>
-          </button>
-        )}
-      </div>
+      <InfoTooltip label="Info insight harian" content={metaTip} align="end" className="shrink-0" />
     </div>
   )
 }

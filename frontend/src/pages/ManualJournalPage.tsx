@@ -287,14 +287,8 @@ export default function ManualJournalPage() {
               )
             ))}
 
-          {/* Insight AI / Aturan ringkas 1 baris ala info tip */}
-          {!!activeId && (
-            <JournalReview
-              key={activeId}
-              accountId={activeId}
-              onOpenSettings={() => openSettings('ai')}
-            />
-          )}
+          {/* Insight AI ringkas 1 baris */}
+          {!!activeId && <JournalReview key={activeId} accountId={activeId} />}
 
           {/* Toolbar ruang kerja: Tabs + Search + Periode + Filter */}
           <section className="space-y-3" aria-label="Ruang kerja jurnal">
@@ -557,14 +551,15 @@ export default function ManualJournalPage() {
                   for (const file of queuedFiles) {
                     try {
                       await journalApi.uploadScreenshot(saved.id, file)
-                    } catch {
-                      failed.push(file.name)
+                    } catch (err) {
+                      const reason = err instanceof Error ? `: ${err.message}` : ''
+                      failed.push(`${file.name}${reason}`)
                     }
                   }
                   await client.invalidateQueries({ queryKey: journalKey })
                   if (failed.length > 0) {
                     setError(
-                      `Trade tersimpan, tetapi ${failed.length} screenshot gagal diunggah (${failed.join(', ')}).`,
+                      `Trade tersimpan, tetapi ${failed.length} screenshot gagal diunggah (${failed[0]}).`,
                     )
                   }
                 }

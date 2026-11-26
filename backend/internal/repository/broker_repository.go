@@ -260,16 +260,30 @@ func (r *subscriptionRepository) Reactivate(ctx context.Context, id, userID stri
 
 // ListActiveByAccount membaca langganan aktif yang berlaku untuk satu akun.
 //
-// Aturan transisi: langganan lama tanpa broker_account_id dianggap berlaku
-// untuk semua akun user. Ini menjaga data sebelum katalog pair tetap
-// dieksekusi tanpa perlu backfill paksa.
+// Jika akun sudah pernah menyimpan pilihan pair sendiri (ada baris dengan
+// broker_account_id = accountID, baik aktif maupun nonaktif), HANYA baris aktif
+// milik akun itu yang dikembalikan agar filter pair akun tidak tertimpa oleh
+// watchlist global (broker_account_id IS NULL).
+//
+// Jika akun belum pernah punya baris khusus sama sekali, fallback ke langganan
+// global tanpa broker_account_id untuk menjaga kompatibilitas data lama.
 func (r *subscriptionRepository) ListActiveByAccount(ctx context.Context, userID, accountID string) ([]model.Subscription, error) {
+	var accountRowCount int64
+	if err := r.db.WithContext(ctx).
+		Model(&model.Subscription{}).
+		Where("user_id = ? AND broker_account_id = ?", userID, accountID).
+		Count(&accountRowCount).Error; err != nil {
+		return nil, fmt.Errorf("memeriksa konfigurasi pair akun: %w", err)
+	}
+
 	var subs []model.Subscription
-	err := r.db.WithContext(ctx).
-		Where("user_id = ? AND is_active = ? AND (broker_account_id IS NULL OR broker_account_id = ?)", userID, true, accountID).
-		Order("symbol ASC").
-		Find(&subs).Error
-	if err != nil {
+	q := r.db.WithContext(ctx).Where("user_id = ? AND is_active = ?", userID, true)
+	if accountRowCount > 0 {
+		q = q.Where("broker_account_id = ?", accountID)
+	} else {
+		q = q.Where("broker_account_id IS NULL")
+	}
+	if err := q.Order("symbol ASC").Find(&subs).Error; err != nil {
 		return nil, fmt.Errorf("membaca subscription akun: %w", err)
 	}
 	return subs, nil
@@ -278,13 +292,14 @@ func (r *subscriptionRepository) ListActiveByAccount(ctx context.Context, userID
 // ReplaceAccountPairs mengganti seluruh pilihan simbol satu akun secara atomik.
 //
 // Langganan lama yang tidak dipilih lagi dinonaktifkan (bukan dihapus) agar
-// jejak historis tetap ada. Baris yang sudah ada diaktifkan kembali sehingga
-// pencabutan tidak menghapus data.
+// jejak historis tetap ada. Untuk simbol watchlist global yang tidak dicentang,
+// baris eksplisit is_active=false dibuat agar akun tetap tercatat sudah
+// dikonfigurasi (termasuk saat seluruh pair di-uncheck / daftar kosong).
 func (r *subscriptionRepository) ReplaceAccountPairs(ctx context.Context, userID, accountID string, symbols []string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		wanted := make(map[string]bool, len(symbols))
 		for _, s := range symbols {
-			wanted[s] = true
+			wanted[strings.ToUpper(s)] = true
 		}
 
 		// Nonaktifkan langganan akun ini yang tidak lagi dipilih.
@@ -329,6 +344,34 @@ func (r *subscriptionRepository) ReplaceAccountPairs(ctx context.Context, userID
 			if err := tx.Create(sub).Error; err != nil {
 				return fmt.Errorf("membuat subscription: %w", err)
 			}
+			byPairKey[canonical] = sub
+		}
+
+		// Tandai simbol watchlist global yang tidak dipilih akun ini sebagai nonaktif
+		// secara eksplisit agar ListActiveByAccount tidak jatuh balik ke watchlist global.
+		var globalSubs []model.Subscription
+		if err := tx.Where("user_id = ? AND is_active = ? AND broker_account_id IS NULL", userID, true).
+			Find(&globalSubs).Error; err != nil {
+			return fmt.Errorf("membaca watchlist global user: %w", err)
+		}
+		for _, g := range globalSubs {
+			canonical := strings.ToUpper(g.Symbol)
+			if wanted[canonical] {
+				continue
+			}
+			if _, exists := byPairKey[canonical]; exists {
+				continue
+			}
+			sub := &model.Subscription{
+				UserID:          userID,
+				Symbol:          canonical,
+				IsActive:        false,
+				BrokerAccountID: strPtr(accountID),
+			}
+			if err := tx.Create(sub).Error; err != nil {
+				return fmt.Errorf("menandai pair nonaktif akun: %w", err)
+			}
+			byPairKey[canonical] = sub
 		}
 
 		return nil

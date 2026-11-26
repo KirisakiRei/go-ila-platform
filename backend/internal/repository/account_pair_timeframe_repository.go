@@ -30,6 +30,9 @@ type AccountPairTimeframeRepository interface {
 	Replace(ctx context.Context, accountID, userID, symbol, strategy string, rows []TimeframeSwitch) error
 	// Ensure membuat saklar bawaan tanpa mengubah yang sudah ada.
 	Ensure(ctx context.Context, rows []model.AccountPairTimeframe) error
+	// DisableAutoExcept mematikan is_auto tanpa mengubah is_watch untuk seluruh
+	// baris akun yang simbolnya tidak masuk daftar allowedSymbols.
+	DisableAutoExcept(ctx context.Context, accountID string, allowedSymbols []string) error
 	// WatchedPairs mengembalikan pasangan timeframe yang dipantau untuk satu
 	// simbol, dipakai Runner untuk menyusun kebutuhan engine.
 	WatchedPairs(ctx context.Context, symbol string) (map[string]map[PairKey]bool, error)
@@ -107,6 +110,21 @@ func (r *accountPairTimeframeRepository) Ensure(ctx context.Context, rows []mode
 		return nil
 	}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error
+}
+
+// DisableAutoExcept mematikan saklar eksekusi otomatis (is_auto=false) untuk
+// seluruh pair akun di luar allowedSymbols tanpa mengubah setelan pantau (is_watch).
+func (r *accountPairTimeframeRepository) DisableAutoExcept(ctx context.Context, accountID string, allowedSymbols []string) error {
+	q := r.db.WithContext(ctx).
+		Model(&model.AccountPairTimeframe{}).
+		Where("broker_account_id = ? AND is_auto = ?", accountID, true)
+	if len(allowedSymbols) > 0 {
+		q = q.Where("UPPER(symbol) NOT IN ?", allowedSymbols)
+	}
+	if err := q.Update("is_auto", false).Error; err != nil {
+		return fmt.Errorf("menonaktifkan auto eksekusi pair akun: %w", err)
+	}
+	return nil
 }
 
 // WatchedPairs mengembalikan pasangan timeframe yang dipantau untuk satu simbol.

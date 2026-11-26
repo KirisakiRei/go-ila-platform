@@ -7,7 +7,7 @@ import {
   ExternalLink,
   Pencil,
 } from 'lucide-react'
-import { Button } from '@/components/ui'
+import { Button, Modal } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
   computeTradePreview,
@@ -262,15 +262,25 @@ export function CalendarView({
                 ).format(Math.abs(result.net))}`
               : ''
 
+            const hasTrades = all.length > 0
+
             return (
               <button
                 key={day}
                 type="button"
-                aria-pressed={isSelected}
+                disabled={!hasTrades}
                 aria-label={`${day} WIB, ${all.length} trade${result ? `, net P&L ${result.net}` : ''}`}
-                onClick={() => setSelected(day)}
+                onClick={() => {
+                  if (all.length === 1) {
+                    setSelected('')
+                    onSelect(all[0]!)
+                  } else if (all.length > 1) {
+                    setSelected(day)
+                  }
+                }}
                 className={cn(
-                  'hover-surface relative flex min-h-[68px] min-w-0 flex-col justify-between border-t border-r border-border/60 p-1.5 text-left transition-[background-color,box-shadow] duration-150 last:border-r-0 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[88px] sm:p-2.5',
+                  'relative flex min-h-[68px] min-w-0 flex-col justify-between border-t border-r border-border/60 p-1.5 text-left transition-[background-color,box-shadow] duration-150 last:border-r-0 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[88px] sm:p-2.5',
+                  hasTrades ? 'hover-surface cursor-pointer' : 'cursor-default',
                   cellTone,
                   isSelected && 'z-10 ring-2 ring-inset ring-foreground/60',
                 )}
@@ -313,14 +323,13 @@ export function CalendarView({
         </div>
       </div>
 
-      {selected && (
-        <section
-          aria-live="polite"
-          className="space-y-3 rounded-xl border border-border/80 bg-secondary/20 p-3.5 sm:p-4"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-sm font-semibold">Rekap {selected} · WIB</h3>
-            <p className="text-xs tabular-nums text-muted-foreground">
+      <Modal
+        open={Boolean(selected && daily.length > 0)}
+        onClose={() => setSelected('')}
+        title={selected ? `Rekap ${selected} · WIB` : undefined}
+        description={
+          selected ? (
+            <span className="tabular-nums">
               {daily.length} trade · net{' '}
               <span className={cn('font-semibold', pnlTone(calendar[selected]?.net_pnl ?? 0))}>
                 {formatSignedAmount(
@@ -328,17 +337,20 @@ export function CalendarView({
                   accounts.find((a) => a.id === daily[0]?.account_id)?.currency ?? resolvedCurrency,
                 )}
               </span>
-            </p>
-          </div>
-          {daily.length ? (
-            <TradeCards trades={daily} accounts={accounts} onSelect={onSelect} />
-          ) : (
-            <p className="py-3 text-xs text-muted-foreground">
-              Tidak ada trade pada tanggal ini.
-            </p>
-          )}
-        </section>
-      )}
+            </span>
+          ) : undefined
+        }
+        size="lg"
+      >
+        <TradeCards
+          trades={daily}
+          accounts={accounts}
+          onSelect={(trade) => {
+            setSelected('')
+            onSelect(trade)
+          }}
+        />
+      </Modal>
     </div>
   )
 }
