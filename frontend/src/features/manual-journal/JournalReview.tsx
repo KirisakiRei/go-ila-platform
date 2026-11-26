@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Lightbulb, Sparkles } from 'lucide-react'
-import { Alert, Button, Skeleton } from '@/components/ui'
+import { Alert, Button, Skeleton, Switch } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { journalApi } from './api'
 import { useJournalMutation, useJournalReview, useJournalReviewSettings } from './hooks'
@@ -80,6 +80,8 @@ export function JournalAIPreferences({ accountId }: { accountId?: string }) {
     journalApi.saveReviewSettings(enabled, account),
   )
   const [error, setError] = useState('')
+  const globalId = useId()
+  const accountToggleId = useId()
 
   async function toggle(enabled: boolean, account?: string) {
     setError('')
@@ -121,45 +123,43 @@ export function JournalAIPreferences({ accountId }: { accountId?: string }) {
         </p>
       )}
 
-      <div className="divide-y divide-border rounded-lg border border-border bg-card">
-        <label className="flex cursor-pointer items-center justify-between gap-4 p-3.5">
-          <span className="min-w-0">
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex items-center justify-between gap-4 p-3.5 transition-colors hover:bg-secondary/35">
+          <label htmlFor={globalId} className="min-w-0 flex-1 cursor-pointer">
             <span className="block text-sm font-medium text-foreground">
               Aktifkan insight AI
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               Berlaku untuk semua jurnal. Jika mati, hanya evaluasi aturan yang jalan.
             </span>
-          </span>
-          <input
-            type="checkbox"
-            role="switch"
-            className="h-4 w-4 shrink-0 accent-primary"
+          </label>
+          <Switch
+            id={globalId}
             checked={globalSettings.data?.ai_enabled ?? false}
-            disabled={save.isPending || !globalSettings.data || globalSettings.isError}
-            onChange={(e) => void toggle(e.target.checked)}
+            loading={save.isPending}
+            disabled={!globalSettings.data || globalSettings.isError}
+            onCheckedChange={(next) => void toggle(next)}
           />
-        </label>
+        </div>
 
         {accountId && (
-          <label className="flex cursor-pointer items-center justify-between gap-4 p-3.5">
-            <span className="min-w-0">
+          <div className="flex items-center justify-between gap-4 p-3.5 transition-colors hover:bg-secondary/35">
+            <label htmlFor={accountToggleId} className="min-w-0 flex-1 cursor-pointer">
               <span className="block text-sm font-medium text-foreground">
                 Aktifkan AI untuk jurnal ini
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 Matikan jika jurnal ini cukup pakai evaluasi aturan.
               </span>
-            </span>
-            <input
-              type="checkbox"
-              role="switch"
-              className="h-4 w-4 shrink-0 accent-primary"
+            </label>
+            <Switch
+              id={accountToggleId}
               checked={settings.data?.ai_enabled ?? false}
-              disabled={save.isPending || !settings.data || settings.isError}
-              onChange={(e) => void toggle(e.target.checked, accountId)}
+              loading={save.isPending}
+              disabled={!settings.data || settings.isError}
+              onCheckedChange={(next) => void toggle(next, accountId)}
             />
-          </label>
+          </div>
         )}
       </div>
 

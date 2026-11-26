@@ -1,10 +1,8 @@
-import { Loader2 } from 'lucide-react'
-import { Badge, Card, CardContent, Skeleton } from '@/components/ui'
+import { Badge, Card, CardContent, Skeleton, Switch } from '@/components/ui'
 import { getCycleBadge, getIla3Mtf } from '@/features/signals/lib/status'
 import { useSetTimeframeSwitch, useTimeframeSwitchMatrix } from '@/lib/queries'
 import { useIsMobile } from '@/lib/use-mobile-viewport'
 import type { StrategyVersion, TimeframeSwitchItem } from '@/types/api'
-import { cn } from '@/lib/utils'
 
 /**
  * SaklarTimeframeAkun menampilkan pasangan timeframe per akun dan per metode.
@@ -123,13 +121,14 @@ export function SaklarTimeframeAkun({
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-muted-foreground">Pantau</span>
-                                <Saklar
-                                  menyala={pair.watch}
-                                  sibuk={sibuk}
-                                  onToggle={(nilai) =>
+                            <div className="divide-y divide-border/60 rounded-lg border border-border/70 bg-secondary/20">
+                              <div className="flex items-center justify-between gap-3 px-2.5 py-2">
+                                <span className="text-[11px] font-medium text-foreground">Pantau</span>
+                                <Switch
+                                  aria-label={`Pantau ${tfLabel} untuk ${account.label || 'Akun Broker'}`}
+                                  checked={pair.watch}
+                                  loading={sibuk}
+                                  onCheckedChange={(nilai) =>
                                     kirim(ubah, account, group.strategy, pair, {
                                       watch: nilai,
                                       auto: nilai ? pair.auto : false,
@@ -139,13 +138,15 @@ export function SaklarTimeframeAkun({
                               </div>
 
                               {data?.auto_allowed && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[11px] text-muted-foreground">Eksekusi</span>
-                                  <Saklar
-                                    menyala={pair.auto}
-                                    sibuk={sibuk}
-                                    nonaktif={!pair.watch}
-                                    onToggle={(nilai) =>
+                                <div className="flex items-center justify-between gap-3 px-2.5 py-2">
+                                  <span className="text-[11px] font-medium text-foreground">Eksekusi</span>
+                                  <Switch
+                                    aria-label={`Eksekusi ${tfLabel} untuk ${account.label || 'Akun Broker'}`}
+                                    checked={pair.auto}
+                                    loading={sibuk}
+                                    disabled={!pair.watch}
+                                    title={!pair.watch ? 'Nyalakan Pantau lebih dulu' : undefined}
+                                    onCheckedChange={(nilai) =>
                                       kirim(ubah, account, group.strategy, pair, {
                                         watch: nilai ? true : pair.watch,
                                         auto: nilai,
@@ -231,10 +232,11 @@ export function SaklarTimeframeAkun({
                             </div>
                           </td>
                           <td className="px-3.5 py-2.5 text-center">
-                            <Saklar
-                              menyala={pair.watch}
-                              sibuk={sibuk}
-                              onToggle={(nilai) =>
+                            <Switch
+                              aria-label={`Pantau ${pair.htf} ${pair.ltf} untuk ${account.label || 'Akun Broker'}`}
+                              checked={pair.watch}
+                              loading={sibuk}
+                              onCheckedChange={(nilai) =>
                                 kirim(ubah, account, group.strategy, pair, {
                                   watch: nilai,
                                   auto: nilai ? pair.auto : false,
@@ -244,11 +246,13 @@ export function SaklarTimeframeAkun({
                           </td>
                           {data?.auto_allowed && (
                             <td className="px-3.5 py-2.5 text-center">
-                              <Saklar
-                                menyala={pair.auto}
-                                sibuk={sibuk}
-                                nonaktif={!pair.watch}
-                                onToggle={(nilai) =>
+                              <Switch
+                                aria-label={`Eksekusi ${pair.htf} ${pair.ltf} untuk ${account.label || 'Akun Broker'}`}
+                                checked={pair.auto}
+                                loading={sibuk}
+                                disabled={!pair.watch}
+                                title={!pair.watch ? 'Nyalakan Pantau lebih dulu' : undefined}
+                                onCheckedChange={(nilai) =>
                                   kirim(ubah, account, group.strategy, pair, {
                                     watch: nilai ? true : pair.watch,
                                     auto: nilai,
@@ -284,45 +288,4 @@ function kirim(
       : pair,
   )
   ubah.mutate({ accountID: account.account_id, strategy, pairs })
-}
-
-function Saklar({
-  menyala,
-  sibuk,
-  nonaktif,
-  onToggle,
-}: {
-  menyala: boolean
-  sibuk: boolean
-  nonaktif?: boolean
-  onToggle: (nilai: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={menyala}
-      aria-disabled={nonaktif}
-      disabled={sibuk || nonaktif}
-      title={nonaktif ? 'Nyalakan Pantau lebih dulu' : undefined}
-      onClick={() => onToggle(!menyala)}
-      className={cn(
-        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors',
-        menyala
-          ? 'border-primary bg-primary'
-          : 'border-border bg-secondary hover:bg-secondary/80',
-        (sibuk || nonaktif) && 'cursor-not-allowed opacity-50',
-        sibuk && 'cursor-wait',
-      )}
-    >
-      <span
-        className={cn(
-          'pointer-events-none flex h-5 w-5 items-center justify-center rounded-full bg-background shadow-xs ring-0 transition-transform duration-200',
-          menyala ? 'translate-x-5' : 'translate-x-0',
-        )}
-      >
-        {sibuk && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-      </span>
-    </button>
-  )
 }

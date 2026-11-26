@@ -1,9 +1,7 @@
-import { Loader2 } from 'lucide-react'
-import { Badge, Card, CardContent, Skeleton } from '@/components/ui'
+import { Badge, Card, CardContent, Skeleton, Switch } from '@/components/ui'
 import { useSetStrategySwitch, useStrategySwitchMatrix } from '@/lib/queries'
 import { useIsMobile } from '@/lib/use-mobile-viewport'
 import type { StrategySwitchAccount } from '@/types/api'
-import { cn } from '@/lib/utils'
 
 /**
  * Metode yang boleh ditampilkan. ILA 3.0 hanya muncul bila server menyatakan
@@ -92,10 +90,11 @@ export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
                     className="flex items-center justify-between gap-2 px-3 py-2.5 text-xs"
                   >
                     <span className="font-medium text-foreground">Metode {LABEL[metode]}</span>
-                    <Saklar
-                      menyala={account.strategies[metode] ?? false}
-                      sibuk={sibuk}
-                      onToggle={(nilai) =>
+                    <Switch
+                      aria-label={`Metode ${LABEL[metode]} untuk ${account.label || 'Akun Broker'}`}
+                      checked={account.strategies[metode] ?? false}
+                      loading={sibuk}
+                      onCheckedChange={(nilai) =>
                         ubah.mutate({
                           accountID: account.account_id,
                           strategies: { ...account.strategies, [metode]: nilai },
@@ -146,13 +145,14 @@ export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
               </td>
               {metodeTampil.map((metode) => (
                 <td key={metode} className="px-3.5 py-2.5 text-center">
-                  <Saklar
-                    menyala={account.strategies[metode] ?? false}
-                    sibuk={
+                  <Switch
+                    aria-label={`Metode ${LABEL[metode]} untuk ${account.label || 'Akun Broker'}`}
+                    checked={account.strategies[metode] ?? false}
+                    loading={
                       ubah.isPending &&
                       ubah.variables?.accountID === account.account_id
                     }
-                    onToggle={(nilai) =>
+                    onCheckedChange={(nilai) =>
                       ubah.mutate({
                         accountID: account.account_id,
                         strategies: { ...account.strategies, [metode]: nilai },
@@ -176,40 +176,4 @@ export function SaklarMetodeAkun({ symbol }: { symbol: string }) {
 function daftarMetode(accounts: StrategySwitchAccount[]): Metode[] {
   const allowed = accounts[0]?.allowed ?? {}
   return METODE.filter((metode) => metode !== 'ila-3.0' || allowed[metode] === true)
-}
-
-function Saklar({
-  menyala,
-  sibuk,
-  onToggle,
-}: {
-  menyala: boolean
-  sibuk: boolean
-  onToggle: (nilai: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={menyala}
-      disabled={sibuk}
-      onClick={() => onToggle(!menyala)}
-      className={cn(
-        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors',
-        menyala
-          ? 'border-primary bg-primary'
-          : 'border-border bg-secondary hover:bg-secondary/80',
-        sibuk && 'cursor-wait opacity-70',
-      )}
-    >
-      <span
-        className={cn(
-          'pointer-events-none flex h-5 w-5 items-center justify-center rounded-full bg-background shadow-xs ring-0 transition-transform duration-200',
-          menyala ? 'translate-x-5' : 'translate-x-0',
-        )}
-      >
-        {sibuk && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-      </span>
-    </button>
-  )
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import { Badge, Modal, Skeleton } from '@/components/ui'
+import { Badge, Modal, Skeleton, Switch } from '@/components/ui'
 import { getCycleBadge, getIla3Mtf } from '@/features/signals/lib/status'
 import {
   useSetStrategySwitch,
@@ -166,15 +165,15 @@ export function PengaturanPairModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="ml-auto flex shrink-0 items-center gap-2.5">
                     <span className="text-[11px] font-medium text-muted-foreground">
                       {metodeNyala ? `${METODE_LABEL[tab]} Aktif` : `${METODE_LABEL[tab]} Nonaktif`}
                     </span>
-                    <ToggleSaklar
-                      label={`Aktifkan ${METODE_LABEL[tab]} untuk ${namaAkun}`}
-                      menyala={metodeNyala}
-                      sibuk={sibukMetode}
-                      onToggle={(nilai) =>
+                    <Switch
+                      aria-label={`Aktifkan ${METODE_LABEL[tab]} untuk ${namaAkun}`}
+                      checked={metodeNyala}
+                      loading={sibukMetode}
+                      onCheckedChange={(nilai) =>
                         ubahMetode.mutate({
                           accountID: account.account_id,
                           strategies: { ...account.strategies, [tab]: nilai },
@@ -195,11 +194,11 @@ export function PengaturanPairModal({
                   </div>
                 ) : (
                   <div className="divide-y divide-border/60">
-                    <div className="flex items-center justify-between bg-secondary/15 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2 bg-secondary/15 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       <span>{tab === 'ila-2.0' ? 'Time Cycle' : 'Siklus Timeframe'}</span>
-                      <div className="flex items-center gap-5">
-                        <span className="w-11 text-center">Pantau</span>
-                        {autoAllowed && <span className="w-11 text-center">Eksekusi</span>}
+                      <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                        <span className="w-14 text-center">Pantau</span>
+                        {autoAllowed && <span className="w-14 text-center">Eksekusi</span>}
                       </div>
                     </div>
 
@@ -213,7 +212,7 @@ export function PengaturanPairModal({
                       return (
                         <div
                           key={`${account.account_id}-${pair.htf}-${pair.ltf}`}
-                          className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                          className="flex items-center justify-between gap-2 px-3.5 py-2.5"
                         >
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-foreground">
@@ -226,31 +225,42 @@ export function PengaturanPairModal({
                             )}
                           </div>
 
-                          <div className="flex shrink-0 items-center gap-5">
-                            <ToggleSaklar
-                              label={`Pantau ${cycle ?? tfLabel} untuk ${namaAkun}`}
-                              menyala={pair.watch}
-                              sibuk={sibukTf}
-                              onToggle={(nilai) =>
-                                toggleTf(tfAccount, tab, pair, {
-                                  watch: nilai,
-                                  auto: nilai ? pair.auto : false,
-                                })
-                              }
-                            />
-                            {autoAllowed && (
-                              <ToggleSaklar
-                                label={`Eksekusi ${cycle ?? tfLabel} untuk ${namaAkun}`}
-                                menyala={pairDiizinkan ? pair.auto : false}
-                                sibuk={sibukTf}
-                                nonaktif={!pair.watch || !pairDiizinkan}
-                                onToggle={(nilai) =>
+                          <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                            <div className="flex w-14 justify-center">
+                              <Switch
+                                aria-label={`Pantau ${cycle ?? tfLabel} untuk ${namaAkun}`}
+                                checked={pair.watch}
+                                loading={sibukTf}
+                                onCheckedChange={(nilai) =>
                                   toggleTf(tfAccount, tab, pair, {
-                                    watch: pair.watch,
-                                    auto: nilai,
+                                    watch: nilai,
+                                    auto: nilai ? pair.auto : false,
                                   })
                                 }
                               />
+                            </div>
+                            {autoAllowed && (
+                              <div className="flex w-14 justify-center">
+                                <Switch
+                                  aria-label={`Eksekusi ${cycle ?? tfLabel} untuk ${namaAkun}`}
+                                  checked={pairDiizinkan ? pair.auto : false}
+                                  loading={sibukTf}
+                                  disabled={!pair.watch || !pairDiizinkan}
+                                  title={
+                                    !pairDiizinkan
+                                      ? `${symbol} tidak dicentang di Filter Pair Eksekusi`
+                                      : !pair.watch
+                                        ? 'Nyalakan Pantau lebih dulu'
+                                        : undefined
+                                  }
+                                  onCheckedChange={(nilai) =>
+                                    toggleTf(tfAccount, tab, pair, {
+                                      watch: pair.watch,
+                                      auto: nilai,
+                                    })
+                                  }
+                                />
+                              </div>
                             )}
                           </div>
                         </div>
@@ -277,49 +287,5 @@ export function PengaturanPairModal({
         </div>
       )}
     </Modal>
-  )
-}
-
-function ToggleSaklar({
-  label,
-  menyala,
-  sibuk,
-  nonaktif,
-  onToggle,
-}: {
-  label: string
-  menyala: boolean
-  sibuk: boolean
-  nonaktif?: boolean
-  onToggle: (nilai: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-label={label}
-      aria-checked={menyala}
-      aria-disabled={nonaktif}
-      disabled={sibuk || nonaktif}
-      title={nonaktif ? 'Nyalakan Pantau lebih dulu' : undefined}
-      onClick={() => onToggle(!menyala)}
-      className={cn(
-        'inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors',
-        menyala
-          ? 'border-primary bg-primary'
-          : 'border-border bg-secondary hover:bg-secondary/80',
-        (sibuk || nonaktif) && 'cursor-not-allowed opacity-50',
-        sibuk && 'cursor-wait',
-      )}
-    >
-      <span
-        className={cn(
-          'pointer-events-none flex h-5 w-5 items-center justify-center rounded-full bg-background shadow-xs ring-0 transition-transform duration-200',
-          menyala ? 'translate-x-5' : 'translate-x-0',
-        )}
-      >
-        {sibuk && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-      </span>
-    </button>
   )
 }

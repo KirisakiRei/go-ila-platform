@@ -11,6 +11,7 @@ export { Select } from './select'
 export { Skeleton } from './skeleton'
 export { Stat, StatGrid } from './stat'
 export { StatusPill } from './status-pill'
+export { Switch, type SwitchProps } from './switch'
 export {
   Table,
   TableBody,

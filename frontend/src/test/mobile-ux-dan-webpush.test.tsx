@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { Pagination } from '@/components/ui'
@@ -120,6 +120,17 @@ describe('Mobile UI/UX (360px) & Web Push', () => {
       ],
     })
 
+    const updateSpy = vi.spyOn(pushApi, 'updatePreferences').mockResolvedValue({
+      id: 'sub-1',
+      device_label: 'Chrome · Android',
+      notify_entry: false,
+      notify_exit: true,
+      last_sent_at: null,
+      created_at: '2026-11-18T06:00:00Z',
+      updated_at: '2026-11-18T06:00:00Z',
+      endpoint_host: 'fcm.googleapis.com',
+    })
+
     const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } })
     render(
       <QueryClientProvider client={qc}>
@@ -128,8 +139,19 @@ describe('Mobile UI/UX (360px) & Web Push', () => {
     )
 
     expect(await screen.findByText('Chrome · Android')).toBeInTheDocument()
-    expect(screen.getByText('Sinyal Siap & Entry Dibuka')).toBeInTheDocument()
-    expect(screen.getByText('Posisi Tutup (TP / SL / Manual)')).toBeInTheDocument()
+    const entrySwitch = screen.getByRole('switch', {
+      name: /Sinyal Siap & Entry Dibuka untuk Chrome · Android/i,
+    })
+    const exitSwitch = screen.getByRole('switch', {
+      name: /Posisi Tutup \(TP \/ SL \/ Manual\) untuk Chrome · Android/i,
+    })
+    expect(entrySwitch).toHaveAttribute('aria-checked', 'true')
+    expect(exitSwitch).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByRole('button', { name: /Kirim Tes Notifikasi/i })).toBeInTheDocument()
+
+    fireEvent.click(entrySwitch)
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith('sub-1', { notify_entry: false, notify_exit: undefined }),
+    )
   })
 })
