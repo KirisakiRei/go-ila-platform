@@ -8,6 +8,101 @@ export function formatAmount(value: number | string, currency: string) {
   }).format(Number(value))
 }
 
+export function formatSignedAmount(value: number | string, currency: string) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return '—'
+  const formatted = formatAmount(Math.abs(num), currency)
+  if (num > 0) return `+${formatted}`
+  if (num < 0) return `−${formatted}`
+  return formatted
+}
+
+export function pnlTone(value: number | string | null | undefined) {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num === 0) return 'text-foreground'
+  return num > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+}
+
+export function formatDuration(openedAt: string | null, closedAt: string | null) {
+  if (!openedAt || !closedAt) return null
+  const diffMs = Date.parse(closedAt) - Date.parse(openedAt)
+  if (!Number.isFinite(diffMs) || diffMs < 0) return null
+  const totalMinutes = Math.round(diffMs / 60000)
+  if (totalMinutes < 60) return `${totalMinutes}m`
+  const hours = Math.floor(totalMinutes / 60)
+  const mins = totalMinutes % 60
+  if (hours < 24) return mins > 0 ? `${hours}j ${mins}m` : `${hours}j`
+  const days = Math.floor(hours / 24)
+  const remHours = hours % 24
+  return remHours > 0 ? `${days}h ${remHours}j` : `${days}h`
+}
+
+export interface TradePreviewMetrics {
+  plannedRR: string | null
+  realizedR: string | null
+  riskPercent: string | null
+  gainPercent: string | null
+  holdDuration: string | null
+}
+
+export function computeTradePreview(trade: Pick<
+  TradeInput,
+  | 'side'
+  | 'entry_price'
+  | 'stop_loss'
+  | 'take_profit'
+  | 'net_pnl'
+  | 'risk_amount'
+  | 'capital_snapshot'
+  | 'opened_at'
+  | 'closed_at'
+>): TradePreviewMetrics {
+  const entry = trade.entry_price !== null ? Number(trade.entry_price) : NaN
+  const sl = trade.stop_loss !== null ? Number(trade.stop_loss) : NaN
+  const tp = trade.take_profit !== null ? Number(trade.take_profit) : NaN
+  let plannedRR: string | null = null
+  if (
+    trade.side &&
+    Number.isFinite(entry) &&
+    Number.isFinite(sl) &&
+    Number.isFinite(tp) &&
+    entry > 0 &&
+    sl > 0 &&
+    tp > 0 &&
+    sl !== entry
+  ) {
+    const riskDist = trade.side === 'short' ? sl - entry : entry - sl
+    const rewardDist = trade.side === 'short' ? entry - tp : tp - entry
+    if (riskDist > 0 && rewardDist > 0) {
+      plannedRR = `1:${(rewardDist / riskDist).toFixed(2)}`
+    }
+  }
+
+  const pnl = trade.net_pnl !== null ? Number(trade.net_pnl) : NaN
+  const risk = trade.risk_amount !== null ? Number(trade.risk_amount) : NaN
+  const cap = trade.capital_snapshot !== null ? Number(trade.capital_snapshot) : NaN
+
+  let realizedR: string | null = null
+  if (Number.isFinite(pnl) && Number.isFinite(risk) && risk > 0) {
+    const r = pnl / risk
+    realizedR = `${r > 0 ? '+' : r < 0 ? '−' : ''}${Math.abs(r).toFixed(2)}R`
+  }
+
+  const riskPercent =
+    Number.isFinite(risk) && risk > 0 && Number.isFinite(cap) && cap > 0
+      ? `${((risk / cap) * 100).toFixed(2)}%`
+      : null
+
+  let gainPercent: string | null = null
+  if (Number.isFinite(pnl) && Number.isFinite(cap) && cap > 0) {
+    const pct = (pnl / cap) * 100
+    gainPercent = `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct).toFixed(2)}%`
+  }
+
+  const holdDuration = formatDuration(trade.opened_at, trade.closed_at)
+  return { plannedRR, realizedR, riskPercent, gainPercent, holdDuration }
+}
+
 export const wibDay = (date: string) =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
@@ -34,6 +129,19 @@ export const splitList = (text: string) => [
       .filter(Boolean),
   ),
 ]
+export function mergeChipDraft(values: string[], raw: string, maxItems = 30) {
+  const parts = raw
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (!parts.length) return values
+  const next = [...values]
+  for (const part of parts) {
+    if (next.length >= maxItems) break
+    if (!next.includes(part)) next.push(part)
+  }
+  return next
+}
 export const safeLink = (url: string) => {
   try {
     const parsed = new URL(url)
@@ -49,10 +157,15 @@ export const safeLink = (url: string) => {
   }
 }
 export function filterTrades(trades: JournalTrade[], filters: JournalFilters) {
+  const q = (filters.search ?? '').trim().toLowerCase()
   return trades.filter((t) => {
     const day = tradeDay(t)
     return (
       (!filters.account_id || t.account_id === filters.account_id) &&
+      (!q ||
+        t.asset.toLowerCase().includes(q) ||
+        t.setup.toLowerCase().includes(q) ||
+        t.notes.toLowerCase().includes(q)) &&
       (!filters.status || t.status === filters.status) &&
       (!filters.from || day >= filters.from) &&
       (!filters.to || day <= filters.to) &&

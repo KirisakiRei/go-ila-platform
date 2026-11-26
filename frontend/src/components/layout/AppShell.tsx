@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3,
+  BookOpen,
   Bot,
   Bug,
   CreditCard,
@@ -40,7 +41,7 @@ const TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/sinyal': 'Signals & Radar',
   '/posisi': 'Positions',
-  '/jurnal': 'Jurnal Manual',
+  '/jurnal': 'Jurnal',
   '/akun': 'Broker Accounts',
   '/strategi': 'Watchlist Pair',
   '/asisten': 'ILA AI',
@@ -81,7 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/sinyal', label: 'Signals & Radar', short: 'Signals', icon: Radio },
       { to: '/posisi', label: 'Positions', short: 'Positions', icon: BarChart3 },
-      { to: '/jurnal', label: 'Jurnal Manual', short: 'Jurnal', icon: BarChart3 },
+      { to: '/jurnal', label: 'Jurnal', short: 'Jurnal', icon: BookOpen },
       { to: '/akun', label: 'Broker Accounts', short: 'Accounts', icon: Wallet },
       { to: '/strategi', label: 'Watchlist Pair', short: 'Watchlist', icon: Bot },
       { to: '/asisten', label: 'ILA AI', short: 'ILA AI', icon: MessageSquareText },

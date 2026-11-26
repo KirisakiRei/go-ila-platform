@@ -1,17 +1,23 @@
 import { useState, type FormEvent } from 'react'
+import { ArrowLeft, Plus, RotateCcw } from 'lucide-react'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
 import { Alert, Button, Input, Select } from '@/components/ui'
+import { cn } from '@/lib/utils'
 import { journalApi } from './api'
 import { journalKey, useJournalMutation } from './hooks'
-import { splitList, validateDecimal, wibDay } from './model'
-import { formatAmount } from './model'
+import { formatAmount, mergeChipDraft, validateDecimal, wibDay } from './model'
 import { AccountBalance } from './AccountBalance'
 import type { AccountInput, CapitalInput, CapitalMovement, JournalAccount } from './types'
+import { ChipInput, ConfirmButton, SegmentedControl } from './ui'
 
-export function AccountManager({ accounts }: { accounts: JournalAccount[] }) {
-  const busy = useIsMutating({ mutationKey: journalKey }) > 0
-  const [editing, setEditing] = useState<JournalAccount | null>(null)
-  const blank: AccountInput = {
+const CURRENCY_PRESETS = ['USD', 'IDR', 'EUR', 'GBP'] as const
+const CAPITAL_KINDS = [
+  { value: 'deposit', label: '+ Deposit', tone: 'buy' as const },
+  { value: 'withdrawal', label: '− Withdrawal', tone: 'sell' as const },
+] as const
+
+function blankAccount(): AccountInput {
+  return {
     name: '',
     broker: '',
     currency: 'USD',
@@ -21,218 +27,377 @@ export function AccountManager({ accounts }: { accounts: JournalAccount[] }) {
     archived: false,
     checklist: [],
   }
-  const [form, setForm] = useState<AccountInput>(blank)
-  const [checklist, setChecklist] = useState('')
+}
+
+export function AccountsPanel({
+  accounts,
+  onSelectCapital,
+}: {
+  accounts: JournalAccount[]
+  onSelectCapital?: (accountId: string) => void
+}) {
+  const busy = useIsMutating({ mutationKey: journalKey }) > 0
+  const [mode, setMode] = useState<'list' | 'form'>(accounts.length === 0 ? 'form' : 'list')
+  const [editing, setEditing] = useState<JournalAccount | null>(null)
+  const [form, setForm] = useState<AccountInput>(blankAccount)
+  const [checklistDraft, setChecklistDraft] = useState('')
   const [error, setError] = useState('')
+
   const save = useJournalMutation(({ input, id }: { input: AccountInput; id?: string }) =>
     journalApi.saveAccount(input, id),
   )
   const archive = useJournalMutation(journalApi.archiveAccount)
-  const [capitalAccount, setCapitalAccount] = useState('')
-  const selected = accounts.find((a) => a.id === capitalAccount)
-  function reset() {
+
+  function openNew() {
     setEditing(null)
-    setForm(blank)
-    setChecklist('')
+    setForm(blankAccount())
+    setChecklistDraft('')
     setError('')
+    setMode('form')
   }
+
+  function openEdit(account: JournalAccount) {
+    setEditing(account)
+    setForm({
+      name: account.name,
+      broker: account.broker,
+      currency: account.currency,
+      initial_capital: account.initial_capital,
+      initial_date: account.initial_date,
+      notes: account.notes,
+      archived: account.archived,
+      checklist: [...account.checklist],
+    })
+    setChecklistDraft('')
+    setError('')
+    setMode('form')
+  }
+
+  function backToList() {
+    setEditing(null)
+    setForm(blankAccount())
+    setChecklistDraft('')
+    setError('')
+    setMode('list')
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const labels =
-      editing && checklist === editing.checklist.join('\n')
-        ? editing.checklist
-        : splitList(checklist)
+    const checklist = mergeChipDraft(form.checklist, checklistDraft, 31)
+    if (checklist !== form.checklist) {
+      setForm((prev) => ({ ...prev, checklist }))
+    }
+    if (checklistDraft.trim()) setChecklistDraft('')
+    const payload: AccountInput = { ...form, checklist }
     if (
-      !form.name.trim() ||
-      !/^[A-Z]{3}$/.test(form.currency) ||
-      !validateDecimal(form.initial_capital) ||
-      labels.length > 30
+      !payload.name.trim() ||
+      !/^[A-Z]{3}$/.test(payload.currency) ||
+      !validateDecimal(payload.initial_capital) ||
+      payload.checklist.length > 30
     ) {
       setError(
-        'Isi nama, mata uang 3 huruf, modal nonnegatif maksimal 4 desimal dan checklist maksimal 30 item.',
+        'Isi nama akun, mata uang 3 huruf, modal awal valid (maks 4 desimal), dan checklist maks 30 item.',
       )
       return
     }
     try {
-      await save.mutateAsync({
-        input: { ...form, checklist: labels },
-        id: editing?.id,
-      })
-      reset()
+      await save.mutateAsync({ input: payload, id: editing?.id })
+      backToList()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal menyimpan akun.')
     }
   }
+
+  if (mode === 'form') {
+    return (
+      <form onSubmit={submit} className="space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {accounts.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={backToList}
+                className="h-8 px-2"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Kembali
+              </Button>
+            )}
+            <h3 className="text-sm font-semibold">
+              {editing ? `Edit ${editing.name}` : 'Akun jurnal baru'}
+            </h3>
+          </div>
+        </div>
+
+        {error && <Alert variant="destructive">{error}</Alert>}
+
+        <fieldset disabled={busy} className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+              Nama akun
+              <Input
+                required
+                maxLength={100}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Mis. Akun Utama, Demo Prop"
+              />
+            </label>
+            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+              Broker / keterangan (opsional)
+              <Input
+                maxLength={100}
+                value={form.broker}
+                onChange={(e) => setForm({ ...form, broker: e.target.value })}
+                placeholder="Mis. Exness, Demo, Backtest"
+              />
+            </label>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Mata uang
+                <Input
+                  required
+                  pattern="[A-Z]{3}"
+                  maxLength={3}
+                  disabled={!!editing}
+                  value={form.currency}
+                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                />
+              </label>
+              {!editing && (
+                <div className="flex flex-wrap gap-1">
+                  {CURRENCY_PRESETS.map((cur) => (
+                    <button
+                      key={cur}
+                      type="button"
+                      onClick={() => setForm({ ...form, currency: cur })}
+                      className={cn(
+                        'rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors',
+                        form.currency === cur
+                          ? 'border-foreground/40 bg-foreground text-background'
+                          : 'border-border text-muted-foreground hover:bg-secondary',
+                      )}
+                    >
+                      {cur}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+              Modal awal
+              <Input
+                required
+                inputMode="decimal"
+                className="tabular-nums"
+                value={form.initial_capital}
+                onChange={(e) => setForm({ ...form, initial_capital: e.target.value })}
+              />
+            </label>
+
+            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+              Tanggal mulai (WIB)
+              <Input
+                required
+                type="date"
+                value={form.initial_date}
+                onChange={(e) => setForm({ ...form, initial_date: e.target.value })}
+              />
+            </label>
+          </div>
+
+          <ChipInput
+            label="Template pre-trade checklist"
+            values={form.checklist}
+            onChange={(checklist) => setForm({ ...form, checklist })}
+            draftValue={checklistDraft}
+            onDraftChange={setChecklistDraft}
+            placeholder="Ketik aturan lalu Enter (mis. Risiko <= 1%)"
+            disabled={busy}
+          />
+
+          <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+            Catatan pengelolaan (opsional)
+            <Input
+              maxLength={1000}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Target risiko harian, aturan berhenti trading, dll."
+            />
+          </label>
+        </fieldset>
+
+        <div className="flex justify-end gap-2 border-t border-border pt-4">
+          {accounts.length > 0 && (
+            <Button type="button" variant="outline" disabled={busy} onClick={backToList}>
+              Batal
+            </Button>
+          )}
+          <Button type="submit" disabled={busy} isLoading={save.isPending}>
+            {editing ? 'Simpan perubahan' : 'Buat akun'}
+          </Button>
+        </div>
+      </form>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        Akun ini independen dari koneksi broker. Saldo terealisasi dihitung dari catatan jurnal,
-        bukan equity broker. Modal awal dan deposit/withdrawal tidak dihitung sebagai profit
-        trading.
-      </p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          Akun jurnal berdiri sendiri, tidak terhubung ke broker atau bot eksekusi.
+        </p>
+        <Button size="sm" disabled={busy} onClick={openNew}>
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          Akun baru
+        </Button>
+      </div>
+
       {error && <Alert variant="destructive">{error}</Alert>}
-      <ul className="divide-y divide-border">
+
+      <ul className="space-y-2.5">
         {accounts.map((account) => (
-          <li key={account.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-            <div className="min-w-0">
-              <p className="break-words text-sm font-semibold">
-                {account.name} {account.archived && '(diarsipkan)'}
-              </p>
+          <li
+            key={account.id}
+            className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border/80 bg-secondary/20 p-3.5"
+          >
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-sm font-semibold">{account.name}</p>
+                <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {account.currency}
+                </span>
+                {account.archived && (
+                  <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    Diarsipkan
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {account.broker || 'Tanpa broker'} · {account.currency} · modal awal{' '}
-                {formatAmount(account.initial_capital, account.currency)}
+                {account.broker || 'Mandiri'} · Modal awal{' '}
+                {formatAmount(account.initial_capital, account.currency)} · {account.checklist.length}{' '}
+                checklist
               </p>
               <AccountBalance account={account} />
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  setEditing(account)
-                  setForm({ ...account })
-                  setChecklist(account.checklist.join('\n'))
-                  setError('')
-                }}
-              >
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => openEdit(account)}>
                 Edit
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                onClick={() => setCapitalAccount(account.id)}
-              >
-                Modal
-              </Button>
-              {!account.archived && (
+              {onSelectCapital && (
                 <Button
                   size="sm"
                   variant="ghost"
                   disabled={busy}
+                  onClick={() => onSelectCapital(account.id)}
+                >
+                  Modal
+                </Button>
+              )}
+              {account.archived ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
                   onClick={async () => {
-                    if (!window.confirm(`Arsipkan ${account.name}? Trade tetap tersimpan.`)) return
+                    setError('')
+                    try {
+                      await save.mutateAsync({
+                        input: {
+                          name: account.name,
+                          broker: account.broker,
+                          currency: account.currency,
+                          initial_capital: account.initial_capital,
+                          initial_date: account.initial_date,
+                          notes: account.notes,
+                          archived: false,
+                          checklist: account.checklist,
+                        },
+                        id: account.id,
+                      })
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Gagal memulihkan akun.')
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Pulihkan
+                </Button>
+              ) : (
+                <ConfirmButton
+                  label="Arsipkan"
+                  confirmLabel="Yakin arsip?"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onConfirm={async () => {
+                    setError('')
                     try {
                       await archive.mutateAsync(account.id)
                     } catch (err) {
                       setError(err instanceof Error ? err.message : 'Gagal mengarsipkan akun.')
                     }
                   }}
-                >
-                  Arsip
-                </Button>
+                />
               )}
             </div>
           </li>
         ))}
       </ul>
-      <form onSubmit={submit} className="space-y-4 border-t border-border pt-4">
-        <h3 className="font-semibold">{editing ? `Edit ${editing.name}` : 'Tambah akun jurnal'}</h3>
-        <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1 text-sm">
-            Nama akun
-            <Input
-              required
-              maxLength={100}
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Broker (opsional)
-            <Input
-              maxLength={100}
-              value={form.broker}
-              onChange={(e) => setForm({ ...form, broker: e.target.value })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Mata uang
-            <Input
-              required
-              pattern="[A-Z]{3}"
-              maxLength={3}
-              disabled={!!editing}
-              value={form.currency}
-              onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Modal awal
-            <Input
-              required
-              inputMode="decimal"
-              value={form.initial_capital}
-              onChange={(e) => setForm({ ...form, initial_capital: e.target.value })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Tanggal modal awal (WIB)
-            <Input
-              required
-              type="date"
-              value={form.initial_date}
-              onChange={(e) => setForm({ ...form, initial_date: e.target.value })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Checklist akun (satu per baris)
-            <textarea
-              className="min-h-24 w-full rounded-md border border-input bg-background p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              value={checklist}
-              onChange={(e) => setChecklist(e.target.value)}
-            />
-          </label>
-          <label className="space-y-1 text-sm sm:col-span-2">
-            Catatan
-            <Input
-              maxLength={1000}
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
-          </label>
-          {editing && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.archived}
-                onChange={(e) => setForm({ ...form, archived: e.target.checked })}
-              />
-              Arsipkan akun
-            </label>
-          )}
-        </fieldset>
-        <div className="flex justify-end gap-2">
-          {editing && (
-            <Button type="button" variant="outline" disabled={busy} onClick={reset}>
-              Batal edit
-            </Button>
-          )}
-          <Button type="submit" disabled={busy} isLoading={save.isPending}>
-            {editing ? 'Simpan akun' : 'Tambah akun'}
-          </Button>
-        </div>
-      </form>
-      <section className="space-y-3 border-t border-border pt-4">
-        <h3 className="font-semibold">Pergerakan modal</h3>
-        <label className="block space-y-1 text-sm">
-          Akun modal
+    </div>
+  )
+}
+
+export function CapitalPanel({
+  accounts,
+  initialAccountId,
+}: {
+  accounts: JournalAccount[]
+  initialAccountId?: string
+}) {
+  const busy = useIsMutating({ mutationKey: journalKey }) > 0
+  const [accountId, setAccountId] = useState(
+    initialAccountId || accounts.find((a) => !a.archived)?.id || accounts[0]?.id || '',
+  )
+  const selected = accounts.find((a) => a.id === accountId) ?? accounts[0]
+
+  if (!accounts.length) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        Buat akun jurnal terlebih dahulu pada tab Akun.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <label className="min-w-[200px] flex-1 space-y-1.5 text-xs font-medium text-muted-foreground">
+          Akun
           <Select
             disabled={busy}
-            value={capitalAccount}
-            onChange={(e) => setCapitalAccount(e.target.value)}
+            value={selected?.id ?? ''}
+            onChange={(e) => setAccountId(e.target.value)}
           >
-            <option value="">Pilih akun</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} · {a.currency}
+                {a.archived ? ' (arsip)' : ''}
               </option>
             ))}
           </Select>
         </label>
-        {selected && <CapitalManager key={selected.id} account={selected} />}
-      </section>
+        {selected && <AccountBalance account={selected} compact />}
+      </div>
+      {selected && <CapitalManager key={selected.id} account={selected} />}
     </div>
   )
 }
@@ -246,7 +411,7 @@ function CapitalManager({ account }: { account: JournalAccount }) {
     date: wibDay(new Date().toISOString()),
     notes: '',
   }
-  const [form, setForm] = useState(blank)
+  const [form, setForm] = useState<CapitalInput>(blank)
   const [editing, setEditing] = useState<CapitalMovement | null>(null)
   const [error, setError] = useState('')
   const query = useQuery({
@@ -257,133 +422,213 @@ function CapitalManager({ account }: { account: JournalAccount }) {
     journalApi.saveCapital(input, id),
   )
   const remove = useJournalMutation(journalApi.deleteCapital)
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!validateDecimal(form.amount) || Number(form.amount) <= 0) {
-      setError('Jumlah harus lebih dari nol, maksimal 4 desimal dan 1 miliar.')
+      setError('Jumlah harus lebih dari nol (maks 4 desimal).')
       return
     }
+    setError('')
     try {
-      await save.mutateAsync({ input: form, id: editing?.id })
+      await save.mutateAsync({
+        input: { ...form, account_id: account.id },
+        id: editing?.id,
+      })
       setEditing(null)
       setForm(blank)
-      setError('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan modal.')
+      setError(err instanceof Error ? err.message : 'Gagal menyimpan pergerakan modal.')
     }
   }
+
   return (
-    <div className="space-y-3">
-      {query.isLoading && (
-        <p role="status" className="text-sm">
-          Memuat modal…
-        </p>
-      )}
+    <div className="space-y-4">
       {(error || query.error) && (
         <Alert variant="destructive">{error || query.error?.message}</Alert>
       )}
-      <ul className="max-h-52 divide-y divide-border overflow-y-auto">
-        {query.data?.data.map((item) => (
-          <li
-            key={item.id}
-            className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs"
-          >
-            <span>
-              {item.date} · {item.kind} · {formatAmount(item.amount, account.currency)}
-              <span className="block text-muted-foreground">{item.notes}</span>
-            </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy || account.archived}
-                onClick={() => {
-                  setEditing(item)
-                  setForm(item)
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy || account.archived}
-                onClick={async () => {
-                  if (!window.confirm('Hapus pergerakan modal ini?')) return
-                  try {
-                    await remove.mutateAsync(item.id)
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Gagal menghapus modal.')
-                  }
-                }}
-              >
-                Hapus
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {query.data && !query.data.data.length && (
-        <p className="text-xs text-muted-foreground">Belum ada deposit atau withdrawal.</p>
-      )}
-      <form onSubmit={submit}>
-        <fieldset disabled={busy || account.archived} className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1 text-sm">
-            Jenis
-            <Select
-              value={form.kind}
-              onChange={(e) => setForm({ ...form, kind: e.target.value as CapitalInput['kind'] })}
+
+      <form
+        onSubmit={submit}
+        className="space-y-3 rounded-xl border border-border/80 bg-secondary/25 p-3.5"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold">
+            {editing ? 'Edit pergerakan modal' : 'Catat deposit / withdrawal'}
+          </span>
+          {editing && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              disabled={busy}
+              onClick={() => {
+                setEditing(null)
+                setForm(blank)
+                setError('')
+              }}
             >
-              <option value="deposit">Deposit</option>
-              <option value="withdrawal">Withdrawal</option>
-            </Select>
-          </label>
-          <label className="space-y-1 text-sm">
-            Jumlah ({account.currency})
-            <Input
-              inputMode="decimal"
-              required
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Tanggal (WIB)
-            <Input
-              type="date"
-              required
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-            />
-          </label>
-          <label className="space-y-1 text-sm">
-            Catatan
+              Batal edit
+            </Button>
+          )}
+        </div>
+
+        <fieldset disabled={busy || account.archived} className="space-y-3">
+          <SegmentedControl
+            ariaLabel="Jenis transaksi modal"
+            value={form.kind}
+            onChange={(kind) => setForm({ ...form, kind })}
+            options={CAPITAL_KINDS}
+            fullWidth
+            disabled={busy || account.archived}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-muted-foreground">
+              Jumlah ({account.currency})
+              <Input
+                required
+                inputMode="decimal"
+                className="tabular-nums"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                placeholder="100.00"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-muted-foreground">
+              Tanggal (WIB)
+              <Input
+                required
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
+            </label>
+          </div>
+          <label className="block space-y-1 text-xs text-muted-foreground">
+            Catatan (opsional)
             <Input
               maxLength={1000}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Mis. Top up bulanan"
             />
           </label>
-          <div className="flex gap-2 sm:col-span-2">
-            {editing && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy || account.archived}
-                onClick={() => {
-                  setEditing(null)
-                  setForm(blank)
-                }}
-              >
-                Batal edit
-              </Button>
-            )}
-            <Button type="submit" isLoading={save.isPending}>
-              {editing ? 'Simpan perubahan modal' : 'Catat modal'}
+          <div className="flex justify-end">
+            <Button type="submit" size="sm" isLoading={save.isPending}>
+              {editing ? 'Simpan perubahan' : 'Tambah transaksi'}
             </Button>
           </div>
         </fieldset>
       </form>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">Riwayat pergerakan modal</p>
+        {query.isLoading ? (
+          <p role="status" className="text-xs text-muted-foreground">
+            Memuat riwayat…
+          </p>
+        ) : !query.data?.data.length ? (
+          <p className="rounded-lg border border-dashed border-border py-5 text-center text-xs text-muted-foreground">
+            Belum ada deposit atau withdrawal
+          </p>
+        ) : (
+          <ul className="max-h-52 divide-y divide-border overflow-y-auto rounded-lg border border-border scrollbar-thin">
+            {query.data.data.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-xs"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'font-semibold tabular-nums',
+                        item.kind === 'deposit'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-rose-600 dark:text-rose-400',
+                      )}
+                    >
+                      {item.kind === 'deposit' ? '+' : '−'}
+                      {formatAmount(item.amount, account.currency)}
+                    </span>
+                    <span className="text-muted-foreground">{item.date} WIB</span>
+                  </div>
+                  {item.notes && <p className="mt-0.5 truncate text-muted-foreground">{item.notes}</p>}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
+                    disabled={busy || account.archived}
+                    onClick={() => {
+                      setEditing(item)
+                      setForm(item)
+                      setError('')
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <ConfirmButton
+                    label="Hapus"
+                    confirmLabel="Yakin?"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={busy || account.archived}
+                    onConfirm={async () => {
+                      setError('')
+                      try {
+                        await remove.mutateAsync(item.id)
+                        if (editing?.id === item.id) {
+                          setEditing(null)
+                          setForm(blank)
+                        }
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Gagal menghapus.')
+                      }
+                    }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Wrapper gabungan untuk kompatibilitas pemanggil tunggal. */
+export function AccountManager({ accounts }: { accounts: JournalAccount[] }) {
+  const busy = useIsMutating({ mutationKey: journalKey }) > 0
+  const [subTab, setSubTab] = useState<'accounts' | 'capital'>('accounts')
+  const [capitalAccountId, setCapitalAccountId] = useState<string | undefined>()
+  return (
+    <div className="space-y-4">
+      <SegmentedControl
+        ariaLabel="Kelola akun dan modal"
+        value={subTab}
+        onChange={setSubTab}
+        disabled={busy}
+        fullWidth
+        options={[
+          { value: 'accounts', label: 'Akun' },
+          { value: 'capital', label: 'Deposit & Withdrawal' },
+        ]}
+      />
+      {subTab === 'accounts' ? (
+        <AccountsPanel
+          accounts={accounts}
+          onSelectCapital={(id) => {
+            setCapitalAccountId(id)
+            setSubTab('capital')
+          }}
+        />
+      ) : (
+        <CapitalPanel accounts={accounts} initialAccountId={capitalAccountId} />
+      )}
     </div>
   )
 }

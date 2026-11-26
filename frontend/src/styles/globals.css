@@ -55,6 +55,7 @@
        terlalu lemah, jadi kurvanya ditulis sendiri. */
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
     /* Durasi. Umpan balik tekan paling pendek, animasi penjelasan paling
        panjang karena pengunjung hanya melihatnya sekali. */
@@ -296,6 +297,79 @@
     }
     50% {
       opacity: 0.35;
+    }
+  }
+
+  /* Transisi dialog: slide dari bawah di layar sentuh, scale halus di desktop.
+     Memakai backwards + satu @keyframes agar tidak mengunci transform setelah selesai
+     dan tidak memutar ulang animasi saat resize melintasi 640px. */
+  .ui-modal-backdrop {
+    animation: ui-fade-in 180ms var(--ease-out) backwards;
+  }
+
+  .ui-modal-panel {
+    --modal-from-transform: translateY(100%);
+    animation: ui-modal-in 240ms var(--ease-drawer) backwards;
+  }
+
+  @media (min-width: 640px) {
+    .ui-modal-panel {
+      --modal-from-transform: scale(0.96);
+      animation-duration: 200ms;
+      animation-timing-function: var(--ease-out);
+    }
+  }
+
+  .ui-tooltip-enter {
+    animation: ui-tooltip-in 125ms var(--ease-out) backwards;
+  }
+
+  .ui-tooltip-enter[data-instant='true'] {
+    animation: none;
+  }
+
+  @keyframes ui-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes ui-modal-in {
+    from {
+      opacity: 0;
+      transform: var(--modal-from-transform);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes ui-tooltip-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hover-surface:hover {
+      background-color: hsl(var(--secondary) / 0.65);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ui-modal-backdrop,
+    .ui-modal-panel,
+    .ui-tooltip-enter {
+      animation: ui-fade-in 120ms ease backwards;
     }
   }
 }

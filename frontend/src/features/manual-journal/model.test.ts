@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeTradePreview,
   emptyTrade,
   filterTrades,
   fromWib,
@@ -91,5 +92,41 @@ describe('manual journal domain', () => {
       'http://tradingview.com/x',
     ])
       expect(safeLink(url)).toBe(false)
+  })
+
+  it('computes live preview metrics honestly for long/short and omits incomplete ones', () => {
+    const longMetrics = computeTradePreview({
+      side: 'long',
+      entry_price: '100',
+      stop_loss: '90',
+      take_profit: '130',
+      net_pnl: '200',
+      risk_amount: '100',
+      capital_snapshot: '5000',
+      opened_at: '2026-11-25T10:00:00Z',
+      closed_at: '2026-11-25T12:15:00Z',
+    })
+    expect(longMetrics).toEqual({
+      plannedRR: '1:3.00',
+      realizedR: '+2.00R',
+      riskPercent: '2.00%',
+      gainPercent: '+4.00%',
+      holdDuration: '2j 15m',
+    })
+
+    const invalidShort = computeTradePreview({
+      side: 'short',
+      entry_price: '100',
+      stop_loss: '90',
+      take_profit: '80',
+      net_pnl: '-50',
+      risk_amount: null,
+      capital_snapshot: null,
+      opened_at: null,
+      closed_at: null,
+    })
+    expect(invalidShort.plannedRR).toBeNull()
+    expect(invalidShort.realizedR).toBeNull()
+    expect(invalidShort.holdDuration).toBeNull()
   })
 })

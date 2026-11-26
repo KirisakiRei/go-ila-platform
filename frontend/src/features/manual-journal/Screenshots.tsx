@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
+import { ExternalLink, ImagePlus } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Input } from '@/components/ui'
+import { Alert } from '@/components/ui'
 import { journalApi } from './api'
 import { journalKey } from './hooks'
+import { ConfirmButton } from './ui'
 
 export function Screenshots({
   entryId,
@@ -12,89 +14,128 @@ export function Screenshots({
   readOnly?: boolean
 }) {
   const client = useQueryClient()
+  const inputId = useId()
   const key = [...journalKey, 'screenshots', entryId]
   const query = useQuery({ queryKey: key, queryFn: () => journalApi.screenshots(entryId) })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
   return (
     <section className="space-y-3 border-t border-border pt-4">
-      <h3 className="text-sm font-semibold">Screenshot sebelum / sesudah</h3>
-      <p className="text-xs text-muted-foreground">
-        Gunakan nama berkas “sebelum” atau “sesudah” untuk membedakan bukti. Hanya pemilik yang
-        dapat membuka berkas. Maksimal 5 MiB per gambar.
-      </p>
-      {(error || query.error) && (
-        <Alert variant="destructive">{error || query.error?.message}</Alert>
-      )}
-      {query.isLoading && (
-        <p role="status" className="text-xs">
-          Memuat screenshot…
-        </p>
-      )}
-      {!query.isLoading && !query.error && !query.data?.length && (
-        <p className="text-xs text-muted-foreground">Belum ada screenshot.</p>
-      )}
-      <ul className="space-y-2">
-        {query.data?.map((shot, i) => (
-          <li key={shot.id} className="flex items-center justify-between gap-2">
-            <a
-              href={journalApi.screenshotUrl(entryId, shot.id)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="min-w-0 truncate rounded text-sm underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {shot.file_name || `Screenshot ${i + 1}`} (tab baru)
-            </a>
-            <Button
-              variant="ghost"
-              size="sm"
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">Screenshot chart</h3>
+          <p className="text-xs text-muted-foreground">
+            Privat · PNG, JPG, WebP · maks 5 MiB per gambar
+          </p>
+        </div>
+        {!readOnly && (
+          <label
+            htmlFor={inputId}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 text-xs font-medium transition-[color,background-color,transform] duration-150 ease-[var(--ease-out)] hover:bg-secondary active:scale-[0.97] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
+          >
+            <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{busy ? 'Mengunggah…' : 'Unggah gambar'}</span>
+            <input
+              id={inputId}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
               disabled={busy || readOnly}
-              onClick={async () => {
-                if (!window.confirm('Hapus screenshot ini?')) return
+              className="sr-only"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
                 setBusy(true)
                 setError('')
                 try {
-                  await journalApi.deleteScreenshot(entryId, shot.id)
+                  await journalApi.uploadScreenshot(entryId, file)
                   await client.invalidateQueries({ queryKey: journalKey })
                 } catch (err) {
-                  setError(err instanceof Error ? err.message : 'Gagal menghapus screenshot.')
+                  setError(err instanceof Error ? err.message : 'Gagal mengunggah screenshot.')
                 } finally {
                   setBusy(false)
+                  e.target.value = ''
                 }
               }}
-            >
-              Hapus
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <label className="block space-y-1 text-sm">
-        Unggah screenshot privat
-        <Input
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          disabled={busy || readOnly}
-          onChange={async (e) => {
-            const file = e.target.files?.[0]
-            if (!file) return
-            setBusy(true)
-            setError('')
-            try {
-              await journalApi.uploadScreenshot(entryId, file)
-              await client.invalidateQueries({ queryKey: journalKey })
-              e.target.value = ''
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'Gagal mengunggah screenshot.')
-            } finally {
-              setBusy(false)
-            }
-          }}
-        />
-      </label>
-      {busy && (
-        <p role="status" className="text-xs">
-          Memproses screenshot…
+            />
+          </label>
+        )}
+      </div>
+
+      {(error || query.error) && (
+        <Alert variant="destructive">{error || query.error?.message}</Alert>
+      )}
+
+      {query.isLoading && (
+        <p role="status" className="text-xs text-muted-foreground">
+          Memuat screenshot…
         </p>
+      )}
+
+      {!query.isLoading && !query.error && !query.data?.length && (
+        <p className="rounded-lg border border-dashed border-border py-5 text-center text-xs text-muted-foreground">
+          Belum ada screenshot terlampir
+        </p>
+      )}
+
+      {!!query.data?.length && (
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {query.data.map((shot, i) => {
+            const url = journalApi.screenshotUrl(entryId, shot.id)
+            const name = shot.file_name || `Screenshot ${i + 1}`
+            return (
+              <li
+                key={shot.id}
+                className="overflow-hidden rounded-lg border border-border bg-secondary/20"
+              >
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative block aspect-video overflow-hidden bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <img
+                    src={url}
+                    alt={name}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-200 ease-[var(--ease-out)] group-hover:scale-[1.02]"
+                  />
+                  <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-[10px] font-medium text-foreground backdrop-blur-sm">
+                    <ExternalLink className="h-2.5 w-2.5" aria-hidden="true" />
+                    Buka
+                  </span>
+                </a>
+                <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+                  <span className="min-w-0 truncate text-xs text-muted-foreground">{name}</span>
+                  {!readOnly && (
+                    <ConfirmButton
+                      label="Hapus"
+                      confirmLabel="Yakin?"
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      className="h-7 px-2 text-xs"
+                      onConfirm={async () => {
+                        setBusy(true)
+                        setError('')
+                        try {
+                          await journalApi.deleteScreenshot(entryId, shot.id)
+                          await client.invalidateQueries({ queryKey: journalKey })
+                        } catch (err) {
+                          setError(
+                            err instanceof Error ? err.message : 'Gagal menghapus screenshot.',
+                          )
+                        } finally {
+                          setBusy(false)
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </section>
   )

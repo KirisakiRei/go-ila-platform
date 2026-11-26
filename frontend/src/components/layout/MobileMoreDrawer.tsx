@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart3,
+  BookOpen,
   Bot,
   Bug,
   CreditCard,
@@ -101,9 +102,9 @@ export function MobileMoreDrawer({ open, onClose, user, inviteOnly = false }: Mo
               onClick={() => go('/posisi')}
             />
             <MobileMenuRow
-              icon={BarChart3}
-              label="Jurnal Manual"
-              description="Catatan trade mandiri, modal, & evaluasi"
+              icon={BookOpen}
+              label="Jurnal"
+              description="Catatan trade, kalender P&L, & evaluasi"
               onClick={() => go('/jurnal')}
             />
             <MobileMenuRow

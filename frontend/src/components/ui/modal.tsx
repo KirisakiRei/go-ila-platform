@@ -60,7 +60,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-in fade-in duration-150"
+      className="ui-modal-backdrop fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:overflow-y-auto sm:p-4"
       role="dialog"
       aria-modal="true"
       onClick={(event) => {
@@ -72,7 +72,7 @@ export function Modal({
       <div
         ref={contentRef}
         className={cn(
-          'relative max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl border border-border bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl sm:max-h-[90vh] sm:rounded-xl sm:p-6 animate-in zoom-in-95 duration-150',
+          'ui-modal-panel relative max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl border border-border bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl sm:max-h-[90vh] sm:rounded-xl sm:p-6',
           SIZE_CLASSES[size],
           className,
         )}

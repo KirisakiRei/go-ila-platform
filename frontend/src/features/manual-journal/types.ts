@@ -72,6 +72,7 @@ export interface CapitalMovement extends CapitalInput {
 }
 export interface JournalFilters {
   account_id: string
+  search?: string
   from: string
   to: string
   status: JournalStatus | ''
