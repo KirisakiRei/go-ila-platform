@@ -15,20 +15,20 @@ export function AccountBalance({
     : 'Belum lengkap'
 
   const tooltipText = complete
-    ? 'Modal awal + deposit − withdrawal + net P&L closed tercatat (seluruh riwayat akun, bukan equity broker).'
+    ? 'Modal awal + deposit − withdrawal + net P&L closed.'
     : account.unknown_closed_pnl > 0
-      ? `${account.unknown_closed_pnl} trade closed belum punya net P&L sehingga saldo belum lengkap. Nilai kosong tidak dianggap nol.`
-      : 'Data saldo belum lengkap; nilai kosong tidak dianggap nol.'
+      ? `${account.unknown_closed_pnl} trade closed belum punya P&L, jadi balance belum lengkap.`
+      : 'Data balance belum lengkap.'
 
   if (compact) {
     return (
       <div
         className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-secondary/40 px-2.5 py-1.5 text-xs"
-        aria-label={`Saldo terealisasi ${account.name}`}
+        aria-label={`Balance ${account.name}`}
       >
-        <span className="text-muted-foreground">Saldo</span>
+        <span className="text-muted-foreground">Balance</span>
         <span className="font-semibold tabular-nums text-foreground">{valueText}</span>
-        <InfoTooltip label={`Info saldo ${account.name}`} content={tooltipText} align="end" />
+        <InfoTooltip label={`Info balance ${account.name}`} content={tooltipText} align="end" />
       </div>
     )
   }
@@ -36,11 +36,11 @@ export function AccountBalance({
   return (
     <div
       className="flex items-center gap-1.5 text-xs text-muted-foreground"
-      aria-label={`Saldo terealisasi ${account.name}`}
+      aria-label={`Balance ${account.name}`}
     >
-      <span>Saldo terealisasi</span>
+      <span>Balance</span>
       <span className="font-semibold tabular-nums text-foreground">{valueText}</span>
-      <InfoTooltip label={`Info saldo ${account.name}`} content={tooltipText} align="start" />
+      <InfoTooltip label={`Info balance ${account.name}`} content={tooltipText} align="start" />
     </div>
   )
 }

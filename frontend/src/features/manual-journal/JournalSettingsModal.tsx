@@ -13,9 +13,9 @@ import { SegmentedControl } from './ui'
 export type SettingsTab = 'accounts' | 'capital' | 'ai' | 'csv'
 
 const TABS = [
-  { value: 'accounts', label: 'Akun' },
+  { value: 'accounts', label: 'Jurnal' },
   { value: 'capital', label: 'Modal' },
-  { value: 'ai', label: 'AI & Privasi' },
+  { value: 'ai', label: 'AI' },
   { value: 'csv', label: 'CSV' },
 ] as const
 
@@ -52,7 +52,7 @@ export function JournalSettingsModal({
         if (!busy) onClose()
       }}
       title="Pengaturan jurnal"
-      description="Kelola akun, modal, preferensi insight AI, serta impor/ekspor CSV."
+      description="Atur daftar jurnal, modal, AI, dan CSV."
       size="2xl"
     >
       <div className="space-y-5">
@@ -95,7 +95,7 @@ export function JournalSettingsModal({
               <div className="min-w-0">
                 <p className="text-sm font-semibold">Ekspor CSV</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Mengikuti filter aktif di halaman utama · maks 500 baris / 1 MiB.
+                  Sesuai filter aktif · maks 500 baris.
                 </p>
               </div>
               <Button

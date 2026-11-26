@@ -28,8 +28,7 @@ export function CSVImport({
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Impor memakai format CSV ekspor Jurnal (maks 500 baris / 1 MiB). Data divalidasi dulu
-        sebelum disimpan.
+        Gunakan format CSV ekspor Jurnal (maks 500 baris / 1 MiB).
       </p>
 
       {error && <Alert variant="destructive">{error}</Alert>}
@@ -96,7 +95,7 @@ export function CSVImport({
               <caption className="sr-only">Preview impor, maksimal 20 baris pertama</caption>
               <thead className="bg-secondary/50 text-muted-foreground">
                 <tr>
-                  {['Akun', 'Aset', 'Status', 'Net P&L'].map((h) => (
+                  {['Jurnal', 'Pair', 'Status', 'Net P&L'].map((h) => (
                     <th key={h} className="px-3 py-2 font-medium" scope="col">
                       {h}
                     </th>

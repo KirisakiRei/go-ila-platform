@@ -525,7 +525,7 @@ export function TradeDetail({
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {account?.name ?? 'Akun jurnal'}
+            {account?.name ?? 'Jurnal'}
             {trade.setup ? ` · ${trade.setup}` : ''}
             {trade.session ? ` · Sesi ${trade.session}` : ''}
           </p>
@@ -600,7 +600,7 @@ export function TradeDetail({
           )}
           {trade.mistakes.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">Kesalahan:</span>
+              <span className="text-xs text-muted-foreground">Mistake:</span>
               {trade.mistakes.map((item) => (
                 <span
                   key={item}
@@ -631,7 +631,7 @@ export function TradeDetail({
       {trade.checklist.length > 0 && (
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <h4 className="text-xs font-medium text-muted-foreground">
               Checklist
             </h4>
             <span className="text-xs tabular-nums text-muted-foreground">
@@ -659,7 +659,7 @@ export function TradeDetail({
       {/* Catatan refleksi */}
       {trade.notes && (
         <section className="space-y-1.5">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h4 className="text-xs font-medium text-muted-foreground">
             Catatan
           </h4>
           <p className="whitespace-pre-wrap break-words rounded-lg border border-border/70 bg-secondary/20 p-3 text-sm leading-relaxed">
@@ -697,8 +697,8 @@ function Evidence({ trade }: { trade: JournalTrade }) {
   const links = trade.tradingview_urls.filter(safeLink)
   return links.length ? (
     <section className="space-y-1.5">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        TradingView
+      <h4 className="text-xs font-medium text-muted-foreground">
+        Link TradingView
       </h4>
       <div className="flex flex-wrap gap-2">
         {links.map((url, i) => (

@@ -104,6 +104,10 @@ func (h *ManualJournalHandler) saveAccount(c *gin.Context, id string) {
 func (h *ManualJournalHandler) CreateAccount(c *gin.Context) { h.saveAccount(c, "") }
 func (h *ManualJournalHandler) UpdateAccount(c *gin.Context) { h.saveAccount(c, c.Param("id")) }
 func (h *ManualJournalHandler) ArchiveAccount(c *gin.Context) {
+	if c.Query("permanent") == "true" {
+		manualJournalReply(c, nil, h.svc.DeleteAccount(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id")), false)
+		return
+	}
 	manualJournalReply(c, nil, h.svc.ArchiveAccount(c.Request.Context(), middleware.CurrentUserID(c), c.Param("id")), false)
 }
 func (h *ManualJournalHandler) ListCapital(c *gin.Context) {

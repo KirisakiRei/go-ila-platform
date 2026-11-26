@@ -103,6 +103,36 @@ func (r *ManualJournalRepository) Update(ctx context.Context, user, id string, v
 	return nil
 }
 func (r *ManualJournalRepository) Delete(ctx context.Context, user, id string, v any) error {
+	if _, ok := v.(*model.ManualJournalAccount); ok {
+		return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			q := tx.Where("user_id = ? AND id = ?", user, id).Delete(v)
+			if q.Error != nil {
+				return q.Error
+			}
+			if q.RowsAffected == 0 {
+				return apperror.ErrNotFound
+			}
+			var entryIDs []string
+			if err := tx.Model(&model.ManualJournalEntry{}).Where("user_id = ? AND account_id = ?", user, id).Pluck("id", &entryIDs).Error; err != nil {
+				return err
+			}
+			if len(entryIDs) > 0 {
+				if err := tx.Where("user_id = ? AND entry_id IN ?", user, entryIDs).Delete(&model.ManualJournalScreenshot{}).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Where("user_id = ? AND account_id = ?", user, id).Delete(&model.ManualJournalEntry{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ? AND account_id = ?", user, id).Delete(&model.ManualJournalCapital{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("user_id = ? AND account_id = ?", user, id).Delete(&model.ManualJournalReview{}).Error; err != nil {
+				return err
+			}
+			return tx.Where("user_id = ? AND account_id = ?", user, id).Delete(&model.ManualJournalReviewSetting{}).Error
+		})
+	}
 	if _, ok := v.(*model.ManualJournalEntry); ok {
 		return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			q := tx.Where("user_id = ? AND id = ?", user, id).Delete(v)
@@ -130,7 +160,10 @@ func (r *ManualJournalRepository) ScreenshotTombstones(ctx context.Context, user
 	rows := []model.ManualJournalScreenshot{}
 	q := r.db.WithContext(ctx).Unscoped().Where("deleted_at IS NOT NULL")
 	if user != "" {
-		q = q.Where("user_id = ? AND entry_id = ?", user, entry)
+		q = q.Where("user_id = ?", user)
+	}
+	if entry != "" {
+		q = q.Where("entry_id = ?", entry)
 	}
 	err := q.Order("deleted_at ASC, id ASC").Limit(100).Find(&rows).Error
 	return rows, err

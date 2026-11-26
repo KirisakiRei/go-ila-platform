@@ -40,13 +40,13 @@ export function JournalReview({
   const text =
     review.data?.text ||
     (pending
-      ? 'Menyiapkan insight harian berdasarkan riwayat trade akun ini…'
-      : 'Catat beberapa trade closed untuk melihat insight otomatis harian')
+      ? 'Menyiapkan insight harian…'
+      : 'Catat trade closed untuk melihat insight harian')
 
   const sourceLabel = isAI ? 'AI' : review.data?.source === 'rules' ? 'Aturan' : 'Menunggu'
   const metaTip = review.data
-    ? `Ringkasan otomatis akun sampai ${review.data.date} WIB (diperbarui ${wibTime(review.data.updated_at)} WIB). Sumber: ${sourceLabel}. Tidak memengaruhi order broker.`
-    : 'Insight otomatis harian dalam WIB.'
+    ? `Update ${wibTime(review.data.updated_at)} WIB · Sumber: ${sourceLabel}`
+    : 'Insight harian otomatis (WIB).'
 
   return (
     <div
@@ -112,12 +112,10 @@ export function JournalAIPreferences({ accountId }: { accountId?: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-secondary/35 p-3.5 text-xs leading-relaxed text-muted-foreground">
-        Jika AI diaktifkan, server hanya mengirim <strong className="font-medium text-foreground">angka agregat</strong>{' '}
-        (jumlah trade, win/loss/BE, net P&amp;L, win rate, drawdown). Catatan pribadi, tag, emosi,
-        checklist, tautan, dan screenshot <strong className="font-medium text-foreground">tidak pernah dikirim</strong>.
-        Evaluasi aturan tetap aktif meski AI dimatikan.
-      </div>
+      <p className="rounded-lg border border-border bg-secondary/35 p-3.5 text-xs leading-relaxed text-muted-foreground">
+        Saat AI aktif, sistem hanya membaca ringkasan angka (jumlah trade, win rate, net P&amp;L,
+        drawdown). Catatan, tag, emosi, checklist, link, dan screenshot tetap privat.
+      </p>
 
       {(error || settings.error || globalSettings.error) && (
         <Alert variant="destructive">
@@ -147,10 +145,10 @@ export function JournalAIPreferences({ accountId }: { accountId?: string }) {
         <label className="flex cursor-pointer items-center justify-between gap-4 p-3.5">
           <span className="min-w-0">
             <span className="block text-sm font-medium text-foreground">
-              Izinkan insight AI untuk seluruh jurnal
+              Aktifkan insight AI
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
-              Default mati. Harus aktif agar akun mana pun bisa memakai rangkuman AI.
+              Berlaku untuk semua jurnal. Jika mati, hanya evaluasi aturan yang jalan.
             </span>
           </span>
           <input
@@ -167,10 +165,10 @@ export function JournalAIPreferences({ accountId }: { accountId?: string }) {
           <label className="flex cursor-pointer items-center justify-between gap-4 p-3.5">
             <span className="min-w-0">
               <span className="block text-sm font-medium text-foreground">
-                Izinkan insight AI untuk akun aktif
+                Aktifkan AI untuk jurnal ini
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                Matikan jika ingin akun ini hanya memakai evaluasi aturan.
+                Matikan jika jurnal ini cukup pakai evaluasi aturan.
               </span>
             </span>
             <input
@@ -187,9 +185,9 @@ export function JournalAIPreferences({ accountId }: { accountId?: string }) {
 
       {settings.data && (
         <p role="status" className="text-xs text-muted-foreground">
-          Status saat ini:{' '}
+          Status:{' '}
           <span className="font-medium text-foreground">
-            {settings.data.effective_ai_enabled ? 'AI aktif (fallback aturan jika gagal)' : 'Hanya aturan'}
+            {settings.data.effective_ai_enabled ? 'AI aktif' : 'Hanya aturan'}
           </span>
         </p>
       )}

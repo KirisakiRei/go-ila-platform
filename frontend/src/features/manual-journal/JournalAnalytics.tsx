@@ -15,7 +15,7 @@ export function JournalKpiStrip({ stats }: { stats: JournalStats }) {
       value: stats.trades ? formatSignedAmount(stats.net_pnl, currency) : formatAmount(0, currency),
       sub: `${stats.trades} trade closed`,
       tone: stats.trades ? pnlTone(netNum) : 'text-foreground',
-      tip: 'Jumlah net P&L seluruh trade closed yang memiliki nominal P&L pada filter aktif. Tidak termasuk modal awal atau deposit/withdrawal.',
+      tip: 'Total net P&L dari trade closed sesuai filter.',
       align: 'start' as const,
     },
     {
@@ -23,7 +23,7 @@ export function JournalKpiStrip({ stats }: { stats: JournalStats }) {
       value: stats.wins + stats.losses > 0 ? `${Number(stats.win_rate).toFixed(1)}%` : '—',
       sub: `${stats.wins}W · ${stats.losses}L · ${stats.breakeven}BE`,
       tone: 'text-foreground',
-      tip: 'Persentase trade profit dibanding total win + loss (breakeven tidak masuk pembagi).',
+      tip: 'Win dibagi (win + loss). Breakeven tidak dihitung.',
       align: 'center' as const,
     },
     {
@@ -31,15 +31,15 @@ export function JournalKpiStrip({ stats }: { stats: JournalStats }) {
       value: stats.profit_factor === null ? '—' : Number(stats.profit_factor).toFixed(2),
       sub: `Avg +${formatAmount(stats.average_win, currency)} / −${formatAmount(stats.average_loss, currency)}`,
       tone: 'text-foreground',
-      tip: 'Total profit dibagi total absolut loss pada filter aktif. Tampil — bila belum ada trade loss.',
+      tip: 'Total profit dibagi total loss. Tampil — jika belum ada loss.',
       align: 'center' as const,
     },
     {
       label: 'Max drawdown',
       value: Number(stats.max_drawdown) > 0 ? `−${formatAmount(stats.max_drawdown, currency)}` : formatAmount(0, currency),
-      sub: 'Penurunan puncak ke lembah',
+      sub: 'Dari peak equity',
       tone: Number(stats.max_drawdown) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-foreground',
-      tip: 'Penurunan nominal terbesar dari puncak ke lembah akumulasi net P&L closed secara kronologis pada filter aktif.',
+      tip: 'Penurunan terbesar dari peak equity pada filter aktif.',
       align: 'end' as const,
     },
   ]
@@ -67,10 +67,10 @@ export function JournalKpiStrip({ stats }: { stats: JournalStats }) {
 
 const BREAKDOWN_OPTIONS = [
   { value: 'setup', label: 'Setup' },
-  { value: 'asset', label: 'Aset' },
+  { value: 'asset', label: 'Pair' },
   { value: 'session', label: 'Sesi' },
   { value: 'emotion', label: 'Emosi' },
-  { value: 'mistake', label: 'Kesalahan' },
+  { value: 'mistake', label: 'Mistake' },
   { value: 'tag', label: 'Tag' },
   { value: 'side', label: 'Arah' },
 ] as const
@@ -118,9 +118,9 @@ export function JournalAnalytics({
         <Card className="min-w-0 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold">Kurva hasil terealisasi</h2>
+              <h2 className="text-sm font-semibold">Equity curve</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Akumulasi net P&amp;L closed · WIB
+                Net P&amp;L kumulatif · WIB
               </p>
             </div>
             {activePoint ? (
@@ -141,14 +141,14 @@ export function JournalAnalytics({
 
           {!points.length ? (
             <p className="py-14 text-center text-sm text-muted-foreground">
-              Kurva muncul setelah ada trade closed
+              Equity curve muncul setelah ada trade closed
             </p>
           ) : (
             <>
               <svg
                 viewBox="0 0 680 184"
                 role="img"
-                aria-label={`Kurva net P&L terealisasi ${currency}`}
+                aria-label={`Equity curve ${currency}`}
                 className={cn(
                   'mt-4 w-full',
                   positiveCurve
@@ -225,7 +225,7 @@ export function JournalAnalytics({
             <InfoTooltip
               label="Info breakdown performa"
               align="end"
-              content="Untuk kategori multi-label (tag, emosi, kesalahan), satu trade dapat muncul di lebih dari satu baris sehingga jumlahnya bisa tumpang tindih."
+              content="Trade dengan lebih dari satu label dihitung di tiap kategorinya."
             />
           </div>
 
@@ -282,12 +282,12 @@ export function JournalAnalytics({
 
       <Card className="p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Temuan aturan (sesuai filter)</h2>
-          <span className="text-[11px] text-muted-foreground">Deterministik · tanpa AI</span>
+          <h2 className="text-sm font-semibold">Catatan pola</h2>
+          <span className="text-[11px] text-muted-foreground">Otomatis · berbasis aturan</span>
         </div>
         {!insights.length ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            Belum ada pola berisiko yang terdeteksi pada filter ini
+            Belum ada pola berisiko pada filter ini
           </p>
         ) : (
           <ul className="mt-3 space-y-2 text-sm">

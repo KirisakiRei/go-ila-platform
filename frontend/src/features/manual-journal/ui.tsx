@@ -5,11 +5,12 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Plus, X } from 'lucide-react'
+import { ImagePlus, Info, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { mergeChipDraft } from './model'
@@ -211,6 +212,7 @@ export function SegmentedControl<T extends string>({
   size = 'md',
   fullWidth = false,
   disabled = false,
+  invalid = false,
   className,
 }: {
   value: T | ''
@@ -220,14 +222,17 @@ export function SegmentedControl<T extends string>({
   size?: 'sm' | 'md'
   fullWidth?: boolean
   disabled?: boolean
+  invalid?: boolean
   className?: string
 }) {
   return (
     <div
       role="group"
       aria-label={ariaLabel}
+      aria-invalid={invalid || undefined}
       className={cn(
-        'inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/50 p-1',
+        'inline-flex items-center gap-1 rounded-lg border bg-secondary/50 p-1',
+        invalid ? 'border-destructive ring-1 ring-destructive/40' : 'border-border',
         fullWidth && 'grid w-full',
         className,
       )}
@@ -260,7 +265,14 @@ export function SegmentedControl<T extends string>({
           >
             <span className="truncate">{opt.label}</span>
             {opt.badge !== undefined && opt.badge !== '' && opt.badge !== 0 && (
-              <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+              <span
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums',
+                  typeof opt.badge === 'string' && opt.badge.includes('error')
+                    ? 'bg-destructive/15 text-destructive'
+                    : 'bg-secondary text-muted-foreground',
+                )}
+              >
                 {opt.badge}
               </span>
             )}
@@ -282,6 +294,7 @@ export function ChipInput({
   suggestions,
   disabled = false,
   maxItems = 30,
+  error,
 }: {
   id?: string
   label: string
@@ -293,6 +306,7 @@ export function ChipInput({
   suggestions?: readonly string[]
   disabled?: boolean
   maxItems?: number
+  error?: string
 }) {
   const [internalDraft, setInternalDraft] = useState('')
   const draft = draftValue ?? internalDraft
@@ -336,7 +350,10 @@ export function ChipInput({
       </label>
       <div
         className={cn(
-          'flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 py-1.5 transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1',
+          'flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 transition-colors focus-within:ring-2 focus-within:ring-offset-1',
+          error
+            ? 'border-destructive focus-within:ring-destructive'
+            : 'border-input focus-within:ring-ring',
           disabled && 'opacity-60',
         )}
       >
@@ -385,6 +402,11 @@ export function ChipInput({
           )}
         </div>
       </div>
+      {error && (
+        <p role="alert" className="text-[11px] font-medium text-destructive">
+          {error}
+        </p>
+      )}
       {suggestions && suggestions.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {suggestions.map((item) => {
@@ -475,5 +497,95 @@ export function ConfirmButton({
         Batal
       </Button>
     </span>
+  )
+}
+
+export function ImageDropzone({
+  id,
+  multiple = true,
+  disabled = false,
+  busy = false,
+  hint = 'PNG, JPG, WebP, GIF · maks 5 MiB',
+  ariaLabel = 'Unggah gambar chart',
+  onFiles,
+}: {
+  id: string
+  multiple?: boolean
+  disabled?: boolean
+  busy?: boolean
+  hint?: string
+  ariaLabel?: string
+  onFiles: (files: File[]) => void
+}) {
+  const [dragging, setDragging] = useState(false)
+  const dragDepthRef = useRef(0)
+
+  function handleDragEnter(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    if (disabled || busy) return
+    dragDepthRef.current += 1
+    setDragging(true)
+  }
+
+  function handleDragOver(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    if (disabled || busy) return
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setDragging(false)
+  }
+
+  function handleDrop(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    dragDepthRef.current = 0
+    setDragging(false)
+    if (disabled || busy) return
+    const dropped = Array.from(e.dataTransfer.files ?? [])
+    if (dropped.length) onFiles(dropped)
+  }
+
+  return (
+    <label
+      htmlFor={id}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        'flex min-h-[76px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-3.5 text-center transition-[color,background-color,border-color] duration-150 ease-[var(--ease-out)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1',
+        dragging
+          ? 'border-foreground/60 bg-secondary/60 text-foreground'
+          : 'border-border bg-secondary/20 text-muted-foreground hover:bg-secondary/35',
+        (disabled || busy) && 'pointer-events-none opacity-60',
+      )}
+    >
+      <ImagePlus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      <span className="text-xs font-medium text-foreground">
+        {busy
+          ? 'Mengunggah gambar…'
+          : dragging
+            ? 'Lepas gambar di sini'
+            : 'Tarik & lepas chart di sini, atau klik pilih gambar'}
+      </span>
+      <span className="text-[11px] text-muted-foreground">{hint}</span>
+      <input
+        id={id}
+        type="file"
+        multiple={multiple}
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        disabled={disabled || busy}
+        aria-label={ariaLabel}
+        className="sr-only"
+        onChange={(e) => {
+          const picked = Array.from(e.target.files ?? [])
+          if (picked.length) onFiles(picked)
+          e.target.value = ''
+        }}
+      />
+    </label>
   )
 }

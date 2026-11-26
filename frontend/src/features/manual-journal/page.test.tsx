@@ -87,19 +87,19 @@ beforeEach(() => {
 })
 
 describe('standalone journal UI', () => {
-  it('renders Jurnal title, compact realized balance tooltip, and single settings modal', async () => {
+  it('renders Jurnal title, compact balance tooltip, and single settings modal', async () => {
     wrap(<ManualJournalPage />)
-    expect(await screen.findByLabelText('Saldo terealisasi Akun mandiri')).toHaveTextContent(
+    expect(await screen.findByLabelText('Balance Akun mandiri')).toHaveTextContent(
       '1.012,3456',
     )
     expect(screen.getByRole('heading', { name: 'Jurnal' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Info saldo Akun mandiri' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/bukan equity broker/)
+    fireEvent.click(screen.getByRole('button', { name: 'Info balance Akun mandiri' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Modal awal \+ deposit/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Pengaturan jurnal' }))
     expect(screen.getByText('Pengaturan jurnal')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'AI & Privasi' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'AI' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'CSV' })).toBeInTheDocument()
   })
 
@@ -113,19 +113,19 @@ describe('standalone journal UI', () => {
     )
     wrap(<AccountManager accounts={[account, other]} />)
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit$/ })[0]!)
-    fireEvent.change(screen.getByLabelText('Nama akun'), { target: { value: 'Draft pertama' } })
+    fireEvent.change(screen.getByLabelText('Nama jurnal'), { target: { value: 'Draft pertama' } })
     fireEvent.click(screen.getByRole('button', { name: 'Simpan perubahan' }))
     await waitFor(() => expect(save).toHaveBeenCalledOnce())
 
     expect(screen.getByRole('button', { name: 'Batal' })).toBeDisabled()
-    expect(screen.getByLabelText('Nama akun')).toBeDisabled()
+    expect(screen.getByLabelText('Nama jurnal')).toBeDisabled()
 
     await act(async () => {
       finish(account)
     })
     await waitFor(() => expect(screen.getAllByRole('button', { name: /^Edit$/ })[1]).toBeEnabled())
     fireEvent.click(screen.getAllByRole('button', { name: /^Edit$/ })[1]!)
-    expect(screen.getByLabelText('Nama akun')).toHaveValue(other.name)
+    expect(screen.getByLabelText('Nama jurnal')).toHaveValue(other.name)
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Draft pertama' }),
       account.id,
@@ -169,13 +169,13 @@ describe('standalone journal UI', () => {
       }
 
       await waitFor(() => expect(operation === 'save' ? save : remove).toHaveBeenCalledOnce())
-      expect(screen.getByLabelText('Akun')).toBeDisabled()
+      expect(screen.getByLabelText('Jurnal')).toBeDisabled()
       expect(screen.getByLabelText('Jumlah (USD)')).toBeDisabled()
 
       await act(async () => {
         finish()
       })
-      await waitFor(() => expect(screen.getByLabelText('Akun')).toBeEnabled())
+      await waitFor(() => expect(screen.getByLabelText('Jurnal')).toBeEnabled())
       fireEvent.click(
         within(screen.getByText('Modal kedua').closest('li')!).getByRole('button', {
           name: 'Edit',
@@ -197,11 +197,20 @@ describe('standalone journal UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Yakin arsip?' }))
     await waitFor(() => expect(archive).toHaveBeenCalledOnce())
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Akun baru' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Tambah jurnal' })).toBeDisabled()
     await act(async () => {
       finish()
     })
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled())
+  })
+
+  it('deletes a journal permanently via inline confirmation', async () => {
+    const del = vi.spyOn(journalApi, 'deleteAccount').mockResolvedValue(undefined)
+    wrap(<AccountManager accounts={[account]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Hapus' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hapus permanen?' }))
+    await waitFor(() => expect(del).toHaveBeenCalledOnce())
+    expect(del.mock.calls[0]?.[0]).toBe(account.id)
   })
 
   it('never renders null or incomplete balance as zero, but renders a known zero', () => {
@@ -216,8 +225,8 @@ describe('standalone journal UI', () => {
       />,
     )
     expect(screen.getByText('Belum lengkap')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Info saldo Akun mandiri' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/2 trade closed belum punya net P&L/)
+    fireEvent.click(screen.getByRole('button', { name: 'Info balance Akun mandiri' }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/2 trade closed belum punya P&L/)
     view.unmount()
 
     wrap(
@@ -226,7 +235,7 @@ describe('standalone journal UI', () => {
       />,
     )
     expect(screen.queryByText('Belum lengkap')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Saldo terealisasi Akun mandiri')).toHaveTextContent('0,00')
+    expect(screen.getByLabelText('Balance Akun mandiri')).toHaveTextContent('0,00')
   })
 
   it('provides hover and focus tooltips for all 4 KPI items without inline disclosure arrows', () => {
@@ -237,18 +246,18 @@ describe('standalone journal UI', () => {
 
     const winRate = screen.getByRole('button', { name: 'Definisi Win rate' })
     fireEvent.focus(winRate)
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/breakeven tidak masuk pembagi/i)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/Breakeven tidak dihitung/i)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('shows independent account onboarding and does not request stats without account', async () => {
+  it('shows independent journal onboarding and does not request stats without journal', async () => {
     vi.mocked(journalApi.accounts).mockResolvedValue({ data: [] })
     wrap(<ManualJournalPage />)
-    expect(await screen.findByRole('button', { name: 'Buat akun jurnal' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Tambah jurnal' })).toBeInTheDocument()
     expect(journalApi.stats).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Buat akun jurnal' }))
-    expect(screen.getByLabelText('Nama akun')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Tambah jurnal' }))
+    expect(screen.getByLabelText('Nama jurnal')).toBeInTheDocument()
   })
 
   it('opens daily recap and trade cards on calendar selection', () => {
@@ -323,7 +332,7 @@ describe('standalone journal UI', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Evaluasi & Bukti/ }))
     fireEvent.click(screen.getByRole('button', { name: '+ Disiplin' }))
-    const tagInput = screen.getByLabelText('Tag kustom')
+    const tagInput = screen.getByLabelText('Tag')
     fireEvent.change(tagInput, { target: { value: 'London, NY' } })
     fireEvent.keyDown(tagInput, { key: 'Enter' })
 
@@ -347,7 +356,7 @@ describe('standalone journal UI', () => {
     const save = vi.spyOn(journalApi, 'saveAccount').mockResolvedValue(original)
     wrap(<AccountManager accounts={[original]} />)
     fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
-    fireEvent.change(screen.getByLabelText('Nama akun'), { target: { value: 'Renamed' } })
+    fireEvent.change(screen.getByLabelText('Nama jurnal'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByRole('button', { name: 'Simpan perubahan' }))
     await waitFor(() =>
       expect(save).toHaveBeenCalledWith(
@@ -385,7 +394,7 @@ describe('standalone journal UI', () => {
 
   it('keeps InfoTooltip open on pointerDown+focus+click sequence without closing immediately', async () => {
     wrap(<AccountBalance account={account} />)
-    const trigger = screen.getByRole('button', { name: 'Info saldo Akun mandiri' })
+    const trigger = screen.getByRole('button', { name: 'Info balance Akun mandiri' })
     fireEvent.pointerDown(trigger)
     fireEvent.focus(trigger)
     fireEvent.click(trigger)
@@ -427,7 +436,7 @@ describe('standalone journal UI', () => {
 
     // Switch to Evaluasi & Bukti, type chip draft without pressing Enter, and type invalid TradingView URL
     fireEvent.click(screen.getByRole('button', { name: /Evaluasi & Bukti/ }))
-    fireEvent.change(screen.getByLabelText('Tag kustom'), { target: { value: 'NY-open' } })
+    fireEvent.change(screen.getByLabelText('Tag'), { target: { value: 'NY-open' } })
     fireEvent.change(screen.getByPlaceholderText('https://www.tradingview.com/x/...'), {
       target: { value: 'http://evil.example.com/chart' },
     })
@@ -435,12 +444,20 @@ describe('standalone journal UI', () => {
     // Switch back to Inti Trade -> submit should validate and auto-switch back to review tab
     fireEvent.click(screen.getByRole('button', { name: 'Inti Trade' }))
     fireEvent.click(screen.getByRole('button', { name: 'Simpan trade' }))
-    expect(await screen.findByText(/tautan HTTPS TradingView/i)).toBeInTheDocument()
-    expect(screen.getByLabelText('Tag kustom')).toBeInTheDocument()
+    expect(await screen.findByText(/Link TradingView: Gunakan link HTTPS/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Tag')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('https://www.tradingview.com/x/...')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
 
-    // Remove invalid URL and submit again; unsubmitted chip should already be preserved
+    // Remove invalid URL, drag-and-drop a chart image, and submit again
     fireEvent.click(screen.getByRole('button', { name: /Hapus http:\/\/evil\.example\.com\/chart/ }))
-    fireEvent.change(screen.getByLabelText('Kondisi emosi'), { target: { value: 'Fokus' } })
+    fireEvent.change(screen.getByLabelText('Psikologi / Emosi'), { target: { value: 'Fokus' } })
+    const dropzone = screen.getByLabelText('Pilih gambar').closest('label')!
+    const droppedImg = new File(['png'], 'drop.png', { type: 'image/png' })
+    fireEvent.drop(dropzone, { dataTransfer: { files: [droppedImg] } })
+    expect(screen.getByAltText('drop.png')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Simpan trade' }))
 
     await waitFor(() =>
@@ -453,7 +470,7 @@ describe('standalone journal UI', () => {
           tags: ['NY-open'],
           emotions: ['Fokus'],
         }),
-        [],
+        [droppedImg],
       ),
     )
   })
@@ -541,5 +558,74 @@ describe('standalone journal UI', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Hapus' }))
     fireEvent.click(within(row).getByRole('button', { name: 'Yakin?' }))
     await waitFor(() => expect(screen.getByText('Catat deposit / withdrawal')).toBeInTheDocument())
+  })
+
+  it('highlights invalid capital_snapshot in red with human label and accepts comma decimal after fix', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    wrap(
+      <TradeForm
+        initial={{ ...emptyTrade('a1'), status: 'draft', size_unit: 'lot' }}
+        accounts={[account]}
+        pending={false}
+        onSave={save}
+        onCancel={() => {}}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Evaluasi & Bukti/ }))
+    const capInput = screen.getByLabelText(/Modal saat entry/)
+    fireEvent.change(capInput, { target: { value: 'abc' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Inti Trade' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Simpan trade' }))
+
+    expect(await screen.findByText(/Modal saat entry:/)).toBeInTheDocument()
+    expect(screen.queryByText(/capital_snapshot/)).not.toBeInTheDocument()
+    const invalidCap = screen.getByLabelText(/Modal saat entry/)
+    expect(invalidCap).toHaveAttribute('aria-invalid', 'true')
+    expect(invalidCap.className).toContain('border-destructive')
+
+    fireEvent.change(invalidCap, { target: { value: '1000,50' } })
+    expect(invalidCap).not.toHaveAttribute('aria-invalid', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Simpan trade' }))
+
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({ capital_snapshot: '1000.50' }),
+        [],
+      ),
+    )
+  })
+
+  it('blocks inverted Buy TP/SL with red outline and clears error when toggling to Sell', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    wrap(
+      <TradeForm
+        initial={{ ...emptyTrade('a1'), status: 'draft', side: 'long', size_unit: 'lot' }}
+        accounts={[account]}
+        pending={false}
+        onSave={save}
+        onCancel={() => {}}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText('Entry'), { target: { value: '3500' } })
+    fireEvent.change(screen.getByLabelText('Stop loss'), { target: { value: '3510' } })
+    fireEvent.change(screen.getByLabelText('Take profit'), { target: { value: '3480' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Simpan trade' }))
+
+    expect(await screen.findByText(/Untuk Buy, Stop loss harus lebih rendah dari Entry/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Take profit')).toHaveAttribute('aria-invalid', 'true')
+    expect(save).not.toHaveBeenCalled()
+
+    // Switching to Sell makes SL=3510 > Entry=3500 > TP=3480 valid and clears red outlines
+    fireEvent.click(screen.getByRole('button', { name: 'Sell / Short' }))
+    expect(screen.getByLabelText('Take profit')).not.toHaveAttribute('aria-invalid', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Simpan trade' }))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith(
+        expect.objectContaining({ side: 'short', entry_price: '3500', stop_loss: '3510', take_profit: '3480' }),
+        [],
+      ),
+    )
   })
 })

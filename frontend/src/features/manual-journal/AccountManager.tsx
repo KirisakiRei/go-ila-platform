@@ -5,7 +5,14 @@ import { Alert, Button, Input, Select } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { journalApi } from './api'
 import { journalKey, useJournalMutation } from './hooks'
-import { formatAmount, mergeChipDraft, validateDecimal, wibDay } from './model'
+import {
+  formatAmount,
+  friendlyJournalError,
+  mergeChipDraft,
+  normalizeDecimalInput,
+  validateDecimal,
+  wibDay,
+} from './model'
 import { AccountBalance } from './AccountBalance'
 import type { AccountInput, CapitalInput, CapitalMovement, JournalAccount } from './types'
 import { ChipInput, ConfirmButton, SegmentedControl } from './ui'
@@ -42,16 +49,21 @@ export function AccountsPanel({
   const [form, setForm] = useState<AccountInput>(blankAccount)
   const [checklistDraft, setChecklistDraft] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<'name' | 'currency' | 'initial_capital' | 'initial_date' | 'checklist', string>>
+  >({})
 
   const save = useJournalMutation(({ input, id }: { input: AccountInput; id?: string }) =>
     journalApi.saveAccount(input, id),
   )
   const archive = useJournalMutation(journalApi.archiveAccount)
+  const remove = useJournalMutation(journalApi.deleteAccount)
 
   function openNew() {
     setEditing(null)
     setForm(blankAccount())
     setChecklistDraft('')
+    setFieldErrors({})
     setError('')
     setMode('form')
   }
@@ -69,6 +81,7 @@ export function AccountsPanel({
       checklist: [...account.checklist],
     })
     setChecklistDraft('')
+    setFieldErrors({})
     setError('')
     setMode('form')
   }
@@ -77,6 +90,7 @@ export function AccountsPanel({
     setEditing(null)
     setForm(blankAccount())
     setChecklistDraft('')
+    setFieldErrors({})
     setError('')
     setMode('list')
   }
@@ -88,29 +102,49 @@ export function AccountsPanel({
       setForm((prev) => ({ ...prev, checklist }))
     }
     if (checklistDraft.trim()) setChecklistDraft('')
-    const payload: AccountInput = { ...form, checklist }
-    if (
-      !payload.name.trim() ||
-      !/^[A-Z]{3}$/.test(payload.currency) ||
-      !validateDecimal(payload.initial_capital) ||
-      payload.checklist.length > 30
-    ) {
-      setError(
-        'Isi nama akun, mata uang 3 huruf, modal awal valid (maks 4 desimal), dan checklist maks 30 item.',
-      )
+    const normalizedCapital = normalizeDecimalInput(form.initial_capital) ?? ''
+    const payload: AccountInput = {
+      ...form,
+      name: form.name.trim(),
+      currency: form.currency.trim().toUpperCase(),
+      initial_capital: normalizedCapital,
+      checklist,
+    }
+    const nextErrors: Partial<
+      Record<'name' | 'currency' | 'initial_capital' | 'initial_date' | 'checklist', string>
+    > = {}
+    if (!payload.name) nextErrors.name = 'Nama jurnal wajib diisi.'
+    if (!/^[A-Z]{3}$/.test(payload.currency)) {
+      nextErrors.currency = 'Gunakan 3 huruf mata uang (mis. USD, IDR).'
+    }
+    if (!payload.initial_capital || !validateDecimal(payload.initial_capital)) {
+      nextErrors.initial_capital = payload.initial_capital.startsWith('-')
+        ? 'Tidak boleh negatif.'
+        : 'Gunakan angka valid (maks 4 desimal, contoh: 1000.00).'
+    }
+    if (!payload.initial_date) nextErrors.initial_date = 'Pilih tanggal mulai.'
+    if (payload.checklist.length > 30) nextErrors.checklist = 'Maksimal 30 item checklist.'
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      setError('Periksa kolom yang ditandai merah.')
       return
     }
+    setFieldErrors({})
+    setError('')
     try {
       await save.mutateAsync({ input: payload, id: editing?.id })
       backToList()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan akun.')
+      setError(friendlyJournalError(err, 'Gagal menyimpan jurnal.'))
     }
   }
 
   if (mode === 'form') {
+    const errCls = (key: keyof typeof fieldErrors) =>
+      fieldErrors[key] ? 'border-destructive focus-visible:ring-destructive' : ''
     return (
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} noValidate className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {accounts.length > 0 && (
@@ -127,7 +161,7 @@ export function AccountsPanel({
               </Button>
             )}
             <h3 className="text-sm font-semibold">
-              {editing ? `Edit ${editing.name}` : 'Akun jurnal baru'}
+              {editing ? `Edit ${editing.name}` : 'Jurnal baru'}
             </h3>
           </div>
         </div>
@@ -136,16 +170,27 @@ export function AccountsPanel({
 
         <fieldset disabled={busy} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Nama akun
-              <Input
-                required
-                maxLength={100}
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Mis. Akun Utama, Demo Prop"
-              />
-            </label>
+            <div className="space-y-1">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Nama jurnal
+                <Input
+                  maxLength={100}
+                  aria-invalid={Boolean(fieldErrors.name) || undefined}
+                  className={errCls('name')}
+                  value={form.name}
+                  onChange={(e) => {
+                    setForm({ ...form, name: e.target.value })
+                    setFieldErrors((p) => ({ ...p, name: undefined }))
+                  }}
+                  placeholder="Mis. XAUUSD H1, Swing Forex, Prop Firm"
+                />
+              </label>
+              {fieldErrors.name && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.name}
+                </span>
+              )}
+            </div>
             <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
               Broker / keterangan (opsional)
               <Input
@@ -162,14 +207,22 @@ export function AccountsPanel({
               <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
                 Mata uang
                 <Input
-                  required
-                  pattern="[A-Z]{3}"
                   maxLength={3}
                   disabled={!!editing}
+                  aria-invalid={Boolean(fieldErrors.currency) || undefined}
+                  className={errCls('currency')}
                   value={form.currency}
-                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                  onChange={(e) => {
+                    setForm({ ...form, currency: e.target.value.toUpperCase() })
+                    setFieldErrors((p) => ({ ...p, currency: undefined }))
+                  }}
                 />
               </label>
+              {fieldErrors.currency && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.currency}
+                </span>
+              )}
               {!editing && (
                 <div className="flex flex-wrap gap-1">
                   {CURRENCY_PRESETS.map((cur) => (
@@ -191,45 +244,70 @@ export function AccountsPanel({
               )}
             </div>
 
-            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Modal awal
-              <Input
-                required
-                inputMode="decimal"
-                className="tabular-nums"
-                value={form.initial_capital}
-                onChange={(e) => setForm({ ...form, initial_capital: e.target.value })}
-              />
-            </label>
+            <div className="space-y-1">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Modal awal
+                <Input
+                  inputMode="decimal"
+                  aria-invalid={Boolean(fieldErrors.initial_capital) || undefined}
+                  className={cn('tabular-nums', errCls('initial_capital'))}
+                  value={form.initial_capital}
+                  onChange={(e) => {
+                    setForm({ ...form, initial_capital: e.target.value })
+                    setFieldErrors((p) => ({ ...p, initial_capital: undefined }))
+                  }}
+                />
+              </label>
+              {fieldErrors.initial_capital && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.initial_capital}
+                </span>
+              )}
+            </div>
 
-            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Tanggal mulai (WIB)
-              <Input
-                required
-                type="date"
-                value={form.initial_date}
-                onChange={(e) => setForm({ ...form, initial_date: e.target.value })}
-              />
-            </label>
+            <div className="space-y-1">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Tanggal mulai (WIB)
+                <Input
+                  type="date"
+                  aria-invalid={Boolean(fieldErrors.initial_date) || undefined}
+                  className={errCls('initial_date')}
+                  value={form.initial_date}
+                  onChange={(e) => {
+                    setForm({ ...form, initial_date: e.target.value })
+                    setFieldErrors((p) => ({ ...p, initial_date: undefined }))
+                  }}
+                />
+              </label>
+              {fieldErrors.initial_date && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.initial_date}
+                </span>
+              )}
+            </div>
           </div>
 
           <ChipInput
             label="Template pre-trade checklist"
             values={form.checklist}
-            onChange={(checklist) => setForm({ ...form, checklist })}
+            onChange={(checklist) => {
+              setForm({ ...form, checklist })
+              setFieldErrors((p) => ({ ...p, checklist: undefined }))
+            }}
             draftValue={checklistDraft}
             onDraftChange={setChecklistDraft}
             placeholder="Ketik aturan lalu Enter (mis. Risiko <= 1%)"
             disabled={busy}
+            error={fieldErrors.checklist}
           />
 
           <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
-            Catatan pengelolaan (opsional)
+            Aturan risiko / catatan (opsional)
             <Input
               maxLength={1000}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Target risiko harian, aturan berhenti trading, dll."
+              placeholder="Mis. Max loss harian 2%, stop setelah 2 SL"
             />
           </label>
         </fieldset>
@@ -241,7 +319,7 @@ export function AccountsPanel({
             </Button>
           )}
           <Button type="submit" disabled={busy} isLoading={save.isPending}>
-            {editing ? 'Simpan perubahan' : 'Buat akun'}
+            {editing ? 'Simpan perubahan' : 'Simpan jurnal'}
           </Button>
         </div>
       </form>
@@ -252,11 +330,11 @@ export function AccountsPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Akun jurnal berdiri sendiri, tidak terhubung ke broker atau bot eksekusi.
+          Pisahkan jurnal sesuai strategi, pair, atau target modal.
         </p>
         <Button size="sm" disabled={busy} onClick={openNew}>
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          Akun baru
+          Tambah jurnal
         </Button>
       </div>
 
@@ -343,11 +421,27 @@ export function AccountsPanel({
                     try {
                       await archive.mutateAsync(account.id)
                     } catch (err) {
-                      setError(err instanceof Error ? err.message : 'Gagal mengarsipkan akun.')
+                      setError(err instanceof Error ? err.message : 'Gagal mengarsipkan jurnal.')
                     }
                   }}
                 />
               )}
+              <ConfirmButton
+                label="Hapus"
+                confirmLabel="Hapus permanen?"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                onConfirm={async () => {
+                  setError('')
+                  try {
+                    await remove.mutateAsync(account.id)
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Gagal menghapus jurnal.')
+                  }
+                }}
+              />
             </div>
           </li>
         ))}
@@ -372,7 +466,7 @@ export function CapitalPanel({
   if (!accounts.length) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
-        Buat akun jurnal terlebih dahulu pada tab Akun.
+        Buat jurnal dulu di tab Jurnal.
       </p>
     )
   }
@@ -381,7 +475,7 @@ export function CapitalPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="min-w-[200px] flex-1 space-y-1.5 text-xs font-medium text-muted-foreground">
-          Akun
+          Jurnal
           <Select
             disabled={busy}
             value={selected?.id ?? ''}
@@ -414,6 +508,7 @@ function CapitalManager({ account }: { account: JournalAccount }) {
   const [form, setForm] = useState<CapitalInput>(blank)
   const [editing, setEditing] = useState<CapitalMovement | null>(null)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'amount' | 'date', string>>>({})
   const query = useQuery({
     queryKey: [...journalKey, 'capital', account.id],
     queryFn: ({ signal }) => journalApi.capital(account.id, signal),
@@ -425,20 +520,32 @@ function CapitalManager({ account }: { account: JournalAccount }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (!validateDecimal(form.amount) || Number(form.amount) <= 0) {
-      setError('Jumlah harus lebih dari nol (maks 4 desimal).')
+    const normalizedAmount = normalizeDecimalInput(form.amount) ?? ''
+    const nextErrors: Partial<Record<'amount' | 'date', string>> = {}
+    if (!normalizedAmount || !validateDecimal(normalizedAmount) || Number(normalizedAmount) <= 0) {
+      nextErrors.amount = normalizedAmount.startsWith('-')
+        ? 'Tidak boleh negatif.'
+        : 'Isi jumlah lebih dari 0 (maks 4 desimal, contoh: 100.00).'
+    }
+    if (!form.date) {
+      nextErrors.date = 'Pilih tanggal transaksi.'
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      setError('Periksa kolom yang ditandai merah.')
       return
     }
+    setFieldErrors({})
     setError('')
     try {
       await save.mutateAsync({
-        input: { ...form, account_id: account.id },
+        input: { ...form, amount: normalizedAmount, account_id: account.id },
         id: editing?.id,
       })
       setEditing(null)
       setForm(blank)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan pergerakan modal.')
+      setError(friendlyJournalError(err, 'Gagal menyimpan pergerakan modal.'))
     }
   }
 
@@ -450,6 +557,7 @@ function CapitalManager({ account }: { account: JournalAccount }) {
 
       <form
         onSubmit={submit}
+        noValidate
         className="space-y-3 rounded-xl border border-border/80 bg-secondary/25 p-3.5"
       >
         <div className="flex items-center justify-between gap-2">
@@ -484,26 +592,50 @@ function CapitalManager({ account }: { account: JournalAccount }) {
             disabled={busy || account.archived}
           />
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-xs text-muted-foreground">
-              Jumlah ({account.currency})
-              <Input
-                required
-                inputMode="decimal"
-                className="tabular-nums"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                placeholder="100.00"
-              />
-            </label>
-            <label className="space-y-1 text-xs text-muted-foreground">
-              Tanggal (WIB)
-              <Input
-                required
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-              />
-            </label>
+            <div className="space-y-1">
+              <label className="block space-y-1 text-xs text-muted-foreground">
+                Jumlah ({account.currency})
+                <Input
+                  inputMode="decimal"
+                  aria-invalid={Boolean(fieldErrors.amount) || undefined}
+                  className={cn(
+                    'tabular-nums',
+                    fieldErrors.amount && 'border-destructive focus-visible:ring-destructive',
+                  )}
+                  value={form.amount}
+                  onChange={(e) => {
+                    setForm({ ...form, amount: e.target.value })
+                    setFieldErrors((p) => ({ ...p, amount: undefined }))
+                  }}
+                  placeholder="100.00"
+                />
+              </label>
+              {fieldErrors.amount && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.amount}
+                </span>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label className="block space-y-1 text-xs text-muted-foreground">
+                Tanggal (WIB)
+                <Input
+                  type="date"
+                  aria-invalid={Boolean(fieldErrors.date) || undefined}
+                  className={fieldErrors.date ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  value={form.date}
+                  onChange={(e) => {
+                    setForm({ ...form, date: e.target.value })
+                    setFieldErrors((p) => ({ ...p, date: undefined }))
+                  }}
+                />
+              </label>
+              {fieldErrors.date && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.date}
+                </span>
+              )}
+            </div>
           </div>
           <label className="block space-y-1 text-xs text-muted-foreground">
             Catatan (opsional)
@@ -530,7 +662,7 @@ function CapitalManager({ account }: { account: JournalAccount }) {
           </p>
         ) : !query.data?.data.length ? (
           <p className="rounded-lg border border-dashed border-border py-5 text-center text-xs text-muted-foreground">
-            Belum ada deposit atau withdrawal
+            Belum ada riwayat deposit atau withdrawal
           </p>
         ) : (
           <ul className="max-h-52 divide-y divide-border overflow-y-auto rounded-lg border border-border scrollbar-thin">
@@ -608,13 +740,13 @@ export function AccountManager({ accounts }: { accounts: JournalAccount[] }) {
   return (
     <div className="space-y-4">
       <SegmentedControl
-        ariaLabel="Kelola akun dan modal"
+        ariaLabel="Kelola jurnal dan modal"
         value={subTab}
         onChange={setSubTab}
         disabled={busy}
         fullWidth
         options={[
-          { value: 'accounts', label: 'Akun' },
+          { value: 'accounts', label: 'Jurnal' },
           { value: 'capital', label: 'Deposit & Withdrawal' },
         ]}
       />

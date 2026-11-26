@@ -319,6 +319,18 @@ func (s *ManualJournalService) ArchiveAccount(ctx context.Context, user, id stri
 	row.Archived = true
 	return s.repo.Update(ctx, user, id, &row)
 }
+func (s *ManualJournalService) DeleteAccount(ctx context.Context, user, id string) error {
+	if err := manualIdentity(user); err != nil {
+		return err
+	}
+	if err := manualID(id); err != nil {
+		return err
+	}
+	if err := s.repo.Delete(ctx, user, id, &model.ManualJournalAccount{}); err != nil {
+		return err
+	}
+	return s.cleanupScreenshots(ctx, user, "")
+}
 func (s *ManualJournalService) writableAccount(ctx context.Context, user, id string) (*dto.ManualJournalAccountResponse, error) {
 	v, err := s.GetAccount(ctx, user, id)
 	if err != nil {
@@ -471,23 +483,65 @@ func (s *ManualJournalService) validateEntry(ctx context.Context, user string, i
 	if in.ClosedAt != nil && (in.OpenedAt == nil || in.ClosedAt.Before(*in.OpenedAt)) {
 		return v, manualBad("closed_at precedes opened_at")
 	}
-	for _, p := range []*string{in.EntryPrice, in.StopLoss, in.TakeProfit, in.ExitPrice, in.Size} {
-		if p != nil {
-			n, err := manualNumber(*p, 8, false)
+	parsed := map[string]*big.Rat{}
+	for _, item := range []struct {
+		key string
+		val *string
+	}{
+		{"entry", in.EntryPrice},
+		{"sl", in.StopLoss},
+		{"tp", in.TakeProfit},
+		{"exit", in.ExitPrice},
+		{"size", in.Size},
+	} {
+		if item.val != nil {
+			n, err := manualNumber(*item.val, 8, false)
 			if err != nil {
 				return v, err
 			}
 			if n.Sign() == 0 {
 				return v, manualBad("price/size must be positive")
 			}
+			parsed[item.key] = n
 		}
 	}
+	if in.Side == "long" {
+		if parsed["entry"] != nil && parsed["sl"] != nil && parsed["sl"].Cmp(parsed["entry"]) >= 0 {
+			return v, manualBad("long stop_loss must be below entry_price")
+		}
+		if parsed["entry"] != nil && parsed["tp"] != nil && parsed["tp"].Cmp(parsed["entry"]) <= 0 {
+			return v, manualBad("long take_profit must be above entry_price")
+		}
+		if parsed["sl"] != nil && parsed["tp"] != nil && parsed["tp"].Cmp(parsed["sl"]) <= 0 {
+			return v, manualBad("long take_profit must be above stop_loss")
+		}
+	} else if in.Side == "short" {
+		if parsed["entry"] != nil && parsed["sl"] != nil && parsed["sl"].Cmp(parsed["entry"]) <= 0 {
+			return v, manualBad("short stop_loss must be above entry_price")
+		}
+		if parsed["entry"] != nil && parsed["tp"] != nil && parsed["tp"].Cmp(parsed["entry"]) >= 0 {
+			return v, manualBad("short take_profit must be below entry_price")
+		}
+		if parsed["sl"] != nil && parsed["tp"] != nil && parsed["tp"].Cmp(parsed["sl"]) >= 0 {
+			return v, manualBad("short take_profit must be below stop_loss")
+		}
+	}
+	var riskRat, capRat *big.Rat
 	for i, p := range []*string{in.NetPNL, in.RiskAmount, in.CapitalSnapshot} {
 		if p != nil {
-			if _, err := manualNumber(*p, 4, i == 0); err != nil {
+			n, err := manualNumber(*p, 4, i == 0)
+			if err != nil {
 				return v, err
 			}
+			if i == 1 {
+				riskRat = n
+			} else if i == 2 {
+				capRat = n
+			}
 		}
+	}
+	if riskRat != nil && capRat != nil && capRat.Sign() > 0 && riskRat.Cmp(capRat) > 0 {
+		return v, manualBad("risk_amount exceeds capital_snapshot")
 	}
 	for _, list := range [][]string{in.Tags, in.Emotions, in.Mistakes} {
 		if err := manualStrings(list, 100); err != nil {

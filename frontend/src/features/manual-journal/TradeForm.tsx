@@ -1,11 +1,21 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Check, Clock, ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { Check, Clock, Plus, Trash2, X } from 'lucide-react'
 import { Alert, Button, Input, Select } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { computeTradePreview, fromWib, localWib, mergeChipDraft, pnlTone, validateTrade } from './model'
+import {
+  computeTradePreview,
+  friendlyJournalError,
+  fromWib,
+  localWib,
+  mergeChipDraft,
+  normalizeDecimalInput,
+  pnlTone,
+  validateTradeFields,
+  type TradeFieldKey,
+} from './model'
 import { Screenshots } from './Screenshots'
 import type { JournalAccount, JournalStatus, TradeInput } from './types'
-import { ChipInput, SegmentedControl } from './ui'
+import { ChipInput, ImageDropzone, SegmentedControl } from './ui'
 
 const STATUS_OPTIONS = [
   { value: 'closed', label: 'Closed' },
@@ -52,11 +62,13 @@ export function TradeForm({
   const [trade, setTrade] = useState<TradeInput>(initial)
   const [tab, setTab] = useState<'core' | 'review'>('core')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<TradeFieldKey, string>>>({})
   const [tvDraft, setTvDraft] = useState('')
   const [emotionDraft, setEmotionDraft] = useState('')
   const [mistakeDraft, setMistakeDraft] = useState('')
   const [tagDraft, setTagDraft] = useState('')
   const [queuedFiles, setQueuedFiles] = useState<File[]>([])
+  const [fileError, setFileError] = useState('')
   const fileInputId = useId()
   const errorRef = useRef<HTMLDivElement>(null)
 
@@ -71,10 +83,29 @@ export function TradeForm({
     }
   }, [previews])
 
-  const update = <K extends keyof TradeInput>(key: K, value: TradeInput[K]) =>
+  const clearFieldError = (key: TradeFieldKey) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  const update = <K extends keyof TradeInput>(key: K, value: TradeInput[K]) => {
     setTrade((t) => ({ ...t, [key]: value }))
+    clearFieldError(key as TradeFieldKey)
+    if (key === 'side' || key === 'entry_price' || key === 'stop_loss' || key === 'take_profit') {
+      clearFieldError('stop_loss')
+      clearFieldError('take_profit')
+    }
+    if (key === 'opened_at') clearFieldError('closed_at')
+    if (key === 'capital_snapshot') clearFieldError('risk_amount')
+  }
 
   function handleStatusChange(next: JournalStatus) {
+    setFieldErrors({})
+    setError('')
     setTrade((t) => {
       const updated: TradeInput = { ...t, status: next }
       if (next !== 'closed') {
@@ -133,6 +164,23 @@ export function TradeForm({
     setTab(next)
   }
 
+  function queueFiles(incoming: File[]) {
+    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+    const valid: File[] = []
+    let rejected = false
+    for (const file of incoming) {
+      if (!allowed.has(file.type) || file.size > 5 * 1024 * 1024) {
+        rejected = true
+        continue
+      }
+      valid.push(file)
+    }
+    setFileError(rejected ? 'Hanya PNG/JPG/WebP/GIF maks 5 MiB per gambar.' : '')
+    if (valid.length) {
+      setQueuedFiles((prev) => [...prev, ...valid].slice(0, 6))
+    }
+  }
+
   function addTvUrl() {
     const clean = tvDraft.trim()
     if (!clean) return
@@ -145,22 +193,24 @@ export function TradeForm({
   async function submit(event: FormEvent) {
     event.preventDefault()
     const flushed = flushDraftInputs(trade)
-    const cleanedPnl =
-      flushed.net_pnl !== null ? flushed.net_pnl.trim().replace(/^\+/, '') : null
     const input: TradeInput = {
       ...flushed,
       asset: flushed.asset.trim().toUpperCase(),
-      net_pnl: cleanedPnl === '' ? null : cleanedPnl,
+      size_unit: flushed.size_unit.trim(),
+      entry_price: normalizeDecimalInput(flushed.entry_price),
+      stop_loss: normalizeDecimalInput(flushed.stop_loss),
+      take_profit: normalizeDecimalInput(flushed.take_profit),
+      exit_price: normalizeDecimalInput(flushed.exit_price),
+      size: normalizeDecimalInput(flushed.size),
+      risk_amount: normalizeDecimalInput(flushed.risk_amount),
+      capital_snapshot: normalizeDecimalInput(flushed.capital_snapshot),
+      net_pnl: normalizeDecimalInput(flushed.net_pnl, true),
     }
-    const message = validateTrade(input)
-    if (message) {
-      const reviewFieldError =
-        message.startsWith('risk_amount') ||
-        message.startsWith('capital_snapshot') ||
-        message.includes('TradingView') ||
-        message.includes('30 item')
-      setTab(reviewFieldError ? 'review' : 'core')
-      setError(message)
+    const validation = validateTradeFields(input)
+    if (validation.summary) {
+      setFieldErrors(validation.errors)
+      setTab(validation.firstTab)
+      setError(validation.summary)
       requestAnimationFrame(() => {
         if (typeof errorRef.current?.scrollIntoView === 'function') {
           errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -168,11 +218,17 @@ export function TradeForm({
       })
       return
     }
+    setFieldErrors({})
     setError('')
     try {
       await onSave(input, queuedFiles)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan trade. Coba lagi.')
+      setError(friendlyJournalError(err, 'Gagal menyimpan trade. Coba lagi.'))
+      requestAnimationFrame(() => {
+        if (typeof errorRef.current?.scrollIntoView === 'function') {
+          errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        }
+      })
     }
   }
 
@@ -194,9 +250,38 @@ export function TradeForm({
 
   const disabled = pending || Boolean(account?.archived)
   const isClosed = trade.status === 'closed'
+  const errCls = (key: TradeFieldKey) =>
+    fieldErrors[key] ? 'border-destructive focus-visible:ring-destructive' : ''
+  const coreErrCount = (
+    [
+      'account_id',
+      'asset',
+      'side',
+      'opened_at',
+      'closed_at',
+      'entry_price',
+      'stop_loss',
+      'take_profit',
+      'exit_price',
+      'size',
+      'size_unit',
+      'net_pnl',
+    ] as const
+  ).filter((k) => Boolean(fieldErrors[k])).length
+  const reviewErrCount = (
+    [
+      'risk_amount',
+      'capital_snapshot',
+      'tradingview_urls',
+      'emotions',
+      'mistakes',
+      'tags',
+      'checklist',
+    ] as const
+  ).filter((k) => Boolean(fieldErrors[k])).length
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} noValidate className="space-y-4">
       {error && (
         <div ref={errorRef}>
           <Alert variant="destructive">{error}</Alert>
@@ -223,9 +308,15 @@ export function TradeForm({
             value={trade.side}
             onChange={(v) => update('side', v)}
             options={SIDE_OPTIONS}
+            invalid={Boolean(fieldErrors.side)}
             fullWidth
             disabled={disabled}
           />
+          {fieldErrors.side && (
+            <span role="alert" className="block text-[11px] text-destructive">
+              {fieldErrors.side}
+            </span>
+          )}
         </div>
       </div>
 
@@ -236,41 +327,58 @@ export function TradeForm({
         onChange={handleTabChange}
         fullWidth
         options={[
-          { value: 'core', label: 'Inti Trade' },
-          { value: 'review', label: 'Evaluasi & Bukti', badge: reviewCount || undefined },
+          {
+            value: 'core',
+            label: 'Inti Trade',
+            badge: coreErrCount ? `${coreErrCount} error` : undefined,
+          },
+          {
+            value: 'review',
+            label: 'Evaluasi & Bukti',
+            badge: reviewErrCount ? `${reviewErrCount} error` : reviewCount || undefined,
+          },
         ]}
       />
 
       {tab === 'core' && (
         <fieldset disabled={disabled} className="space-y-4">
-          {/* Identitas: Akun & Pair */}
+          {/* Identitas: Jurnal & Pair */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Akun
-              <Select
-                value={trade.account_id}
-                disabled={editing}
-                onChange={(e) =>
-                  setTrade((t) => ({
-                    ...t,
-                    account_id: e.target.value,
-                    checklist: (accounts.find((a) => a.id === e.target.value)?.checklist ?? []).map(
-                      (label) => ({ label, checked: false }),
-                    ),
-                  }))
-                }
-                required
-              >
-                <option value="">Pilih akun</option>
-                {accounts
-                  .filter((a) => !a.archived || a.id === initial.account_id)
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} · {a.currency}
-                    </option>
-                  ))}
-              </Select>
-            </label>
+            <div className="space-y-1">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Jurnal
+                <Select
+                  value={trade.account_id}
+                  disabled={editing}
+                  aria-invalid={Boolean(fieldErrors.account_id) || undefined}
+                  className={errCls('account_id')}
+                  onChange={(e) => {
+                    clearFieldError('account_id')
+                    setTrade((t) => ({
+                      ...t,
+                      account_id: e.target.value,
+                      checklist: (accounts.find((a) => a.id === e.target.value)?.checklist ?? []).map(
+                        (label) => ({ label, checked: false }),
+                      ),
+                    }))
+                  }}
+                >
+                  <option value="">Pilih jurnal</option>
+                  {accounts
+                    .filter((a) => !a.archived || a.id === initial.account_id)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} · {a.currency}
+                      </option>
+                    ))}
+                </Select>
+              </label>
+              {fieldErrors.account_id && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.account_id}
+                </span>
+              )}
+            </div>
 
             <div className="space-y-1.5">
               <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
@@ -278,11 +386,17 @@ export function TradeForm({
                 <Input
                   value={trade.asset}
                   maxLength={40}
+                  aria-invalid={Boolean(fieldErrors.asset) || undefined}
                   onChange={(e) => update('asset', e.target.value.toUpperCase())}
                   placeholder="XAUUSD, EURUSD, BTCUSDT"
-                  className="font-medium uppercase"
+                  className={cn('font-medium uppercase', errCls('asset'))}
                 />
               </label>
+              {fieldErrors.asset && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.asset}
+                </span>
+              )}
               {recentAssets.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {recentAssets.slice(0, 5).map((sym) => (
@@ -327,9 +441,16 @@ export function TradeForm({
               <Input
                 id="trade-opened-at"
                 type="datetime-local"
+                aria-invalid={Boolean(fieldErrors.opened_at) || undefined}
+                className={errCls('opened_at')}
                 value={localWib(trade.opened_at)}
                 onChange={(e) => update('opened_at', fromWib(e.target.value))}
               />
+              {fieldErrors.opened_at && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.opened_at}
+                </span>
+              )}
             </div>
 
             {isClosed && (
@@ -353,9 +474,16 @@ export function TradeForm({
                 <Input
                   id="trade-closed-at"
                   type="datetime-local"
+                  aria-invalid={Boolean(fieldErrors.closed_at) || undefined}
+                  className={errCls('closed_at')}
                   value={localWib(trade.closed_at)}
                   onChange={(e) => update('closed_at', fromWib(e.target.value))}
                 />
+                {fieldErrors.closed_at && (
+                  <span role="alert" className="block text-[11px] text-destructive">
+                    {fieldErrors.closed_at}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -372,16 +500,24 @@ export function TradeForm({
                   ...(isClosed ? ([['exit_price', 'Exit aktual']] as const) : []),
                 ] as const
               ).map(([key, label]) => (
-                <label key={key} className="space-y-1 text-xs text-muted-foreground">
-                  {label}
-                  <Input
-                    inputMode="decimal"
-                    className="tabular-nums"
-                    value={trade[key] ?? ''}
-                    onChange={(e) => update(key, e.target.value === '' ? null : e.target.value)}
-                    placeholder="0.00"
-                  />
-                </label>
+                <div key={key} className="space-y-1">
+                  <label className="block space-y-1 text-xs text-muted-foreground">
+                    {label}
+                    <Input
+                      inputMode="decimal"
+                      aria-invalid={Boolean(fieldErrors[key]) || undefined}
+                      className={cn('tabular-nums', errCls(key))}
+                      value={trade[key] ?? ''}
+                      onChange={(e) => update(key, e.target.value === '' ? null : e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </label>
+                  {fieldErrors[key] && (
+                    <span role="alert" className="block text-[11px] text-destructive">
+                      {fieldErrors[key]}
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -389,25 +525,32 @@ export function TradeForm({
           {/* Blok Ukuran & Hasil */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <span className="block text-xs font-medium text-muted-foreground">Ukuran posisi</span>
+              <span className="block text-xs font-medium text-muted-foreground">Lot / Size</span>
               <div className="flex gap-2">
                 <Input
                   aria-label="Size"
                   inputMode="decimal"
-                  className="tabular-nums"
+                  aria-invalid={Boolean(fieldErrors.size) || undefined}
+                  className={cn('tabular-nums', errCls('size'))}
                   value={trade.size ?? ''}
                   onChange={(e) => update('size', e.target.value === '' ? null : e.target.value)}
                   placeholder="0.10"
                 />
                 <Input
                   aria-label="Satuan size"
-                  className="w-24 shrink-0"
+                  aria-invalid={Boolean(fieldErrors.size_unit) || undefined}
+                  className={cn('w-24 shrink-0', errCls('size_unit'))}
                   value={trade.size_unit}
                   maxLength={40}
                   onChange={(e) => update('size_unit', e.target.value)}
                   placeholder="lot"
                 />
               </div>
+              {(fieldErrors.size || fieldErrors.size_unit) && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.size || fieldErrors.size_unit}
+                </span>
+              )}
               <div className="flex flex-wrap gap-1">
                 {SIZE_UNITS.map((unit) => (
                   <button
@@ -433,9 +576,11 @@ export function TradeForm({
                   Net P&amp;L aktual ({currency})
                   <Input
                     inputMode="decimal"
+                    aria-invalid={Boolean(fieldErrors.net_pnl) || undefined}
                     className={cn(
                       'text-base font-semibold tabular-nums',
                       trade.net_pnl !== null && trade.net_pnl !== '' && pnlTone(trade.net_pnl),
+                      errCls('net_pnl'),
                     )}
                     value={trade.net_pnl ?? ''}
                     onChange={(e) => {
@@ -445,15 +590,21 @@ export function TradeForm({
                     placeholder="120.50 atau -45.00"
                   />
                 </label>
-                <span className="block text-[11px] font-normal text-muted-foreground">
-                  Hasil bersih setelah komisi/swap
-                </span>
+                {fieldErrors.net_pnl ? (
+                  <span role="alert" className="block text-[11px] text-destructive">
+                    {fieldErrors.net_pnl}
+                  </span>
+                ) : (
+                  <span className="block text-[11px] font-normal text-muted-foreground">
+                    Sudah termasuk komisi/swap
+                  </span>
+                )}
               </div>
             ) : (
               <div className="flex items-center rounded-lg border border-dashed border-border px-3.5 py-2.5 text-xs text-muted-foreground">
                 {trade.status === 'draft'
-                  ? 'Mode Draft: simpan sebagian dulu dan lengkapi nanti.'
-                  : 'Mode Open: waktu keluar & Net P&L diisi saat posisi ditutup.'}
+                  ? 'Draft bisa dilengkapi nanti.'
+                  : 'Isi exit & P&L saat posisi sudah close.'}
               </div>
             )}
           </div>
@@ -505,20 +656,24 @@ export function TradeForm({
 
       {tab === 'review' && (
         <fieldset disabled={disabled} className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Semua bagian di sini opsional, dipakai untuk breakdown performa dan catatan pola.
+          </p>
+
           {/* Setup & Sesi */}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Setup / Strategi
+              Setup
               <Input
                 value={trade.setup}
                 maxLength={100}
                 onChange={(e) => update('setup', e.target.value)}
-                placeholder="Mis. Liquidity sweep, Breakout"
+                placeholder="Mis. Sweep H1, Breakout"
               />
             </label>
 
             <div className="space-y-1.5">
-              <span className="block text-xs font-medium text-muted-foreground">Sesi trading</span>
+              <span className="block text-xs font-medium text-muted-foreground">Sesi</span>
               <div className="flex flex-wrap gap-1.5">
                 {SESSIONS.map((s) => {
                   const active = trade.session === s
@@ -553,35 +708,51 @@ export function TradeForm({
 
           {/* Risiko & Modal acuan opsional */}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Risiko awal ({currency})
-              <Input
-                inputMode="decimal"
-                className="tabular-nums"
-                value={trade.risk_amount ?? ''}
-                onChange={(e) =>
-                  update('risk_amount', e.target.value === '' ? null : e.target.value)
-                }
-                placeholder="Opsional · untuk hitung R"
-              />
-            </label>
-            <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-              Modal saat entry ({currency})
-              <Input
-                inputMode="decimal"
-                className="tabular-nums"
-                value={trade.capital_snapshot ?? ''}
-                onChange={(e) =>
-                  update('capital_snapshot', e.target.value === '' ? null : e.target.value)
-                }
-                placeholder="Opsional · untuk hitung %"
-              />
-            </label>
+            <div className="space-y-1">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Risiko awal ({currency})
+                <Input
+                  inputMode="decimal"
+                  aria-invalid={Boolean(fieldErrors.risk_amount) || undefined}
+                  className={cn('tabular-nums', errCls('risk_amount'))}
+                  value={trade.risk_amount ?? ''}
+                  onChange={(e) =>
+                    update('risk_amount', e.target.value === '' ? null : e.target.value)
+                  }
+                  placeholder="Opsional · contoh 25.00"
+                />
+              </label>
+              {fieldErrors.risk_amount && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.risk_amount}
+                </span>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+                Modal saat entry ({currency})
+                <Input
+                  inputMode="decimal"
+                  aria-invalid={Boolean(fieldErrors.capital_snapshot) || undefined}
+                  className={cn('tabular-nums', errCls('capital_snapshot'))}
+                  value={trade.capital_snapshot ?? ''}
+                  onChange={(e) =>
+                    update('capital_snapshot', e.target.value === '' ? null : e.target.value)
+                  }
+                  placeholder="Opsional · contoh 1000.00"
+                />
+              </label>
+              {fieldErrors.capital_snapshot && (
+                <span role="alert" className="block text-[11px] text-destructive">
+                  {fieldErrors.capital_snapshot}
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Chip inputs: Emosi, Kesalahan, Tag */}
+          {/* Chip inputs: Emosi, Mistake, Tag */}
           <ChipInput
-            label="Kondisi emosi"
+            label="Psikologi / Emosi"
             values={trade.emotions}
             onChange={(next) => update('emotions', next)}
             draftValue={emotionDraft}
@@ -589,10 +760,11 @@ export function TradeForm({
             placeholder="Ketik lalu Enter"
             suggestions={EMOTION_PRESETS}
             disabled={disabled}
+            error={fieldErrors.emotions}
           />
 
           <ChipInput
-            label="Kesalahan (mistake)"
+            label="Mistake"
             values={trade.mistakes}
             onChange={(next) => update('mistakes', next)}
             draftValue={mistakeDraft}
@@ -600,16 +772,18 @@ export function TradeForm({
             placeholder="Ketik lalu Enter"
             suggestions={MISTAKE_PRESETS}
             disabled={disabled}
+            error={fieldErrors.mistakes}
           />
 
           <ChipInput
-            label="Tag kustom"
+            label="Tag"
             values={trade.tags}
             onChange={(next) => update('tags', next)}
             draftValue={tagDraft}
             onDraftChange={setTagDraft}
             placeholder="Mis. H1, news, retest (Enter)"
             disabled={disabled}
+            error={fieldErrors.tags}
           />
 
           {/* Checklist */}
@@ -624,7 +798,7 @@ export function TradeForm({
             </div>
             {!trade.checklist.length ? (
               <p className="text-xs text-muted-foreground">
-                Belum ada checklist. Tambahkan template di Pengaturan → Akun.
+                Belum ada checklist. Atur di Pengaturan → Jurnal.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -671,27 +845,32 @@ export function TradeForm({
 
           {/* Catatan refleksi */}
           <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
-            Catatan &amp; refleksi
+            Catatan
             <textarea
               className="min-h-24 w-full rounded-lg border border-input bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={trade.notes}
               maxLength={10000}
               onChange={(e) => update('notes', e.target.value)}
-              placeholder="Apa yang berjalan sesuai rencana, apa yang perlu diperbaiki?"
+              placeholder="Alasan entry, eksekusi, atau hal yang perlu diperbaiki"
             />
           </label>
 
           {/* Link TradingView */}
           <div className="space-y-2">
             <span className="block text-xs font-medium text-muted-foreground">
-              Tautan TradingView
+              Link TradingView
             </span>
             <div className="flex gap-2">
               <Input
                 type="text"
                 inputMode="url"
+                aria-invalid={Boolean(fieldErrors.tradingview_urls) || undefined}
+                className={errCls('tradingview_urls')}
                 value={tvDraft}
-                onChange={(e) => setTvDraft(e.target.value)}
+                onChange={(e) => {
+                  setTvDraft(e.target.value)
+                  clearFieldError('tradingview_urls')
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -705,6 +884,11 @@ export function TradeForm({
                 Tambah
               </Button>
             </div>
+            {fieldErrors.tradingview_urls && (
+              <span role="alert" className="block text-[11px] text-destructive">
+                {fieldErrors.tradingview_urls}
+              </span>
+            )}
             {trade.tradingview_urls.length > 0 && (
               <ul className="space-y-1.5">
                 {trade.tradingview_urls.map((url) => (
@@ -737,35 +921,18 @@ export function TradeForm({
             <Screenshots entryId={entryId} readOnly={Boolean(account?.archived)} />
           ) : (
             <div className="space-y-2.5 border-t border-border pt-4">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="block text-xs font-medium text-muted-foreground">
-                    Screenshot chart (opsional)
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    Diunggah otomatis saat trade disimpan · maks 5 MiB
-                  </span>
-                </div>
-                <label
-                  htmlFor={fileInputId}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:bg-secondary focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
-                >
-                  <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
-                  Pilih gambar
-                  <input
-                    id={fileInputId}
-                    type="file"
-                    multiple
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const next = Array.from(e.target.files ?? [])
-                      if (next.length) setQueuedFiles((prev) => [...prev, ...next].slice(0, 6))
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
-              </div>
+              <span className="block text-xs font-medium text-muted-foreground">
+                Screenshot chart
+              </span>
+              <ImageDropzone
+                id={fileInputId}
+                multiple
+                disabled={disabled}
+                ariaLabel="Pilih gambar"
+                hint="Otomatis diunggah saat trade disimpan · PNG, JPG, WebP, GIF maks 5 MiB (maks 6)"
+                onFiles={queueFiles}
+              />
+              {fileError && <Alert variant="destructive">{fileError}</Alert>}
               {previews.length > 0 && (
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {previews.map((item, idx) => (

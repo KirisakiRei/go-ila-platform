@@ -3,12 +3,15 @@ import {
   computeTradePreview,
   emptyTrade,
   filterTrades,
+  friendlyJournalError,
   fromWib,
   localWib,
+  normalizeDecimalInput,
   safeLink,
   tradeDay,
   validateDecimal,
   validateTrade,
+  validateTradeFields,
   wibDay,
 } from './model'
 import type { JournalFilters, JournalTrade } from './types'
@@ -61,8 +64,8 @@ describe('manual journal domain', () => {
   })
   it('allows incomplete drafts, requires complete open and accepts zero closed pnl', () => {
     expect(validateTrade(emptyTrade('a1'))).toBe('')
-    expect(validateTrade({ ...emptyTrade('a1'), size: '0' })).toMatch(/lebih dari nol/)
-    expect(validateTrade({ ...emptyTrade('a1'), stop_loss: '0' })).toMatch(/lebih dari nol/)
+    expect(validateTrade({ ...emptyTrade('a1'), size: '0' })).toMatch(/lebih dari 0/)
+    expect(validateTrade({ ...emptyTrade('a1'), stop_loss: '0' })).toMatch(/lebih dari 0/)
     expect(validateTrade({ ...emptyTrade('a1'), risk_amount: '0', capital_snapshot: '0' })).toBe('')
     expect(validateTrade({ ...emptyTrade('a1'), status: 'open' })).not.toBe('')
     const open = {
@@ -128,5 +131,58 @@ describe('manual journal domain', () => {
     expect(invalidShort.plannedRR).toBeNull()
     expect(invalidShort.realizedR).toBeNull()
     expect(invalidShort.holdDuration).toBeNull()
+  })
+
+  it('normalizes decimal input, returns human field errors, and translates server errors', () => {
+    expect(normalizeDecimalInput(' 1000,50 ')).toBe('1000.50')
+    expect(normalizeDecimalInput('+45,25', true)).toBe('45.25')
+    expect(normalizeDecimalInput('   ')).toBeNull()
+
+    const badCap = validateTradeFields({ ...emptyTrade('a1'), capital_snapshot: 'abc' })
+    expect(badCap.firstTab).toBe('review')
+    expect(badCap.errors.capital_snapshot).toMatch(/angka valid/i)
+    expect(badCap.summary).toContain('Modal saat entry')
+    expect(badCap.summary).not.toContain('capital_snapshot')
+
+    expect(friendlyJournalError(new Error('account is archived'))).toMatch(/diarsipkan/i)
+    expect(friendlyJournalError(new Error('closed_at precedes opened_at'))).toMatch(/sebelum waktu masuk/i)
+  })
+
+  it('guards TP/SL direction against Entry and risk_amount against capital_snapshot', () => {
+    const badBuy = validateTradeFields({
+      ...emptyTrade('a1'),
+      side: 'long',
+      entry_price: '3500',
+      stop_loss: '3510',
+      take_profit: '3480',
+    })
+    expect(badBuy.errors.stop_loss).toMatch(/Buy.*lebih rendah/i)
+    expect(badBuy.errors.take_profit).toMatch(/Buy.*lebih tinggi/i)
+
+    const badSell = validateTradeFields({
+      ...emptyTrade('a1'),
+      side: 'short',
+      entry_price: '3500',
+      stop_loss: '3490',
+      take_profit: '3520',
+    })
+    expect(badSell.errors.stop_loss).toMatch(/Sell.*lebih tinggi/i)
+    expect(badSell.errors.take_profit).toMatch(/Sell.*lebih rendah/i)
+
+    const validSell = validateTradeFields({
+      ...emptyTrade('a1'),
+      side: 'short',
+      entry_price: '3500',
+      stop_loss: '3510',
+      take_profit: '3480',
+    })
+    expect(validSell.summary).toBe('')
+
+    const badRisk = validateTradeFields({
+      ...emptyTrade('a1'),
+      risk_amount: '1500',
+      capital_snapshot: '1000',
+    })
+    expect(badRisk.errors.risk_amount).toMatch(/melebihi modal/i)
   })
 })

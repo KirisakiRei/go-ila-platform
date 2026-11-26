@@ -1,10 +1,10 @@
 import { useId, useState } from 'react'
-import { ExternalLink, ImagePlus } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert } from '@/components/ui'
 import { journalApi } from './api'
 import { journalKey } from './hooks'
-import { ConfirmButton } from './ui'
+import { ConfirmButton, ImageDropzone } from './ui'
 
 export function Screenshots({
   entryId,
@@ -20,47 +20,45 @@ export function Screenshots({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  async function handleFiles(files: File[]) {
+    if (!files.length || busy || readOnly) return
+    setBusy(true)
+    setError('')
+    const failed: string[] = []
+    try {
+      for (const file of files) {
+        try {
+          await journalApi.uploadScreenshot(entryId, file)
+        } catch (err) {
+          failed.push(err instanceof Error ? `${file.name}: ${err.message}` : file.name)
+        }
+      }
+      await client.invalidateQueries({ queryKey: journalKey })
+      if (failed.length) {
+        setError(failed[0]!)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="space-y-3 border-t border-border pt-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold">Screenshot chart</h3>
-          <p className="text-xs text-muted-foreground">
-            Privat · PNG, JPG, WebP · maks 5 MiB per gambar
-          </p>
-        </div>
-        {!readOnly && (
-          <label
-            htmlFor={inputId}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-transparent px-3 py-1.5 text-xs font-medium transition-[color,background-color,transform] duration-150 ease-[var(--ease-out)] hover:bg-secondary active:scale-[0.97] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
-          >
-            <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{busy ? 'Mengunggah…' : 'Unggah gambar'}</span>
-            <input
-              id={inputId}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              disabled={busy || readOnly}
-              className="sr-only"
-              onChange={async (e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                setBusy(true)
-                setError('')
-                try {
-                  await journalApi.uploadScreenshot(entryId, file)
-                  await client.invalidateQueries({ queryKey: journalKey })
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : 'Gagal mengunggah screenshot.')
-                } finally {
-                  setBusy(false)
-                  e.target.value = ''
-                }
-              }}
-            />
-          </label>
-        )}
+      <div>
+        <h3 className="text-sm font-semibold">Screenshot chart</h3>
       </div>
+
+      {!readOnly && (
+        <ImageDropzone
+          id={inputId}
+          multiple
+          busy={busy}
+          disabled={readOnly}
+          ariaLabel="Unggah gambar chart"
+          hint="Privat · PNG, JPG, WebP, GIF · maks 5 MiB"
+          onFiles={(files) => void handleFiles(files)}
+        />
+      )}
 
       {(error || query.error) && (
         <Alert variant="destructive">{error || query.error?.message}</Alert>

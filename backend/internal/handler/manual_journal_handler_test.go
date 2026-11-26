@@ -37,7 +37,7 @@ func TestManualJournalHTTPContracts(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	if err := db.AutoMigrate(&model.ManualJournalAccount{}, &model.ManualJournalCapital{}, &model.ManualJournalEntry{}, &model.ManualJournalScreenshot{}, &model.ManualJournalImportToken{}); err != nil {
+	if err := db.AutoMigrate(&model.ManualJournalAccount{}, &model.ManualJournalCapital{}, &model.ManualJournalEntry{}, &model.ManualJournalScreenshot{}, &model.ManualJournalImportToken{}, &model.ManualJournalReview{}, &model.ManualJournalReviewSetting{}); err != nil {
 		t.Fatal(err)
 	}
 	svc := service.NewManualJournalService(repository.NewManualJournalRepository(db), t.TempDir())
@@ -127,5 +127,34 @@ func TestManualJournalHTTPContracts(t *testing.T) {
 	// The API rejects naive local time rather than silently assuming UTC.
 	if w := request("PUT", "/entries/"+draft.ID, user, map[string]any{"account_id": out.Data.ID, "status": "open", "opened_at": "2026-01-01T09:00:00"}); w.Code != http.StatusBadRequest {
 		t.Fatalf("naive time: %d %s", w.Code, w.Body)
+	}
+	// The API rejects inverted Buy/Sell SL/TP against Entry.
+	if w := request("POST", "/entries", user, map[string]any{"account_id": out.Data.ID, "status": "draft", "side": "long", "entry_price": "3500", "take_profit": "3480"}); w.Code != http.StatusBadRequest {
+		t.Fatalf("inverted long tp: %d %s", w.Code, w.Body)
+	}
+	if w := request("POST", "/entries", user, map[string]any{"account_id": out.Data.ID, "status": "draft", "side": "short", "entry_price": "3500", "stop_loss": "3490"}); w.Code != http.StatusBadRequest {
+		t.Fatalf("inverted short sl: %d %s", w.Code, w.Body)
+	}
+	if w := request("POST", "/entries", user, map[string]any{"account_id": out.Data.ID, "status": "draft", "side": "long", "entry_price": "3500", "stop_loss": "3490", "take_profit": "3520"}); w.Code != http.StatusCreated {
+		t.Fatalf("valid long levels: %d %s", w.Code, w.Body)
+	}
+	// Default DELETE archives; permanent=true deletes the journal and its child entries.
+	if w := request("DELETE", "/accounts/"+out.Data.ID, user, nil); w.Code != http.StatusOK {
+		t.Fatalf("archive: %d %s", w.Code, w.Body)
+	}
+	if w := request("GET", "/accounts/"+out.Data.ID, user, nil); w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), []byte(`"archived":true`)) {
+		t.Fatalf("archived check: %d %s", w.Code, w.Body)
+	}
+	if w := request("DELETE", "/accounts/"+out.Data.ID+"?permanent=true", uuid.NewString(), nil); w.Code != http.StatusNotFound {
+		t.Fatalf("permanent owner check: %d %s", w.Code, w.Body)
+	}
+	if w := request("DELETE", "/accounts/"+out.Data.ID+"?permanent=true", user, nil); w.Code != http.StatusOK {
+		t.Fatalf("permanent delete: %d %s", w.Code, w.Body)
+	}
+	if w := request("GET", "/accounts/"+out.Data.ID, user, nil); w.Code != http.StatusNotFound {
+		t.Fatalf("account still exists after delete: %d %s", w.Code, w.Body)
+	}
+	if w := request("GET", "/entries/"+draft.ID, user, nil); w.Code != http.StatusNotFound {
+		t.Fatalf("entry still exists after account delete: %d %s", w.Code, w.Body)
 	}
 }

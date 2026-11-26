@@ -98,28 +98,28 @@ describe('manual journal review', () => {
     view.unmount()
   })
 
-  it('lets users toggle global and account AI preferences inside settings modal', async () => {
+  it('lets users toggle global and journal AI preferences inside settings modal', async () => {
     mount(<JournalAIPreferences accountId="a1" />)
-    const accountToggle = await screen.findByLabelText(/Izinkan insight AI untuk akun aktif/)
+    const accountToggle = await screen.findByLabelText(/Aktifkan AI untuk jurnal ini/)
     await waitFor(() => expect(accountToggle).toBeEnabled())
     fireEvent.click(accountToggle)
     await waitFor(() => expect(journalApi.saveReviewSettings).toHaveBeenCalledWith(false, 'a1'))
 
-    const globalToggle = screen.getByLabelText(/Izinkan insight AI untuk seluruh jurnal/)
+    const globalToggle = screen.getByLabelText(/Aktifkan insight AI/)
     await waitFor(() => expect(globalToggle).toBeEnabled())
     fireEvent.click(globalToggle)
     await waitFor(() =>
       expect(journalApi.saveReviewSettings).toHaveBeenCalledWith(false, undefined),
     )
     expect(screen.getByText(/Hanya aturan/)).toBeInTheDocument()
-    expect(screen.getByText(/tidak pernah dikirim/)).toBeInTheDocument()
+    expect(screen.getByText(/tetap privat/)).toBeInTheDocument()
   })
 
   it('does not allow preference writes when settings failed to load', async () => {
     vi.mocked(journalApi.reviewSettings).mockRejectedValue(new Error('Pengaturan tidak tersedia'))
     mount(<JournalAIPreferences accountId="a1" />)
     expect(await screen.findByText('Pengaturan tidak tersedia')).toBeInTheDocument()
-    expect(screen.getByLabelText(/Izinkan insight AI untuk akun aktif/)).toBeDisabled()
+    expect(screen.getByLabelText(/Aktifkan AI untuk jurnal ini/)).toBeDisabled()
   })
 
   it('invalidates cached review through the existing journal mutation key', async () => {

@@ -68,8 +68,11 @@ export default function ManualJournalPage() {
   const [filters, setFilters] = useState<Omit<JournalFilters, 'account_id'>>(EMPTY_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
-  const activeId = accountId ?? accounts.find((a) => !a.archived)?.id ?? accounts[0]?.id ?? ''
-  const active = accounts.find((a) => a.id === activeId)
+  const active =
+    accounts.find((a) => a.id === accountId) ??
+    accounts.find((a) => !a.archived) ??
+    accounts[0]
+  const activeId = active?.id ?? ''
   const queryFilters: JournalFilters = { ...filters, account_id: activeId }
   const validRange = !filters.from || !filters.to || filters.from <= filters.to
   const enabled = !!activeId && validRange
@@ -160,7 +163,7 @@ export default function ManualJournalPage() {
     <div className="space-y-4">
       <PageHeader
         title="Jurnal"
-        description="Catat trade pribadi, pantau kalender P&L, dan evaluasi disiplin · WIB"
+        description="Catatan trade manual & kalender P&L · WIB"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -220,28 +223,28 @@ export default function ManualJournalPage() {
       )}
 
       {accountsQuery.isLoading ? (
-        <div role="status" aria-label="Memuat akun jurnal" className="space-y-3">
+        <div role="status" aria-label="Memuat daftar jurnal" className="space-y-3">
           <Skeleton className="h-20 w-full rounded-xl" />
           <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       ) : !accounts.length && !accountsQuery.isError ? (
         <Card className="px-6 py-12 text-center">
-          <h2 className="text-base font-semibold">Mulai dari akun jurnal pertamamu</h2>
+          <h2 className="text-base font-semibold">Buat jurnal pertamamu</h2>
           <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
-            Atur nama akun, mata uang, dan modal awal. Independen dari koneksi broker.
+            Isi nama jurnal, mata uang, dan modal awal.
           </p>
           <Button className="mt-5" onClick={() => openSettings('accounts')}>
             <Plus className="h-4 w-4" aria-hidden="true" />
-            Buat akun jurnal
+            Tambah jurnal
           </Button>
         </Card>
       ) : accounts.length > 0 ? (
         <>
-          {/* Bar identitas akun ringkas */}
+          {/* Bar identitas jurnal ringkas */}
           <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <Select
-                aria-label="Akun jurnal"
+                aria-label="Pilih jurnal"
                 className="h-9 w-auto min-w-[180px] text-xs font-medium sm:text-sm"
                 value={activeId}
                 onChange={(e) => {
@@ -262,7 +265,7 @@ export default function ManualJournalPage() {
 
             {active?.archived && (
               <span className="text-xs text-muted-foreground">
-                Akun diarsipkan · pulihkan di Pengaturan untuk menambah trade
+                Jurnal diarsipkan · pulihkan di Pengaturan untuk mencatat trade
               </span>
             )}
           </div>
@@ -314,7 +317,7 @@ export default function ManualJournalPage() {
                     aria-label="Cari trade"
                     value={filters.search ?? ''}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                    placeholder="Cari pair, setup, catatan…"
+                    placeholder="Cari pair, setup, catatan"
                     className="h-9 pl-8 text-xs sm:text-sm"
                   />
                 </div>
@@ -394,11 +397,11 @@ export default function ManualJournalPage() {
                   </label>
                   {(
                     [
-                      ['asset', 'Aset'],
+                      ['asset', 'Pair'],
                       ['setup', 'Setup'],
                       ['tag', 'Tag'],
                       ['emotion', 'Emosi'],
-                      ['mistake', 'Kesalahan'],
+                      ['mistake', 'Mistake'],
                     ] as const
                   ).map(([key, label]) => (
                     <label key={key} className="space-y-1 text-xs text-muted-foreground">

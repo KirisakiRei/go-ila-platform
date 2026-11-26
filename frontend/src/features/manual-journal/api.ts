@@ -40,7 +40,7 @@ async function list<T>(
   for (let page = 1; page <= 101; page++) {
     const batch = await request<T[]>(path, { query: { ...query, page, per_page: 100 }, signal })
     if (data.length + batch.length > 10000)
-      throw new Error('Lebih dari 10.000 catatan. Persempit periode atau pilih akun.')
+      throw new Error('Lebih dari 10.000 catatan. Persempit periode atau pilih jurnal.')
     data.push(...batch)
     if (batch.length < 100) return { data }
   }
@@ -79,6 +79,8 @@ export const journalApi = {
       },
     }),
   archiveAccount: (id: string) => request<void>(`${root}/accounts/${id}`, { method: 'DELETE' }),
+  deleteAccount: (id: string) =>
+    request<void>(`${root}/accounts/${id}`, { method: 'DELETE', query: { permanent: 'true' } }),
   entries: async (filters: JournalFilters, signal?: AbortSignal) => {
     const result = await list<JournalTrade>(`${root}/entries`, { ...filters }, signal)
     return { ...result, data: result.data.map(normalizeTrade) }
