@@ -28,14 +28,84 @@ func Recovery(logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-// pesanTerakhir mengambil baris terakhir dari pesan error gabungan.
-//
-// WrapValidation menyusun error lewat errors.Join(ErrBadRequest, errPesan),
-// sehingga teksnya menjadi "invalid request payload\n<pesan>". Yang pantas
-// dibaca pengguna hanya bagian pesannya saja.
-func pesanTerakhir(pesan string) string {
-	if idx := strings.LastIndex(pesan, "\n"); idx >= 0 {
-		return strings.TrimSpace(pesan[idx+1:])
+// sentinelDomain mencantumkan teks bawaan error domain agar tidak bocor sebagai
+// prefix mentah ke layar pengguna (mis. "service temporarily unavailable: ...").
+var sentinelDomain = []string{
+	apperror.ErrNotFound.Error(),
+	apperror.ErrAlreadyExists.Error(),
+	apperror.ErrConflict.Error(),
+	apperror.ErrUnauthorized.Error(),
+	apperror.ErrForbidden.Error(),
+	apperror.ErrBadRequest.Error(),
+	apperror.ErrInternalServer.Error(),
+	apperror.ErrServiceUnavailable.Error(),
+	apperror.ErrTooManyRequests.Error(),
+}
+
+// pesanBawaanKode adalah pesan ramah pengguna saat error hanya berupa sentinel
+// tanpa keterangan tambahan.
+func pesanBawaanKode(code string) string {
+	switch code {
+	case "NOT_FOUND":
+		return "Data tidak ditemukan."
+	case "ALREADY_EXISTS":
+		return "Data sudah terdaftar."
+	case "CONFLICT":
+		return "Permintaan tidak dapat diproses saat ini karena bentrok dengan status sebelumnya."
+	case "UNAUTHORIZED":
+		return "Sesi tidak valid atau telah berakhir. Silakan masuk kembali."
+	case "FORBIDDEN":
+		return "Anda tidak memiliki akses untuk tindakan ini."
+	case "BAD_REQUEST":
+		return "Data yang dikirim tidak valid. Periksa kembali isian Anda."
+	case "TOO_MANY_REQUESTS":
+		return "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi."
+	case "SERVICE_UNAVAILABLE":
+		return "Layanan sedang tidak tersedia sementara. Silakan coba lagi beberapa saat."
+	default:
+		return "Terjadi kesalahan internal. Silakan coba lagi."
+	}
+}
+
+// bersihkanPesan menghapus prefix sentinel domain dan detail teknis berlebih
+// agar yang diterima klien hanyalah pesan yang bisa dipahami pengguna.
+func bersihkanPesan(raw, code string) string {
+	if code == "INTERNAL_SERVER_ERROR" {
+		return pesanBawaanKode(code)
+	}
+
+	pesan := strings.TrimSpace(raw)
+	for _, s := range sentinelDomain {
+		if pesan == s {
+			return pesanBawaanKode(code)
+		}
+		if strings.HasPrefix(pesan, s+": ") {
+			pesan = strings.TrimSpace(strings.TrimPrefix(pesan, s+": "))
+			break
+		}
+		if strings.HasPrefix(pesan, s+"\n") {
+			pesan = strings.TrimSpace(strings.TrimPrefix(pesan, s+"\n"))
+			break
+		}
+	}
+
+	// Untuk errors.Join(ErrServiceUnavailable, errors.New("pesan"), errUpstream),
+	// baris pertama setelah sentinel adalah pesan aman untuk pengguna, sedangkan
+	// baris berikutnya bisa berisi detail jaringan/upstream.
+	if code == "SERVICE_UNAVAILABLE" {
+		if idx := strings.Index(pesan, "\n"); idx >= 0 {
+			pesan = strings.TrimSpace(pesan[:idx])
+		}
+		pesan = strings.TrimSpace(strings.TrimRight(pesan, ":"))
+	} else if idx := strings.LastIndex(pesan, "\n"); idx >= 0 {
+		pesan = strings.TrimSpace(pesan[idx+1:])
+	}
+
+	if code == "BAD_REQUEST" {
+		pesan = httpx.PesanValidasi(pesan)
+	}
+	if pesan == "" {
+		return pesanBawaanKode(code)
 	}
 	return pesan
 }
@@ -65,15 +135,7 @@ func ErrorHandler(logger *slog.Logger) gin.HandlerFunc {
 		}
 
 		status, code := apperror.MapHTTPStatus(err)
-		message := err.Error()
-		if code == "INTERNAL_SERVER_ERROR" {
-			message = "Terjadi kesalahan internal. Silakan coba lagi."
-		} else if code == "BAD_REQUEST" {
-			// WrapValidation menyatukan ErrBadRequest dengan pesan manusia, sehingga
-			// err.Error() berbentuk "invalid request payload\n<pesan>". Klien hanya
-			// perlu pesannya; kalimat pembukanya adalah istilah internal.
-			message = httpx.PesanValidasi(pesanTerakhir(message))
-		}
+		message := bersihkanPesan(err.Error(), code)
 		httpx.Error(c, status, code, message, nil)
 		c.Abort()
 	}

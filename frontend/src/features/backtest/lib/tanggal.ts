@@ -68,3 +68,13 @@ export function hitungBulan(mulaiUnix: number, selesaiUnix: number): number {
   const hari = (selesaiUnix - mulaiUnix) / 86_400
   return Math.max(1, Math.round(hari / 30))
 }
+
+/** formatPanjangData menampilkan rentang data jujur dalam hari atau bulan. */
+export function formatPanjangData(mulaiUnix: number, selesaiUnix: number): string {
+  if (!mulaiUnix || !selesaiUnix || selesaiUnix <= mulaiUnix) return 'data belum cukup'
+  const hari = (selesaiUnix - mulaiUnix) / 86_400
+  if (hari < 25) {
+    return `${Math.max(1, Math.round(hari))} hari data`
+  }
+  return `${Math.max(1, Math.round(hari / 30))} bulan data`
+}

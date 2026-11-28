@@ -10,6 +10,8 @@ package middleware
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"ila/backend/pkg/apperror"
 	"ila/backend/pkg/httpx"
 )
 
@@ -101,5 +104,61 @@ func TestErrorHandlerGalatInternalDisamarkan(t *testing.T) {
 	pesan := pesanBalasan(t, w.Body.Bytes())
 	if strings.Contains(pesan, "unexpected") {
 		t.Fatalf("detail internal bocor: %q", pesan)
+	}
+}
+
+// Prefix sentinel berbahasa Inggris tidak boleh bocor ke pesan error untuk pengguna.
+func TestErrorHandlerMenghapusPrefixSentinelDomain(t *testing.T) {
+	kasus := []struct {
+		nama   string
+		err    error
+		status int
+		ingin  string
+	}{
+		{
+			nama:   "service unavailable dengan keterangan",
+			err:    fmt.Errorf("%w: data historis untuk XAUUSD belum tersedia di feed FOREXCOM", apperror.ErrServiceUnavailable),
+			status: http.StatusServiceUnavailable,
+			ingin:  "data historis untuk XAUUSD belum tersedia di feed FOREXCOM",
+		},
+		{
+			nama:   "service unavailable joined dengan galat upstream",
+			err:    errors.Join(apperror.ErrServiceUnavailable, errors.New("gateway pembayaran sedang tidak tersedia"), errors.New("dial tcp 10.0.0.1:443: i/o timeout")),
+			status: http.StatusServiceUnavailable,
+			ingin:  "gateway pembayaran sedang tidak tersedia",
+		},
+		{
+			nama:   "bad request memakai fmt.Errorf",
+			err:    fmt.Errorf("%w: tanggal akhir harus setelah tanggal mulai", apperror.ErrBadRequest),
+			status: http.StatusBadRequest,
+			ingin:  "tanggal akhir harus setelah tanggal mulai",
+		},
+		{
+			nama:   "too many requests dengan keterangan",
+			err:    fmt.Errorf("%w: jatah backtest hari ini sudah habis", apperror.ErrTooManyRequests),
+			status: http.StatusTooManyRequests,
+			ingin:  "jatah backtest hari ini sudah habis",
+		},
+		{
+			nama:   "sentinel polos memakai pesan default bahasa Indonesia",
+			err:    apperror.ErrServiceUnavailable,
+			status: http.StatusServiceUnavailable,
+			ingin:  "Layanan sedang tidak tersedia sementara. Silakan coba lagi beberapa saat.",
+		},
+	}
+
+	for _, tc := range kasus {
+		t.Run(tc.nama, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			routerGalat(tc.err).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/uji", nil))
+
+			if w.Code != tc.status {
+				t.Fatalf("status = %d, ingin %d", w.Code, tc.status)
+			}
+			pesan := pesanBalasan(t, w.Body.Bytes())
+			if pesan != tc.ingin {
+				t.Fatalf("pesan = %q, ingin %q", pesan, tc.ingin)
+			}
+		})
 	}
 }

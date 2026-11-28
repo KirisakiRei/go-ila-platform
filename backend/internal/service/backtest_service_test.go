@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"ila/backend/internal/market"
 	"ila/backend/internal/model"
 )
 
@@ -170,5 +173,95 @@ func TestRingkasTradeMenandaiChartBersih(t *testing.T) {
 	bersih := ringkasTrade(trade)
 	if bersih.ChartTersedia {
 		t.Fatal("trade yang candle-nya dibersihkan tidak boleh menawarkan chart")
+	}
+}
+
+type providerCandlePalsu struct {
+	data map[string][]market.Candle
+	err  map[string]error
+}
+
+func (p providerCandlePalsu) FetchCandles(_ context.Context, _, _, timeframe string, _ int) ([]market.Candle, error) {
+	if e := p.err[timeframe]; e != nil {
+		return nil, e
+	}
+	return p.data[timeframe], nil
+}
+
+// TestCakupanBacktestTetapSahSaatWeeklyLebihTuaDariM1 mereproduksi bug produksi
+// saat waktu buka lilin mingguan (W, Minggu 22 Nov) lebih tua daripada lilin M1
+// terlama (Selasa 24 Nov). Sebelumnya irisan global 7 timeframe langsung 503.
+func TestCakupanBacktestTetapSahSaatWeeklyLebihTuaDariM1(t *testing.T) {
+	akhirJumat := time.Date(2026, 11, 27, 19, 45, 0, 0, time.UTC).Unix()
+	mingguBuka := time.Date(2026, 11, 22, 23, 0, 0, 0, time.UTC).Unix()
+	selasaM1 := time.Date(2026, 11, 24, 2, 56, 0, 0, time.UTC).Unix()
+
+	provider := providerCandlePalsu{
+		data: map[string][]market.Candle{
+			"W":   {{Time: time.Date(2020, 1, 5, 0, 0, 0, 0, time.UTC).Unix()}, {Time: mingguBuka}},
+			"D1":  {{Time: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC).Unix()}, {Time: time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC).Unix()}},
+			"H4":  {{Time: time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC).Unix()}, {Time: akhirJumat}},
+			"H1":  {{Time: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix()}, {Time: akhirJumat}},
+			"M15": {{Time: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC).Unix()}, {Time: akhirJumat}},
+			"M5":  {{Time: time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC).Unix()}, {Time: akhirJumat}},
+			"M1":  {{Time: selasaM1}, {Time: akhirJumat}},
+		},
+	}
+
+	svc := NewBacktestCoverageService(provider)
+	cakupan, err := svc.Ambil(context.Background(), "XAUUSD", "FOREXCOM", true)
+	if err != nil {
+		t.Fatalf("cakupan seharusnya berhasil, dapat galat: %v", err)
+	}
+
+	for _, pasangan := range DaftarPasanganBacktest {
+		r := cakupan.RentangCakupan(pasangan)
+		if r.Mulai == 0 || r.Selesai <= r.Mulai {
+			t.Fatalf("pasangan %s->%s seharusnya tersedia, dapat %+v", pasangan.HTF, pasangan.LTF, r)
+		}
+	}
+
+	// Urutan abjad Rentang menempatkan H4 sebelum W dan M1 sebelum M15;
+	// RentangCakupan tidak boleh menimpa batas mulai LTF dengan batas HTF.
+	wh4 := cakupan.RentangCakupan(PasanganTimeframeBacktest{HTF: "W", LTF: "H4"})
+	if wh4.Mulai != time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC).Unix() || wh4.Selesai != akhirJumat {
+		t.Fatalf("rentang W->H4 meleset: %+v", wh4)
+	}
+	m15m1 := cakupan.RentangCakupan(PasanganTimeframeBacktest{HTF: "M15", LTF: "M1"})
+	if m15m1.Mulai != selasaM1 || m15m1.Selesai != akhirJumat {
+		t.Fatalf("rentang M15->M1 meleset: %+v", m15m1)
+	}
+}
+
+// TestCakupanBacktestSebagianTimeframeGagalTetapBerjalan memastikan gagalnya satu
+// timeframe (mis. M1) tidak mematikan pasangan timeframe lain yang datanya lengkap.
+func TestCakupanBacktestSebagianTimeframeGagalTetapBerjalan(t *testing.T) {
+	akhir := time.Date(2026, 11, 27, 19, 0, 0, 0, time.UTC).Unix()
+	provider := providerCandlePalsu{
+		data: map[string][]market.Candle{
+			"D1": {{Time: time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC).Unix()}, {Time: time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC).Unix()}},
+			"H1": {{Time: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix()}, {Time: akhir}},
+		},
+		err: map[string]error{
+			"W":   errors.New("timeout"),
+			"H4":  errors.New("timeout"),
+			"M15": errors.New("timeout"),
+			"M5":  errors.New("timeout"),
+			"M1":  errors.New("timeout"),
+		},
+	}
+
+	svc := NewBacktestCoverageService(provider)
+	cakupan, err := svc.Ambil(context.Background(), "XAUUSD", "FOREXCOM", true)
+	if err != nil {
+		t.Fatalf("D1->H1 tersedia, seharusnya tidak gagal: %v", err)
+	}
+	d1h1 := cakupan.RentangCakupan(PasanganTimeframeBacktest{HTF: "D1", LTF: "H1"})
+	if d1h1.Mulai == 0 || d1h1.Selesai <= d1h1.Mulai {
+		t.Fatalf("D1->H1 seharusnya tersedia: %+v", d1h1)
+	}
+	m15m1 := cakupan.RentangCakupan(PasanganTimeframeBacktest{HTF: "M15", LTF: "M1"})
+	if m15m1.Mulai != 0 || m15m1.Selesai != 0 {
+		t.Fatalf("M15->M1 seharusnya kosong: %+v", m15m1)
 	}
 }

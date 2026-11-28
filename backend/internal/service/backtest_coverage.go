@@ -98,25 +98,61 @@ type CakupanBacktest struct {
 	DiperiksaPada time.Time `json:"diperiksa_pada"`
 }
 
+// durasiTimeframe mengembalikan panjang satu lilin dalam detik.
+//
+// Timestamp candle TradingView menandai waktu buka (open), bukan waktu tutup.
+// Candle mingguan (W) yang dibuka Minggu malam tetap valid mencakup seluruh
+// minggu berjalan sampai candle LTF terakhir.
+func durasiTimeframe(tf string) int64 {
+	switch strings.ToUpper(strings.TrimSpace(tf)) {
+	case "W", "1W", "W1":
+		return 7 * 86400
+	case "D1", "1D", "D":
+		return 86400
+	case "H4", "4H":
+		return 4 * 3600
+	case "H1", "1H":
+		return 3600
+	case "M15", "15M":
+		return 15 * 60
+	case "M5", "5M":
+		return 5 * 60
+	case "M1", "1M":
+		return 60
+	default:
+		return 0
+	}
+}
+
 // RentangCakupan mengembalikan irisan cakupan untuk satu pasangan timeframe.
 func (c CakupanBacktest) RentangCakupan(pasangan PasanganTimeframeBacktest) CakupanTimeframe {
-	var hasil CakupanTimeframe
+	var htf, ltf CakupanTimeframe
+	var adaHTF, adaLTF bool
 	for _, satu := range c.Rentang {
 		switch satu.Timeframe {
 		case pasangan.HTF:
-			hasil.Mulai, hasil.Selesai = satu.Mulai, satu.Selesai
+			htf, adaHTF = satu, true
 		case pasangan.LTF:
-			// Timeframe pendek selalu lebih sempit dalam kasus ILA 2.0, tetapi
-			// irisan tetap dihitung supaya aturan ini tidak bergantung urutan.
-			if satu.Mulai > hasil.Mulai {
-				hasil.Mulai = satu.Mulai
-			}
-			if hasil.Selesai == 0 || (satu.Selesai > 0 && satu.Selesai < hasil.Selesai) {
-				hasil.Selesai = satu.Selesai
-			}
+			ltf, adaLTF = satu, true
 		}
 	}
-	return hasil
+	if !adaHTF || !adaLTF || htf.Mulai == 0 || htf.Selesai == 0 || ltf.Mulai == 0 || ltf.Selesai == 0 {
+		return CakupanTimeframe{}
+	}
+
+	mulai := htf.Mulai
+	if ltf.Mulai > mulai {
+		mulai = ltf.Mulai
+	}
+	htfAkhir := htf.Selesai + durasiTimeframe(htf.Timeframe)
+	selesai := ltf.Selesai
+	if htfAkhir < selesai {
+		selesai = htfAkhir
+	}
+	if mulai >= selesai {
+		return CakupanTimeframe{}
+	}
+	return CakupanTimeframe{Mulai: mulai, Selesai: selesai}
 }
 
 // ProviderCandleBacktest adalah kebutuhan layanan cakupan terhadap sumber data.
@@ -247,10 +283,28 @@ func (s *BacktestCoverageService) bacaDariFeed(ctx context.Context, symbol, feed
 		return hasil.Rentang[i].Timeframe < hasil.Rentang[j].Timeframe
 	})
 
-	hasil.Mulai, hasil.Selesai = irisanCakupan(hasil.Rentang)
-	if hasil.Mulai == 0 || hasil.Selesai == 0 || hasil.Mulai >= hasil.Selesai {
+	// Validasi dilakukan per pasangan timeframe, bukan irisan seluruh 7 timeframe
+	// sekaligus: waktu buka lilin mingguan (W) bisa lebih tua daripada lilin M1
+	// paling awal, padahal semua pasangan W->H4 sampai M15->M1 tetap sah.
+	var mulaiGabungan, selesaiGabungan int64
+	adaPasangan := false
+	for _, pasangan := range DaftarPasanganBacktest {
+		r := hasil.RentangCakupan(pasangan)
+		if r.Mulai == 0 || r.Selesai <= r.Mulai {
+			continue
+		}
+		adaPasangan = true
+		if mulaiGabungan == 0 || r.Mulai < mulaiGabungan {
+			mulaiGabungan = r.Mulai
+		}
+		if r.Selesai > selesaiGabungan {
+			selesaiGabungan = r.Selesai
+		}
+	}
+	if !adaPasangan {
 		return CakupanBacktest{}, fmt.Errorf("%w: data historis untuk %s belum tersedia di feed %s", apperror.ErrServiceUnavailable, symbol, feed)
 	}
+	hasil.Mulai, hasil.Selesai = mulaiGabungan, selesaiGabungan
 	return hasil, nil
 }
 

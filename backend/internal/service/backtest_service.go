@@ -30,10 +30,11 @@ const (
 	// pasangan timeframe pendek, yang bisa berarti puluhan ribu candle LTF.
 	BatasRentangHariMaks = 190
 
-	// KuotaHarian per tier. Admin tidak dibatasi.
-	KuotaHarianFree  = 1
-	KuotaHarianBasic = 3
-	KuotaHarianPlus  = 20
+	// KuotaHarian per tier (0 = tanpa batas harian).
+	// shortcut: batas harian dinonaktifkan selama fase invite-only; isi ulang angka per tier saat buka publik.
+	KuotaHarianFree  = 0
+	KuotaHarianBasic = 0
+	KuotaHarianPlus  = 0
 
 	// BatasUmurHariFree, Basic, Plus membatasi panjang rentang yang boleh
 	// dipilih. Semakin pendek timeframe, semakin pendek datanya di feed, jadi
@@ -211,7 +212,7 @@ func (s *BacktestService) Kuota(ctx context.Context, userID string) (dto.Backtes
 		RentangMaksRb: hak.BatasBulan,
 	}
 
-	if hak.Admin {
+	if hak.Admin || hak.KuotaHarian <= 0 {
 		balasan.Sisa = -1 // negatif berarti tanpa batas
 		balasan.BisaJalankan = true
 		return balasan, nil
@@ -323,16 +324,25 @@ func (s *BacktestService) Buat(ctx context.Context, userID string, req dto.Backt
 		return dto.BacktestRunResponse{}, fmt.Errorf("%w: data %s untuk %s belum tersedia", apperror.ErrServiceUnavailable, pasangan.LTF, symbol)
 	}
 	if dari.Unix() < rentang.Mulai {
-		return dto.BacktestRunResponse{}, fmt.Errorf("%w: data %s dimulai %s, tanggal mulai terlalu awal",
-			apperror.ErrBadRequest, pasangan.LTF,
-			time.Unix(rentang.Mulai, 0).In(s.zonaHari).Format("2 Jan 2006"))
+		mulaiRentang := time.Unix(rentang.Mulai, 0).UTC()
+		// Input tanggal dari browser selalu berada di 00:00 waktu lokal. Bila
+		// pengguna memilih hari pertama yang sama dengan awal candle, jepit ke
+		// timestamp candle pertama alih-alih menolak permintaan.
+		if dari.In(s.zonaHari).Format("2006-01-02") == mulaiRentang.In(s.zonaHari).Format("2006-01-02") {
+			dari = mulaiRentang
+		} else {
+			return dto.BacktestRunResponse{}, fmt.Errorf("%w: data %s dimulai %s, tanggal mulai terlalu awal",
+				apperror.ErrBadRequest, pasangan.LTF,
+				mulaiRentang.In(s.zonaHari).Format("2 Jan 2006"))
+		}
 	}
 	if sampai.Unix() > rentang.Selesai {
 		sampai = time.Unix(rentang.Selesai, 0).UTC()
 	}
 
 	tanggal := time.Now().In(s.zonaHari).Format("2006-01-02")
-	if !hak.Admin {
+	pakaiKuota := !hak.Admin && hak.KuotaHarian > 0
+	if pakaiKuota {
 		if err := s.runs.KlaimKuota(ctx, userID, tanggal, hak.KuotaHarian); err != nil {
 			if err == repository.ErrKuotaHabis {
 				return dto.BacktestRunResponse{}, fmt.Errorf("%w: jatah backtest hari ini sudah habis", apperror.ErrTooManyRequests)
@@ -358,7 +368,7 @@ func (s *BacktestService) Buat(ctx context.Context, userID string, req dto.Backt
 		// Job tidak pernah lahir, jadi jatah yang terlanjur dipotong harus
 		// dikembalikan. Kegagalan pengembalian dicatat, tidak menggagalkan
 		// balasan: pengguna lebih perlu tahu job-nya tidak dibuat.
-		if !hak.Admin {
+		if pakaiKuota {
 			if kembalikanErr := s.runs.KembalikanKuota(ctx, userID, tanggal); kembalikanErr != nil {
 				s.logger.Error("gagal mengembalikan kuota backtest", "error", kembalikanErr.Error(), "user", userID)
 			}

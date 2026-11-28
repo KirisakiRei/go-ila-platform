@@ -15,16 +15,18 @@
  * kebenaran yang bisa berselisih atau api state-di-dalam-effect.
  */
 import { useId, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Play, RotateCw } from 'lucide-react'
 import { Button, Input, Label, Select, Skeleton } from '@/components/ui'
-import { useBacktestCoverage, useBacktestQuota, useCreateBacktest } from '@/lib/queries'
+import { backtestApi } from '@/lib/api'
+import { queryKeys, useBacktestCoverage, useBacktestQuota, useCreateBacktest } from '@/lib/queries'
 import { ApiError } from '@/lib/api-error'
 import type { BacktestPairOption } from '@/types/api'
 import {
   dariTanggalInput,
+  formatPanjangData,
   formatTanggalInput,
   formatTanggalPanjang,
-  hitungBulan,
 } from '../lib/tanggal'
 
 type Props = {
@@ -44,7 +46,8 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
   const idEquity = useId()
   const idRisk = useId()
 
-  const { data: cakupan, isLoading, isFetching, error, refetch } = useBacktestCoverage(symbolTerpilih)
+  const queryClient = useQueryClient()
+  const { data: cakupan, isLoading, isFetching, error } = useBacktestCoverage(symbolTerpilih)
   const { data: kuota } = useBacktestQuota()
   const buat = useCreateBacktest()
 
@@ -53,6 +56,22 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
   const [equity, setEquity] = useState('10000')
   const [risk, setRisk] = useState('0.5')
   const [pesan, setPesan] = useState<string | null>(null)
+  const [memeriksaUlang, setMemeriksaUlang] = useState(false)
+  const [galatPeriksaUlang, setGalatPeriksaUlang] = useState<string | null>(null)
+
+  const periksaUlang = async () => {
+    if (!symbolTerpilih || memeriksaUlang) return
+    setMemeriksaUlang(true)
+    setGalatPeriksaUlang(null)
+    try {
+      const segar = await backtestApi.coverage(symbolTerpilih, true)
+      queryClient.setQueryData(queryKeys.backtestCoverage(symbolTerpilih), segar)
+    } catch (galat) {
+      setGalatPeriksaUlang(formatPesanGalatCakupan(galat))
+    } finally {
+      setMemeriksaUlang(false)
+    }
+  }
 
   const opsi = useMemo(() => cakupan?.pasangan ?? [], [cakupan])
 
@@ -131,7 +150,10 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
           <Select
             id={idSymbol}
             value={symbolTerpilih}
-            onChange={(e) => onPilihSymbol(e.target.value)}
+            onChange={(e) => {
+              setGalatPeriksaUlang(null)
+              onPilihSymbol(e.target.value)
+            }}
             disabled={symbols.length === 0}
           >
             {symbols.length === 0 && <option value="">Belum ada pair di katalog</option>}
@@ -179,7 +201,7 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <Label htmlFor={idDari}>Tanggal mulai</Label>
           <Input
             id={idDari}
@@ -189,9 +211,10 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
             max={rentangAktif.sampai || undefined}
             onChange={(e) => setRentangDiminta({ ...rentangAktif, dari: e.target.value })}
             disabled={!pasanganAktif}
+            className="min-w-0 max-w-full appearance-none"
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <Label htmlFor={idSampai}>Tanggal akhir</Label>
           <Input
             id={idSampai}
@@ -201,6 +224,7 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
             max={pasanganAktif ? formatTanggalInput(new Date(pasanganAktif.selesai * 1000)) : undefined}
             onChange={(e) => setRentangDiminta({ ...rentangAktif, sampai: e.target.value })}
             disabled={!pasanganAktif}
+            className="min-w-0 max-w-full appearance-none"
           />
         </div>
       </div>
@@ -240,20 +264,30 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
         dan paling banyak dua kerugian. Target laba ditentukan metode, bukan diatur di sini.
       </p>
 
-      {error && (
-        <div className="flex items-start gap-2 border border-border bg-secondary/40 p-3 text-[13px]">
+      {(galatPeriksaUlang || error) && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-[13px] text-destructive"
+        >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Cakupan data gagal dibaca. {error instanceof ApiError ? error.message : ''}</span>
+          <div className="min-w-0 space-y-0.5">
+            <p className="font-medium leading-snug">
+              {galatPeriksaUlang ?? formatPesanGalatCakupan(error)}
+            </p>
+            <p className="text-[12px] text-muted-foreground">
+              Coba klik &ldquo;Periksa ulang data&rdquo; atau pilih pair lain.
+            </p>
+          </div>
         </div>
       )}
 
       {pesan && (
         <div
           role="alert"
-          className="flex items-start gap-2 border border-destructive/40 bg-destructive/5 p-3 text-[13px] text-destructive"
+          className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-[13px] text-destructive"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{pesan}</span>
+          <span>{kapitalAwal(pesan)}</span>
         </div>
       )}
 
@@ -277,11 +311,11 @@ export function BacktestForm({ symbols, symbolTerpilih, onPilihSymbol, onDibuat 
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => void refetch()}
-            disabled={isFetching || !symbolTerpilih}
+            onClick={() => void periksaUlang()}
+            disabled={isFetching || memeriksaUlang || !symbolTerpilih}
           >
             <RotateCw
-              className={isFetching ? 'h-4 w-4 animate-spin' : 'h-4 w-4'}
+              className={isFetching || memeriksaUlang ? 'h-4 w-4 animate-spin' : 'h-4 w-4'}
               aria-hidden="true"
             />
             Periksa ulang data
@@ -340,8 +374,24 @@ function TombolPasangan({
         {opsi.htf} ke {opsi.ltf}
       </span>
       <span className={['text-[11px]', aktif ? 'text-background/70' : 'text-muted-foreground'].join(' ')}>
-        {opsi.tersedia ? `${hitungBulan(opsi.mulai, opsi.selesai)} bulan data` : 'data belum cukup'}
+        {opsi.tersedia ? formatPanjangData(opsi.mulai, opsi.selesai) : 'data belum cukup'}
       </span>
     </button>
   )
+}
+
+function kapitalAwal(teks: string): string {
+  const bersih = teks.trim()
+  if (!bersih) return ''
+  return bersih.charAt(0).toUpperCase() + bersih.slice(1)
+}
+
+function formatPesanGalatCakupan(galat: unknown): string {
+  if (galat instanceof ApiError && galat.message.trim()) {
+    return kapitalAwal(galat.message)
+  }
+  if (galat instanceof Error && /timeout|network|fetch/i.test(galat.message)) {
+    return 'Koneksi ke server data terputus atau terlalu lama merespons.'
+  }
+  return 'Data historis untuk pair ini gagal dimuat sementara.'
 }
